@@ -2,18 +2,22 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\TokenAuthController;
+use App\Http\Controllers\ProfileController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
-|
-*/
+// TOKEN-BASED (Sanctum Bearer)
+Route::post('/auth/token/login', [TokenAuthController::class, 'loginAndIssue'])
+    ->middleware('throttle:login');
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+Route::prefix('auth')->group(function () {
+    Route::middleware(['auth:sanctum', 'auto.rotate.sanctum'])->group(function () {
+        Route::post('/token/issue',   [TokenAuthController::class, 'issue']);   // issue PAT cho user hien tai
+        Route::post('/token/revoke',  [TokenAuthController::class, 'revoke']);  // revoke current hoac theo id
+        Route::post('/token/rotate',  [TokenAuthController::class, 'rotate']);  // xoay token khi can
+        Route::get('/token/ttl',      [TokenAuthController::class, 'ttl']);     // xem minutes_left
+        Route::get('/me', [ProfileController::class, 'me']);
+    });
 });
+
+// VA- demo route bao ve theo role/permission
+Route::middleware(['auth:sanctum', 'role:ADMIN'])->get('/admin/ping', fn() => ['ok' => true]);
