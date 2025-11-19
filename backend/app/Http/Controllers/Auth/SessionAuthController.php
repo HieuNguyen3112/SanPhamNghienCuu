@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class SessionAuthController extends Controller
 {
@@ -16,7 +18,6 @@ class SessionAuthController extends Controller
      */
     public function login(Request $request)
     {
-        // Validate inline so IDEs that cannot resolve FormRequest stay happy.
         $data = $request->validate([
             'email'             => ['required', 'email'],
             'password'          => ['required', 'string'],
@@ -24,6 +25,7 @@ class SessionAuthController extends Controller
             'token_name'        => ['sometimes', 'string', 'max:100'],
             'token_abilities'   => ['sometimes', 'array'],
             'token_abilities.*' => ['string'],
+            'single_device'     => ['sometimes', 'boolean'],
         ]);
 
         if (! Auth::guard('web')->attempt(
@@ -47,14 +49,27 @@ class SessionAuthController extends Controller
 
         $request->session()->regenerate();
 
+        $tokenName = $data['token_name'] ?? 'session-token';
+
+        if (! empty($data['single_device'])) {
+            $user->tokens()->where('name', $tokenName)->delete();
+        }
+
         $token = $user->createToken(
-            $data['token_name'] ?? 'session-token',
+            $tokenName,
             $data['token_abilities'] ?? ['*']
         );
+        $request->session()->put('session_token_id', $token->accessToken->id ?? null);
+
+        Log::info('login.success', [
+            'user_id' => $user->id,
+            'ip' => $request->ip(),
+            'ua' => $request->userAgent(),
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Đăng nhập thành công',
+            'message' => 'Dang nhap thanh cong',
             'token'   => $token->plainTextToken,
             'user'    => [
                 'id'    => $user->id,
@@ -70,9 +85,39 @@ class SessionAuthController extends Controller
      */
     public function logout(Request $request)
     {
+        $user = $request->user();
+        $tokenIds = [];
+
+        if ($sessionTokenId = $request->session()->pull('session_token_id')) {
+            $tokenIds[] = $sessionTokenId;
+        }
+
+        if ($token = $request->bearerToken()) {
+            $pat = PersonalAccessToken::findToken($token);
+            if (
+                $pat &&
+                $user &&
+                $pat->tokenable_type === get_class($user) &&
+                (int) $pat->tokenable_id === (int) $user->getKey()
+            ) {
+                $tokenIds[] = $pat->id;
+            }
+        }
+
+        if (! empty($tokenIds)) {
+            PersonalAccessToken::whereIn('id', $tokenIds)->delete();
+        }
+
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        Log::info('logout.success', [
+            'user_id' => $user?->id,
+            'ip' => $request->ip(),
+            'ua' => $request->userAgent(),
+            'revoked_token_ids' => $tokenIds,
+        ]);
 
         return response()->json(['message' => 'ok'], Response::HTTP_OK);
     }
