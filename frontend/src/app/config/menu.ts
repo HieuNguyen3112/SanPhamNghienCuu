@@ -1,59 +1,40 @@
 // src/app/config/menu.ts
+import type { UserRole } from "@/app/stores/userStore";
+import type { MenuItem } from "@/app/config/menu.types";
 
-// Route name dùng trong app
-export type AppRouteName =
-  | "works-my-declarations"
-  | "profile.scientific"
-  | "profile.contact"
-  | "profile.workHistory"
-  | "profile.education"
-  | "profile.researchAreas"
-  | "profile.academicRank"
-  | "profile.languages";
-// … sau này thêm route thì mở rộng union này
+import { profileMenuGroup, profileMenuItems } from "@/features/profile/menu";
 
-export interface MenuItem {
-  id: string;
-  label: string;
-  routeName?: AppRouteName; // header thì không có
-}
+import {
+  declarationsMenuGroup,
+  declarationMenuItems,
+} from "@/features/declarations/menu";
+import { hoursMenuGroup, hoursMenuItems } from "@/features/hours/menu";
 
-// Cấu hình toàn bộ menu (chung cho mọi role)
+import { searchMenuGroup, searchMenuItems } from "@/features/search/menu";
+// Ghép toàn bộ menu (chung cho mọi role)
 const allMenuItems: MenuItem[] = [
-  { id: "grp-profile", label: "Hồ sơ cá nhân" },
-  {
-    id: "profile-scientific",
-    label: "Hồ sơ khoa học",
-    routeName: "profile.scientific",
-  },
-  {
-    id: "profile-contact",
-    label: "Thông tin liên hệ",
-    routeName: "profile.contact",
-  },
-  {
-    id: "profile-work-history",
-    label: "Quá trình công tác",
-    routeName: "profile.workHistory",
-  },
-  {
-    id: "profile-education",
-    label: "Quá trình đào tạo",
-    routeName: "profile.education",
-  },
-  {
-    id: "profile-academic-rank",
-    label: "Học vị – chức danh khoa học",
-    routeName: "profile.academicRank",
-  },
-  {
-    id: "profile-languages",
-    label: "Trình độ ngoại ngữ",
-    routeName: "profile.languages",
-  },
+  // quan ly thong tin ca nhan
+  profileMenuGroup,
+  ...profileMenuItems,
+  // quan ly cong trinh khoa hoc
+  declarationsMenuGroup,
+  ...declarationMenuItems,
+  // quan ly gio khoa hoc
+  hoursMenuGroup,
+  ...hoursMenuItems,
+
+  // tra cuu cong trinh
+  searchMenuGroup,
+  ...searchMenuItems,
 ];
 
-// Hiện tại chưa dùng role → chỉ trả hết
-export function buildMenuForRole(): MenuItem[] {
-  return allMenuItems;
+export function buildMenuForRole(role?: UserRole | null): MenuItem[] {
+  if (!role) return allMenuItems;
+  return allMenuItems.filter((item) => {
+    if (!item.roles) return true; // không set roles => ai cũng thấy
+    return item.roles.includes(role);
+  });
 }
+
+// optional: nếu chỗ khác cần full menu
+export { allMenuItems };

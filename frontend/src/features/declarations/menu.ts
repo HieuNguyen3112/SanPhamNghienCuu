@@ -1,0 +1,41 @@
+// src/features/declarations/menu.ts
+import type { MenuItem } from "@/app/config/menu.types";
+
+export const declarationsMenuGroup: MenuItem = {
+  id: "grp-declarations",
+  label: "Quản lý công trình",
+  roles: ["LECTURER"],
+};
+
+export const declarationMenuItems: MenuItem[] = [
+  {
+    id: "works-my-declarations",
+    label: "Công trình của tôi",
+    routeName: "works-my-declarations",
+    roles: ["LECTURER"],
+  },
+  {
+    id: "declarations-articles",
+    label: "Bài báo khoa học",
+    routeName: "declarations.articles",
+    roles: ["LECTURER"],
+  },
+  {
+    id: "declarations-projects",
+    label: "Đề tài NCKH",
+    routeName: "declarations.projects",
+    roles: ["LECTURER"],
+  },
+  {
+    id: "declarations-books",
+    label: "Sách / giáo trình",
+    routeName: "declarations.books",
+    roles: ["LECTURER"],
+  },
+  {
+    id: "declarations-others",
+    label: "Công trình khác",
+    routeName: "declarations.others",
+    roles: ["LECTURER"],
+  },
+];

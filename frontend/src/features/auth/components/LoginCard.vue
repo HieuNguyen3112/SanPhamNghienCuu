@@ -35,7 +35,21 @@
         required
         inputClass="bg-blue-50 border border-gray-300 rounded py-3"
       />
-
+      <!-- DROPDOWN CHỌN VAI TRÒ -->
+      <div>
+        <label class="block mb-1 text-sm font-medium text-slate-700">
+          Vai trò
+        </label>
+        <select
+          v-model="roleModel"
+          class="w-full rounded border px-3 py-2 text-sm"
+        >
+          <option value="LECTURER">Giảng viên</option>
+          <option value="DEPARTMENT_BOARD">Ban chủ nhiệm khoa</option>
+          <option value="SCIENCE_OFFICE">Phòng quản lý khoa học</option>
+        </select>
+        <p v-if="roleError" class="text-red-600 text-xs">{{ roleError }}</p>
+      </div>
       <!-- Login button -->
       <div class="pt-2">
         <BaseButton
@@ -59,7 +73,7 @@
         type="button"
         class="text-sm text-gray-600 hover:underline"
         aria-label="Quên mật khẩu?"
-        @click="onForgotPassword"
+        @click="emit('forgot-password')"
       >
         Quên mật khẩu?
       </button>
@@ -69,46 +83,50 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { BaseInput, BaseButton } from "../../../shared/components/form/index";
+import { BaseInput, BaseButton } from "@/shared/components/form";
 
 interface LoginCardProps {
   email: string;
   password: string;
+  role: string;
   emailError?: string | null;
   passwordError?: string | null;
+  roleError?: string | null;
   submitting?: boolean;
 }
 
 const props = withDefaults(defineProps<LoginCardProps>(), {
   emailError: null,
   passwordError: null,
+  roleError: null,
   submitting: false,
 });
 
 const emit = defineEmits<{
   (e: "update:email", value: string): void;
   (e: "update:password", value: string): void;
+  (e: "update:role", value: string): void;
   (e: "submit"): void;
-  (e: "google-sign-in"): void;
   (e: "forgot-password"): void;
-  (e: "create-account"): void;
 }>();
 
-const emailModel = computed<string>({
+const emailModel = computed({
   get: () => props.email,
-  set: (value: string) => emit("update:email", value),
+  set: (v) => emit("update:email", v),
 });
 
-const passwordModel = computed<string>({
+const passwordModel = computed({
   get: () => props.password,
-  set: (value: string) => emit("update:password", value),
+  set: (v) => emit("update:password", v),
 });
 
-const onSubmit = (): void => {
-  emit("submit");
-};
+const roleModel = computed({
+  get: () => props.role,
+  set: (v) => emit("update:role", v),
+});
 
-const onForgotPassword = (): void => {
-  emit("forgot-password");
+// 👉 HÀNH VI ĐĂNG NHẬP: emit sự kiện submit cho LoginPage xử lý
+const onSubmit = () => {
+  emit("submit");
 };
 </script>

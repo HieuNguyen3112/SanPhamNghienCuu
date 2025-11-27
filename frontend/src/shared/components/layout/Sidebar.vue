@@ -12,39 +12,34 @@
         <div class="flex h-16 w-full items-center justify-center">
           <!-- Thay logoSrc bằng import logo thật của bạn -->
           <img
-            v-if="logoSrc"
-            :src="logoSrc"
+            src="/logo.png"
             alt="University logo"
             class="max-h-20 w-auto object-contain"
           />
-          <div
-            v-else
-            class="flex h-14 w-full items-center justify-center rounded bg-slate-100 text-xs font-semibold tracking-wide text-slate-500"
-          >
-            LOGO TRƯỜNG
-          </div>
         </div>
       </div>
     </div>
 
     <!-- THÔNG TIN GIẢNG VIÊN -->
     <div class="border-b border-slate-200 bg-slate-50 px-4 py-4">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-6">
+        <!-- Avatar chữ cái -->
         <div
-          class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-300 text-lg font-semibold text-slate-700"
+          class="flex h-14 w-14 items-center justify-center rounded-full bg-slate-300 text-lg font-semibold text-slate-700"
         >
           <span>{{ teacherInitials }}</span>
         </div>
 
-        <div class="flex items-center flex-col">
+        <!-- Thông tin -->
+        <div class="flex flex-col items-center">
           <span class="text-sm font-semibold text-slate-900">
-            {{ teacher.academicTitle + teacher.name }}
+            {{ teacher.name }}
           </span>
-          <span class="text-sm text-slate-500">
+          <span class="text-xs text-slate-500">
             {{ teacher.code }}
           </span>
-          <span class="text-sm text-slate-500">
-            {{ teacher.role }}
+          <span class="text-xs text-slate-500">
+            {{ roleName }}
           </span>
         </div>
       </div>
@@ -76,9 +71,8 @@
             <!-- Icon placeholder (có thể thay bằng icon thật) -->
             <span
               class="flex h-4 w-4 items-center justify-center rounded-sm bg-slate-300 text-[10px] text-slate-700"
-            >
-              •
-            </span>
+            ></span>
+
             <span>{{ item.label }}</span>
           </RouterLink>
         </template>
@@ -93,55 +87,63 @@
     </div>
   </aside>
 </template>
-
 <script setup lang="ts">
-import { computed, toRefs } from "vue";
+import { computed } from "vue";
 import { useRoute, RouterLink } from "vue-router";
+import { useUserStore } from "@/app/stores/userStore";
+import { buildMenuForRole } from "@/app/config/menu";
 
-interface Teacher {
-  name: string;
-  role: string;
-  code: string;
-  academicTitle: string;
-}
+const props = defineProps<{
+  isOpen: boolean;
+}>();
 
-interface MenuItem {
-  id: string;
-  label: string;
-  routeName?: string;
-}
-
-const props = withDefaults(
-  defineProps<{
-    teacher: Teacher;
-    menuItems: MenuItem[];
-    isOpen?: boolean;
-  }>(),
-  {
-    isOpen: true,
-  }
-);
-
-const { teacher, menuItems, isOpen } = toRefs(props);
-
-// TODO: khi có logo thật:
-// import logoReal from "@/assets/images/logo-university.svg";
-// const logoSrc = logoReal;
-const logoSrc = "/logo.png";
-
+// Store & route
+const userStore = useUserStore();
 const route = useRoute();
 
-const isActive = (routeName: string) => {
-  return route.name === routeName;
+// Teacher (null-safe)
+
+const teacher = computed(
+  () =>
+    userStore.currentUser ?? {
+      id: "",
+      name: "",
+      code: "",
+      department: "",
+      role: "",
+    }
+);
+const roleLabelMap: Record<string, string> = {
+  LECTURER: "Giảng viên",
+  DEPARTMENT_BOARD: "Ban chủ nhiệm khoa",
+  SCIENCE_OFFICE: "Phòng quản lý khoa học",
 };
 
-const teacherInitials = computed(() => {
-  const name = teacher.value.name?.trim() ?? "";
-  if (!name) return "?";
-  const parts = name.split(" ").filter(Boolean);
-  const last = parts[parts.length - 1];
-  return last?.[0]?.toUpperCase() ?? "?";
+const roleName = computed(() => {
+  const roleUser = userStore.role; //
+  return roleUser ? roleLabelMap[roleUser] : "Không xác định";
 });
 
+// Menu theo role
+
+const menuItems = computed(() => buildMenuForRole(userStore.role));
+
+// Active route
+const isActive = (routeName: string) => route.name === routeName;
+
+// Avatar chữ cái
+
+const teacherInitials = computed(() => {
+  const name = teacher.value.name?.trim();
+  if (!name) return "?";
+
+  const parts = name.split(" ").filter(Boolean);
+  if (!parts.length) return "?";
+
+  const last = parts[parts.length - 1] ?? ""; // fallback to empty string if undefined
+  return last.charAt(0).toUpperCase() || "?";
+});
+
+// Năm hiện tại
 const currentYear = new Date().getFullYear();
 </script>
