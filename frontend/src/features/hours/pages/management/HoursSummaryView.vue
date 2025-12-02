@@ -2,14 +2,30 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div>
-      <h1 class="text-2xl font-semibold text-slate-800">
-        Giờ NCKH giảng viên trong khoa
-      </h1>
-      <p class="mt-1 text-sm text-slate-500">
-        Tổng hợp giờ nghiên cứu khoa học của giảng viên theo năm học, phục vụ
-        theo dõi và quản lý của BCN khoa.
-      </p>
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-semibold text-slate-800">
+          Giờ NCKH giảng viên trong khoa
+        </h1>
+        <p class="mt-1 text-sm text-slate-500">
+          Tổng hợp giờ nghiên cứu khoa học của giảng viên theo năm học, phục vụ
+          theo dõi và quản lý của BCN khoa / Phòng QLKH.
+        </p>
+      </div>
+
+      <!-- Nút sang màn duyệt giờ -->
+      <RouterLink
+        :to="{ name: 'hours.approvals' }"
+        class="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm hover:bg-red-100"
+      >
+        <span class="mr-2 h-2 w-2 rounded-full bg-red-500" />
+        Danh sách giờ chờ duyệt
+        <span
+          class="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white"
+        >
+          {{ pendingHoursTotal }}
+        </span>
+      </RouterLink>
     </div>
 
     <!-- Bộ lọc -->
@@ -47,7 +63,7 @@
 
         <div class="w-52">
           <label class="block text-xs font-medium text-slate-600">
-            Bộ môn (tuỳ chọn)
+            Bộ môn
           </label>
           <select
             v-model="department"
@@ -75,6 +91,48 @@
         >
           Lọc
         </button>
+      </div>
+    </div>
+
+    <!-- Cards tổng quan -->
+    <div class="grid gap-4 md:grid-cols-3">
+      <div
+        class="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-sm"
+      >
+        <p class="text-[11px] uppercase tracking-wide text-slate-400">
+          Số giảng viên được thống kê
+        </p>
+        <p class="mt-1 text-2xl font-semibold text-slate-800">
+          {{ totalLecturers }}
+        </p>
+      </div>
+
+      <div
+        class="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-sm"
+      >
+        <p class="text-[11px] uppercase tracking-wide text-slate-400">
+          Tổng giờ đã được tính
+        </p>
+        <p class="mt-1 text-2xl font-semibold text-emerald-700">
+          {{ totalCompletedHours }}
+        </p>
+        <p class="mt-0.5 text-[11px] text-slate-500">
+          Tính trên tất cả giảng viên trong phạm vi xem.
+        </p>
+      </div>
+
+      <div
+        class="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-sm"
+      >
+        <p class="text-[11px] uppercase tracking-wide text-slate-400">
+          Giờ đang chờ duyệt
+        </p>
+        <p class="mt-1 text-2xl font-semibold text-amber-700">
+          {{ pendingHoursTotal }}
+        </p>
+        <p class="mt-0.5 text-[11px] text-slate-500">
+          Giờ sẽ được cộng vào khi duyệt các công trình tương ứng.
+        </p>
       </div>
     </div>
 
@@ -145,18 +203,11 @@
       </table>
     </div>
 
-    <!-- Phân trang đơn giản (mock) -->
-    <div
-      v-if="!loading && rows.length"
-      class="flex items-center justify-between text-xs text-slate-500"
-    >
-      <p>
-        Tổng cộng
-        <span class="font-medium">{{ rows.length }}</span> giảng viên (mock).
-      </p>
-      <p class="italic text-slate-400">
-        Phân trang / xuất Excel sẽ được bổ sung sau.
-      </p>
+    <!-- Chú thích -->
+    <div class="text-[11px] text-slate-400">
+      Lưu ý: giờ <span class="font-semibold text-amber-700">chờ duyệt</span> chỉ
+      được cộng chính thức sau khi BCN khoa / Phòng QLKH duyệt trong màn
+      <span class="font-semibold">Duyệt giờ NCKH</span>.
     </div>
   </div>
 </template>
@@ -178,10 +229,7 @@ const allRows = ref<FacultyHoursItem[]>([
     teacherId: "GV001",
     teacherName: "Nguyễn Văn A",
     departmentName: "Bộ môn Công nghệ thông tin",
-    quota: {
-      academicYear: "2024-2025",
-      requiredHours: 150,
-    },
+    quota: { academicYear: "2024-2025", requiredHours: 150 },
     completedHours: 120,
     pendingHours: 10,
   },
@@ -189,10 +237,7 @@ const allRows = ref<FacultyHoursItem[]>([
     teacherId: "GV002",
     teacherName: "Trần Thị B",
     departmentName: "Bộ môn Toán",
-    quota: {
-      academicYear: "2024-2025",
-      requiredHours: 130,
-    },
+    quota: { academicYear: "2024-2025", requiredHours: 130 },
     completedHours: 80,
     pendingHours: 25,
   },
@@ -200,18 +245,16 @@ const allRows = ref<FacultyHoursItem[]>([
     teacherId: "GV003",
     teacherName: "Lê Văn C",
     departmentName: "Bộ môn Công nghệ thông tin",
-    quota: {
-      academicYear: "2024-2025",
-      requiredHours: 150,
-    },
+    quota: { academicYear: "2024-2025", requiredHours: 150 },
     completedHours: 40,
     pendingHours: 5,
   },
 ]);
 
 const rows = computed(() => {
-  // hiện tại chỉ filter mock rất đơn giản
-  let data = allRows.value;
+  let data = allRows.value.filter(
+    (x) => x.quota.academicYear === academicYear.value
+  );
 
   if (department.value === "CNTT") {
     data = data.filter((x) =>
@@ -226,12 +269,19 @@ const rows = computed(() => {
     data = data.filter((x) => x.teacherName.toLowerCase().includes(keyword));
   }
 
-  // chưa xử lý academicYear / semester vì mock
+  // chưa xử lý semester vì mock
   return data;
 });
 
+const totalLecturers = computed(() => rows.value.length);
+const totalCompletedHours = computed(() =>
+  rows.value.reduce((sum, x) => sum + x.completedHours, 0)
+);
+const pendingHoursTotal = computed(() =>
+  rows.value.reduce((sum, x) => sum + x.pendingHours, 0)
+);
+
 function reload() {
-  // sau này gọi API, hiện tại chỉ mô phỏng loading
   loading.value = true;
   setTimeout(() => {
     loading.value = false;

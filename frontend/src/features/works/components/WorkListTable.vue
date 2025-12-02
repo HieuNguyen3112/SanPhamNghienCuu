@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import type { WorkItem, WorkStatus } from "../type";
+import type { WorkItem, WorkStatus } from "../types";
 import type { WorkType } from "@/features/declarations/types";
 
 interface Props {

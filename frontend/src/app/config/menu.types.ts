@@ -11,13 +11,20 @@ export type AppRouteName =
   | "profile.researchAreas"
   | "profile.academicRank"
   | "profile.languages"
+  | "profile.research"
   | "declarations.articles"
   | "declarations.projects"
   | "declarations.books"
   | "declarations.others"
+  | "declarations.participatier"
+  | "works.approvals"
   | "hours.my"
-  | "hours.faculty"
-  | "search.global";
+  | "hours.summary"
+  | "search.global"
+  | "hours.calculate"
+  | "hours.warnings"
+  | "hours.approvals"
+  | "hours.batchDetail";
 // sau này thêm route thì bổ sung vào đây
 
 export interface MenuItem {

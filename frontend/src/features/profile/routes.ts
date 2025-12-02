@@ -7,6 +7,7 @@ import ProfileWorkHistoryView from "../../features/profile/pages/ProfileWorkHist
 import ProfileEducationView from "../../features/profile/pages/ProfileEducationView.vue";
 import ProfileAcademicRankView from "@/features/profile/pages/ProfileAcademicRankView.vue";
 import ProfileLanguageSkillsView from "@/features/profile/pages/ProfileLanguageSkillsView.vue";
+import ProfileResearchAreaView from "@/features/profile/pages/ProfileResearchAreaView.vue";
 
 export const profileRoutes: RouteRecordRaw[] = [
   {
@@ -39,5 +40,10 @@ export const profileRoutes: RouteRecordRaw[] = [
     path: "profile/languages",
     name: "profile.languages",
     component: ProfileLanguageSkillsView,
+  },
+  {
+    path: "profile/research",
+    name: "profile.research",
+    component: ProfileResearchAreaView,
   },
 ];

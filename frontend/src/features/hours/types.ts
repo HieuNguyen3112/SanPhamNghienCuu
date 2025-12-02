@@ -1,8 +1,10 @@
 // src/features/hours/types.ts
+import type { WorkType } from "@/features/declarations/types";
+
 export interface HoursQuota {
-  academicYear: string; // ví dụ: "2024–2025"
-  semester?: string; // ví dụ: "HK1", "HK2" (optional)
-  requiredHours: number; // định mức phải đạt
+  academicYear: string;
+  semester?: string;
+  requiredHours: number;
 }
 
 export interface HoursSummary {
@@ -10,10 +12,31 @@ export interface HoursSummary {
   teacherName: string;
   departmentName?: string;
   quota: HoursQuota;
-  completedHours: number; // giờ đã được tính
-  pendingHours: number; // giờ đang chờ duyệt
+  completedHours: number;
+  pendingHours: number;
 }
 
-export interface FacultyHoursItem extends HoursSummary {
-  // có thể mở rộng thêm field riêng cho màn khoa nếu cần
+export interface FacultyHoursItem extends HoursSummary {}
+
+export type HoursWarningLevel = "INFO" | "WARNING" | "CRITICAL";
+
+export interface HoursWarning {
+  id: string;
+  level: HoursWarningLevel;
+  message: string;
+  detail?: string;
+  suggestedAction?: string;
+}
+
+/** Item dùng cho màn duyệt giờ NCKH */
+export interface HoursApprovalItem {
+  id: string;
+  lecturerId: string;
+  lecturerName: string;
+  departmentName: string;
+  workTitle: string;
+  workType: WorkType;
+  year: number;
+  hours: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
 }

@@ -115,8 +115,8 @@
             lý.
           </li>
           <li>
-            Các công trình đang chờ duyệt sẽ xuất hiện trong phần{" "}
-            <span class="font-medium text-amber-700">giờ chờ duyệt</span>.
+            Các công trình đang chờ duyệt sẽ xuất hiện trong phần
+            <span class="font-medium text-amber-700"> giờ chờ duyệt</span>.
           </li>
           <li>
             Nếu số liệu chưa chính xác, vui lòng kiểm tra lại kê khai hoặc liên
@@ -163,6 +163,97 @@
         </table>
       </div>
     </div>
+
+    <!-- 🔔 Danh sách các đợt tính giờ / yêu cầu duyệt -->
+    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-sm font-semibold text-slate-700">
+          Các đợt tính giờ NCKH & yêu cầu duyệt
+        </h2>
+
+        <p class="text-[11px] text-slate-500">
+          Bạn có
+          <span class="font-semibold text-amber-700">
+            {{ waitingApprovalCount }}
+          </span>
+          đợt đang ở trạng thái
+          <span class="font-semibold text-amber-700">chờ duyệt</span>.
+        </p>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-sm">
+          <thead
+            class="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500"
+          >
+            <tr>
+              <th class="px-3 py-2">Đợt tính giờ</th>
+              <th class="px-3 py-2">Trạng thái</th>
+              <th class="px-3 py-2">Ngày yêu cầu</th>
+              <th class="px-3 py-2">Ngày duyệt</th>
+              <th class="px-3 py-2 text-right">Tổng giờ</th>
+              <th class="px-3 py-2 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-if="!batchesForView.length">
+              <td
+                colspan="6"
+                class="px-3 py-4 text-center text-sm text-slate-500"
+              >
+                Chưa có đợt tính giờ nào cho năm học / học kỳ hiện tại.
+              </td>
+            </tr>
+
+            <tr v-for="batch in batchesForView" :key="batch.id">
+              <td class="px-3 py-2 align-top text-sm text-slate-700">
+                <p class="font-medium text-slate-800">
+                  Năm học {{ batch.academicYear }}
+                </p>
+                <p class="text-xs text-slate-500">
+                  {{ batch.semesterLabel }}
+                </p>
+              </td>
+              <td class="px-3 py-2 align-top text-sm">
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                  :class="batchStatusClass(batch.status)"
+                >
+                  {{ batchStatusLabel(batch.status) }}
+                </span>
+              </td>
+              <td class="px-3 py-2 align-top text-sm text-slate-700">
+                {{ batch.requestedAt }}
+              </td>
+              <td class="px-3 py-2 align-top text-sm text-slate-700">
+                {{ batch.approvedAt || "—" }}
+              </td>
+              <td
+                class="px-3 py-2 align-top text-right text-sm font-semibold text-emerald-700"
+              >
+                {{ batch.totalHours }}
+              </td>
+              <td class="px-3 py-2 align-top text-right text-xs">
+                <RouterLink
+                  :to="{
+                    name: 'hours.batchDetail',
+                    params: { batchId: batch.id },
+                  }"
+                  class="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Xem chi tiết
+                </RouterLink>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="mt-3 text-[11px] text-slate-400">
+        Gợi ý: Sau khi được duyệt, kết quả giờ NCKH tương ứng sẽ được cộng vào
+        phần <span class="font-semibold">Giờ đã được tính</span> ở trên.
+      </p>
+    </div>
   </div>
 </template>
 
@@ -198,4 +289,101 @@ const breakdown = computed(() => [
     pending: 6,
   },
 ]);
+
+// ==== ĐỢT TÍNH GIỜ / YÊU CẦU DUYỆT (mock) ====
+
+type BatchStatus = "DRAFT" | "WAITING_APPROVAL" | "APPROVED" | "REJECTED";
+
+interface HourBatchSummary {
+  id: string;
+  academicYear: string;
+  semester: "ALL" | "HK1" | "HK2";
+  status: BatchStatus;
+  requestedAt: string; // ví dụ: "01/06/2025 14:35"
+  approvedAt?: string | null;
+  totalHours: number;
+}
+
+const allBatches = ref<HourBatchSummary[]>([
+  {
+    id: "BATCH-2024-HK2-01",
+    academicYear: "2024-2025",
+    semester: "HK2",
+    status: "WAITING_APPROVAL",
+    requestedAt: "01/06/2025 14:35",
+    approvedAt: null,
+    totalHours: 145,
+  },
+  {
+    id: "BATCH-2024-HK1-01",
+    academicYear: "2024-2025",
+    semester: "HK1",
+    status: "APPROVED",
+    requestedAt: "10/01/2025 09:10",
+    approvedAt: "20/01/2025 16:20",
+    totalHours: 75,
+  },
+  {
+    id: "BATCH-2023-ALL-01",
+    academicYear: "2023-2024",
+    semester: "ALL",
+    status: "APPROVED",
+    requestedAt: "05/06/2024 08:00",
+    approvedAt: "15/06/2024 10:15",
+    totalHours: 150,
+  },
+]);
+
+const batchesForView = computed(() => {
+  return allBatches.value
+    .filter((b) => b.academicYear === academicYear.value)
+    .filter((b) => {
+      if (semester.value === "ALL") return true;
+      return b.semester === semester.value;
+    })
+    .map((b) => ({
+      ...b,
+      semesterLabel:
+        b.semester === "ALL"
+          ? "Cả năm"
+          : b.semester === "HK1"
+          ? "Học kỳ 1"
+          : "Học kỳ 2",
+    }));
+});
+
+const waitingApprovalCount = computed(
+  () =>
+    batchesForView.value.filter((b) => b.status === "WAITING_APPROVAL").length
+);
+
+function batchStatusLabel(status: BatchStatus): string {
+  switch (status) {
+    case "DRAFT":
+      return "Bản nháp";
+    case "WAITING_APPROVAL":
+      return "Chờ duyệt";
+    case "APPROVED":
+      return "Đã duyệt";
+    case "REJECTED":
+      return "Từ chối";
+    default:
+      return status;
+  }
+}
+
+function batchStatusClass(status: BatchStatus): string {
+  switch (status) {
+    case "DRAFT":
+      return "bg-slate-50 text-slate-700 border border-slate-200";
+    case "WAITING_APPROVAL":
+      return "bg-amber-50 text-amber-700 border border-amber-200";
+    case "APPROVED":
+      return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+    case "REJECTED":
+      return "bg-red-50 text-red-700 border border-red-200";
+    default:
+      return "bg-slate-50 text-slate-600 border border-slate-200";
+  }
+}
 </script>

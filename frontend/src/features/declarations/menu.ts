@@ -4,7 +4,7 @@ import type { MenuItem } from "@/app/config/menu.types";
 export const declarationsMenuGroup: MenuItem = {
   id: "grp-declarations",
   label: "Quản lý công trình",
-  roles: ["LECTURER"],
+  roles: ["LECTURER", "SCIENCE_OFFICE"],
 };
 
 export const declarationMenuItems: MenuItem[] = [
@@ -37,5 +37,18 @@ export const declarationMenuItems: MenuItem[] = [
     label: "Công trình khác",
     routeName: "declarations.others",
     roles: ["LECTURER"],
+  },
+  {
+    id: "declarations-participatier",
+    label: "Thông báo xác nhận",
+    routeName: "declarations.participatier",
+    roles: ["LECTURER"],
+  },
+
+  {
+    id: "works-approvals",
+    label: "Duyệt công trình ",
+    routeName: "works.approvals",
+    roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
   },
 ];

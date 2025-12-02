@@ -1,12 +1,11 @@
-<!-- src/features/profile/pages/ProfileAcademicRankView.vue -->
+<!-- src/features/profile/pages/ProfileResearchAreaView.vue -->
 <template>
   <div class="space-y-4">
     <header>
-      <h1 class="text-xl font-semibold text-slate-900">
-        Học vị – chức danh khoa học
-      </h1>
+      <h1 class="text-xl font-semibold text-slate-900">Lĩnh vực nghiên cứu</h1>
       <p class="mt-1 text-sm text-slate-500">
-        Thông tin về các học vị và chức danh khoa học đã được công nhận.
+        Khai báo các lĩnh vực nghiên cứu chính và phụ của giảng viên, kèm theo
+        mô tả và từ khóa liên quan.
       </p>
     </header>
 
@@ -14,16 +13,21 @@
       <!-- Header + nút -->
       <div class="mb-4 flex items-center justify-between">
         <h2 class="text-base font-semibold text-slate-800">
-          Học vị – chức danh
+          Danh sách lĩnh vực nghiên cứu
         </h2>
         <button
           type="button"
           class="rounded bg-[#234a74] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#1b3a5a]"
           @click="openAddForm"
         >
-          Thêm thông tin
+          Thêm lĩnh vực
         </button>
       </div>
+
+      <p class="mb-4 text-sm text-slate-500">
+        Ưu tiên khai báo rõ 1–2 lĩnh vực chính và các lĩnh vực phụ liên quan để
+        phục vụ tra cứu, thống kê, phân nhóm chuyên môn.
+      </p>
 
       <!-- Bảng danh sách -->
       <div
@@ -35,14 +39,11 @@
             class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"
           >
             <tr>
-              <th class="px-3 py-2">Học vị</th>
-              <th class="px-3 py-2">Chuyên ngành</th>
-              <th class="px-3 py-2">Nơi đào tạo</th>
-              <th class="px-3 py-2">Năm bảo vệ</th>
-              <th class="px-3 py-2">Chức danh</th>
-              <th class="px-3 py-2">Năm phong</th>
-              <th class="px-3 py-2">Nơi phong</th>
-              <th class="px-3 py-2">Ghi chú</th>
+              <th class="px-3 py-2">Lĩnh vực</th>
+              <th class="px-3 py-2">Vai trò</th>
+              <th class="px-3 py-2">Từ năm</th>
+              <th class="px-3 py-2">Từ khóa</th>
+              <th class="px-3 py-2">Mô tả</th>
               <th class="px-3 py-2 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -52,37 +53,34 @@
               :key="item.id"
               class="hover:bg-slate-50"
             >
-              <td class="px-3 py-2 align-top text-sm text-slate-700">
-                {{ highestDegreeLabel(item.highestDegree) }}
+              <td class="px-3 py-2 align-top text-sm text-slate-800">
+                {{ item.name }}
+              </td>
+              <td class="px-3 py-2 align-top text-xs font-medium">
+                <span
+                  :class="[
+                    'inline-flex rounded-full px-2 py-0.5',
+                    item.type === 'PRIMARY'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                      : 'bg-slate-50 text-slate-700 border border-slate-200',
+                  ]"
+                >
+                  {{ researchTypeLabel(item.type) }}
+                </span>
               </td>
               <td class="px-3 py-2 align-top text-sm text-slate-700">
-                {{ item.degreeMajor }}
-              </td>
-              <td class="px-3 py-2 align-top text-sm text-slate-700">
-                <div class="flex flex-col">
-                  <span>{{ item.degreeInstitution }}</span>
-                  <span
-                    v-if="item.degreeCountry"
-                    class="text-xs text-slate-500"
-                  >
-                    {{ item.degreeCountry }}
-                  </span>
-                </div>
-              </td>
-              <td class="px-3 py-2 align-top text-sm text-slate-700">
-                {{ item.degreeYear || "—" }}
-              </td>
-              <td class="px-3 py-2 align-top text-sm text-slate-700">
-                {{ academicTitleLabel(item.academicTitle) }}
-              </td>
-              <td class="px-3 py-2 align-top text-sm text-slate-700">
-                {{ item.academicTitleYear || "—" }}
-              </td>
-              <td class="px-3 py-2 align-top text-sm text-slate-700">
-                {{ item.academicTitleInstitution || "—" }}
+                {{ item.startYear || "—" }}
               </td>
               <td class="px-3 py-2 align-top text-xs text-slate-600">
-                {{ item.note || "—" }}
+                <span v-if="item.keywords">
+                  {{ item.keywords }}
+                </span>
+                <span v-else>—</span>
+              </td>
+              <td class="px-3 py-2 align-top text-xs text-slate-600">
+                <p class="max-w-xs whitespace-pre-line break-words">
+                  {{ item.description || "—" }}
+                </p>
               </td>
               <td class="px-3 py-2 align-top text-right">
                 <div class="inline-flex items-center gap-1">
@@ -117,9 +115,8 @@
         v-else
         class="rounded-md border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500"
       >
-        Chưa có thông tin học vị – chức danh. Hãy bấm
-        <span class="font-semibold">"Thêm thông tin"</span> để tạo dòng đầu
-        tiên.
+        Chưa có lĩnh vực nghiên cứu nào. Hãy bấm
+        <span class="font-semibold">"Thêm lĩnh vực"</span> để khai báo.
       </p>
 
       <!-- Modal thêm / chỉnh sửa -->
@@ -146,13 +143,13 @@
                 <h3 class="text-lg font-semibold text-slate-900">
                   {{
                     editingEntry
-                      ? "Chỉnh sửa học vị – chức danh"
-                      : "Thêm học vị – chức danh"
+                      ? "Chỉnh sửa lĩnh vực nghiên cứu"
+                      : "Thêm lĩnh vực nghiên cứu"
                   }}
                 </h3>
                 <p class="mt-1 text-sm text-slate-500">
-                  Nhập thông tin chi tiết về học vị và (nếu có) chức danh khoa
-                  học.
+                  Nhập thông tin chi tiết về lĩnh vực nghiên cứu, vai trò và từ
+                  khóa liên quan.
                 </p>
               </div>
               <button
@@ -165,7 +162,7 @@
               </button>
             </div>
 
-            <ProfileAcademicRankForm
+            <ProfileResearchAreaForm
               :model-value="editingEntry"
               @submit="handleSubmit"
               @cancel="closeForm"
@@ -179,22 +176,30 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import ProfileAcademicRankForm, {
-  type AcademicRankFormModel,
-  type HighestDegree,
-  type AcademicTitle,
-} from "@/features/profile/components/ProfileAcademicRankForm.vue";
+import ProfileResearchAreaForm, {
+  type ResearchAreaFormModel,
+  type ResearchAreaType,
+} from "@/features/profile/components/ProfileResearchAreaForm.vue";
 
-interface AcademicRankEntry extends AcademicRankFormModel {
+interface ResearchAreaEntry extends ResearchAreaFormModel {
   id: number;
 }
 
 // mock data – sau này thay bằng dữ liệu từ API
-const entries = ref<AcademicRankEntry[]>([]);
+const entries = ref<ResearchAreaEntry[]>([
+  // Ví dụ:
+  // {
+  //   id: 1,
+  //   name: 'Trí tuệ nhân tạo',
+  //   type: 'PRIMARY',
+  //   startYear: 2018,
+  //   keywords: 'machine learning, deep learning, NLP',
+  //   description: 'Nghiên cứu mô hình học sâu, xử lý ngôn ngữ tự nhiên.'
+  // },
+]);
 
 const showForm = ref(false);
-const editingEntry = ref<AcademicRankEntry | null>(null);
-
+const editingEntry = ref<ResearchAreaEntry | null>(null);
 let nextId = 1;
 
 const openAddForm = () => {
@@ -202,13 +207,13 @@ const openAddForm = () => {
   showForm.value = true;
 };
 
-const onEdit = (item: AcademicRankEntry) => {
+const onEdit = (item: ResearchAreaEntry) => {
   editingEntry.value = { ...item };
   showForm.value = true;
 };
 
 const onDelete = (id: number) => {
-  if (!confirm("Bạn có chắc chắn muốn xóa dòng này?")) return;
+  if (!confirm("Bạn có chắc chắn muốn xóa lĩnh vực này?")) return;
   entries.value = entries.value.filter((x) => x.id !== id);
 };
 
@@ -217,7 +222,7 @@ const closeForm = () => {
   editingEntry.value = null;
 };
 
-const handleSubmit = (payload: AcademicRankFormModel) => {
+const handleSubmit = (payload: ResearchAreaFormModel) => {
   if (editingEntry.value) {
     const index = entries.value.findIndex(
       (x) => x.id === editingEntry.value?.id
@@ -235,35 +240,19 @@ const handleSubmit = (payload: AcademicRankFormModel) => {
     });
   }
 
-  // TODO: sau này gọi API lưu danh sách học vị – chức danh ở đây
+  // TODO: sau này gọi API lưu danh sách lĩnh vực nghiên cứu ở đây
 
   showForm.value = false;
   editingEntry.value = null;
 };
 
-const highestDegreeLabel = (value: HighestDegree): string => {
+const researchTypeLabel = (value: ResearchAreaType): string => {
   switch (value) {
-    case "BACHELOR":
-      return "Cử nhân / Kỹ sư";
-    case "MASTER":
-      return "Thạc sĩ";
-    case "PHD":
-      return "Tiến sĩ";
-    case "OTHER":
+    case "PRIMARY":
+      return "Chính";
+    case "SECONDARY":
     default:
-      return "Khác";
-  }
-};
-
-const academicTitleLabel = (value: AcademicTitle): string => {
-  switch (value) {
-    case "ASSOCIATE_PROFESSOR":
-      return "Phó Giáo sư";
-    case "PROFESSOR":
-      return "Giáo sư";
-    case "NONE":
-    default:
-      return "Không";
+      return "Phụ";
   }
 };
 </script>

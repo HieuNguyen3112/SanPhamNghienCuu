@@ -72,7 +72,7 @@ const handleSubmit = async () => {
     }
 
     // 3. OK → chuyển vào app
-    await router.push("/"); // hoặc "/" tuỳ bạn đang cấu hình router
+    await router.push("/");
   } catch (err: any) {
     if (err.message === "SAI_TAI_KHOAN") {
       errors.password = "Tên đăng nhập hoặc mật khẩu không chính xác";

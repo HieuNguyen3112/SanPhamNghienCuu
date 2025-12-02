@@ -171,29 +171,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
-import { useUserStore } from "@/app/stores/userStore";
 
-const emit = defineEmits([
-  "toggle-sidebar",
-  "open-profile",
-  "change-password",
-  "logout",
-]);
+const emit = defineEmits<{
+  (e: "toggle-sidebar"): void;
+  (e: "open-profile"): void;
+  (e: "change-password"): void;
+  (e: "logout"): void;
+}>();
 
-const userStore = useUserStore();
-const router = useRouter();
-
-// Lấy từ store, không từ props nữa
-const userName = computed(
-  () => userStore.currentUser?.name ?? "Không xác định"
+const props = withDefaults(
+  defineProps<{
+    title?: string;
+    notificationCount?: number;
+    userName?: string;
+    userCode?: string;
+  }>(),
+  {
+    title: "TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH",
+    notificationCount: 8,
+    userName: "Nguyễn Quang Vinh",
+  }
 );
-const userCode = computed(() => userStore.currentUser?.code ?? "");
+
+// TODO: khi có logo thật:
+// import logoReal from "@/assets/images/logo-university.svg";
+// const logoSrc = logoReal;
+// const logoSrc = "" as string;
 
 const isUserMenuOpen = ref(false);
-const avatarBtnRef = ref(null);
-const userMenuRef = ref(null);
+const avatarBtnRef = ref<HTMLElement | null>(null);
+const userMenuRef = ref<HTMLElement | null>(null);
 
 const toggleUserMenu = () => {
   isUserMenuOpen.value = !isUserMenuOpen.value;
@@ -213,9 +222,34 @@ const handleChangePassword = () => {
   closeUserMenu();
 };
 
+const router = useRouter();
+
 const handleLogout = () => {
-  userStore.logout();
+  emit("logout");
   closeUserMenu();
   router.push("/login");
 };
+
+const handleClickOutside = (event: MouseEvent) => {
+  if (!isUserMenuOpen.value) return;
+  const target = event.target as Node | null;
+  if (
+    userMenuRef.value &&
+    !userMenuRef.value.contains(target) &&
+    avatarBtnRef.value &&
+    !avatarBtnRef.value.contains(target)
+  ) {
+    closeUserMenu();
+  }
+};
+
+onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleClickOutside);
+});
+
+const { notificationCount, userName, userCode } = props;
 </script>

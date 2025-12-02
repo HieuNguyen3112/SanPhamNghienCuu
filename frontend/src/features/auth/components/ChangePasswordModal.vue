@@ -162,7 +162,7 @@
           </button>
           <button
             type="button"
-            class="rounded bg-[#234a74] px-6 py-2 text-sm font-semibold text-white hover:bg-[#1b3a5a]"
+            class="rounded bg-[rgb(23,43,77)] px-6 py-2 text-sm font-semibold text-white hover:bg-[#1b3a5a]"
             @click="handleSubmit"
           >
             Đổi mật khẩu
