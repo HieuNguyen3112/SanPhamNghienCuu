@@ -212,7 +212,7 @@
 import { computed, ref } from "vue";
 import WorkApprovalDetailModal, {
   type WorkApprovalItem,
-} from "@/features/works/components/WorkApprovalDetailModal.vue";
+} from "@/features/research-works/components/WorkApprovalDetailModal.vue";
 
 type WorkType = "ARTICLE" | "PROJECT" | "BOOK" | "OTHER";
 type WorkApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";

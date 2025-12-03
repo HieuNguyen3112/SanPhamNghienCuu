@@ -6,8 +6,8 @@ import DeclarationProjectsView from "@/features/declarations/pages/lecturer/Decl
 import DeclarationBooksView from "@/features/declarations/pages/lecturer/DeclarationBooksView.vue";
 import DeclarationOthersView from "@/features/declarations/pages/lecturer/DeclarationOthersView.vue";
 import DeclarationParticipationConfirmView from "@/features/declarations/pages/lecturer/DeclarationParticipationConfirmView.vue";
-import MyWorksView from "@/features/works/pages/MyWorksView.vue";
-import WorksApprovalsView from "@/features/works/pages/management/WorksApprovalsView.vue";
+import MyWorksView from "@/features/research-works/pages/lecturer/MyWorksView.vue";
+import WorksApprovalsView from "@/features/research-works/pages/management/WorkApprovalView.vue";
 
 export const declarationRoutes: RouteRecordRaw[] = [
   {

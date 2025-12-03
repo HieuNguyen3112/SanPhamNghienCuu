@@ -14,6 +14,7 @@ import { profileRoutes } from "@/features/profile/routes";
 import { declarationRoutes } from "@/features/declarations/routes";
 import { hoursRoutes } from "@/features/hours/routes";
 import { searchRoutes } from "@/features/search/routes";
+import { researchWorksRoutes } from "@/features/research-works/routes";
 // =====================
 // CẤU HÌNH ROUTE CHUẨN
 // =====================
@@ -36,6 +37,7 @@ const routes: RouteRecordRaw[] = [
       ...declarationRoutes,
       ...hoursRoutes,
       ...searchRoutes,
+      ...researchWorksRoutes,
     ],
   },
 

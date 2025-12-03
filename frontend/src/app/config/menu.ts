@@ -9,6 +9,7 @@ import {
   declarationMenuItems,
 } from "@/features/declarations/menu";
 import { hoursMenuGroup, hoursMenuItems } from "@/features/hours/menu";
+import { researchWorksMenuItems } from "@/features/research-works/menu";
 
 import { searchMenuGroup, searchMenuItems } from "@/features/search/menu";
 // Ghép toàn bộ menu (chung cho mọi role)
@@ -18,8 +19,10 @@ const allMenuItems: MenuItem[] = [
   ...profileMenuItems,
   // quan ly cong trinh khoa hoc
   declarationsMenuGroup,
+  ...researchWorksMenuItems,
   ...declarationMenuItems,
   // quan ly gio khoa hoc
+
   hoursMenuGroup,
   ...hoursMenuItems,
 

@@ -117,9 +117,9 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import WorkListTable from "@/features/works/components/WorkListTable.vue";
-import { fetchMyWorks } from "../api";
-import type { WorkStatus, WorkItem } from "../types";
+import WorkListTable from "@/features/research-works/components/WorkListTable.vue";
+import { fetchMyWorks } from "../../api";
+import type { WorkStatus, WorkItem } from "../../types";
 import type { WorkType } from "@/features/declarations/types";
 
 type StatusFilter = WorkStatus | "ALL";

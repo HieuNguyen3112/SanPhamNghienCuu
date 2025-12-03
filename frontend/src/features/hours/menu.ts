@@ -4,6 +4,7 @@ import type { MenuItem } from "@/app/config/menu.types";
 export const hoursMenuGroup: MenuItem = {
   id: "grp-hours",
   label: "Quản lý giờ khoa học ",
+  roles: ["LECTURER"],
 };
 export const getHoursFacultyLabel = (role: string) => {
   if (role === "DEPARTMENT_BOARD") return "Giờ NCKH của khoa";
@@ -17,18 +18,7 @@ export const hoursMenuItems: MenuItem[] = [
     routeName: "hours.my",
     roles: ["LECTURER"],
   },
-  {
-    id: "hours-summary",
-    label: "Theo dõi giờ NCKH khoa ",
-    routeName: "hours.summary",
-    roles: ["DEPARTMENT_BOARD"],
-  },
-  {
-    id: "hours-summary",
-    label: "Theo dõi giờ NCKH trường ",
-    routeName: "hours.summary",
-    roles: ["SCIENCE_OFFICE"],
-  },
+
   {
     id: "hours-calculate",
     label: "Tính giờ NCKH ",
@@ -41,9 +31,22 @@ export const hoursMenuItems: MenuItem[] = [
     routeName: "hours.warnings",
     roles: ["LECTURER"],
   },
+
+  {
+    id: "hours-summary-department",
+    label: "Quản lý giờ NCKH khoa ",
+    routeName: "hours.summary",
+    roles: ["DEPARTMENT_BOARD"],
+  },
+  {
+    id: "hours-summary-university",
+    label: "Quản lý giờ NCKH toàn trường ",
+    routeName: "hours.summary",
+    roles: ["SCIENCE_OFFICE"],
+  },
   {
     id: "hours-approvals ",
-    label: "Duyệt giờ   ",
+    label: "Xét duyệt giờ NCKH   ",
     routeName: "hours.approvals",
     roles: ["SCIENCE_OFFICE"],
   },

@@ -3,7 +3,7 @@ import type {
   FetchMyWorksParams,
   PagedResult,
   WorkItem,
-} from "@/features/works/types";
+} from "@/features/research-works/types";
 
 /**
  * TODO: Nối với backend thật.
