@@ -3,7 +3,7 @@ import type { MenuItem } from "@/app/config/menu.types";
 
 export const declarationsMenuGroup: MenuItem = {
   id: "grp-declarations",
-  label: "Quản lý khoa học",
+  label: "Kê khai khoa học",
   roles: ["LECTURER"],
 };
 

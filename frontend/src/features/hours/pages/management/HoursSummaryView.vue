@@ -18,8 +18,8 @@
         :to="{ name: 'hours.approvals' }"
         class="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm hover:bg-red-100"
       >
-        <span class="mr-2 h-2 w-2 rounded-full bg-red-500" />
-        Danh sách giờ chờ duyệt
+        <span class="mr-2 h-2 w-2 rounded-full bg-red-500" />Danh sách giờ chờ
+        duyệt
         <span
           class="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white"
         >

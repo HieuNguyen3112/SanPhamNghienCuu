@@ -3,7 +3,7 @@ import type { MenuItem } from "@/app/config/menu.types";
 
 export const hoursMenuGroup: MenuItem = {
   id: "grp-hours",
-  label: "Quản lý giờ khoa học ",
+  label: "Kê khai giờ khoa học ",
   roles: ["LECTURER"],
 };
 export const getHoursFacultyLabel = (role: string) => {
@@ -14,46 +14,33 @@ export const getHoursFacultyLabel = (role: string) => {
 export const hoursMenuItems: MenuItem[] = [
   {
     id: "hours-my",
-    label: "Theo dõi giờ NCKH cá nhân ",
+    label: "Giờ NCKH cá nhân", // bớt chữ "Theo dõi"
     routeName: "hours.my",
     roles: ["LECTURER"],
   },
-
   {
     id: "hours-calculate",
-    label: "Tính giờ NCKH ",
+    label: "Tính giờ NCKH", // giữ nguyên, chỉ bỏ space thừa
     routeName: "hours.calculate",
     roles: ["LECTURER"],
   },
   {
     id: "hours-warnings",
-    label: "Thông báo  ",
+    label: "Thông báo NCKH", // rõ ràng đây là thông báo liên quan NCKH
     routeName: "hours.warnings",
     roles: ["LECTURER"],
   },
-
   {
     id: "hours-summary-department",
-    label: "Quản lý giờ NCKH khoa ",
+    roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
+    // dùng label trung tính để dùng chung cho khoa + phòng KH
+    label: "Tổng hợp giờ NCKH", // hoặc "Thống kê giờ NCKH"
     routeName: "hours.summary",
-    roles: ["DEPARTMENT_BOARD"],
   },
   {
-    id: "hours-summary-university",
-    label: "Quản lý giờ NCKH toàn trường ",
-    routeName: "hours.summary",
-    roles: ["SCIENCE_OFFICE"],
-  },
-  {
-    id: "hours-approvals ",
-    label: "Xét duyệt giờ NCKH   ",
+    id: "hours-approvals",
+    label: "Xét duyệt giờ NCKH", // chuẩn, rõ vai trò phê duyệt
     routeName: "hours.approvals",
     roles: ["SCIENCE_OFFICE"],
   },
-  // {
-  //   id: "hours-approvals ",
-  //   label: "Duyệt giờ   ",
-  //   routeName: "hours.approvals",
-  //   roles: ["SCIENCE_OFFICE"],
-  // },
 ];

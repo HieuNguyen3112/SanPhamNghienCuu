@@ -1,7 +1,8 @@
 import type { MenuItem } from "@/app/config/menu.types";
 export const researchWorksMenuGroup: MenuItem = {
-  id: "pu",
-  label: "Công bố khoa học ",
+  id: "research-work-publication",
+  label: "Quản lý khoa học ",
+  roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
 };
 export const researchWorksMenuItems: MenuItem[] = [
   {
@@ -11,8 +12,14 @@ export const researchWorksMenuItems: MenuItem[] = [
     roles: ["LECTURER"],
   },
   {
+    id: "works-pverview",
+    label: "Quản lý công trình NCKH  ",
+    routeName: "work.overview",
+    roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
+  },
+  {
     id: "works-approvals",
-    label: "Duyệt công trình ",
+    label: "Xẻt duyệt công trình ",
     routeName: "works.approvals",
     roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
   },

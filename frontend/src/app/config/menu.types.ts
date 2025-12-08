@@ -22,6 +22,7 @@ export type AppRouteName =
   | "works-my-declarations"
   // duyet cong trinh cho manager
   | "works.approvals"
+  | "work.overview"
   // quan ly gio nckh cho giang vien
   | "hours.my"
   | "hours.summary"
@@ -30,7 +31,10 @@ export type AppRouteName =
   // duyet gio nckh
   | "hours.approvals"
   | "hours.batchDetail"
-  | "search.global";
+  | "search.global"
+  | "user.manager"
+  | "userorg.structure";
+
 // sau này thêm route thì bổ sung vào đây
 
 export interface MenuItem {
