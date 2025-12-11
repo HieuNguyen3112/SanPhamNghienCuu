@@ -23,24 +23,29 @@ _Ngày xuất bản:_ 2025-11-10 17:50:54
 6. `academic_ranks`
 7. `users` _(mặc định Laravel)_
 8. `lecturers`
-9. `activity_kinds`
-10. `activity_types`
-11. `member_roles`
-12. `evidence_file_types`
-13. `activity_statuses`
-14. `approval_stages`
-15. `research_activities`
-16. `paper_details`
-17. `book_details`
-18. `project_details`
-19. `conference_details`
-20. `research_activity_members`
-21. `activity_status_histories`
-22. `activity_approvals`
-23. `evidence_files`
-24. `hour_rules`
-25. `calculation_logs`
-26. `lecturer_yearly_hours`
+9. `lecturer_profiles`
+10. `lecturer_party_memberships`
+11. `lecturer_training_histories`
+12. `lecturer_work_histories`
+13. `lecturer_language_proficiencies`
+14. `activity_kinds`
+15. `activity_types`
+16. `member_roles`
+17. `evidence_file_types`
+18. `activity_statuses`
+19. `approval_stages`
+20. `research_activities`
+21. `paper_details`
+22. `book_details`
+23. `project_details`
+24. `conference_details`
+25. `research_activity_members`
+26. `activity_status_histories`
+27. `activity_approvals`
+28. `evidence_files`
+29. `hour_rules`
+30. `calculation_logs`
+31. `lecturer_yearly_hours`
 
 > Gợi ý: Publish migrations của **spatie/laravel-permission** ngay sau khi tạo DB (không phụ thuộc bảng khác).
 
@@ -110,13 +115,61 @@ _Ngày xuất bản:_ 2025-11-10 17:50:54
 -   `user_id` BIGINT FK → `users.id` (**SET NULL**)
 -   `code` VARCHAR(50) **UNIQUE**
 -   `full_name` VARCHAR(255)
--   `email` VARCHAR(255) **UNIQUE**
+-   `email` VARCHAR(255) NULL
 -   `phone` VARCHAR(30) NULL
 -   `degree_id` BIGINT FK → `degrees.id` (**SET NULL**)
 -   `academic_rank_id` BIGINT FK → `academic_ranks.id` (**SET NULL**)
 -   `department_id` BIGINT FK → `departments.id` (**RESTRICT**)
 -   `active` TINYINT(1) DEFAULT 1
+-   UNIQUE(`user_id`) để đảm bảo 1-1 với user
 -   timestamps
+
+#### 9. `lecturer_profiles` _(1-1)_
+
+-   `id` BIGINT PK
+-   `lecturer_id` BIGINT FK → `lecturers.id` (**RESTRICT**), **UNIQUE**
+-   Nhân thân: `gender` VARCHAR(20) NULL, `date_of_birth` DATE NULL, `place_of_birth` VARCHAR(255) NULL, `ethnicity` VARCHAR(100) NULL, `hometown` VARCHAR(255) NULL
+-   Liên hệ mở rộng: `personal_email` VARCHAR(255) NULL, `alternate_phone` VARCHAR(50) NULL, `address` VARCHAR(500) NULL, `emergency_contact_name` VARCHAR(255) NULL, `emergency_contact_phone` VARCHAR(50) NULL, `emergency_contact_relation` VARCHAR(100) NULL
+-   Thông tin hiện tại: `current_position` VARCHAR(255) NULL, `current_unit` VARCHAR(255) NULL, `research_area` VARCHAR(255) NULL, `teaching_specialization` VARCHAR(255) NULL
+-   Hồ sơ khoa học: `orcid_id` VARCHAR(50) NULL, `google_scholar_profile` VARCHAR(500) NULL, `research_gate_profile` VARCHAR(500) NULL, `scopus_id` VARCHAR(100) NULL, `publons_id` VARCHAR(100) NULL, `personal_website` VARCHAR(500) NULL, `academic_portfolio_url` VARCHAR(500) NULL
+-   timestamps
+
+#### 10. `lecturer_party_memberships` _(1-1)_
+
+-   `id` BIGINT PK
+-   `lecturer_id` BIGINT FK → `lecturers.id` (**RESTRICT**), **UNIQUE**
+-   `is_member` TINYINT(1) DEFAULT 0
+-   `membership_no` VARCHAR(100) NULL **UNIQUE**
+-   `joined_at` DATE NULL, `official_at` DATE NULL, `joining_place` VARCHAR(255) NULL, `current_branch` VARCHAR(255) NULL, `position` VARCHAR(255) NULL, `status` VARCHAR(100) NULL, `notes` VARCHAR(500) NULL
+-   timestamps
+
+#### 11. `lecturer_training_histories`
+
+-   `id` BIGINT PK
+-   `lecturer_id` BIGINT FK → `lecturers.id` (**RESTRICT**)
+-   `degree_id` BIGINT FK → `degrees.id` (**SET NULL**)
+-   `degree_title` VARCHAR(255) NULL, `major` VARCHAR(255) NULL, `institution` VARCHAR(255) NOT NULL, `country` VARCHAR(100) NULL, `city` VARCHAR(150) NULL
+-   `start_date` DATE NULL, `end_date` DATE NULL, `is_current` TINYINT(1) DEFAULT 0
+-   `training_form` VARCHAR(100) NULL, `funding_source` VARCHAR(150) NULL, `certificate_no` VARCHAR(100) NULL, `notes` VARCHAR(500) NULL
+-   timestamps; index (`lecturer_id`,`start_date`), index(`degree_id`)
+
+#### 12. `lecturer_work_histories`
+
+-   `id` BIGINT PK
+-   `lecturer_id` BIGINT FK → `lecturers.id` (**RESTRICT**)
+-   `organization` VARCHAR(255) NOT NULL, `position` VARCHAR(255) NULL, `department` VARCHAR(255) NULL, `workplace` VARCHAR(255) NULL
+-   `start_date` DATE NULL, `end_date` DATE NULL, `is_current` TINYINT(1) DEFAULT 0
+-   `employment_type` VARCHAR(100) NULL, `reason_for_leaving` VARCHAR(255) NULL, `notes` VARCHAR(500) NULL
+-   timestamps; index (`lecturer_id`,`start_date`)
+
+#### 13. `lecturer_language_proficiencies`
+
+-   `id` BIGINT PK
+-   `lecturer_id` BIGINT FK → `lecturers.id` (**RESTRICT**)
+-   `language` VARCHAR(100) NOT NULL, `proficiency_level` VARCHAR(100) NULL, `is_native` TINYINT(1) DEFAULT 0
+-   Chứng chỉ (tuỳ chọn): `certificate_name` VARCHAR(150) NULL, `certificate_level` VARCHAR(100) NULL, `certificate_score` VARCHAR(50) NULL, `issued_by` VARCHAR(255) NULL, `issued_at` DATE NULL, `expires_at` DATE NULL
+-   `notes` VARCHAR(500) NULL
+-   timestamps; index (`lecturer_id`,`language`)
 
 ### (C) RBAC (tuỳ chọn – Spatie)
 
@@ -363,6 +416,8 @@ _Ngày xuất bản:_ 2025-11-10 17:50:54
 | `report.export`           |     |  ✔  |  ✔  |   ✔   | Xuất Excel/PDF                                                               |
 | `rbac.manage`             |     |     |     |   ✔   | Quản trị vai trò & quyền                                                     |
 
+> Seed thực tế (RolesPermissionsSeeder): `user.viewSelf`, `user.updateSelf`, `user.manage`, `report.viewPersonal`, `report.viewDepartment`, `report.export`, `rules.manage`, `quota.manage`, `rbac.manage`. GV: `user.viewSelf`,`user.updateSelf`,`report.viewPersonal`; DL: `report.viewDepartment`,`report.export`; QL: `report.viewDepartment`,`report.export`,`rules.manage`,`quota.manage`; ADMIN: toàn bộ các quyền trên. Nhóm `activity.*`, `evidence.*` hiện chỉ là gợi ý, chưa seed.
+
 **Luồng trạng thái:**
 
 -   GV: `draft → submitted`
@@ -403,10 +458,25 @@ _Ngày xuất bản:_ 2025-11-10 17:50:54
 
 ---
 
-## 8) Cập nhật 2025-11-12 (migration `2025_11_12_190000_update_research_details_tables`)
+## 8) Cập nhật 2025-11-11 (migration `2025_11_11_170748_alter_lecturers_email_and_unique_user`)
+
+-   `lecturers.email` cho phép NULL (không còn UNIQUE) để tránh trùng với `users.email`.
+-   Thêm UNIQUE(`user_id`) để đảm bảo 1-1 giữa `users` và `lecturers`.
+
+---
+
+## 9) Cập nhật 2025-11-12 (migration `2025_11_12_190000_update_research_details_tables`)
 
 -   `paper_details`: thêm `page_start` INT NULL sau `issue`, thêm `page_end` INT NULL sau `page_start`, thêm `article_url` VARCHAR(500) NULL sau `doi` để lưu range trang và link bài báo.
 -   `project_details`: thêm `decision_no` VARCHAR(100) NULL sau `project_code`, thêm `decision_date` DATE NULL sau `decision_no` để theo dõi quyết định phê duyệt dự án.
 -   `book_details`: thêm `approval_decision_no` VARCHAR(100) NULL sau `publisher`, thêm `approval_decision_date` DATE NULL sau `approval_decision_no` để quản lý thông tin phê duyệt giáo trình/sách.
 
 ---
+
+## 10) Cập nhật 2025-11-21 (các bảng hồ sơ giảng viên)
+
+-   Thêm bảng 1-1 `lecturer_profiles` (nhân thân, liên hệ mở rộng, thông tin hiện tại, hồ sơ khoa học).
+-   Thêm bảng 1-1 `lecturer_party_memberships` (`is_member`, `membership_no`, ngày vào/CT, chi bộ, chức vụ, trạng thái, ghi chú).
+-   Thêm bảng nhiều dòng `lecturer_training_histories` (đào tạo): trường, chuyên ngành, quốc gia/tỉnh, thời gian, hình thức, nguồn kinh phí, văn bằng.
+-   Thêm bảng nhiều dòng `lecturer_work_histories` (công tác): tổ chức, vị trí, phòng ban, nơi làm việc, thời gian, loại HĐ, lý do rời, ghi chú.
+-   Thêm bảng nhiều dòng `lecturer_language_proficiencies` (ngoại ngữ): ngôn ngữ, mức độ, native flag, chứng chỉ/cấp/điểm, nơi cấp, ngày cấp/hết hạn, ghi chú.
