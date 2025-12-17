@@ -15,7 +15,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        // Dọn PAT hết hạn của Sanctum (giữ lại token đã hết hạn <= 48h để tránh xóa nhầm log)
+        $schedule->command('sanctum:prune-expired --hours=48')->daily();
     }
 
     /**

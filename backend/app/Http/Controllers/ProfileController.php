@@ -14,11 +14,13 @@ class ProfileController extends Controller
     public function me(Request $request)
     {
         $u = $request->user();
+
         return response()->json([
             'id'    => $u->id,
             'name'  => $u->name,
             'email' => $u->email,
-            'roles' => $u->getRoleNames(),
+            'roles' => \App\Support\RoleMapper::backendListToCanonical($u->getRoleNames()->all()),
+            'backend_roles' => $u->getRoleNames(),
         ]);
     }
 
@@ -51,6 +53,15 @@ class ProfileController extends Controller
         $user = $request->user();
         $user->fill($data)->save();
 
-        return response()->json(['message' => 'profile updated'], Response::HTTP_OK);
+        return response()->json([
+            'message' => 'profile updated',
+            'user' => [
+                'id'    => $user->id,
+                'name'  => $user->name,
+                'email' => $user->email,
+                'roles' => \App\Support\RoleMapper::backendListToCanonical($user->getRoleNames()->all()),
+                'backend_roles' => $user->getRoleNames(),
+            ],
+        ], Response::HTTP_OK);
     }
 }

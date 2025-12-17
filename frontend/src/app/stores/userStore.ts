@@ -1,101 +1,178 @@
-import { defineStore } from "pinia";
+﻿import { defineStore } from "pinia";
+import {
+  login as apiLogin,
+  logout as apiLogout,
+  fetchCurrentUser as apiFetchCurrentUser,
+} from "@/features/auth/api";
 
 export type UserRole = "LECTURER" | "DEPARTMENT_BOARD" | "SCIENCE_OFFICE";
 
 interface User {
   id: string;
   name: string;
-  code: string;
-  department: string;
-  roles: UserRole[]; // 👈 1 user có thể có nhiều role
+  email: string;
+  code?: string;
+  department?: string;
+  roles: UserRole[];
   avatar?: string;
 }
 
 interface LoginPayload {
-  username: string;
+  email: string;
   password: string;
+  role: UserRole;
 }
+
+type AuthErrorCode =
+  | null
+  | "UNAUTHENTICATED"
+  | "UNVERIFIED_EMAIL"
+  | "FORBIDDEN_MISSING_ROLE"
+  | "FORBIDDEN"
+  | "UNKNOWN";
+
+const mapBackendRole = (role: string): UserRole | null => {
+  switch ((role || "").toUpperCase()) {
+    case "GV":
+    case "LECTURER":
+      return "LECTURER";
+    case "DL":
+    case "DEPARTMENT_BOARD":
+      return "DEPARTMENT_BOARD";
+    case "QL":
+    case "ADMIN":
+    case "SCIENCE_OFFICE":
+      return "SCIENCE_OFFICE";
+    default:
+      return null;
+  }
+};
+
+const mapBackendRoles = (roles: string[] = [], fallback: string[] = []): UserRole[] => {
+  const source = roles.length ? roles : fallback;
+  const mapped = source
+    .map((r) => mapBackendRole(r))
+    .filter((r): r is UserRole => Boolean(r));
+  return Array.from(new Set(mapped));
+};
+
 
 export const useUserStore = defineStore("user", {
   state: () => ({
     currentUser: null as User | null,
-    currentRole: null as UserRole | null, // 👈 role đang được chọn
+    currentRole: null as UserRole | null, // role dang chon
+    _initPromise: null as Promise<User | null> | null,
+    isInitialized: false,
+    authErrorCode: null as AuthErrorCode,
+    authErrorMessage: null as string | null,
   }),
 
   getters: {
     isAuthenticated: (state) => !!state.currentUser,
-    role: (state) => state.currentRole, // 👈 dùng getter này ở menu, guard, sidebar
+    role: (state) => state.currentRole,
   },
 
   actions: {
-    login(payload: LoginPayload) {
-      const mockAccounts: { username: string; password: string; user: User }[] =
-        [
-          {
-            username: "gv",
-            password: "123",
-            user: {
-              id: "GV001",
-              name: "Nguyễn Văn A",
-              code: "48.01.104.001",
-              department: "Khoa CNTT",
-              roles: ["LECTURER"], // chỉ là giảng viên
-              avatar: "https://i.pravatar.cc/100?img=1",
-            },
-          },
-          {
-            username: "bcn",
-            password: "123",
-            user: {
-              id: "BCN001",
-              name: "Trần Thị B",
-              code: "48.01.104.002",
-              department: "Khoa CNTT",
-              roles: ["DEPARTMENT_BOARD"], // chỉ BCN
-              avatar: "https://i.pravatar.cc/100?img=5",
-            },
-          },
-          {
-            username: "qlkh",
-            password: "123",
-            user: {
-              id: "QLKH001",
-              name: "Phạm Quốc C",
-              code: "48.01.104.003",
-              department: "Phòng QLKH",
-              roles: ["SCIENCE_OFFICE"], // chỉ QLKH
-              avatar: "https://i.pravatar.cc/100?img=12",
-            },
-          },
-          {
-            // 👉 TÀI KHOẢN ĐA VAI TRÒ: vừa là GV vừa là QLKH
-            username: "multi",
-            password: "123",
-            user: {
-              id: "M001",
-              name: "Nguyễn Đa Vai Trò",
-              code: "48.01.104.999",
-              department: "Khoa CNTT",
-              roles: ["LECTURER", "SCIENCE_OFFICE"],
-              avatar: "https://i.pravatar.cc/100?img=20",
-            },
-          },
-        ];
+    async initAuth() {
+      if (this.isInitialized && !this._initPromise) return this.currentUser;
+      if (this._initPromise) return this._initPromise;
+      // reset error state before fetch
+      this.authErrorCode = null;
+      this.authErrorMessage = null;
 
-      const found = mockAccounts.find(
-        (acc) =>
-          acc.username === payload.username && acc.password === payload.password
-      );
+      this._initPromise = (async () => {
+        try {
+          const { data } = await apiFetchCurrentUser();
+          const mappedRoles = mapBackendRoles(
+            data?.roles ?? [],
+            data?.backend_roles ?? []
+          );
+          if (!mappedRoles.length) {
+            this.currentUser = null;
+            this.currentRole = null;
+            return null;
+          }
+          this.authErrorCode = null;
+          this.authErrorMessage = null;
+          this.currentUser = {
+            id: String(data.id ?? ""),
+            name: data.name ?? "",
+            email: data.email ?? "",
+            roles: mappedRoles,
+            code: data.code,
+            department: data.department,
+            avatar: data.avatar,
+          };
+          if (
+            !this.currentRole ||
+            !this.currentUser.roles.includes(this.currentRole)
+          ) {
+            this.currentRole = mappedRoles[0] ?? null;
+          }
+          return this.currentUser;
+        } catch (err: any) {
+          const status = err?.response?.status;
+          const code: AuthErrorCode =
+            err?.response?.data?.code || (status === 401
+              ? "UNAUTHENTICATED"
+              : status === 403
+              ? "FORBIDDEN"
+              : "UNKNOWN");
+          this.authErrorCode = code;
+          this.authErrorMessage =
+            err?.response?.data?.message ||
+            (status === 401
+              ? "Unauthenticated"
+              : status === 403
+              ? "Forbidden"
+              : "Không thể tải thông tin người dùng");
+          this.currentUser = null;
+          this.currentRole = null;
+          return null;
+        } finally {
+          this.isInitialized = true;
+          this._initPromise = null;
+        }
+      })();
 
-      if (!found) {
-        throw new Error("SAI_TAI_KHOAN");
-      }
-
-      this.currentUser = found.user;
-      this.currentRole = found.user.roles[0] ?? null; // default role đầu tiên
+      return this._initPromise;
     },
 
-    // đổi role đang dùng
+    // Backward-compatible alias
+    async ensureCurrentUser() {
+      return this.initAuth();
+    },
+
+    async login(payload: LoginPayload) {
+      // Gửi role ở dạng canonical (LECTURER/DEPARTMENT_BOARD/SCIENCE_OFFICE) để khớp với backend response
+      const { data } = await apiLogin({
+        email: payload.email,
+        password: payload.password,
+        role: payload.role,
+      });
+
+      const mappedRoles = mapBackendRoles(
+        data?.user?.roles ?? [],
+        data?.user?.backend_roles ?? []
+      );
+
+
+      this.currentUser = {
+        id: String(data.user.id ?? ""),
+        name: data.user.name ?? "",
+        email: data.user.email ?? "",
+        roles: mappedRoles,
+        code: data.user.code,
+        department: data.user.department,
+        avatar: data.user.avatar,
+      };
+      this.currentRole = mappedRoles[0] ?? null;
+      this.isInitialized = true;
+      this._initPromise = null;
+
+      return mappedRoles;
+    },
+
     setRole(role: UserRole) {
       if (!this.currentUser) throw new Error("CHUA_DANG_NHAP");
 
@@ -106,9 +183,16 @@ export const useUserStore = defineStore("user", {
       this.currentRole = role;
     },
 
-    logout() {
+    async logout() {
+      try {
+        await apiLogout();
+      } catch (e) {
+        // best effort
+      }
       this.currentUser = null;
       this.currentRole = null;
+      this._initPromise = null;
+      this.isInitialized = false;
     },
   },
 });

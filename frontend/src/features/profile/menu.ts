@@ -45,6 +45,12 @@ export const profileMenuItems: MenuItem[] = [
     roles: PROFILE_ROLES,
   },
   {
+    id: "profile-research",
+    label: "Lĩnh vực nghiên cứu ",
+    routeName: "profile.research",
+    roles: PROFILE_ROLES,
+  },
+  {
     id: "profile-languages",
     label: "Trình độ ngoại ngữ",
     routeName: "profile.languages",

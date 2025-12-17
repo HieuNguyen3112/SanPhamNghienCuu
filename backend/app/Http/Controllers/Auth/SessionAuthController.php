@@ -10,29 +10,64 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Laravel\Sanctum\PersonalAccessToken;
+use Illuminate\Validation\Rule;
+use App\Support\RoleMapper;
 
 class SessionAuthController extends Controller
 {
     /**
      * POST /login (session + CSRF)
+     *
+     * Payload: email, password, remember?
+     * Success response: { success, message, token: null, user: { id, name, email, roles } }
+     * Lưu ý: không phát hành Sanctum PAT cho SPA login; field token luôn null để giữ nguyên schema phản hồi.
      */
     public function login(Request $request)
     {
+        $allowedRoles = RoleMapper::canonicalRoles();
+
+        if (Auth::guard('web')->check()) {
+            /** @var \App\Models\User|null $user */
+            $user = Auth::user();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ban da dang nhap roi',
+                'token'   => null,
+                'user'    => $user ? [
+                    'id'    => $user->id,
+                    'name'  => $user->name,
+                    'email' => $user->email,
+                    'roles' => RoleMapper::backendListToCanonical($user->getRoleNames()->values()->all()),
+                    'backend_roles' => $user->getRoleNames()->values()->all(),
+                ] : null,
+            ], Response::HTTP_OK); // 200: keep SPA flow happy without creating a new session/token
+        }
+
+        $incomingRole = $request->input('role');
+        if ($incomingRole) {
+            $normalizedRole = strtoupper((string) $incomingRole);
+
+            // Chấp nhận cả mã backend (GV/DL/QL/ADMIN) lẫn role canonical (LECTURER/DEPARTMENT_BOARD/SCIENCE_OFFICE)
+            if ($canonicalRole = RoleMapper::backendToCanonical($normalizedRole)) {
+                $request->merge(['role' => $canonicalRole]);
+            } elseif (in_array($normalizedRole, $allowedRoles, true)) {
+                $request->merge(['role' => $normalizedRole]);
+            }
+        }
+
         $data = $request->validate([
             'email'             => ['required', 'email'],
             'password'          => ['required', 'string'],
+            'role'              => ['required', 'string', Rule::in($allowedRoles)],
             'remember'          => ['sometimes', 'boolean'],
-            'token_name'        => ['sometimes', 'string', 'max:100'],
-            'token_abilities'   => ['sometimes', 'array'],
-            'token_abilities.*' => ['string'],
-            'single_device'     => ['sometimes', 'boolean'],
         ]);
 
         if (! Auth::guard('web')->attempt(
             ['email' => $data['email'], 'password' => $data['password']],
             $data['remember'] ?? false
         )) {
-            return response()->json(['message' => 'Invalid credentials'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
         /** @var \App\Models\User|null $user */
@@ -47,19 +82,21 @@ class SessionAuthController extends Controller
             return response()->json(['message' => 'Email not verified'], Response::HTTP_FORBIDDEN);
         }
 
-        $request->session()->regenerate();
-
-        $tokenName = $data['token_name'] ?? 'session-token';
-
-        if (! empty($data['single_device'])) {
-            $user->tokens()->where('name', $tokenName)->delete();
+        $backendRolesForRequest = RoleMapper::canonicalToBackend($data['role']);
+        $hasAcceptedRole = false;
+        foreach ($backendRolesForRequest as $backendRole) {
+            if ($user->hasRole($backendRole)) {
+                $hasAcceptedRole = true;
+                break;
+            }
         }
 
-        $token = $user->createToken(
-            $tokenName,
-            $data['token_abilities'] ?? ['*']
-        );
-        $request->session()->put('session_token_id', $token->accessToken->id ?? null);
+        if (! $hasAcceptedRole) {
+            Auth::guard('web')->logout();
+            return response()->json(['message' => 'Role not allowed for this user'], Response::HTTP_FORBIDDEN);
+        }
+
+        $request->session()->regenerate();
 
         Log::info('login.success', [
             'user_id' => $user->id,
@@ -67,15 +104,17 @@ class SessionAuthController extends Controller
             'ua' => $request->userAgent(),
         ]);
 
+        // SPA session login: không tạo Personal Access Token; token luôn null để giữ schema phản hồi cũ.
         return response()->json([
             'success' => true,
             'message' => 'Dang nhap thanh cong',
-            'token'   => $token->plainTextToken,
+            'token'   => null,
             'user'    => [
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
-                'roles' => $user->getRoleNames()->values()->all(),
+                'roles' => RoleMapper::backendListToCanonical($user->getRoleNames()->values()->all()),
+                'backend_roles' => $user->getRoleNames()->values()->all(),
             ],
         ], Response::HTTP_OK);
     }

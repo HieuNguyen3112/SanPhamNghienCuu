@@ -15,11 +15,11 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
+    'stateful' => array_filter(array_map('trim', explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
         '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
+        'localhost,localhost:3000,localhost:5173,127.0.0.1,127.0.0.1:8000,127.0.0.1:5173,::1,spa.example.test',
         Sanctum::currentApplicationUrlWithPort()
-    ))),
+    ))))),
 
     /*
     |--------------------------------------------------------------------------
@@ -47,6 +47,8 @@ return [
     */
 
     'expiration' => env('SANCTUM_EXPIRATION', 120),
+    'refresh_threshold' => (int) env('SANCTUM_REFRESH_THRESHOLD', 5),
+    'revoke_old_on_rotate' => (bool) env('SANCTUM_REVOKE_OLD_ON_ROTATE', false),
 
     /*
     |--------------------------------------------------------------------------

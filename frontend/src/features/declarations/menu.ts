@@ -3,17 +3,11 @@ import type { MenuItem } from "@/app/config/menu.types";
 
 export const declarationsMenuGroup: MenuItem = {
   id: "grp-declarations",
-  label: "Quản lý công trình",
+  label: "Kê khai khoa học",
   roles: ["LECTURER"],
 };
 
 export const declarationMenuItems: MenuItem[] = [
-  {
-    id: "works-my-declarations",
-    label: "Công trình của tôi",
-    routeName: "works-my-declarations",
-    roles: ["LECTURER"],
-  },
   {
     id: "declarations-articles",
     label: "Bài báo khoa học",
@@ -36,6 +30,12 @@ export const declarationMenuItems: MenuItem[] = [
     id: "declarations-others",
     label: "Công trình khác",
     routeName: "declarations.others",
+    roles: ["LECTURER"],
+  },
+  {
+    id: "declarations-participatier",
+    label: "Thông báo xác nhận",
+    routeName: "declarations.participatier",
     roles: ["LECTURER"],
   },
 ];

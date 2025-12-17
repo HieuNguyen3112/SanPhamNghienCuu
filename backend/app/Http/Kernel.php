@@ -69,5 +69,6 @@ class Kernel extends HttpKernel
         'role'       => \Spatie\Permission\Middlewares\RoleMiddleware::class,
         'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
         'auto.rotate.sanctum' => \App\Http\Middleware\AutoRotateSanctumToken::class,
+        'force.json' => \App\Http\Middleware\ForceJsonResponse::class,
     ];
 }

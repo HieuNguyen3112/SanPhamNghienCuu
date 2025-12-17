@@ -8,9 +8,8 @@ use App\Http\Controllers\ProfileController;
 
 // AUTH (session/cookie, co CSRF)
 Route::middleware(['web'])->group(function () {
+    // Cong khai cho dang nhap/dang ky
     Route::post('/login',  [SessionAuthController::class, 'login'])->middleware('throttle:login');
-    Route::post('/logout', [SessionAuthController::class, 'logout'])->middleware('auth');
-
     Route::post('/register', [RegistrationController::class, 'register'])->middleware('throttle:login');
     Route::post('/password/forgot', [PasswordResetController::class, 'sendResetLinkEmail'])->middleware('throttle:6,1');
     Route::post('/password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:6,1');
@@ -25,10 +24,21 @@ Route::middleware(['web'])->group(function () {
         ->middleware(['auth', 'throttle:6,1'])
         ->name('verification.send');
 
-    // Profile (yeu cau dang nhap + verify neu can)
-    Route::middleware(['auth', 'verified'])->group(function () {
+    // Dang xuat
+    Route::post('/logout', [SessionAuthController::class, 'logout'])->middleware('auth');
+
+    // Profile: /me tra JSON ke ca loi (auth/verified/role) de tranh redirect/HTML
+    Route::middleware(['force.json', 'auth', 'verified', 'role:GV|DL|QL|ADMIN'])->group(function () {
         Route::get('/me', [ProfileController::class, 'me']);
+    });
+
+    Route::middleware(['auth', 'verified', 'role:GV|DL|QL|ADMIN'])->group(function () {
         Route::put('/profile', [ProfileController::class, 'updateProfile']);
         Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
+
+        // Nhom placeholder cho cac module web rieng theo role (them sau)
+        Route::middleware('role:ADMIN')->group(function () {
+            // TODO: them route quan tri web (neu can) - giu trong de sap xep middleware
+        });
     });
 });

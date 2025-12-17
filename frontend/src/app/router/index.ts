@@ -1,4 +1,4 @@
-import {
+﻿import {
   createRouter,
   createWebHistory,
   type RouteRecordRaw,
@@ -14,36 +14,37 @@ import { profileRoutes } from "@/features/profile/routes";
 import { declarationRoutes } from "@/features/declarations/routes";
 import { hoursRoutes } from "@/features/hours/routes";
 import { searchRoutes } from "@/features/search/routes";
-// =====================
-// CẤU HÌNH ROUTE CHUẨN
-// =====================
+import { researchWorksRoutes } from "@/features/research-works/routes";
+import { UserManagerRoutes } from "@/features/users/routes";
+
 const routes: RouteRecordRaw[] = [
-  // ===== LOGIN (public) =====
   {
     path: "/login",
     name: "login",
     component: LoginPage,
-    meta: { public: true },
+    meta: { guestOnly: true },
   },
-
-  // ===== LAYOUT CHÍNH (có bảo vệ) =====
   {
     path: "/",
     component: MainLayout,
+    meta: { requiresAuth: true },
     children: [
-      { path: "", redirect: "/profile" }, // Trang mặc định
+      { path: "", redirect: "/profile" },
       ...profileRoutes,
       ...declarationRoutes,
       ...hoursRoutes,
       ...searchRoutes,
+      ...researchWorksRoutes,
+      ...UserManagerRoutes,
     ],
   },
-
-  // ===== NOT FOUND =====
   {
-    path: "/",
-    redirect: "/login",
+    path: "/403",
+    name: "forbidden",
+    component: () => import("@/features/errors/pages/ForbiddenPage.vue"),
+    meta: { requiresAuth: true },
   },
+  { path: "/:pathMatch(.*)*", redirect: "/login", meta: { guestOnly: true } },
 ];
 
 const router = createRouter({
@@ -51,24 +52,44 @@ const router = createRouter({
   routes,
 });
 
-// =====================
-// ROUTER GUARD
-// =====================
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const userStore = useUserStore();
 
-  // Route công khai (login)
-  if (to.meta.public) return true;
+  const requiresAuth = to.matched.some(
+    (record) => record.meta.requiresAuth === true
+  );
+  const isGuestOnly = to.matched.some(
+    (record) => record.meta.guestOnly === true
+  );
+  const requiredRoles = to.matched
+    .map((record) => record.meta.roles as string[] | undefined)
+    .find((roles) => Array.isArray(roles) && roles.length);
 
-  // Chưa đăng nhập → về login
-  if (!userStore.isAuthenticated) {
-    return { name: "login" };
+  const needsSession = requiresAuth || isGuestOnly || Boolean(requiredRoles);
+
+  if (needsSession && !userStore.isInitialized) {
+    await userStore.initAuth();
   }
 
-  // Kiểm tra quyền truy cập theo role nếu có meta.roles
-  const allowedRoles = to.meta.roles as string[] | undefined;
-  if (allowedRoles && !allowedRoles.includes(userStore.role!)) {
-    return "/"; // hoặc chuyển tới trang 403
+  const isAuthenticated = userStore.isAuthenticated;
+
+  if (isGuestOnly && isAuthenticated) {
+    return { path: "/", replace: true };
+  }
+
+  if (requiresAuth && !isAuthenticated) {
+    const redirectQuery =
+      to.fullPath && to.fullPath !== "/login"
+        ? { query: { redirect: to.fullPath } }
+        : {};
+    return { name: "login", replace: true, ...redirectQuery };
+  }
+
+  if (requiredRoles) {
+    const currentRole = userStore.role;
+    if (!currentRole || !requiredRoles.includes(currentRole)) {
+      return { path: "/403", replace: true };
+    }
   }
 
   return true;

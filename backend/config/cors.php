@@ -15,15 +15,24 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout'],
+    // Thêm /me + profile/* vì SPA dùng session/cookie ở các endpoint này (không nằm dưới /api)
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'me', 'profile/*'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    'allowed_origins' => array_map('trim', explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173'))),
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => [
+        'Content-Type',
+        'X-Requested-With',
+        'X-XSRF-TOKEN',
+        'XSRF-TOKEN',
+        'X-CSRF-TOKEN',
+        'Accept',
+        'Authorization',
+    ],
 
     'exposed_headers' => [],
 

@@ -17,7 +17,7 @@ class AutoRotateSanctumToken
             $user = $request->user();
             $pat  = $user->currentAccessToken();
             $left = SanctumToken::minutesLeft($pat);
-            $thr  = (int) config('token.sanctum_refresh_threshold', 5);
+            $thr  = (int) config('sanctum.refresh_threshold', 5);
 
             if ($left !== null && $left <= $thr) {
                 // cấp token mới, giữ abilities cũ nếu có
@@ -29,7 +29,7 @@ class AutoRotateSanctumToken
                 $response->headers->set('X-Token-Minutes-Left', (string) $left);
 
                 // tuỳ chọn: đánh dấu revoke token cũ ở terminate
-                if (config('token.revoke_old_on_rotate', false) && $pat) {
+                if (config('sanctum.revoke_old_on_rotate', false) && $pat) {
                     $request->attributes->set('old_pat_id', $pat->id);
                 }
             }
@@ -40,7 +40,7 @@ class AutoRotateSanctumToken
 
     public function terminate($request, $response)
     {
-        if (config('token.revoke_old_on_rotate', false)) {
+        if (config('sanctum.revoke_old_on_rotate', false)) {
             if ($oldId = $request->attributes->get('old_pat_id')) {
                 PAT::where('id', $oldId)->delete();
             }

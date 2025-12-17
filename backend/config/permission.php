@@ -2,6 +2,11 @@
 
 return [
 
+    /*
+     * Guard mặc định cho roles/permissions (phù hợp login web)
+     */
+    'default_guard' => 'web',
+
     'models' => [
 
         /*
@@ -136,7 +141,8 @@ return [
     /*
      * The class to use to resolve the permissions team id
      */
-    'team_resolver' => \Spatie\Permission\DefaultTeamResolver::class,
+    // Không dùng teams => đặt null để tránh cảnh báo class không tồn tại trong phiên bản hiện tại
+    'team_resolver' => null,
 
     /*
      * Passport Client Credentials Grant
