@@ -12,11 +12,14 @@ import LoginPage from "@/features/auth/pages/LoginPage.vue";
 // Features
 import { profileRoutes } from "@/features/profile/routes";
 import { declarationRoutes } from "@/features/declarations/routes";
-import { hoursRoutes } from "@/features/hours/routes";
+import { hoursRoutes } from "@/features/scientific/hours/routes";
 import { searchRoutes } from "@/features/search/routes";
-import { researchWorksRoutes } from "@/features/research-works/routes";
+import { researchWorksRoutes } from "@/features/scientific/routes";
 import { UserManagerRoutes } from "@/features/users/routes";
-
+import { reportRoutes } from "@/features/reports/routes";
+// =====================
+// CẤU HÌNH ROUTE CHUẨN
+// =====================
 const routes: RouteRecordRaw[] = [
   {
     path: "/login",
@@ -36,6 +39,7 @@ const routes: RouteRecordRaw[] = [
       ...searchRoutes,
       ...researchWorksRoutes,
       ...UserManagerRoutes,
+      ...reportRoutes,
     ],
   },
   {

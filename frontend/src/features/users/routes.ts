@@ -1,4 +1,4 @@
-import UserManagementPage from "@/features/users/pages/UserManagementView.vue";
+import UserManagementPage from "@/features/users/pages/UserManagementPage.vue";
 import OrgStructureManagementPage from "@/features/users/pages/OrgStructureManagementPage.vue";
 import type { RouteRecordRaw } from "vue-router";
 export const UserManagerRoutes: RouteRecordRaw[] = [

@@ -3,7 +3,7 @@
 import { ref } from "vue";
 import { RouterView, useRouter } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
-
+import { useLayoutStore } from "@/app/stores/layoutStore";
 import Sidebar from "@/shared/components/layout/Sidebar.vue";
 import Navbar from "@/shared/components/layout/Navbar.vue";
 import ChangePasswordModal from "@/features/auth/components/ChangePasswordModal.vue";
@@ -11,6 +11,7 @@ import ChangePasswordModal from "@/features/auth/components/ChangePasswordModal.
 const userStore = useUserStore();
 const router = useRouter();
 
+const layout = useLayoutStore();
 const isSidebarOpen = ref(true);
 const isChangePasswordOpen = ref(false);
 
@@ -26,7 +27,11 @@ const handleLogout = async () => {
 
 <template>
   <div class="flex h-screen bg-slate-100">
-    <Sidebar :is-open="isSidebarOpen" />
+    <Sidebar
+      :is-open="isSidebarOpen"
+      :is-collapsed="layout.isSidebarCollapsed"
+      @toggle-collapse="layout.toggleSidebarCollapse()"
+    />
 
     <div class="flex flex-col flex-1">
       <Navbar

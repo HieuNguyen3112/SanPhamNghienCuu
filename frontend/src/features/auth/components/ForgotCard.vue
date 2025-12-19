@@ -67,7 +67,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { BaseInput, BaseButton } from "../../../shared/components/form/index";
+import { BaseInput, BaseButton } from "../../../shared/form/index";
 
 const emit = defineEmits<{
   (e: "back-to-login"): void;

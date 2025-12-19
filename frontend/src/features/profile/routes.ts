@@ -8,7 +8,6 @@ import ProfileEducationView from "../../features/profile/pages/ProfileEducationV
 import ProfileAcademicRankView from "@/features/profile/pages/ProfileAcademicRankView.vue";
 import ProfileLanguageSkillsView from "@/features/profile/pages/ProfileLanguageSkillsView.vue";
 import ProfileResearchAreaView from "@/features/profile/pages/ProfileResearchAreaView.vue";
-
 export const profileRoutes: RouteRecordRaw[] = [
   {
     path: "profile",

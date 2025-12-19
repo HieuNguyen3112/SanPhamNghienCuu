@@ -83,7 +83,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { BaseInput, BaseButton } from "@/shared/components/form";
+import { BaseInput, BaseButton } from "@/shared/form";
 
 interface LoginCardProps {
   email: string;

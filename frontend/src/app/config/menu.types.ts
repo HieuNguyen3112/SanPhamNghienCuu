@@ -1,5 +1,6 @@
 // src/app/config/menu.types.ts
 import type { UserRole } from "@/app/stores/userStore";
+import type { Component } from "vue";
 
 // Route name dùng trong app
 export type AppRouteName =
@@ -21,7 +22,8 @@ export type AppRouteName =
   | "declarations.participatier"
   | "works-my-declarations"
   // duyet cong trinh cho manager
-  | "works.approvals"
+  | "works.facapprovals"
+  | "works.uniapprovals"
   | "work.overview"
   // quan ly gio nckh cho giang vien
   | "hours.my"
@@ -33,7 +35,11 @@ export type AppRouteName =
   | "hours.batchDetail"
   | "search.global"
   | "user.manager"
-  | "userorg.structure";
+  | "userorg.structure"
+  | "report.lecturer"
+  | "report.research"
+  | "hours.warning"
+  | "report.hour-research";
 
 // sau này thêm route thì bổ sung vào đây
 
@@ -41,5 +47,6 @@ export interface MenuItem {
   id: string;
   label: string;
   routeName?: AppRouteName; // header thì không có
-  roles?: UserRole[]; // menu áp dụng cho role nào
+  roles?: UserRole[];
+  icon?: Component; // NEW: icon component
 }

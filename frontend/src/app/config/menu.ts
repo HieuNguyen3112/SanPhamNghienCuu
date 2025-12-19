@@ -8,7 +8,10 @@ import {
   declarationsMenuGroup,
   declarationMenuItems,
 } from "@/features/declarations/menu";
-import { hoursMenuGroup, hoursMenuItems } from "@/features/hours/menu";
+import {
+  hoursMenuGroup,
+  hoursMenuItems,
+} from "@/features/scientific/hours/menu";
 import {
   UserManagerMenuGroup,
   UserManagerMenuItems,
@@ -16,9 +19,10 @@ import {
 import {
   researchWorksMenuGroup,
   researchWorksMenuItems,
-} from "@/features/research-works/menu";
+} from "@/features/scientific/menu";
 
 import { searchMenuGroup, searchMenuItems } from "@/features/search/menu";
+import { reportMenuGroup, reportMenuItems } from "@/features/reports/menu";
 // Ghép toàn bộ menu (chung cho mọi role)
 const allMenuItems: MenuItem[] = [
   // quan ly thong tin ca nhan
@@ -36,6 +40,8 @@ const allMenuItems: MenuItem[] = [
   UserManagerMenuGroup,
   ...UserManagerMenuItems,
   // tra cuu cong trinh
+  reportMenuGroup,
+  ...reportMenuItems,
   searchMenuGroup,
   ...searchMenuItems,
 ];

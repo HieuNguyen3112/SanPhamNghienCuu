@@ -5,6 +5,9 @@ import type { LecturerUser } from "@/features/users/types";
 interface UserTableProps {
   users: LecturerUser[];
   loading: boolean;
+
+  /** Cho phép set chiều cao bảng từ ngoài (vd: "max-h-[70vh]" hoặc "max-h-[520px]") */
+  maxHeightClass?: string;
 }
 
 interface UserTableEmits {
@@ -14,7 +17,10 @@ interface UserTableEmits {
   (e: "manage-roles", user: LecturerUser): void;
 }
 
-const props = defineProps<UserTableProps>();
+const props = withDefaults(defineProps<UserTableProps>(), {
+  maxHeightClass: "max-h-[70vh]",
+});
+
 const emit = defineEmits<UserTableEmits>();
 
 const openMenuUser = ref<LecturerUser | null>(null);
@@ -22,7 +28,6 @@ const menuTop = ref(0);
 const menuLeft = ref(0);
 
 const openMenu = (user: LecturerUser, event: MouseEvent) => {
-  // Nếu menu đang mở cho đúng user này -> đóng lại (toggle)
   if (openMenuUser.value && openMenuUser.value.id === user.id) {
     closeMenu();
     return;
@@ -32,7 +37,7 @@ const openMenu = (user: LecturerUser, event: MouseEvent) => {
   if (!target) return;
 
   const rect = target.getBoundingClientRect();
-  const menuWidth = 224; // ~ w-56
+  const menuWidth = 256; // ~ w-56
   const gap = 8;
 
   let left = rect.right - menuWidth;
@@ -69,100 +74,103 @@ const onManageRoles = (user: LecturerUser) => {
 </script>
 
 <template>
-  <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
-      <thead
-        class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"
-      >
-        <tr>
-          <th class="px-3 py-2 text-left">Giảng viên</th>
-          <th class="px-3 py-2 text-left">Email</th>
-          <th class="px-3 py-2 text-left">Tài khoản</th>
-          <th class="px-3 py-2 text-left">Đơn vị</th>
-          <th class="px-3 py-2 text-left">Vai trò</th>
-          <th class="px-3 py-2 text-left">Trạng thái</th>
-          <th class="px-3 py-2 text-center">Thao tác</th>
-        </tr>
-      </thead>
-
-      <tbody class="divide-y divide-slate-100 bg-white">
-        <!-- Loading -->
-        <tr v-if="loading">
-          <td colspan="7" class="px-4 py-6 text-center text-slate-500">
-            Đang tải dữ liệu...
-          </td>
-        </tr>
-
-        <!-- Empty -->
-        <tr v-else-if="!users.length">
-          <td colspan="7" class="px-4 py-6 text-center text-slate-500">
-            Chưa có tài khoản nào phù hợp với bộ lọc.
-          </td>
-        </tr>
-
-        <!-- Rows -->
-        <tr
-          v-else
-          v-for="user in users"
-          :key="user.id"
-          class="align-top hover:bg-slate-50"
+  <div class="w-full">
+    <!-- ✅ Fixed height scroll container -->
+    <div class="overflow-auto" :class="props.maxHeightClass">
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead
+          class="sticky top-0 z-10 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"
         >
-          <td class="px-3 py-3">
-            <p class="text-sm font-medium text-slate-800">
-              {{ user.fullName }}
-            </p>
-            <p v-if="user.staffCode" class="text-xs text-slate-400">
-              Mã CB: {{ user.staffCode }}
-            </p>
-          </td>
+          <tr>
+            <th class="px-3 py-2 text-left">Giảng viên</th>
+            <th class="px-3 py-2 text-left">Email</th>
+            <th class="px-3 py-2 text-left">Tài khoản</th>
+            <th class="px-3 py-2 text-left">Đơn vị</th>
+            <th class="px-3 py-2 text-left">Vai trò</th>
+            <th class="px-3 py-2 text-left">Trạng thái</th>
+            <th class="px-3 py-2 text-center">Thao tác</th>
+          </tr>
+        </thead>
 
-          <td class="px-3 py-3 text-sm text-slate-700">
-            {{ user.email }}
-          </td>
+        <tbody class="divide-y divide-slate-100 bg-white">
+          <!-- Loading -->
+          <tr v-if="loading">
+            <td colspan="7" class="px-4 py-6 text-center text-slate-500">
+              Đang tải dữ liệu...
+            </td>
+          </tr>
 
-          <td class="px-3 py-3 text-sm text-slate-700">
-            {{ user.username }}
-          </td>
+          <!-- Empty -->
+          <tr v-else-if="!users.length">
+            <td colspan="7" class="px-4 py-6 text-center text-slate-500">
+              Chưa có tài khoản nào phù hợp với bộ lọc.
+            </td>
+          </tr>
 
-          <td class="px-3 py-3 text-sm text-slate-700">
-            {{ user.department }}
-          </td>
+          <!-- Rows -->
+          <tr
+            v-else
+            v-for="user in users"
+            :key="user.id"
+            class="align-top hover:bg-slate-50"
+          >
+            <td class="px-3 py-3">
+              <p class="text-sm font-medium text-slate-800">
+                {{ user.fullName }}
+              </p>
+              <p v-if="user.staffCode" class="text-xs text-slate-400">
+                Mã CB: {{ user.staffCode }}
+              </p>
+            </td>
 
-          <td class="px-3 py-3 text-xs text-slate-700">
-            <span
-              v-for="(role, idx) in user.roles"
-              :key="role + idx"
-              class="mr-1 inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[11px]"
-            >
-              {{ role }}
-            </span>
-          </td>
+            <td class="px-3 py-3 text-sm text-slate-700">
+              {{ user.email }}
+            </td>
 
-          <td class="px-3 py-3 text-sm">
-            <span
-              class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-              :class="
-                user.isActive
-                  ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                  : 'border-slate-200 bg-slate-50 text-slate-500'
-              "
-            >
-              {{ user.isActive ? "Đang hoạt động" : "Đã khóa" }}
-            </span>
-          </td>
+            <td class="px-3 py-3 text-sm text-slate-700">
+              {{ user.username }}
+            </td>
 
-          <td class="px-3 py-3 text-center text-xs">
-            <button
-              type="button"
-              class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50"
-              @click.stop="openMenu(user, $event)"
-            >
-              <span class="text-base leading-none">⋮</span>
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            <td class="px-3 py-3 text-sm text-slate-700">
+              {{ user.department }}
+            </td>
+
+            <td class="px-3 py-3 text-xs text-slate-700">
+              <span
+                v-for="(role, idx) in user.roles"
+                :key="role + idx"
+                class="mr-1 inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[11px]"
+              >
+                {{ role }}
+              </span>
+            </td>
+
+            <td class="px-3 py-3 text-sm">
+              <span
+                class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                :class="
+                  user.isActive
+                    ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-500'
+                "
+              >
+                {{ user.isActive ? "Đang hoạt động" : "Đã khóa" }}
+              </span>
+            </td>
+
+            <td class="px-3 py-3 text-center text-xs">
+              <button
+                type="button"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50"
+                @click.stop="openMenu(user, $event)"
+              >
+                <span class="text-base leading-none">⋮</span>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <!-- Menu teleport ra body để không bị cắt bởi scroll -->
     <Teleport to="body">
@@ -177,10 +185,7 @@ const onManageRoles = (user: LecturerUser) => {
         <div
           v-if="openMenuUser"
           class="fixed z-50"
-          :style="{
-            top: `${menuTop}px`,
-            left: `${menuLeft}px`,
-          }"
+          :style="{ top: `${menuTop}px`, left: `${menuLeft}px` }"
           @click.stop
         >
           <div
