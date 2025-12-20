@@ -6,7 +6,11 @@
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
-          @exportPdfClicked="showExportNotImplementedMessage('PDF')"
+          title="Thống kê công trình nghiên cứu khoa học"
+          subtitle="Tổng quan công trình nghiên cứu khoa học trong trường đại học"
+          :show-export-pdf="true"
+          :show-export-excel="true"
+          exportPdfClicked="showExportNotImplementedMessage('PDF')"
           @exportExcelClicked="showExportNotImplementedMessage('Excel')"
         />
       </div>
@@ -112,7 +116,7 @@ import ResearchDetailModal from "../components/ResearchDetailModal.vue";
 import DepartmentStackedBarChart from "..//components/charts/DepartmentStackedBarChart.vue";
 import WorksOverYearsLineChart from "..//components/charts/WorksOverYearsLineChart.vue";
 import ResearchTypeDonutChart from "..//components/charts/ResearchTypeDonutChart.vue";
-import PageHeader from "../components/PageHeader.vue";
+import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import {
   useResearchMockData,
   type ResearchWork,

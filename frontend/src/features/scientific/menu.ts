@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   ShieldCheck,
   AlertTriangle,
+  BarChart3,
 } from "lucide-vue-next";
 
 // Nếu MenuItem CHƯA có field icon thì bạn thêm:
@@ -21,19 +22,33 @@ export const researchWorksMenuGroup: MenuItem & { icon?: Component } = {
 };
 
 export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
+  // {
+  //   id: "works-my-declarations",
+  //   label: "Công trình của tôi",
+  //   routeName: "works-my-declarations",
+  //   icon: User,
+  //   roles: ["LECTURER"],
+  // },
   {
-    id: "works-my-declarations",
+    id: "works-personal",
     label: "Công trình của tôi",
-    routeName: "works-my-declarations",
+    routeName: "works.personal",
     icon: User,
     roles: ["LECTURER"],
   },
   {
-    id: "works-pverview",
+    id: "works-facmanagement",
     label: "Quản lý công trình NCKH",
-    routeName: "work.overview",
+    routeName: "works.facmanagement",
     icon: LayoutDashboard,
-    roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
+    roles: ["DEPARTMENT_BOARD"],
+  },
+  {
+    id: "works-unimanagement",
+    label: "Quản lý công trình NCKH",
+    routeName: "works.unimanagement",
+    icon: LayoutDashboard,
+    roles: ["SCIENCE_OFFICE"],
   },
   {
     id: "works-facapproval",
@@ -55,5 +70,33 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     routeName: "hours.warning",
     icon: AlertTriangle,
     roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
+  },
+  {
+    id: "hours-facmanagement",
+    label: "Quản lý giờ NCKH ",
+    routeName: "hours.facmanagement",
+    icon: BarChart3,
+    roles: ["DEPARTMENT_BOARD"],
+  },
+  {
+    id: "hours-unimanagement",
+    label: "Quản lý giờ NCKH",
+    routeName: "hours.unimanagement",
+    icon: BarChart3,
+    roles: ["SCIENCE_OFFICE"],
+  },
+  {
+    id: "hours.facapprovals",
+    label: "Xét duyệt giờ NCKH",
+    routeName: "hours.facapprovals",
+    icon: ClipboardCheck,
+    roles: ["DEPARTMENT_BOARD"],
+  },
+  {
+    id: "hours.uniapprovals",
+    label: "Xét duyệt giờ NCKH",
+    routeName: "hours.uniapprovals",
+    icon: ClipboardCheck,
+    roles: ["SCIENCE_OFFICE"],
   },
 ];

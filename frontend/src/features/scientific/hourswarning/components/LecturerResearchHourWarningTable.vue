@@ -23,7 +23,7 @@
     </div>
 
     <div class="overflow-auto">
-      <table class="min-w-[980px] w-full border-collapse">
+      <table class="min-w-[100px] w-full border-collapse">
         <thead class="sticky top-0 z-10 bg-slate-50">
           <tr class="border-b border-slate-200">
             <th

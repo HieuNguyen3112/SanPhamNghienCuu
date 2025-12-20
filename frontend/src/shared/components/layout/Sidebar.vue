@@ -48,20 +48,17 @@
     </div>
     <!-- NÚT THU GỌN (tròn, nửa trong nửa ngoài) -->
     <div class="relative">
-      <!-- divider -->
       <div class="border-b border-slate-200"></div>
 
       <button
         type="button"
-        class="absolute -right-4 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-slate-700 shadow-lg ring-1 ring-slate-200 hover:bg-slate-50 hover:text-slate-900 hover:ring-slate-300 active:scale-95 active:shadow-md focus:outline-none focus:ring-2 focus:ring-[#234a74]/40 md:flex"
+        class="group absolute right-0 top-0 hidden h-full w-3 md:block"
         @click="emit('toggle-collapse')"
         :title="isCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'"
         style="z-index: 9999"
       >
-        <!-- Icon -->
         <span
-          class="text-[18px] font-semibold leading-none"
-          :class="isCollapsed ? 'translate-x-[0.5px]' : '-translate-x-[0.5px]'"
+          class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 rounded-md px-1.5 py-1 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:text-slate-900 group-hover:bg-slate-200/70 transition"
         >
           {{ isCollapsed ? "›" : "‹" }}
         </span>
@@ -69,7 +66,7 @@
     </div>
 
     <!-- MENU -->
-    <div class="flex-1 overflow-y-auto px-3 py-4">
+    <div class="flex-1 overflow-y-auto px-3 py-4 no-scrollbar">
       <div class="space-y-2">
         <div v-for="g in menuGroups" :key="g.header.id">
           <!-- GROUP HEADER: ẩn khi sidebar collapsed -->
@@ -224,5 +221,14 @@ const currentYear = new Date().getFullYear();
   max-height: 1000px;
   opacity: 1;
   overflow: hidden;
+}
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE/Edge cũ */
+  scrollbar-width: none; /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 </style>

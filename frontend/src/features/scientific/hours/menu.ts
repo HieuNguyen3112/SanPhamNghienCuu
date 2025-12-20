@@ -48,18 +48,18 @@ export const hoursMenuItems: MenuItemWithIcon[] = [
     icon: Bell,
     roles: ["LECTURER"],
   },
-  {
-    id: "hours-summary-department",
-    label: "Tổng hợp giờ NCKH",
-    routeName: "hours.summary",
-    icon: BarChart3,
-    roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
-  },
-  {
-    id: "hours-approvals",
-    label: "Xét duyệt giờ NCKH",
-    routeName: "hours.approvals",
-    icon: ClipboardCheck,
-    roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
-  },
+  // {
+  //   id: "hours-summary-department",
+  //   label: "Tổng hợp giờ NCKH",
+  //   routeName: "hours.summary",
+  //   icon: BarChart3,
+  //   roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
+  // },
+  // {
+  //   id: "hours-approvals",
+  //   label: "Xét duyệt giờ NCKH",
+  //   routeName: "hours.approvals",
+  //   icon: ClipboardCheck,
+  //   roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
+  // },
 ];

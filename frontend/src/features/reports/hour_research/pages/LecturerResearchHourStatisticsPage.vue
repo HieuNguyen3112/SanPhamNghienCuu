@@ -4,7 +4,14 @@
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
-        <PageHeader />
+        <PageHeader
+          title="Thống kê giờ nghiên cứu khoa học"
+          subtitle="Tổng quan tình hình thực hiện giờ NCKH của giảng viên"
+          :show-export-pdf="true"
+          :show-export-excel="true"
+          @exportPdfClicked="showExportNotImplementedMessage('PDF')"
+          @exportExcelClicked="showExportNotImplementedMessage('Excel')"
+        />
       </div>
 
       <div class="mt-4 space-y-4">
@@ -49,7 +56,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import PageHeader from "../components/PageHeader.vue";
+import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import LecturerResearchHourFilterPanel from "../components/LecturerResearchHourFilterPanel.vue";
 import LecturerResearchHourSummaryCards from "../components/LecturerResearchHourSummaryCards.vue";
 import LecturerResearchHourChartSection from "../components/LecturerResearchHourChartSection.vue";
@@ -68,7 +75,7 @@ import type {
  */
 const lecturerResearchHourStatisticsResponse =
   ref<LecturerResearchHourStatisticsResponse | null>(null);
-
+const temporaryNotificationMessage = ref("");
 const selectedFacultyIdentifier = ref<string>("ALL_FACULTIES");
 const selectedAcademicYear = ref<string>("ALL_ACADEMIC_YEARS");
 const selectedResearchHourStatusFilterCondition =
@@ -285,7 +292,12 @@ const lecturerMeetingResearchHourStandardPercentage = computed<number>(() => {
 
   return (meetingStandardLecturerCount / totalLecturerCount.value) * 100;
 });
-
+function showExportNotImplementedMessage(exportFormatName: "PDF" | "Excel") {
+  temporaryNotificationMessage.value = `Chức năng xuất ${exportFormatName} hiện chỉ là giao diện (UI-only) theo yêu cầu.`;
+  window.setTimeout(() => {
+    temporaryNotificationMessage.value = "";
+  }, 2500);
+}
 onMounted(() => {
   loadLecturerResearchHourStatistics();
 });

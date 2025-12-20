@@ -1,6 +1,6 @@
 <!-- src/features/hours/pages/HoursMyWarningsView.vue -->
 <template>
-  <div class="space-y-6">
+  <div class="container mx-auto p-4 md:p-6">
     <!-- Header -->
     <div>
       <h1 class="text-2xl font-semibold text-slate-800">

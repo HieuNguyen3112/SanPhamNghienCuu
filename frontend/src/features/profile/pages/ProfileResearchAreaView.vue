@@ -78,7 +78,7 @@
                 <span v-else>—</span>
               </td>
               <td class="px-3 py-2 align-top text-xs text-slate-600">
-                <p class="max-w-xs whitespace-pre-line break-words">
+                <p class="max-w-xs whitespace-pre-line wrap-break-word">
                   {{ item.description || "—" }}
                 </p>
               </td>

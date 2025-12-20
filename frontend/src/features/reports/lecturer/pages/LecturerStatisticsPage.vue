@@ -5,6 +5,10 @@
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
+          title="Thống kê giảng viên"
+          subtitle="Tổng quan nhân sự giảng dạy trong trường đại học"
+          :show-export-pdf="true"
+          :show-export-excel="true"
           @exportPdfClicked="showExportNotImplementedMessage('PDF')"
           @exportExcelClicked="showExportNotImplementedMessage('Excel')"
         />
@@ -46,7 +50,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 
-import PageHeader from "../components/PageHeader.vue";
+import PageHeader from "@/shared/components/layout/PageHeader.vue";
+
 import LecturerFilterPanel from "../components/LecturerFilterPanel.vue";
 import LecturerSummaryCards from "../components/LecturerSummaryCards.vue";
 import LecturerChartSection from "../components/LecturerChartSection.vue";

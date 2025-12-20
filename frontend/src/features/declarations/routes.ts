@@ -6,7 +6,6 @@ import DeclarationProjectsView from "@/features/declarations/pages/lecturer/Decl
 import DeclarationBooksView from "@/features/declarations/pages/lecturer/DeclarationBooksView.vue";
 import DeclarationOthersView from "@/features/declarations/pages/lecturer/DeclarationOthersView.vue";
 import DeclarationParticipationConfirmView from "@/features/declarations/pages/lecturer/DeclarationParticipationConfirmView.vue";
-import WorksApprovalsView from "@/features/scientific/research-works/approval/pages/ResearchWorkApprovalPage.vue";
 
 export const declarationRoutes: RouteRecordRaw[] = [
   {
@@ -39,10 +38,10 @@ export const declarationRoutes: RouteRecordRaw[] = [
     component: DeclarationParticipationConfirmView,
     meta: { roles: ["LECTURER"] },
   },
-  {
-    path: "works/approvals",
-    name: "works.approvals",
-    component: WorksApprovalsView,
-    meta: { roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"] },
-  },
+  // {
+  //   path: "works/approvals",
+  //   name: "works.approvals",
+  //   component: WorksApprovalsView,
+  //   meta: { roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"] },
+  // },
 ];

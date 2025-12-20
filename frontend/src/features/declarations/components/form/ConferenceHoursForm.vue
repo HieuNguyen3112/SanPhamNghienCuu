@@ -288,7 +288,6 @@ import { computed, reactive, ref } from "vue";
 import type {
   ConferenceHoursFormModel,
   ConferenceEntry,
-  ConferenceRole,
   WorkEvidenceFile,
 } from "@/features/declarations/types";
 

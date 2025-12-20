@@ -22,14 +22,21 @@ export type AppRouteName =
   | "declarations.participatier"
   | "works-my-declarations"
   // duyet cong trinh cho manager
+  | "works.personal"
   | "works.facapprovals"
   | "works.uniapprovals"
   | "work.overview"
+  | "works.facmanagement"
+  | "works.unimanagement"
   // quan ly gio nckh cho giang vien
   | "hours.my"
   | "hours.summary"
   | "hours.calculate"
   | "hours.warnings"
+  | "hours.facmanagement"
+  | "hours.unimanagement"
+  | "hours.facapprovals"
+  | "hours.uniapprovals"
   // duyet gio nckh
   | "hours.approvals"
   | "hours.batchDetail"

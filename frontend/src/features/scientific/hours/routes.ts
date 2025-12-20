@@ -38,7 +38,7 @@ export const hoursRoutes: RouteRecordRaw[] = [
     path: "hours/approvals",
     name: "hours.approvals",
     component: HoursApprovalsView,
-    meta: { roles: ["SCIENCE_OFFICE"] },
+    meta: { roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"] },
   },
   {
     path: "hours/batches/:batchId",
