@@ -12,7 +12,6 @@ import LoginPage from "@/features/auth/pages/LoginPage.vue";
 // Features
 import { profileRoutes } from "@/features/profile/routes";
 import { declarationRoutes } from "@/features/declarations/routes";
-import { hoursRoutes } from "@/features/scientific/hours/routes";
 import { searchRoutes } from "@/features/search/routes";
 import { researchWorksRoutes } from "@/features/scientific/routes";
 import { UserManagerRoutes } from "@/features/users/routes";
@@ -35,7 +34,7 @@ const routes: RouteRecordRaw[] = [
       { path: "", redirect: "/profile" },
       ...profileRoutes,
       ...declarationRoutes,
-      ...hoursRoutes,
+
       ...searchRoutes,
       ...researchWorksRoutes,
       ...UserManagerRoutes,

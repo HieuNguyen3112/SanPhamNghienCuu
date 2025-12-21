@@ -9,6 +9,9 @@ import {
   ShieldCheck,
   AlertTriangle,
   BarChart3,
+  Calculator,
+  Clock,
+  Bell,
 } from "lucide-vue-next";
 
 // Nếu MenuItem CHƯA có field icon thì bạn thêm:
@@ -22,13 +25,9 @@ export const researchWorksMenuGroup: MenuItem & { icon?: Component } = {
 };
 
 export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
-  // {
-  //   id: "works-my-declarations",
-  //   label: "Công trình của tôi",
-  //   routeName: "works-my-declarations",
-  //   icon: User,
-  //   roles: ["LECTURER"],
-  // },
+  // =========================
+  // LECTURER
+  // =========================
   {
     id: "works-personal",
     label: "Công trình của tôi",
@@ -37,6 +36,31 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     roles: ["LECTURER"],
   },
   {
+    id: "hours-calculate",
+    label: "Tính giờ NCKH cá nhân",
+    routeName: "hours.calculate",
+    icon: Calculator,
+    roles: ["LECTURER"],
+  },
+  {
+    id: "hours-personal",
+    label: "Giờ NCKH cá nhân",
+    routeName: "hours.personal",
+    icon: Clock,
+    roles: ["LECTURER"],
+  },
+  {
+    id: "hours-personal-warnings",
+    label: "Thông báo cảnh báo",
+    routeName: "hours.personal_warnings",
+    icon: Bell,
+    roles: ["LECTURER"],
+  },
+
+  // =========================
+  // DEPARTMENT_BOARD (BCN KHOA)
+  // =========================
+  {
     id: "works-facmanagement",
     label: "Quản lý công trình NCKH",
     routeName: "works.facmanagement",
@@ -44,25 +68,11 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     roles: ["DEPARTMENT_BOARD"],
   },
   {
-    id: "works-unimanagement",
-    label: "Quản lý công trình NCKH",
-    routeName: "works.unimanagement",
-    icon: LayoutDashboard,
-    roles: ["SCIENCE_OFFICE"],
-  },
-  {
     id: "works-facapproval",
     label: "Xét duyệt công trình",
     routeName: "works.facapprovals",
     icon: ClipboardCheck,
     roles: ["DEPARTMENT_BOARD"],
-  },
-  {
-    id: "works-uniapproval",
-    label: "Xét duyệt công trình",
-    routeName: "works.uniapprovals",
-    icon: ShieldCheck,
-    roles: ["SCIENCE_OFFICE"],
   },
   {
     id: "hours-warning",
@@ -73,10 +83,35 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
   },
   {
     id: "hours-facmanagement",
-    label: "Quản lý giờ NCKH ",
+    label: "Quản lý giờ NCKH",
     routeName: "hours.facmanagement",
     icon: BarChart3,
     roles: ["DEPARTMENT_BOARD"],
+  },
+  {
+    id: "hours.facapprovals",
+    label: "Xét duyệt giờ NCKH",
+    routeName: "hours.facapprovals",
+    icon: ClipboardCheck,
+    roles: ["DEPARTMENT_BOARD"],
+  },
+
+  // =========================
+  // SCIENCE_OFFICE (QLKH)
+  // =========================
+  {
+    id: "works-unimanagement",
+    label: "Quản lý công trình NCKH",
+    routeName: "works.unimanagement",
+    icon: LayoutDashboard,
+    roles: ["SCIENCE_OFFICE"],
+  },
+  {
+    id: "works-uniapproval",
+    label: "Xét duyệt công trình",
+    routeName: "works.uniapprovals",
+    icon: ShieldCheck,
+    roles: ["SCIENCE_OFFICE"],
   },
   {
     id: "hours-unimanagement",
@@ -86,17 +121,10 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     roles: ["SCIENCE_OFFICE"],
   },
   {
-    id: "hours.facapprovals",
-    label: "Xét duyệt giờ NCKH",
-    routeName: "hours.facapprovals",
-    icon: ClipboardCheck,
-    roles: ["DEPARTMENT_BOARD"],
-  },
-  {
     id: "hours.uniapprovals",
     label: "Xét duyệt giờ NCKH",
     routeName: "hours.uniapprovals",
-    icon: ClipboardCheck,
+    icon: ShieldCheck,
     roles: ["SCIENCE_OFFICE"],
   },
 ];

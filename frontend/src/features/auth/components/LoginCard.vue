@@ -75,7 +75,7 @@
         aria-label="Quên mật khẩu?"
         @click="emit('forgot-password')"
       >
-        Quên mật khẩu?
+        Quên mật khẩu? Password!123
       </button>
     </form>
   </section>

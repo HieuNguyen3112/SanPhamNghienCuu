@@ -8,10 +8,7 @@ import {
   declarationsMenuGroup,
   declarationMenuItems,
 } from "@/features/declarations/menu";
-import {
-  hoursMenuGroup,
-  hoursMenuItems,
-} from "@/features/scientific/hours/menu";
+
 import {
   UserManagerMenuGroup,
   UserManagerMenuItems,
@@ -35,8 +32,6 @@ const allMenuItems: MenuItem[] = [
   ...declarationMenuItems,
   // quan ly gio khoa hoc
 
-  hoursMenuGroup,
-  ...hoursMenuItems,
   UserManagerMenuGroup,
   ...UserManagerMenuItems,
   // tra cuu cong trinh

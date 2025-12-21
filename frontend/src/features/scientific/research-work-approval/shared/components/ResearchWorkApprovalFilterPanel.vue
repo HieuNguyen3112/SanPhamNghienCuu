@@ -275,6 +275,5 @@ const {
   selectedResearchWorkType,
   selectedApprovalStatus,
   selectedLecturerOrResearchWorkKeyword,
-  filterPanelHelperText,
 } = toRefs(props);
 </script>

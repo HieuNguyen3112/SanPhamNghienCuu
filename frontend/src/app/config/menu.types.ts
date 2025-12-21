@@ -4,7 +4,9 @@ import type { Component } from "vue";
 
 // Route name dùng trong app
 export type AppRouteName =
-  // route page ho so ca nhan
+  // =========================
+  // LECTURER — Hồ sơ cá nhân
+  // =========================
   | "profile.scientific"
   | "profile.contact"
   | "profile.workHistory"
@@ -13,39 +15,61 @@ export type AppRouteName =
   | "profile.academicRank"
   | "profile.languages"
   | "profile.research"
-  // quan ly khoa hoc
-  // ke khai cho giang vien
+
+  // =========================
+  // LECTURER — Kê khai công trình
+  // =========================
   | "declarations.articles"
   | "declarations.projects"
   | "declarations.books"
   | "declarations.others"
   | "declarations.participatier"
-  | "works-my-declarations"
-  // duyet cong trinh cho manager
   | "works.personal"
-  | "works.facapprovals"
-  | "works.uniapprovals"
-  | "work.overview"
-  | "works.facmanagement"
-  | "works.unimanagement"
-  // quan ly gio nckh cho giang vien
-  | "hours.my"
-  | "hours.summary"
+
+  // =========================
+  // LECTURER — Quản lý giờ NCKH cá nhân
+  // =========================
+  | "hours.personal"
   | "hours.calculate"
-  | "hours.warnings"
+  | "hours.personal_warnings"
+
+  // =========================
+  // DEPARTMENT_BOARD — Công trình (khoa)
+  // =========================
+  | "works.facmanagement"
+  | "works.facapprovals"
+
+  // =========================
+  // DEPARTMENT_BOARD — Giờ NCKH (khoa)
+  // =========================
   | "hours.facmanagement"
-  | "hours.unimanagement"
   | "hours.facapprovals"
+
+  // =========================
+  // SCIENCE_OFFICE — Công trình (toàn trường)
+  // =========================
+  | "works.unimanagement"
+  | "works.uniapprovals"
+
+  // =========================
+  // SCIENCE_OFFICE — Giờ NCKH (toàn trường)
+  // =========================
+  | "hours.unimanagement"
   | "hours.uniapprovals"
-  // duyet gio nckh
-  | "hours.approvals"
-  | "hours.batchDetail"
+
+  // =========================
+  // MANAGERS (DEPARTMENT_BOARD + SCIENCE_OFFICE) — Cảnh báo / tổng quan
+  // =========================
+  | "hours.warning"
+
+  // =========================
+  // SYSTEM / GLOBAL / REPORTS
+  // =========================
   | "search.global"
   | "user.manager"
   | "userorg.structure"
   | "report.lecturer"
   | "report.research"
-  | "hours.warning"
   | "report.hour-research";
 
 // sau này thêm route thì bổ sung vào đây
