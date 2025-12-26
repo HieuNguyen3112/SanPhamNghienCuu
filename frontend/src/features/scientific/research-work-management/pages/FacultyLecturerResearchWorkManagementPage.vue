@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-slate-50">
-    <div class="mx-auto max-w-7xl space-y-4 p-4 md:p-6">
+    <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >

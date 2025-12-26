@@ -24,6 +24,7 @@ export type AppRouteName =
   | "declarations.books"
   | "declarations.others"
   | "declarations.participatier"
+  | "declarations.gateway"
   | "works.personal"
 
   // =========================
@@ -61,6 +62,16 @@ export type AppRouteName =
   // MANAGERS (DEPARTMENT_BOARD + SCIENCE_OFFICE) — Cảnh báo / tổng quan
   // =========================
   | "hours.warning"
+  | "hours.facwarning"
+  | "hours.uniwarning"
+  | "auditlog.facmanagement"
+  | "auditlog.unimanagement"
+
+  // =========================
+  // MASTERDATA (DEPARTMENT_BOARD + SCIENCE_OFFICE) — QUẢN LÝ DANH MỤC
+  // =========================
+  | "masterdata.work_catalog"
+  | "masterdata.hours_catalog"
 
   // =========================
   // SYSTEM / GLOBAL / REPORTS

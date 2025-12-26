@@ -1,28 +1,6 @@
 <template>
   <div>
     <!-- Controls -->
-    <div
-      class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
-    >
-      <div class="text-sm text-slate-600">
-        Hiển thị
-        <span class="font-medium text-slate-900">{{ pagedRows.length }}</span> /
-        <span class="font-medium text-slate-900">{{ rows.length }}</span>
-        công trình
-      </div>
-
-      <div class="flex items-center gap-2">
-        <label class="text-xs text-slate-600">Dòng/trang</label>
-        <select
-          class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
-          v-model.number="pageSize"
-        >
-          <option :value="8">8</option>
-          <option :value="12">12</option>
-          <option :value="20">20</option>
-        </select>
-      </div>
-    </div>
 
     <!-- Table -->
     <div class="overflow-hidden rounded-xl border border-slate-200">
@@ -119,33 +97,21 @@
         </tbody>
       </table>
     </div>
-
-    <!-- Pagination -->
-    <div class="mt-4 flex items-center justify-between">
-      <div class="text-sm text-slate-600">
-        Trang <span class="font-medium text-slate-900">{{ page }}</span> /
-        <span class="font-medium text-slate-900">{{ totalPages }}</span>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button
-          type="button"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          :disabled="page === 1"
-          @click="page = page - 1"
-        >
-          Trước
-        </button>
-        <button
-          type="button"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          :disabled="page === totalPages"
-          @click="page = page + 1"
-        >
-          Sau
-        </button>
-      </div>
+    <div class="border-t border-slate-200 px-4 py-3">
+      <SharedPaginationControls
+        :total-item-count="sortedRows.length"
+        :current-page-number="page"
+        :page-size="pageSize"
+        display-mode="FULL"
+        :show-record-summary="true"
+        record-summary-mode="PAGE_COUNT"
+        record-summary-unit-label="công trình"
+        @update:currentPageNumber="(v) => (page = v)"
+        @update:pageSize="(v) => (pageSize = v)"
+      />
     </div>
+    <!-- Pagination -->
+    <!-- Pagination (FULL: có summary + page buttons + page size) -->
   </div>
 </template>
 
@@ -157,6 +123,7 @@ import type {
   ResearchType,
   ResearchWork,
 } from "../useResearchMockData";
+import SharedPaginationControls from "@/shared/components/SharedPaginationControls.vue";
 
 type SortKey = keyof Pick<
   ResearchWork,
@@ -195,6 +162,8 @@ function typeLabel(type: ResearchType) {
       return "Sách/GT";
   }
 }
+const page = ref(1);
+const pageSize = ref(12);
 
 function lecturerNames(lecturerIds: string[]) {
   return lecturerIds
@@ -229,8 +198,6 @@ const sortedRows = computed(() => {
 });
 
 /** Pagination */
-const page = ref(1);
-const pageSize = ref(12);
 
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(sortedRows.value.length / pageSize.value))

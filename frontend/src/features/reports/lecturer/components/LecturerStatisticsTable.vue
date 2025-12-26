@@ -48,7 +48,7 @@
     </div>
 
     <!-- Table -->
-    <div class="max-h-[520px] overflow-auto">
+    <div class="max-h-[520px] overflow-auto scrollbar-none">
       <table class="min-w-full text-sm">
         <thead class="sticky top-0 z-10 bg-slate-50">
           <tr class="text-left text-slate-700">
@@ -168,26 +168,17 @@
     </div>
 
     <!-- Footer: ONE place only -->
-    <div
-      class="flex flex-col gap-2 border-t border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
-    >
-      <div class="text-xs text-slate-600">
-        Hiển thị
-        <span class="font-semibold text-slate-900">{{
-          pagedLecturerRecords.length
-        }}</span>
-        /
-        <span class="font-semibold text-slate-900">{{
-          totalFilteredLecturerCount
-        }}</span>
-        bản ghi
-      </div>
+    <div class="border-t border-slate-200 p-4">
       <SharedPaginationControls
-        displayMode="PAGINATION_ONLY"
-        :totalItemCount="totalFilteredLecturerCount"
-        v-model:currentPageNumber="currentPageNumber"
-        v-model:pageSize="pageSize"
-        :showRecordSummary="false"
+        :total-item-count="filteredLecturerRecords.length"
+        :current-page-number="currentPageNumber"
+        :page-size="pageSize"
+        display-mode="FULL"
+        :show-record-summary="true"
+        record-summary-mode="PAGE_COUNT"
+        record-summary-unit-label="giảng viên "
+        @update:currentPageNumber="(v) => (currentPageNumber = v)"
+        @update:pageSize="(v) => (pageSize = v)"
       />
     </div>
   </div>
@@ -213,7 +204,8 @@ const currentSortCondition = ref<LecturerSortCondition>({
 });
 
 /** Pagination state (shared style across app) */
-const pageSize = ref<number>(10);
+const pageSize = ref<number>(12);
+
 const currentPageNumber = ref<number>(1);
 
 const totalFilteredLecturerCount = computed<number>(() => {
@@ -233,6 +225,21 @@ watch([totalFilteredLecturerCount, pageSize], () => {
     currentPageNumber.value = totalPageCount.value;
   }
   if (currentPageNumber.value < 1) currentPageNumber.value = 1;
+});
+watch(
+  () => componentProperties.filteredLecturerRecords,
+  () => {
+    currentPageNumber.value = 1;
+  }
+);
+
+watch(pageSize, () => {
+  // tránh rơi trang rỗng khi user đổi page size
+  const nextTotal = Math.max(
+    1,
+    Math.ceil(totalFilteredLecturerCount.value / pageSize.value)
+  );
+  if (currentPageNumber.value > nextTotal) currentPageNumber.value = nextTotal;
 });
 
 watch(
@@ -333,3 +340,12 @@ function getVietnameseAcademicRankLabel(
   return "Không";
 }
 </script>
+<style>
+.scrollbar-none {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+</style>

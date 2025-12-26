@@ -74,13 +74,15 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     icon: ClipboardCheck,
     roles: ["DEPARTMENT_BOARD"],
   },
+
   {
-    id: "hours-warning",
+    id: "hours-facwarning",
     label: "Cảnh báo giảng viên",
-    routeName: "hours.warning",
+    routeName: "hours.facwarning",
     icon: AlertTriangle,
-    roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
+    roles: ["DEPARTMENT_BOARD"],
   },
+
   {
     id: "hours-facmanagement",
     label: "Quản lý giờ NCKH",
@@ -125,6 +127,13 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     label: "Xét duyệt giờ NCKH",
     routeName: "hours.uniapprovals",
     icon: ShieldCheck,
+    roles: ["SCIENCE_OFFICE"],
+  },
+  {
+    id: "hours-uniwarning",
+    label: "Cảnh báo giảng viên",
+    routeName: "hours.uniwarning",
+    icon: AlertTriangle,
     roles: ["SCIENCE_OFFICE"],
   },
 ];
