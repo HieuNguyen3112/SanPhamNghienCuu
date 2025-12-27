@@ -29,7 +29,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import KpiCard from "@/features/scientific/lecturer-hours-management/components/internal/KpiCard.vue";
+import KpiCard from "@/features/scientific/management/lecturer-hours-management/components/internal/KpiCard.vue";
 
 interface Props {
   totalLecturers: number;

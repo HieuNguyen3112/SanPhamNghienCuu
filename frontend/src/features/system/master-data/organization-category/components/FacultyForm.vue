@@ -1,0 +1,207 @@
+<!-- src/features/organization-category/components/FacultyForm.vue -->
+<template>
+  <Teleport to="body">
+    <div v-if="open" class="fixed inset-0 z-50">
+      <div class="absolute inset-0 bg-slate-900/40" @click="onClose" />
+
+      <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div
+          class="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-xl"
+        >
+          <div
+            class="flex items-start justify-between gap-4 border-b border-slate-200 p-4 md:p-6"
+          >
+            <div class="min-w-0">
+              <div class="text-base font-semibold text-slate-900">
+                {{ editing ? "Sửa khoa" : "Thêm khoa" }}
+              </div>
+              <div class="mt-1 text-xs text-slate-500">
+                Quản lý danh mục khoa. Không hỗ trợ xóa.
+              </div>
+            </div>
+
+            <button
+              class="rounded-xl p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+              @click="onClose"
+            >
+              <X class="h-5 w-5" />
+            </button>
+          </div>
+
+          <form class="space-y-4 p-4 md:p-6" @submit.prevent="onSubmit">
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="md:col-span-1">
+                <label class="text-xs font-semibold text-slate-600"
+                  >Mã khoa *</label
+                >
+                <input
+                  v-model="form.code"
+                  type="text"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
+                  placeholder="VD: CNTT"
+                />
+                <p v-if="errors.code" class="mt-1 text-xs text-rose-600">
+                  {{ errors.code }}
+                </p>
+
+                <p class="mt-1 text-xs text-slate-500">
+                  * TODO nghiệp vụ: nếu khoa đã có giảng viên → khóa sửa mã (cần
+                  API DTO has_lecturers/lecturers_count).
+                </p>
+              </div>
+
+              <div class="md:col-span-1">
+                <label class="text-xs font-semibold text-slate-600"
+                  >Tên khoa *</label
+                >
+                <input
+                  v-model="form.name"
+                  type="text"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
+                  placeholder="VD: Khoa Công nghệ Thông tin"
+                />
+                <p v-if="errors.name" class="mt-1 text-xs text-rose-600">
+                  {{ errors.name }}
+                </p>
+              </div>
+
+              <!-- Missing in schema -->
+              <div class="md:col-span-1">
+                <label class="text-xs font-semibold text-slate-600"
+                  >Tên viết tắt</label
+                >
+                <input
+                  disabled
+                  type="text"
+                  class="mt-1 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                  placeholder="TODO: cần faculties.short_name"
+                />
+                <p class="mt-1 text-xs text-slate-500">
+                  TODO: thêm cột <code>faculties.short_name</code>.
+                </p>
+              </div>
+
+              <!-- Missing in schema -->
+              <div class="md:col-span-1">
+                <label class="text-xs font-semibold text-slate-600"
+                  >Trạng thái</label
+                >
+                <div
+                  class="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                >
+                  <span
+                    class="inline-flex h-5 w-9 items-center rounded-full bg-slate-200 px-1"
+                  >
+                    <span class="h-4 w-4 rounded-full bg-white" />
+                  </span>
+                  <span>TODO: cần faculties.is_active</span>
+                </div>
+              </div>
+
+              <!-- Missing in schema -->
+              <div class="md:col-span-2">
+                <label class="text-xs font-semibold text-slate-600"
+                  >Ghi chú</label
+                >
+                <textarea
+                  disabled
+                  rows="3"
+                  class="mt-1 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                  placeholder="TODO: cần faculties.notes"
+                />
+              </div>
+            </div>
+
+            <div
+              class="flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-end"
+            >
+              <button
+                type="button"
+                class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                @click="onClose"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="submit"
+                class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="loading"
+              >
+                <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
+                Lưu
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+</template>
+
+<script setup lang="ts">
+import { reactive, watch } from "vue";
+import { Loader2, X } from "lucide-vue-next";
+import type { Faculty } from "../contracts/organizationCategory.contract";
+
+const props = defineProps<{
+  open: boolean;
+  loading: boolean;
+  editing: Faculty | null;
+}>();
+
+const emit = defineEmits<{
+  (e: "close"): void;
+  (e: "submit", payload: { code: string; name: string }): void;
+}>();
+
+const form = reactive({
+  code: "",
+  name: "",
+});
+
+const errors = reactive<{ code?: string; name?: string }>({});
+
+watch(
+  () => props.open,
+  (v) => {
+    if (!v) return;
+    errors.code = undefined;
+    errors.name = undefined;
+
+    if (props.editing) {
+      form.code = props.editing.code;
+      form.name = props.editing.name;
+    } else {
+      form.code = "";
+      form.name = "";
+    }
+  },
+  { immediate: true }
+);
+
+function validate(): boolean {
+  errors.code = undefined;
+  errors.name = undefined;
+
+  const code = form.code.trim();
+  const name = form.name.trim();
+
+  if (!code) errors.code = "Mã khoa là bắt buộc.";
+  else if (code.length > 50) errors.code = "Mã khoa tối đa 50 ký tự.";
+
+  if (!name) errors.name = "Tên khoa là bắt buộc.";
+  else if (name.length > 255) errors.name = "Tên khoa tối đa 255 ký tự.";
+
+  return !errors.code && !errors.name;
+}
+
+function onClose() {
+  emit("close");
+}
+
+function onSubmit() {
+  if (!validate()) return;
+  emit("submit", { code: form.code.trim(), name: form.name.trim() });
+}
+</script>

@@ -80,10 +80,10 @@
 </template>
 
 <script setup lang="ts">
-import LecturerResearchWorkFilterPanel from "@/features/scientific/research-work-management/components/LecturerResearchWorkFilterPanel.vue";
-import LecturerResearchWorkSummaryTable from "@/features/scientific/research-work-management/components/LecturerResearchWorkSummaryTable.vue";
-import LecturerApprovedResearchWorkDrawer from "@/features/scientific/research-work-management/components/LecturerApprovedResearchWorkDrawer.vue";
-import ApprovedResearchWorkDetailDrawer from "@/features/scientific/research-work-management/components/ApprovedResearchWorkDetailDrawer.vue";
+import LecturerResearchWorkFilterPanel from "@/features/scientific/management/research-work-management/components/LecturerResearchWorkFilterPanel.vue";
+import LecturerResearchWorkSummaryTable from "@/features/scientific/management/research-work-management/components/LecturerResearchWorkSummaryTable.vue";
+import LecturerApprovedResearchWorkDrawer from "@/features/scientific/management/research-work-management/components/LecturerApprovedResearchWorkDrawer.vue";
+import ApprovedResearchWorkDetailDrawer from "@/features/scientific/management/research-work-management/components/ApprovedResearchWorkDetailDrawer.vue";
 import type { FilterState } from "@/features/scientific/management/research-work-management/lecturerResearchWork.contracts";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 

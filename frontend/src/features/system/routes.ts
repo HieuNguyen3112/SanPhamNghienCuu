@@ -1,6 +1,6 @@
 import type { RouteRecordRaw } from "vue-router";
 
-import OrgStructureManagementPage from "@/features/system/users/pages/OrgStructureManagementPage.vue";
+import OrganizationCategoryPage from "@/features/system/master-data/organization-category/pages/OrganizationCategoryPage.vue";
 import LecturerAccountManagementPage from "@/features/system/users-management/pages/LecturerAccountManagementPage.vue";
 
 import FacultyAuditLogPage from "@/features/system/audit-log/pages/FacultyAuditLogPage.vue";
@@ -20,7 +20,7 @@ export const UserManagerRoutes: RouteRecordRaw[] = [
   {
     path: "users/org-structure",
     name: "userorg.structure",
-    component: OrgStructureManagementPage,
+    component: OrganizationCategoryPage,
     meta: { roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"] },
   },
 

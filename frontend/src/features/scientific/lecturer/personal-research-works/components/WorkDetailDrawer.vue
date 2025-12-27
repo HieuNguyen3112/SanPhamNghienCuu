@@ -310,8 +310,8 @@ import type {
   PersonalWorkDetail,
   PersonalWorkStatusCode,
 } from "../contracts/personalResearchWorksContracts";
-import InfoRow from "@/features/scientific/personal-research-works/components/InfoRow.vue";
-import TimelineItem from "@/features/scientific/personal-research-works/components/TimelineItem.vue";
+import InfoRow from "@/features/scientific/lecturer/personal-research-works/components/InfoRow.vue";
+import TimelineItem from "@/features/scientific/lecturer/personal-research-works/components/TimelineItem.vue";
 
 const props = defineProps<{
   open: boolean;

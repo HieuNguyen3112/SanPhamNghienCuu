@@ -49,8 +49,8 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
-import AlertsHeaderBanner from "@/features/scientific/personal-hours-warning/components/WarningHeaderBanner.vue";
-import AlertsFilterBar from "@/features/scientific/personal-hours-warning/components/WarningFilterBar.vue";
+import AlertsHeaderBanner from "@/features/scientific/lecturer/personal-hours-warning/components/WarningHeaderBanner.vue";
+import AlertsFilterBar from "@/features/scientific/lecturer/personal-hours-warning/components/WarningFilterBar.vue";
 import AlertsList from "../components/WarningList.vue";
 import AlertsActionPanel from "../components/WarningActionPanel.vue";
 import { useHoursWarning } from "../composables/useHoursWarning";

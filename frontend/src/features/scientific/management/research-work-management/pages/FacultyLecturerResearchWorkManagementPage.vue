@@ -53,10 +53,10 @@
 </template>
 
 <script setup lang="ts">
-import LecturerResearchWorkFilterPanel from "@/features/scientific/research-work-management/components/LecturerResearchWorkFilterPanel.vue";
-import LecturerResearchWorkSummaryTable from "@/features/scientific/research-work-management/components/LecturerResearchWorkSummaryTable.vue";
-import LecturerApprovedResearchWorkDrawer from "@/features/scientific/research-work-management/components/LecturerApprovedResearchWorkDrawer.vue";
-import ApprovedResearchWorkDetailDrawer from "@/features/scientific/research-work-management/components/ApprovedResearchWorkDetailDrawer.vue";
+import LecturerResearchWorkFilterPanel from "@/features/scientific/management/research-work-management/components/LecturerResearchWorkFilterPanel.vue";
+import LecturerResearchWorkSummaryTable from "@/features/scientific/management/research-work-management/components/LecturerResearchWorkSummaryTable.vue";
+import LecturerApprovedResearchWorkDrawer from "@/features/scientific/management/research-work-management/components/LecturerApprovedResearchWorkDrawer.vue";
+import ApprovedResearchWorkDetailDrawer from "@/features/scientific/management/research-work-management/components/ApprovedResearchWorkDetailDrawer.vue";
 
 import { createLecturerResearchWorkClient } from "@/features/scientific/management/research-work-management/api/lecturerResearchWork.client";
 import type { FilterState } from "@/features/scientific/management/research-work-management/lecturerResearchWork.contracts";

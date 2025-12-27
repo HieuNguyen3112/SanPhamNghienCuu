@@ -51,9 +51,9 @@
 
 <script setup lang="ts">
 import { onMounted } from "vue";
-import HourApprovalFilterPanel from "@/features/scientific/lecturer-hour-approval/components/HourApprovalFilterPanel.vue";
-import HourApprovalTable from "@/features/scientific/lecturer-hour-approval/components/HourApprovalTable.vue";
-import HourApprovalDetailDrawer from "@/features/scientific/lecturer-hour-approval/components/HourApprovalDetailDrawer.vue";
+import HourApprovalFilterPanel from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalFilterPanel.vue";
+import HourApprovalTable from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalTable.vue";
+import HourApprovalDetailDrawer from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalDetailDrawer.vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
 import type { FacultyOption } from "@/features/scientific/management/lecturer-hour-approval/contracts/hourApproval.contract";

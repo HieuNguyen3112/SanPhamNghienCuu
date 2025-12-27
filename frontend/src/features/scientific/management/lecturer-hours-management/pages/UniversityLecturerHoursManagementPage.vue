@@ -80,10 +80,10 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
-import HoursFilterPanel from "@/features/scientific/lecturer-hours-management/components/HoursFilterPanel.vue";
-import HoursKpiOverview from "@/features/scientific/lecturer-hours-management/components/HoursKpiOverview.vue";
-import LecturerHoursTable from "@/features/scientific/lecturer-hours-management/components/LecturerHoursTable.vue";
-import LecturerHoursDrawer from "@/features/scientific/lecturer-hours-management/components/LecturerHoursDrawer.vue";
+import HoursFilterPanel from "@/features/scientific/management/lecturer-hours-management/components/HoursFilterPanel.vue";
+import HoursKpiOverview from "@/features/scientific/management/lecturer-hours-management/components/HoursKpiOverview.vue";
+import LecturerHoursTable from "@/features/scientific/management/lecturer-hours-management/components/LecturerHoursTable.vue";
+import LecturerHoursDrawer from "@/features/scientific/management/lecturer-hours-management/components/LecturerHoursDrawer.vue";
 import { useLecturerHoursManagement } from "@/features/scientific/management/lecturer-hours-management/composables/useLecturerHoursManagement";
 import {
   mockAcademicYears,
