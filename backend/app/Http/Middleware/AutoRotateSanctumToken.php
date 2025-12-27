@@ -16,6 +16,9 @@ class AutoRotateSanctumToken
         if (auth('sanctum')->check()) {
             $user = $request->user();
             $pat  = $user->currentAccessToken();
+            if (! $pat instanceof PAT) {
+                return $response;
+            }
             $left = SanctumToken::minutesLeft($pat);
             $thr  = (int) config('sanctum.refresh_threshold', 5);
 

@@ -78,6 +78,11 @@ const handleSubmit = async () => {
     const target = redirect === "/login" ? "/" : redirect;
     await router.replace(target);
   } catch (err: any) {
+    if (err?.message === "CSRF_FAILED") {
+      errors.password =
+        "Khong the ket noi server hoac CSRF that bai. Vui long thu lai.";
+      return;
+    }
     if (err?.response?.status === 422) {
       errors.password =
         "Dữ liệu đăng nhập không hợp lệ hoặc tài khoản/mật khẩu sai.";

@@ -68,9 +68,12 @@ router.beforeEach(async (to) => {
     .map((record) => record.meta.roles as string[] | undefined)
     .find((roles) => Array.isArray(roles) && roles.length);
 
-  const needsSession = requiresAuth || isGuestOnly || Boolean(requiredRoles);
+  const needsSession = requiresAuth || Boolean(requiredRoles);
+  const hasSessionCookie =
+    typeof document !== "undefined" &&
+    document.cookie.split(";").some((c) => c.trim().startsWith("laravel_session="));
 
-  if (needsSession && !userStore.isInitialized) {
+  if (!userStore.isInitialized && (needsSession || (isGuestOnly && hasSessionCookie))) {
     await userStore.initAuth();
   }
 

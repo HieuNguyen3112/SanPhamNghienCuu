@@ -75,7 +75,7 @@
         aria-label="Quên mật khẩu?"
         @click="emit('forgot-password')"
       >
-        Quên mật khẩu? Password!123
+        Quên mật khẩu?
       </button>
     </form>
   </section>
@@ -130,3 +130,4 @@ const onSubmit = () => {
   emit("submit");
 };
 </script>
+

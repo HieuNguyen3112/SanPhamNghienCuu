@@ -18,7 +18,7 @@ class UsersDemoSeeder extends Seeder
         ];
 
         foreach ($users as $u) {
-            $user = User::firstOrCreate(
+            $user = User::updateOrCreate(
                 ['email' => $u['email']],
                 ['name' => $u['name'], 'password' => Hash::make('Password!123')]
             );

@@ -13,6 +13,8 @@ const readCookie = (name: string) => {
   return value ? decodeURIComponent(value) : null;
 };
 
+let csrfPromise: Promise<void> | null = null;
+
 // Axios chỉ tự thêm XSRF header cho same-origin; SPA chạy khác port nên cần tự gắn header.
 http.interceptors.request.use((config) => {
   const token = readCookie("XSRF-TOKEN");
@@ -24,6 +26,22 @@ http.interceptors.request.use((config) => {
 });
 
 // Đảm bảo lấy CSRF cookie trước khi gửi POST/PUT/PATCH/DELETE
-export const ensureCsrfCookie = () => http.get("/sanctum/csrf-cookie");
+export const getCsrfCookie = async () => {
+  if (readCookie("XSRF-TOKEN")) return;
+  if (csrfPromise) return csrfPromise;
+
+  csrfPromise = http
+    .get("/sanctum/csrf-cookie")
+    .then(() => undefined)
+    .finally(() => {
+      csrfPromise = null;
+    });
+
+  return csrfPromise;
+};
+
+export const ensureCsrfCookie = () => getCsrfCookie();
 
 export default http;
+
+

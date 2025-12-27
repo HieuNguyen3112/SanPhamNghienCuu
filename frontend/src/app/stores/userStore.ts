@@ -1,8 +1,9 @@
-﻿import { defineStore } from "pinia";
+import { defineStore } from "pinia";
 import {
   login as apiLogin,
   logout as apiLogout,
   fetchCurrentUser as apiFetchCurrentUser,
+  getCsrfCookie as apiGetCsrfCookie,
 } from "@/features/auth/api";
 
 export type UserRole = "LECTURER" | "DEPARTMENT_BOARD" | "SCIENCE_OFFICE";
@@ -125,7 +126,7 @@ export const useUserStore = defineStore("user", {
               ? "Unauthenticated"
               : status === 403
               ? "Forbidden"
-              : "Không thể tải thông tin người dùng");
+              : "Kh�ng th? t?i th�ng tin ngu?i d�ng");
           this.currentUser = null;
           this.currentRole = null;
           return null;
@@ -144,27 +145,35 @@ export const useUserStore = defineStore("user", {
     },
 
     async login(payload: LoginPayload) {
-      // Gửi role ở dạng canonical (LECTURER/DEPARTMENT_BOARD/SCIENCE_OFFICE) để khớp với backend response
-      const { data } = await apiLogin({
+      try {
+        await apiGetCsrfCookie();
+      } catch (err) {
+        const error = new Error("CSRF_FAILED");
+        (error as any).cause = err;
+        throw error;
+      }
+
+      // G?i role ? d?ng canonical (LECTURER/DEPARTMENT_BOARD/SCIENCE_OFFICE) d? kh?p v?i backend response
+      await apiLogin({
         email: payload.email,
         password: payload.password,
         role: payload.role,
       });
 
+      const { data } = await apiFetchCurrentUser();
       const mappedRoles = mapBackendRoles(
-        data?.user?.roles ?? [],
-        data?.user?.backend_roles ?? []
+        data?.roles ?? [],
+        data?.backend_roles ?? []
       );
 
-
       this.currentUser = {
-        id: String(data.user.id ?? ""),
-        name: data.user.name ?? "",
-        email: data.user.email ?? "",
+        id: String(data.id ?? ""),
+        name: data.name ?? "",
+        email: data.email ?? "",
         roles: mappedRoles,
-        code: data.user.code,
-        department: data.user.department,
-        avatar: data.user.avatar,
+        code: data.code,
+        department: data.department,
+        avatar: data.avatar,
       };
       this.currentRole = mappedRoles[0] ?? null;
       this.isInitialized = true;
@@ -196,3 +205,5 @@ export const useUserStore = defineStore("user", {
     },
   },
 });
+
+

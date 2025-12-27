@@ -8,6 +8,10 @@ use App\Models\Department;
 use App\Models\Degree;
 use App\Models\AcademicRank;
 use App\Models\LecturerProfile;
+use App\Models\LecturerPartyMembership;
+use App\Models\LecturerLanguageProficiency;
+use App\Models\LecturerWorkHistory;
+use App\Models\LecturerTrainingHistory;
 
 class Lecturer extends Model
 {
@@ -60,5 +64,33 @@ class Lecturer extends Model
     public function profile()
     {
         return $this->hasOne(LecturerProfile::class, 'lecturer_id', 'id');
+    }
+
+    public function partyMembership()
+    {
+        return $this->hasOne(LecturerPartyMembership::class, 'lecturer_id', 'id');
+    }
+
+    public function languageProficiencies()
+    {
+        return $this->hasMany(LecturerLanguageProficiency::class, 'lecturer_id', 'id')
+            ->orderBy('language')
+            ->orderByDesc('id');
+    }
+
+    public function workHistories()
+    {
+        return $this->hasMany(LecturerWorkHistory::class, 'lecturer_id', 'id')
+            ->orderByRaw('start_date IS NULL')
+            ->orderByDesc('start_date')
+            ->orderByDesc('id');
+    }
+
+    public function trainingHistories()
+    {
+        return $this->hasMany(LecturerTrainingHistory::class, 'lecturer_id', 'id')
+            ->orderByRaw('start_date IS NULL')
+            ->orderByDesc('start_date')
+            ->orderByDesc('id');
     }
 }
