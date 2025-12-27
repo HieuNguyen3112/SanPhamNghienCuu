@@ -11,10 +11,10 @@ import LoginPage from "@/features/auth/pages/LoginPage.vue";
 
 // Features
 import { profileRoutes } from "@/features/profile/routes";
-import { declarationRoutes } from "@/features/declarations/routes";
-import { searchRoutes } from "@/features/search/routes";
+import { declarationRoutes } from "@/features/declaration/routes";
+import { searchRoutes } from "@/features/research-work-search/routes";
 import { researchWorksRoutes } from "@/features/scientific/routes";
-import { UserManagerRoutes } from "@/features/users/routes";
+import { UserManagerRoutes } from "@/features/system/routes";
 import { reportRoutes } from "@/features/reports/routes";
 // =====================
 // CẤU HÌNH ROUTE CHUẨN

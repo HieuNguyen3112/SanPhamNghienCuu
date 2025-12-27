@@ -12,18 +12,6 @@
           viên.
         </p>
       </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-slate-600">Số dòng / trang</span>
-        <select
-          class="rounded-lg border-slate-200 bg-white text-sm focus:border-slate-400 focus:ring-0"
-          v-model.number="pageSize"
-        >
-          <option :value="8">8</option>
-          <option :value="12">12</option>
-          <option :value="20">20</option>
-        </select>
-      </div>
     </div>
 
     <div class="overflow-auto">
@@ -138,49 +126,18 @@
       </div>
     </div>
 
-    <div
-      class="flex flex-col gap-2 border-t border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
-    >
-      <div class="text-xs text-slate-600">
-        Hiển thị
-        <span class="font-semibold text-slate-900">{{
-          pagedLecturerResearchHourRecords.length
-        }}</span>
-        /
-        <span class="font-semibold text-slate-900">{{
-          lecturerResearchHourRecords.length
-        }}</span>
-        bản ghi
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button
-          type="button"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          :disabled="currentPageNumber === 1"
-          @click="goToPreviousPage"
-        >
-          Trang trước
-        </button>
-
-        <div class="text-sm text-slate-700">
-          Trang
-          <span class="font-semibold text-slate-900">{{
-            currentPageNumber
-          }}</span>
-          /
-          <span class="font-semibold text-slate-900">{{ totalPageCount }}</span>
-        </div>
-
-        <button
-          type="button"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          :disabled="currentPageNumber === totalPageCount"
-          @click="goToNextPage"
-        >
-          Trang sau
-        </button>
-      </div>
+    <div class="border-t border-slate-200 p-4">
+      <SharedPaginationControls
+        :total-item-count="lecturerResearchHourRecords.length"
+        :current-page-number="currentPageNumber"
+        :page-size="pageSize"
+        display-mode="FULL"
+        :show-record-summary="true"
+        record-summary-mode="PAGE_COUNT"
+        record-summary-unit-label="giảng viên "
+        @update:currentPageNumber="(v) => (currentPageNumber = v)"
+        @update:pageSize="(v) => (pageSize = v)"
+      />
     </div>
   </section>
 </template>
@@ -188,6 +145,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { LecturerResearchHourRecord } from "../lecturerResearchHourModels";
+import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 const componentProperties = defineProps<{
   lecturerResearchHourRecords: LecturerResearchHourRecord[];
@@ -205,10 +163,10 @@ watch(
   { deep: true }
 );
 
-const totalPageCount = computed<number>(() => {
-  const recordCount = componentProperties.lecturerResearchHourRecords.length;
-  return Math.max(1, Math.ceil(recordCount / pageSize.value));
-});
+// const totalPageCount = computed<number>(() => {
+//   const recordCount = componentProperties.lecturerResearchHourRecords.length;
+//   return Math.max(1, Math.ceil(recordCount / pageSize.value));
+// });
 
 const pagedLecturerResearchHourRecords = computed<LecturerResearchHourRecord[]>(
   () => {
@@ -220,17 +178,6 @@ const pagedLecturerResearchHourRecords = computed<LecturerResearchHourRecord[]>(
     );
   }
 );
-
-function goToPreviousPage(): void {
-  currentPageNumber.value = Math.max(1, currentPageNumber.value - 1);
-}
-
-function goToNextPage(): void {
-  currentPageNumber.value = Math.min(
-    totalPageCount.value,
-    currentPageNumber.value + 1
-  );
-}
 
 function formatIntegerValue(value: number): string {
   return new Intl.NumberFormat("vi-VN").format(Math.round(value));

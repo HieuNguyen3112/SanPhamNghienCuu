@@ -7,18 +7,21 @@ import { profileMenuGroup, profileMenuItems } from "@/features/profile/menu";
 import {
   declarationsMenuGroup,
   declarationMenuItems,
-} from "@/features/declarations/menu";
+} from "@/features/declaration/menu";
 
 import {
   UserManagerMenuGroup,
   UserManagerMenuItems,
-} from "@/features/users/menu";
+} from "@/features/system/menu";
 import {
   researchWorksMenuGroup,
   researchWorksMenuItems,
 } from "@/features/scientific/menu";
 
-import { searchMenuGroup, searchMenuItems } from "@/features/search/menu";
+import {
+  searchMenuGroup,
+  searchMenuItems,
+} from "@/features/research-work-search/menu";
 import { reportMenuGroup, reportMenuItems } from "@/features/reports/menu";
 // Ghép toàn bộ menu (chung cho mọi role)
 const allMenuItems: MenuItem[] = [
@@ -28,8 +31,9 @@ const allMenuItems: MenuItem[] = [
   // quan ly cong trinh khoa hoc
   declarationsMenuGroup,
   researchWorksMenuGroup,
-  ...researchWorksMenuItems,
   ...declarationMenuItems,
+  ...researchWorksMenuItems,
+
   // quan ly gio khoa hoc
 
   UserManagerMenuGroup,
