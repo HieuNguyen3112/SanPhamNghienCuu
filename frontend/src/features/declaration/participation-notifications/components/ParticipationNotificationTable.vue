@@ -132,7 +132,7 @@ src/features/declaration/participation-notifications/components/ParticipationNot
 <script setup lang="ts">
 import { computed, watch } from "vue";
 import { Eye } from "lucide-vue-next";
-import SharedPaginationControls from "@/shared/components/SharedPaginationControls.vue";
+import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 type WorkType = "ARTICLE" | "PROJECT" | "BOOK" | "CONFERENCE";
 type NotificationStatus = "PENDING" | "ACCEPTED" | "REJECTED";

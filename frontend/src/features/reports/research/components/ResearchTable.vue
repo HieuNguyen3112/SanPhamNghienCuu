@@ -123,7 +123,7 @@ import type {
   ResearchType,
   ResearchWork,
 } from "../useResearchMockData";
-import SharedPaginationControls from "@/shared/components/SharedPaginationControls.vue";
+import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 type SortKey = keyof Pick<
   ResearchWork,

@@ -188,7 +188,7 @@
 import { computed, ref, watch } from "vue";
 import type { LecturerRecord } from "../lecturerStatisticsTypes";
 
-import SharedPaginationControls from "@/shared/components/SharedPaginationControls.vue";
+import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 import SortableTableHeaderCell, {
   type LecturerSortCondition,
   type LecturerSortFieldIdentifier,

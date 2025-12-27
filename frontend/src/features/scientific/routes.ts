@@ -1,20 +1,20 @@
-import PersonalResearchWorksPage from "@/features/scientific/personal-research-works/pages/PersonalResearchWorksPage.vue";
-import LecturerSelectApprovedWorksForHoursPage from "@/features/scientific/personal-hours-declare/pages/LecturerSelectApprovedWorksForHoursPage.vue";
-import LecturerHoursWarningPage from "@/features/scientific/personal-hours-warning/pages/LecturerHoursWarningPage.vue";
-import PersonalHoursOverviewPage from "@/features/scientific/personal-hours-overview/pages/PersonalHoursOverviewPage.vue";
+import PersonalResearchWorksPage from "@/features/scientific/lecturer/personal-research-works/pages/PersonalResearchWorksPage.vue";
+import LecturerSelectApprovedWorksForHoursPage from "@/features/scientific/lecturer/personal-hours-declare/pages/LecturerSelectApprovedWorksForHoursPage.vue";
+import LecturerHoursWarningPage from "@/features/scientific/lecturer/personal-hours-warning/pages/LecturerHoursWarningPage.vue";
+import PersonalHoursOverviewPage from "@/features/scientific/lecturer/personal-hours-overview/pages/PersonalHoursOverviewPage.vue";
 
-import FacultyLecturerResearchWorkManagementPage from "@/features/scientific/research-work-management/pages/FacultyLecturerResearchWorkManagementPage.vue";
-import UniversityLecturerResearchWorkManagementPage from "@/features/scientific/research-work-management/pages/UniversityLecturerResearchWorkManagementPage.vue";
-import FacultyResearchWorkApprovalPage from "@/features/scientific/research-work-approval/faculty/pages/FacultyResearchWorkApprovalPage.vue";
-import UniversityResearchWorkApprovalPage from "@/features/scientific/research-work-approval/university/pages/UniversityResearchWorkApprovalPage.vue";
+import FacultyLecturerResearchWorkManagementPage from "@/features/scientific/management/research-work-management/pages/FacultyLecturerResearchWorkManagementPage.vue";
+import UniversityLecturerResearchWorkManagementPage from "@/features/scientific/management/research-work-management/pages/UniversityLecturerResearchWorkManagementPage.vue";
+import FacultyResearchWorkApprovalPage from "@/features/scientific/management/research-work-approval/faculty/pages/FacultyResearchWorkApprovalPage.vue";
+import UniversityResearchWorkApprovalPage from "@/features/scientific/management/research-work-approval/university/pages/UniversityResearchWorkApprovalPage.vue";
 
-import FacultyLecturerHoursManagementPage from "@/features/scientific/lecturer-hours-management/pages/FacultyLecturerHoursManagementPage.vue";
-import UniversityLecturerHoursManagementPage from "@/features/scientific/lecturer-hours-management/pages/UniversityLecturerHoursManagementPage.vue";
-import FacultyHourApprovalPage from "@/features/scientific/lecturer-hour-approval/pages/FacultyHourApprovalPage.vue";
-import UniversityHourApprovalPage from "@/features/scientific/lecturer-hour-approval/pages/UniversityHourApprovalPage.vue";
+import FacultyLecturerHoursManagementPage from "@/features/scientific/management/lecturer-hours-management/pages/FacultyLecturerHoursManagementPage.vue";
+import UniversityLecturerHoursManagementPage from "@/features/scientific/management/lecturer-hours-management/pages/UniversityLecturerHoursManagementPage.vue";
+import FacultyHourApprovalPage from "@/features/scientific/management/lecturer-hour-approval/pages/FacultyHourApprovalPage.vue";
+import UniversityHourApprovalPage from "@/features/scientific/management/lecturer-hour-approval/pages/UniversityHourApprovalPage.vue";
 
-import FacultyResearchHourWarningPage from "@/features/scientific/hours-warnings/pages/FacultyResearchHourWarningPage.vue";
-import UniversityResearchHourWarningPage from "@/features/scientific/hours-warnings/pages/UniversityResearchHourWarningPage.vue";
+import FacultyResearchHourWarningPage from "@/features/scientific/management/lecturer-hours-warnings/pages/FacultyResearchHourWarningPage.vue";
+import UniversityResearchHourWarningPage from "@/features/scientific/management/lecturer-hours-warnings/pages/UniversityResearchHourWarningPage.vue";
 import type { RouteRecordRaw } from "vue-router";
 
 export const researchWorksRoutes: RouteRecordRaw[] = [

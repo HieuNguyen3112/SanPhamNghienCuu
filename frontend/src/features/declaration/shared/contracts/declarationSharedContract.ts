@@ -81,16 +81,13 @@ export type EvidenceFileDto = {
   file_type_name?: string;
 };
 
-export interface HoursDistributionItem {
+export type HoursDistributionItem = {
   lecturer_id: number;
   lecturer_name: string;
-
-  // ✅ allow null for cases like conference
-  member_role_id: number | null;
-  member_role_name: string | null;
-
+  member_role_id: number;
+  member_role_name: string;
   hours: number;
-}
+};
 
 export type HoursComputationResult = {
   total_hours: number;

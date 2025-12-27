@@ -62,7 +62,7 @@
         </div>
 
         <!-- Type -->
-        <div class="w-[240px]">
+        <div class="w-60">
           <label class="mb-1 block text-xs font-medium text-slate-600">
             Loại công trình
           </label>
@@ -125,7 +125,7 @@
             <div
               v-if="dropdownOpen"
               ref="dropdownRef"
-              class="z-[9999] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+              class="z-9999 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
               :style="dropdownStyle"
             >
               <div class="max-h-72 overflow-auto p-1">

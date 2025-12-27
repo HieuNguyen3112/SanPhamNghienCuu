@@ -142,7 +142,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import SharedPaginationControls from "@/shared/components/SharedPaginationControls.vue";
+import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 import {
   BookOpen,
   Eye,

@@ -12,7 +12,7 @@ import {
 import {
   UserManagerMenuGroup,
   UserManagerMenuItems,
-} from "@/features/users/menu";
+} from "@/features/system/menu";
 import {
   researchWorksMenuGroup,
   researchWorksMenuItems,

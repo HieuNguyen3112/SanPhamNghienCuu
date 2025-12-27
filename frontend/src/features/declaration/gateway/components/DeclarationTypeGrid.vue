@@ -37,7 +37,7 @@
                 class="flex gap-2"
               >
                 <span
-                  class="mt-[6px] inline-block h-1.5 w-1.5 rounded-full bg-slate-300"
+                  class="mt-1.5 inline-block h-1.5 w-1.5 rounded-full bg-slate-300"
                 />
                 <span class="min-w-0">{{ line }}</span>
               </li>
