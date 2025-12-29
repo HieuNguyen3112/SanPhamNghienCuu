@@ -169,6 +169,7 @@ const componentEvents = defineEmits<{
     payload: {
       researchWorkIdentifier: number;
       officialResearchHours: number | null;
+        memberHours?: { authorIdentifier: number; officialHours: number }[];
     }
   ): void;
   (

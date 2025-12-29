@@ -144,6 +144,10 @@ export const useUserStore = defineStore("user", {
       return this.initAuth();
     },
 
+    async ensureAuthInitialized() {
+      return this.initAuth();
+    },
+
     async login(payload: LoginPayload) {
       try {
         await apiGetCsrfCookie();

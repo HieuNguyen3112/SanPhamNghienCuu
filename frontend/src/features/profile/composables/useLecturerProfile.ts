@@ -1,5 +1,19 @@
-// File: src/features/lecturer/profile/composables/useLecturerProfile.ts
-import { ref } from "vue";
+﻿import { ref } from "vue";
+import {
+  fetchAcademicRanks,
+  fetchDegrees,
+  fetchScientificProfile,
+  updateAcademicTitles,
+  updateLanguages,
+  updateProfileContact,
+  updateResearchAreas,
+  type EducationDTO,
+  type LanguageDTO,
+  type LookupItemDTO,
+  type ResearchAreaDTO,
+  type ResearchWorkItemDTO,
+  type ScientificProfilePayload,
+} from "../services/lecturerProfileService";
 
 export type Gender = "male" | "female" | "other";
 export type EmploymentType = "full_time" | "visiting";
@@ -68,108 +82,307 @@ export interface ResearchWorkItem {
   status: ResearchWorkStatus;
 }
 
-function delay(ms: number) {
-  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+const emptyPersonalInfo: LecturerPersonalInfo = {
+  lecturerCode: "",
+  fullName: "",
+  birthDate: null,
+  gender: "other",
+  departmentName: "",
+  jobTitle: "",
+  employmentType: "full_time",
+  workStatus: "active",
+  avatarUrl: null,
+};
+
+const emptyContactInfo: LecturerContactInfo = {
+  officialEmail: "",
+  personalEmail: "",
+  phone: "",
+  address: "",
+  website: "",
+  googleScholar: "",
+  orcid: "",
+};
+
+const emptyAcademicProfile: LecturerAcademicProfile = {
+  highestQualification: "",
+  major: "",
+  academicDegree: "",
+  academicRank: "",
+  degreeYear: null,
+  rankYear: null,
+  primaryArea: "",
+  secondaryArea: "",
+  keywords: [],
+  languages: [],
+};
+
+function normalizeGender(value?: string | null): Gender {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (!raw) return "other";
+  if (raw === "m") return "male";
+  if (raw === "f") return "female";
+  if (raw.includes("nữ")) return "female";
+  const tokens = raw.split(/[^a-z]+/).filter(Boolean);
+  if (tokens.includes("female") || tokens.includes("nu")) return "female";
+  if (tokens.includes("male") || tokens.includes("nam")) return "male";
+  return "other";
 }
 
-function createId(prefix: string) {
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+function normalizeGenderToBackend(value: Gender): string {
+  if (value === "male") return "Male";
+  if (value === "female") return "Female";
+  return "Other";
+}
+
+function normalizeEmploymentType(value?: string | null): EmploymentType {
+  const raw = (value ?? "").toLowerCase();
+  if (["permanent", "full", "bien", "co huu"].some((x) => raw.includes(x))) {
+    return "full_time";
+  }
+  if (["visiting", "contract", "thin"].some((x) => raw.includes(x))) {
+    return "visiting";
+  }
+  return "full_time";
+}
+
+function normalizeWorkStatus(
+  value?: string | null,
+  active?: boolean | null
+): WorkStatus {
+  const raw = (value ?? "").toLowerCase();
+  if (raw.includes("on_leave")) return "on_leave";
+  if (raw.includes("retired")) return "retired";
+  if (raw.includes("resigned") || raw.includes("inactive")) return "resigned";
+  if (active === false) return "resigned";
+  return "active";
+}
+
+function parseYear(value?: string | number | null): number | null {
+  if (value == null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const str = String(value);
+  if (str.length < 4) return null;
+  const year = Number(str.slice(0, 4));
+  return Number.isFinite(year) ? year : null;
+}
+
+function parseResearchAreaString(value?: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function mapResearchFields(
+  fields: ResearchAreaDTO[] | undefined,
+  fallback: string | null | undefined
+) {
+  const items = (fields ?? [])
+    .map((f) => ({ name: f.name?.trim(), type: f.type }))
+    .filter((f) => f.name);
+
+  const primary =
+    items.find((i) => i.type === "PRIMARY")?.name ??
+    parseResearchAreaString(fallback)[0] ??
+    "";
+  const secondaryCandidates = items
+    .filter((i) => i.type === "SECONDARY")
+    .map((i) => i.name as string);
+  const fallbackParts = parseResearchAreaString(fallback);
+  const secondary = secondaryCandidates[0] ?? fallbackParts[1] ?? "";
+  let keywords = secondaryCandidates.slice(1);
+
+  if (keywords.length === 0 && fallbackParts.length > 2) {
+    keywords = fallbackParts.slice(2);
+  }
+
+  return { primary, secondary, keywords };
+}
+
+function mapLanguageLevel(item: LanguageDTO): string {
+  const base = item.certificate_name || item.level || "";
+  const detail = item.certificate_score || item.certificate_level || "";
+  return [base, detail].filter(Boolean).join(" ");
+}
+
+function mapLanguageRows(items?: LanguageDTO[]): LanguageRow[] {
+  if (!items) return [];
+  return items.map((item) => ({
+    id: String(item.id ?? ""),
+    language: item.language,
+    level: mapLanguageLevel(item),
+  }));
+}
+
+function mapWorkStatus(value?: string | null): ResearchWorkStatus {
+  const raw = (value ?? "").toLowerCase();
+  if (raw === "approved") return "APPROVED";
+  if (raw === "submitted") return "SUBMITTED";
+  if (raw === "rejected") return "REJECTED";
+  return "DRAFT";
+}
+
+function normalizeLookupValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function matchLookupId(value: string, items: LookupItemDTO[]): number | null {
+  const key = normalizeLookupValue(value);
+  if (!key) return null;
+  const matched = items.find((item) => {
+    const nameKey = normalizeLookupValue(item.name ?? "");
+    const codeKey = normalizeLookupValue(item.code ?? "");
+    return key === nameKey || key === codeKey;
+  });
+  return matched ? matched.id : null;
+}
+
+function mapResearchWorks(items?: ResearchWorkItemDTO[]): ResearchWorkItem[] {
+  if (!items) return [];
+  return items
+    .map((item) => {
+      const kind = item.kind_code as ResearchWorkKind | undefined;
+      if (!kind || !["paper", "project", "book", "conference"].includes(kind)) {
+        return null;
+      }
+
+      return {
+        id: item.activity_id,
+        kind,
+        title: item.title,
+        metaLine: item.info || item.venue || item.location || "",
+        year: item.work_year ?? parseYear(item.approved_at),
+        role: item.member_role_name || "",
+        status: mapWorkStatus(item.status_code),
+      } as ResearchWorkItem;
+    })
+    .filter((item): item is ResearchWorkItem => item !== null);
+}
+
+function applyProfilePayload(
+  payload: ScientificProfilePayload,
+  personalInfoRef: { value: LecturerPersonalInfo },
+  contactInfoRef: { value: LecturerContactInfo },
+  academicProfileRef: { value: LecturerAcademicProfile },
+  worksRef: { value: ResearchWorkItem[] }
+) {
+  const summary = payload.scientific_profile;
+  const personal = summary?.personal_info ?? {};
+  const contact = summary?.contact_info ?? {};
+  const academic = summary?.academic_info ?? {};
+  const latestEducation =
+    summary?.latest_education ?? payload.latest_education ?? null;
+  const latestWork = summary?.latest_work_history ?? payload.latest_work_history;
+
+  const degreeName = academic.degree_name ?? payload.lecturer?.degree_name ?? "";
+  const rankName =
+    academic.academic_rank_name ?? payload.lecturer?.academic_rank_name ?? "";
+
+  const { primary, secondary, keywords } = mapResearchFields(
+    summary?.research_fields ?? payload.research_areas,
+    academic.research_area ?? payload.profile?.research_area
+  );
+
+  personalInfoRef.value = {
+    lecturerCode:
+      personal.lecturer_code ?? payload.lecturer?.code ?? "",
+    fullName: personal.full_name ?? payload.lecturer?.full_name ?? "",
+    birthDate: personal.date_of_birth ?? payload.profile?.date_of_birth ?? null,
+    gender: normalizeGender(personal.gender ?? payload.profile?.gender),
+    departmentName:
+      personal.department_name ?? payload.lecturer?.department_name ?? "",
+    jobTitle: personal.current_position ?? payload.profile?.current_position ?? "",
+    employmentType: normalizeEmploymentType(
+      personal.staff_type ?? latestWork?.employment_type
+    ),
+    workStatus: normalizeWorkStatus(personal.work_status, personal.active),
+    avatarUrl: null,
+  };
+
+  contactInfoRef.value = {
+    officialEmail:
+      contact.work_email ??
+      payload.lecturer?.email ??
+      payload.user?.email ??
+      "",
+    personalEmail: contact.personal_email ?? payload.profile?.personal_email ?? "",
+    phone: contact.phone ?? payload.lecturer?.phone ?? "",
+    address: contact.address ?? payload.profile?.address ?? "",
+    website: contact.personal_website ?? payload.profile?.personal_website ?? "",
+    googleScholar:
+      contact.google_scholar_profile ??
+      payload.profile?.google_scholar_profile ??
+      "",
+    orcid: contact.orcid_id ?? payload.profile?.orcid_id ?? "",
+  };
+
+  academicProfileRef.value = {
+    highestQualification:
+      latestEducation?.degree_title ??
+      latestEducation?.degree_name ??
+      degreeName,
+    major: latestEducation?.major ?? "",
+    academicDegree: degreeName,
+    academicRank: rankName,
+    degreeYear: parseYear(latestEducation?.end_date ?? latestEducation?.start_date),
+    rankYear: null,
+    primaryArea: primary,
+    secondaryArea: secondary,
+    keywords,
+    languages: mapLanguageRows(summary?.languages ?? payload.languages),
+  };
+
+  worksRef.value = mapResearchWorks(payload.research_works?.items ?? []);
+}
+
+function buildResearchAreaItems(profile: LecturerAcademicProfile): string[] {
+  const items = [
+    profile.primaryArea,
+    profile.secondaryArea,
+    ...profile.keywords,
+  ]
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return Array.from(new Set(items));
+}
+
+function buildLanguagePayload(rows: LanguageRow[]): LanguageDTO[] {
+  return rows
+    .map((row) => {
+      const idNum = Number(row.id);
+      return {
+        id: Number.isFinite(idNum) ? idNum : 0,
+        language: row.language,
+        level: row.level,
+      } as LanguageDTO;
+    })
+    .filter((row) => row.language && row.level);
+}
+
+function resolveErrorMessage(error: unknown, fallback: string): string {
+  const anyError = error as { response?: { data?: { message?: string } } };
+  return anyError?.response?.data?.message || (error as Error)?.message || fallback;
 }
 
 export function useLecturerProfile() {
   const loading = ref(false);
 
-  const personalInfo = ref<LecturerPersonalInfo>({
-    lecturerCode: "GV001",
-    fullName: "Nguyễn Văn A",
-    birthDate: "1988-10-12",
-    gender: "male",
-    departmentName: "Bộ môn CNTT • Khoa Công nghệ",
-    jobTitle: "Giảng viên",
-    employmentType: "full_time",
-    workStatus: "active",
-    avatarUrl: null,
-  });
-
-  const contactInfo = ref<LecturerContactInfo>({
-    officialEmail: "a.nguyen@university.edu.vn",
-    personalEmail: "nguyenvana@gmail.com",
-    phone: "0901 234 567",
-    address: "12 Nguyễn Trãi, Q.1, TP.HCM",
-    website: "https://your-site.com",
-    googleScholar: "https://scholar.google.com/citations?user=abc123",
-    orcid: "https://orcid.org/0000-0002-1825-0097",
-  });
-
+  const personalInfo = ref<LecturerPersonalInfo>({ ...emptyPersonalInfo });
+  const contactInfo = ref<LecturerContactInfo>({ ...emptyContactInfo });
   const academicProfile = ref<LecturerAcademicProfile>({
-    highestQualification: "Tiến sĩ",
-    major: "Khoa học máy tính",
-    academicDegree: "TS",
-    academicRank: "PGS",
-    degreeYear: 2018,
-    rankYear: 2023,
-    primaryArea: "Trí tuệ nhân tạo",
-    secondaryArea: "Khai phá dữ liệu",
-    keywords: ["AI", "MachineLearning", "DataMining"],
-    languages: [
-      { id: createId("lang"), language: "English", level: "IELTS 7.0" },
-      { id: createId("lang"), language: "Japanese", level: "JLPT N3" },
-    ],
+    ...emptyAcademicProfile,
   });
-
-  const works = ref<ResearchWorkItem[]>([
-    {
-      id: 101,
-      kind: "paper",
-      title: "Ứng dụng AI trong phân tích dữ liệu giáo dục",
-      metaLine: "Tạp chí Khoa học Trường X",
-      year: 2025,
-      role: "Tác giả chính",
-      status: "DRAFT",
-    },
-    {
-      id: 102,
-      kind: "paper",
-      title: "A Study on Student Behavior Prediction",
-      metaLine: "Proceedings of ABC Conference",
-      year: 2024,
-      role: "Đồng tác giả",
-      status: "APPROVED",
-    },
-    {
-      id: 201,
-      kind: "project",
-      title: "Hệ thống giám sát chất lượng học tập bằng dữ liệu lớn",
-      metaLine: "Cấp Trường",
-      year: 2025,
-      role: "Chủ nhiệm",
-      status: "SUBMITTED",
-    },
-    {
-      id: 301,
-      kind: "book",
-      title: "Giáo trình Cấu trúc dữ liệu và Giải thuật",
-      metaLine: "NXB Giáo dục Việt Nam",
-      year: 2023,
-      role: "Chủ biên",
-      status: "APPROVED",
-    },
-    {
-      id: 401,
-      kind: "conference",
-      title: "Báo cáo: Ứng dụng LLM trong trợ giảng",
-      metaLine: "Hội thảo Khoa học Quốc gia 2025 • Hà Nội",
-      year: 2025,
-      role: "Báo cáo",
-      status: "APPROVED",
-    },
-  ]);
+  const works = ref<ResearchWorkItem[]>([]);
 
   async function loadProfile() {
     loading.value = true;
     try {
-      await delay(350);
-      // MOCK: dữ liệu đã có sẵn
+      const payload = await fetchScientificProfile();
+      applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+    } catch (error) {
+      throw new Error(resolveErrorMessage(error, "Unable to load profile"));
     } finally {
       loading.value = false;
     }
@@ -178,8 +391,15 @@ export function useLecturerProfile() {
   async function updatePersonalInfo(next: LecturerPersonalInfo) {
     loading.value = true;
     try {
-      await delay(400);
-      personalInfo.value = { ...next };
+      const payload = await updateProfileContact({
+        full_name: next.fullName,
+        date_of_birth: next.birthDate,
+        gender: normalizeGenderToBackend(next.gender),
+        current_position: next.jobTitle,
+      });
+      applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+    } catch (error) {
+      throw new Error(resolveErrorMessage(error, "Unable to update personal info"));
     } finally {
       loading.value = false;
     }
@@ -188,8 +408,17 @@ export function useLecturerProfile() {
   async function updateContactInfo(next: LecturerContactInfo) {
     loading.value = true;
     try {
-      await delay(400);
-      contactInfo.value = { ...next };
+      const payload = await updateProfileContact({
+        personal_email: next.personalEmail || null,
+        phone: next.phone || null,
+        address: next.address || null,
+        personal_website: next.website || null,
+        google_scholar_profile: next.googleScholar || null,
+        orcid_id: next.orcid || null,
+      });
+      applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+    } catch (error) {
+      throw new Error(resolveErrorMessage(error, "Unable to update contact info"));
     } finally {
       loading.value = false;
     }
@@ -198,8 +427,57 @@ export function useLecturerProfile() {
   async function updateAcademicProfile(next: LecturerAcademicProfile) {
     loading.value = true;
     try {
-      await delay(450);
-      academicProfile.value = { ...next };
+      const prev = academicProfile.value;
+      const degreeInput = next.academicDegree.trim();
+      const rankInput = next.academicRank.trim();
+      const degreeChanged = degreeInput !== prev.academicDegree.trim();
+      const rankChanged = rankInput !== prev.academicRank.trim();
+
+      if (degreeChanged || rankChanged) {
+        const [degrees, ranks] = await Promise.all([
+          fetchDegrees(),
+          fetchAcademicRanks(),
+        ]);
+
+        const degreeId = degreeInput ? matchLookupId(degreeInput, degrees) : null;
+        const rankId = rankInput ? matchLookupId(rankInput, ranks) : null;
+
+        if (degreeInput && !degreeId) {
+          throw new Error("Khong tim thay hoc vi trong danh muc.");
+        }
+        if (rankInput && !rankId) {
+          throw new Error("Khong tim thay hoc ham trong danh muc.");
+        }
+
+        const payload = await updateAcademicTitles({
+          items: [
+            {
+              degree_id: degreeId ?? null,
+              academic_rank_id: rankId ?? null,
+            },
+          ],
+        });
+        applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+      }
+
+      const researchItems = buildResearchAreaItems(next);
+      const payload = await updateResearchAreas({ items: researchItems });
+      const languagePayload = buildLanguagePayload(next.languages);
+      const languages = await updateLanguages({
+        items: languagePayload.map((row) => ({
+          id: row.id || undefined,
+          language: row.language,
+          level: row.level ?? "",
+        })),
+      });
+
+      applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+      academicProfile.value = {
+        ...academicProfile.value,
+        languages: mapLanguageRows(languages),
+      };
+    } catch (error) {
+      throw new Error(resolveErrorMessage(error, "Unable to update academic profile"));
     } finally {
       loading.value = false;
     }

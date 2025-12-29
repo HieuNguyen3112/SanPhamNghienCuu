@@ -318,7 +318,7 @@ const evidenceFileTypes = ref<EvidenceFileTypeDto[]>([]);
 const conferenceTypesAll = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
 
-const currentLecturerId = ref<number>(1);
+const currentLecturerId = ref<number>(0);
 const currentLecturerName = ref<string>("Nguyễn Văn A"); // TODO: from /api/profile/me
 
 const form = reactive<ConferenceDeclarationFormModel>({

@@ -19,6 +19,8 @@ class DatabaseSeeder extends Seeder
         RolesPermissionsSeeder::class,
         UsersDemoSeeder::class,
         LecturerProfileDemoSeeder::class,
+        ResearchLookupSeeder::class,
+        ResearchActivityDemoSeeder::class,
     ]);
 }
 

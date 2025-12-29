@@ -10,6 +10,7 @@ use App\Models\LecturerTrainingHistory;
 use App\Models\LecturerWorkHistory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -38,6 +39,22 @@ class SeedDataTest extends TestCase
         $this->assertTrue(LecturerTrainingHistory::where('lecturer_id', $lecturer->id)->exists());
         $this->assertTrue(LecturerWorkHistory::where('lecturer_id', $lecturer->id)->exists());
         $this->assertTrue(LecturerLanguageProficiency::where('lecturer_id', $lecturer->id)->exists());
+
+        $this->assertTrue(DB::table('activity_kinds')->whereIn('code', [
+            'paper',
+            'book',
+            'project',
+            'conference',
+        ])->count() >= 4);
+        $this->assertTrue(DB::table('activity_statuses')->where('code', 'approved')->exists());
+
+        $approvedStatusId = DB::table('activity_statuses')->where('code', 'approved')->value('id');
+        $this->assertNotNull($approvedStatusId);
+
+        $this->assertTrue(DB::table('research_activities')
+            ->where('owner_lecturer_id', $lecturer->id)
+            ->where('status_id', $approvedStatusId)
+            ->exists());
     }
 
     /** @test */

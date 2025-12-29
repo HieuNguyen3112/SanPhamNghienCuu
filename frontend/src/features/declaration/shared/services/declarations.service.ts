@@ -1,21 +1,18 @@
+import http, { ensureCsrfCookie } from "@/lib/http";
 import type {
   EvidenceFileDto,
   ResearchActivityMemberUpsertDto,
 } from "../contracts/declarationSharedContract";
 
-/**
- * TODO (backend):
- * - POST /api/research-activities
- * - PUT /api/research-activities/{id}
- * - PUT /api/research-activities/{id}/{detail-kind} (paper_details/book_details/...)
- * - PUT /api/research-activities/{id}/members
- * - POST /api/research-activities/{id}/submit
- * - POST /api/research-activities/{id}/evidence-files (multipart)
- *
- * NOTE: mock dưới đây chỉ để FE dev UI.
- */
+// Backend endpoints:
+// - POST /api/research-activities
+// - PUT /api/research-activities/{id}
+// - PUT /api/research-activities/{id}/{detail-kind}
+// - PUT /api/research-activities/{id}/members
+// - POST /api/research-activities/{id}/submit
+// - GET  /api/research-activities/{id}/evidence-files
 
-const MOCK = true;
+const MOCK = false;
 
 type ResearchActivityDto = {
   id: number;
@@ -94,7 +91,34 @@ function now_iso() {
 export async function upsert_activity_base(
   dto: Omit<ResearchActivityDto, "id" | "activity_code"> & { id?: number }
 ): Promise<ResearchActivityDto> {
-  if (!MOCK) throw new Error("TODO: upsert_activity_base API");
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    const payload = {
+      kind_id: dto.kind_id,
+      type_id: dto.type_id ?? null,
+      academic_year_id: dto.academic_year_id,
+      title: dto.title,
+      abstract: dto.abstract ?? null,
+      start_date: dto.start_date ?? null,
+      end_date: dto.end_date ?? null,
+      quantity: dto.quantity ?? 1,
+      notes: dto.notes ?? null,
+    };
+
+    if (!dto.id) {
+      const { data } = await http.post<{ data: ResearchActivityDto }>(
+        "/api/research-activities",
+        payload
+      );
+      return data.data;
+    }
+
+    const { data } = await http.put<{ data: ResearchActivityDto }>(
+      `/api/research-activities/${dto.id}`,
+      payload
+    );
+    return data.data;
+  }
 
   if (!dto.id) {
     const id = next_id++;
@@ -102,11 +126,7 @@ export async function upsert_activity_base(
     const created: ResearchActivityDto = {
       id,
       activity_code: `ACT-${id}`,
-
-      // spread trước để không overwrite defaults
       ...dto,
-
-      // defaults cuối (dto không thể ghi đè)
       submitted_at: dto.submitted_at ?? null,
       approved_at: dto.approved_at ?? null,
       total_hours_calc: dto.total_hours_calc ?? null,
@@ -132,25 +152,53 @@ export async function upsert_activity_base(
 }
 
 export async function upsert_paper_details(dto: PaperDetailsDto) {
-  if (!MOCK) throw new Error("TODO: upsert_paper_details API");
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    const { data } = await http.put<{ data: PaperDetailsDto }>(
+      `/api/research-activities/${dto.activity_id}/paper_details`,
+      dto
+    );
+    return data.data;
+  }
   paper_details.set(dto.activity_id, dto);
   return dto;
 }
 
 export async function upsert_book_details(dto: BookDetailsDto) {
-  if (!MOCK) throw new Error("TODO: upsert_book_details API");
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    const { data } = await http.put<{ data: BookDetailsDto }>(
+      `/api/research-activities/${dto.activity_id}/book_details`,
+      dto
+    );
+    return data.data;
+  }
   book_details.set(dto.activity_id, dto);
   return dto;
 }
 
 export async function upsert_project_details(dto: ProjectDetailsDto) {
-  if (!MOCK) throw new Error("TODO: upsert_project_details API");
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    const { data } = await http.put<{ data: ProjectDetailsDto }>(
+      `/api/research-activities/${dto.activity_id}/project_details`,
+      dto
+    );
+    return data.data;
+  }
   project_details.set(dto.activity_id, dto);
   return dto;
 }
 
 export async function upsert_conference_details(dto: ConferenceDetailsDto) {
-  if (!MOCK) throw new Error("TODO: upsert_conference_details API");
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    const { data } = await http.put<{ data: ConferenceDetailsDto }>(
+      `/api/research-activities/${dto.activity_id}/conference_details`,
+      dto
+    );
+    return data.data;
+  }
   conference_details.set(dto.activity_id, dto);
   return dto;
 }
@@ -159,21 +207,31 @@ export async function upsert_members(
   activity_id: number,
   list: ResearchActivityMemberUpsertDto[]
 ) {
-  if (!MOCK) throw new Error("TODO: upsert_members API");
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    const { data } = await http.put<{ data: ResearchActivityMemberUpsertDto[] }>(
+      `/api/research-activities/${activity_id}/members`,
+      { items: list }
+    );
+    return data.data;
+  }
   members.set(activity_id, list);
   return list;
 }
 
 export async function submit_activity(
   activity_id: number,
-  submitted_status_id: number
+  _submitted_status_id?: number
 ) {
-  if (!MOCK) throw new Error("TODO: submit_activity API");
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    await http.post(`/api/research-activities/${activity_id}/submit`);
+    return;
+  }
   const prev = activities.get(activity_id);
   if (!prev) throw new Error("Activity not found");
   activities.set(activity_id, {
     ...prev,
-    status_id: submitted_status_id,
     submitted_at: now_iso(),
   });
 }
@@ -181,6 +239,45 @@ export async function submit_activity(
 export async function list_evidence_files(
   activity_id: number
 ): Promise<EvidenceFileDto[]> {
-  if (!MOCK) throw new Error("TODO: list_evidence_files API");
+  if (!MOCK) {
+    const { data } = await http.get<{ data: EvidenceFileDto[] }>(
+      `/api/research-activities/${activity_id}/evidence-files`
+    );
+    return data.data;
+  }
   return evidence.get(activity_id) ?? [];
+}
+
+export type ResearchActivityDetailResponse = {
+  activity: ResearchActivityDto & {
+    status_code?: string | null;
+    kind_code?: string | null;
+  };
+  detail_kind?: string | null;
+  detail?: Record<string, unknown> | null;
+  members?: Array<{
+    lecturer_id: number;
+    member_role_id: number;
+    contribution_share: number | null;
+    hours_assigned: number | null;
+    member_role_code?: string | null;
+    member_role_name?: string | null;
+  }>;
+  evidence_files?: EvidenceFileDto[];
+};
+
+export async function fetch_activity(
+  activity_id: number
+): Promise<ResearchActivityDetailResponse> {
+  const { data } = await http.get<{ data: ResearchActivityDetailResponse }>(
+    `/api/research-activities/${activity_id}`
+  );
+  return data.data;
+}
+
+export async function fetch_current_lecturer_id(): Promise<number | null> {
+  const { data } = await http.get<{ data: { lecturer?: { id?: number } } }>(
+    "/api/profile/me"
+  );
+  return data?.data?.lecturer?.id ?? null;
 }

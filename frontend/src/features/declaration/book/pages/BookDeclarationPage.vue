@@ -255,6 +255,7 @@ import {
   fetch_activity_statuses,
 } from "../../shared/services/catalogs.service";
 import {
+  fetch_current_lecturer_id,
   submit_activity,
   upsert_activity_base,
   upsert_members,
@@ -277,7 +278,7 @@ const types = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
 const submittedStatusId = ref<number>(0);
 
-const currentLecturerId = ref<number>(1);
+const currentLecturerId = ref<number>(0);
 
 const form = reactive<BookDeclarationFormModel>({
   activityId: null,
@@ -394,6 +395,7 @@ const canSubmit = computed(() => {
 });
 
 async function loadCatalogs() {
+  currentLecturerId.value = (await fetch_current_lecturer_id()) ?? 0;
   const [years, kinds, roles, fileTypes, statuses] = await Promise.all([
     fetch_academic_years(),
     fetch_activity_kinds(),
@@ -486,8 +488,10 @@ const shell = useDeclarationFormShell({
       throw new Error("TODO (P0): Evidence links chưa có backend support.");
   },
   on_submit: async () => {
-    if (!form.activityId) await shell.save_draft();
-    if (!form.activityId) throw new Error("Chưa có activity_id");
+    if (!form.activityId) {
+      await shell.save_draft();
+    }
+    if (!form.activityId) return;
     if (!submittedStatusId.value) throw new Error("Thiếu submitted status_id");
     await submit_activity(form.activityId, submittedStatusId.value);
   },

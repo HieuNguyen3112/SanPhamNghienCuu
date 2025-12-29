@@ -7,7 +7,14 @@ import type {
   FilterState,
   OverviewItem,
 } from "../lecturerResearchWork.contracts";
-import type { FilterDTO } from "../lecturerResearchWork.contracts";
+import type {
+  AcademicYearOptionDTO,
+  ApprovedDetailDTO,
+  ApprovedSummaryDTO,
+  FacultyOptionDTO,
+  FilterDTO,
+  OverviewDTO,
+} from "../lecturerResearchWork.contracts";
 import { mapper } from "../lecturerResearchWork.contracts";
 import {
   buildApprovedDetail,
@@ -17,6 +24,7 @@ import {
   mockFacultyOptions,
   mockLecturerDirectory,
 } from "../lecturerResearchWork.mockData";
+import http from "@/lib/http";
 
 export type Scope = "faculty" | "university";
 
@@ -120,12 +128,32 @@ export function createLecturerResearchWorkClient(
       const mapped = dtos.map(mapper.overviewFromDto);
       if (filter.statusMode === "all") return mapped;
 
-      return mapped.map((item) => ({
-        ...item,
-        totalCount: item.approvedCount,
-        pendingCount: 0,
-        rejectedCount: 0,
-      }));
+      return mapped.map((item) => {
+        if (filter.statusMode === "approved") {
+          return {
+            ...item,
+            totalCount: item.approvedCount,
+            pendingCount: 0,
+            rejectedCount: 0,
+          };
+        }
+
+        if (filter.statusMode === "pending") {
+          return {
+            ...item,
+            totalCount: item.pendingCount,
+            approvedCount: 0,
+            rejectedCount: 0,
+          };
+        }
+
+        return {
+          ...item,
+          totalCount: item.rejectedCount,
+          approvedCount: 0,
+          pendingCount: 0,
+        };
+      });
     },
 
     async loadApprovedWorks(lecturerId: number, filter: FilterState) {
@@ -155,3 +183,67 @@ export function createLecturerResearchWorkClient(
  * - nhận DTO snake_case
  * - map về UI model camelCase
  */
+export function createLecturerResearchWorkHttpClient(
+  config: ClientConfig
+): LecturerResearchWorkClient {
+  const fixedFacultyId = config.fixedFacultyId ?? null;
+
+  function buildScopedFacultyId(filterDto: FilterDTO) {
+    if (config.scope === "faculty" && fixedFacultyId) {
+      return filterDto.faculty_id ?? fixedFacultyId;
+    }
+    return filterDto.faculty_id;
+  }
+
+  return {
+    async loadFacultyOptions() {
+      const { data } = await http.get<{ data: FacultyOptionDTO[] }>(
+        "/api/lookups/faculties"
+      );
+      return data.data.map((dto) => mapper.facultyOptionFromDto(dto));
+    },
+
+    async loadAcademicYearOptions() {
+      const { data } = await http.get<{ data: AcademicYearOptionDTO[] }>(
+        "/api/lookups/academic-years"
+      );
+      return data.data.map((dto) => mapper.academicYearOptionFromDto(dto));
+    },
+
+    async loadOverview(filter: FilterState) {
+      const filterDto = mapper.filter.toDto(filter);
+      const params = {
+        faculty_id: buildScopedFacultyId(filterDto),
+        academic_year_id: filterDto.academic_year_id,
+        lecturer_name: filterDto.lecturer_name,
+        status_mode: filterDto.status_mode,
+      };
+
+      const { data } = await http.get<{ data: OverviewDTO[] }>(
+        "/api/admin/works/lecturers/summary",
+        { params }
+      );
+      return data.data.map((dto) => mapper.overviewFromDto(dto));
+    },
+
+    async loadApprovedWorks(lecturerId: number, filter: FilterState) {
+      const filterDto = mapper.filter.toDto(filter);
+      const params = {
+        academic_year_id: filterDto.academic_year_id,
+      };
+
+      const { data } = await http.get<{ data: ApprovedSummaryDTO[] }>(
+        `/api/admin/works/lecturers/${lecturerId}/approved`,
+        { params }
+      );
+      return data.data.map((dto) => mapper.approvedSummaryFromDto(dto));
+    },
+
+    async loadApprovedDetail(activityId: number) {
+      const { data } = await http.get<{ data: ApprovedDetailDTO }>(
+        `/api/admin/works/activities/${activityId}/approved`
+      );
+      return mapper.approvedDetailFromDto(data.data);
+    },
+  };
+}

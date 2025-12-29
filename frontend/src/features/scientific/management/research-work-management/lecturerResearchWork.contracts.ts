@@ -3,7 +3,7 @@
 // =====================
 // DTO (snake_case)
 // =====================
-export type StatusModeDTO = "approved" | "all";
+export type StatusModeDTO = "approved" | "pending" | "rejected" | "all";
 
 export interface FilterDTO {
   faculty_id: number | null;
@@ -125,7 +125,7 @@ export interface ApprovedDetailDTO {
 // =====================
 // UI Models (camelCase)
 // =====================
-export type StatusMode = "approved" | "all";
+export type StatusMode = "approved" | "pending" | "rejected" | "all";
 
 export interface FilterState {
   facultyId: number | null;

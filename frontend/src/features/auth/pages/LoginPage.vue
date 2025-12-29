@@ -74,8 +74,14 @@ const handleSubmit = async () => {
     }
 
     // 3. OK thì chuyển vào app
-    const redirect = (router.currentRoute.value.query.redirect as string) || "/";
-    const target = redirect === "/login" ? "/" : redirect;
+    const redirectParam = router.currentRoute.value.query.redirect;
+    const redirect = typeof redirectParam === "string" ? redirectParam : "";
+    const isSafeRedirect =
+      redirect.startsWith("/") && !redirect.startsWith("//") && !redirect.includes("://");
+    const target =
+      isSafeRedirect && redirect && redirect !== "/login"
+        ? redirect
+        : "/profile";
     await router.replace(target);
   } catch (err: any) {
     if (err?.message === "CSRF_FAILED") {

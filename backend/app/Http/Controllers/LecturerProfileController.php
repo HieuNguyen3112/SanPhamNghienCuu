@@ -649,6 +649,39 @@ class LecturerProfileController extends Controller
         $workHistories = $lecturer->workHistories()->get();
         $languageProficiencies = $lecturer->languageProficiencies()->get();
         $backendRoles = $user ? $user->getRoleNames()->values()->all() : [];
+        $educationPayload = $this->serializeTrainingHistories($trainingHistories);
+        $latestEducationPayload = $trainingHistories->isNotEmpty()
+            ? $this->serializeTrainingHistory($trainingHistories->first())
+            : null;
+        $workPayload = $this->serializeWorkHistories($workHistories);
+        $latestWorkPayload = $workHistories->isNotEmpty()
+            ? $this->serializeWorkHistory($workHistories->first())
+            : null;
+        $languagePayload = LecturerLanguageResource::collection($languageProficiencies)->resolve();
+        $researchAreasPayload = $this->serializeResearchAreas($profile?->research_area);
+        $partyPayload = $partyMembership ? [
+            'is_member' => $partyMembership->is_member,
+            'membership_no' => $partyMembership->membership_no,
+            'joined_at' => $partyMembership->joined_at?->toDateString(),
+            'official_at' => $partyMembership->official_at?->toDateString(),
+            'joining_place' => $partyMembership->joining_place,
+            'current_branch' => $partyMembership->current_branch,
+            'position' => $partyMembership->position,
+            'status' => $partyMembership->status,
+            'notes' => $partyMembership->notes,
+        ] : null;
+        $scientificProfile = $this->buildScientificProfileSummary(
+            $lecturer,
+            $profile,
+            $partyPayload,
+            $educationPayload,
+            $latestEducationPayload,
+            $workPayload,
+            $latestWorkPayload,
+            $languagePayload,
+            $researchAreasPayload
+        );
+        $researchWorks = $this->buildApprovedResearchWorks($lecturer);
 
         return [
             'user' => [
@@ -697,28 +730,16 @@ class LecturerProfileController extends Controller
                 'academic_portfolio_url' => $profile->academic_portfolio_url,
             ] : null,
             // Các danh sách chi tiết khác: hiện để trống, có thể mở rộng sau
-            'party_membership' => $partyMembership ? [
-                'is_member' => $partyMembership->is_member,
-                'membership_no' => $partyMembership->membership_no,
-                'joined_at' => $partyMembership->joined_at?->toDateString(),
-                'official_at' => $partyMembership->official_at?->toDateString(),
-                'joining_place' => $partyMembership->joining_place,
-                'current_branch' => $partyMembership->current_branch,
-                'position' => $partyMembership->position,
-                'status' => $partyMembership->status,
-                'notes' => $partyMembership->notes,
-            ] : null,
+            'party_membership' => $partyPayload,
             'academic_titles' => [],
-            'educations' => $this->serializeTrainingHistories($trainingHistories),
-            'latest_education' => $trainingHistories->isNotEmpty()
-                ? $this->serializeTrainingHistory($trainingHistories->first())
-                : null,
-            'languages' => LecturerLanguageResource::collection($languageProficiencies)->resolve(),
-            'research_areas' => $this->serializeResearchAreas($profile?->research_area),
-            'work_histories' => $this->serializeWorkHistories($workHistories),
-            'latest_work_history' => $workHistories->isNotEmpty()
-                ? $this->serializeWorkHistory($workHistories->first())
-                : null,
+            'educations' => $educationPayload,
+            'latest_education' => $latestEducationPayload,
+            'languages' => $languagePayload,
+            'research_areas' => $researchAreasPayload,
+            'work_histories' => $workPayload,
+            'latest_work_history' => $latestWorkPayload,
+            'scientific_profile' => $scientificProfile,
+            'research_works' => $researchWorks,
         ];
     }
 
@@ -749,6 +770,334 @@ class LecturerProfileController extends Controller
             'academic_rank_id' => null,
             'active' => true,
         ]);
+    }
+
+    private function buildScientificProfileSummary(
+        Lecturer $lecturer,
+        ?LecturerProfile $profile,
+        ?array $partyPayload,
+        array $educationPayload,
+        ?array $latestEducationPayload,
+        array $workPayload,
+        ?array $latestWorkPayload,
+        array $languagePayload,
+        array $researchAreasPayload
+    ): array {
+        $staffType = $latestWorkPayload['employment_type'] ?? null;
+        $workStatus = $lecturer->active ? 'active' : 'inactive';
+
+        return [
+            'personal_info' => [
+                'lecturer_id' => $lecturer->id,
+                'lecturer_code' => $lecturer->code,
+                'full_name' => $lecturer->full_name,
+                'gender' => $profile?->gender,
+                'date_of_birth' => $profile?->date_of_birth,
+                'place_of_birth' => $profile?->place_of_birth,
+                'ethnicity' => $profile?->ethnicity,
+                'hometown' => $profile?->hometown,
+                'current_position' => $profile?->current_position,
+                'current_unit' => $profile?->current_unit,
+                'department_id' => $lecturer->department_id,
+                'department_name' => $lecturer->department->name ?? null,
+                'staff_type' => $staffType,
+                'work_status' => $workStatus,
+                'active' => $lecturer->active,
+            ],
+            'contact_info' => [
+                'work_email' => $lecturer->email,
+                'personal_email' => $profile?->personal_email,
+                'phone' => $lecturer->phone,
+                'alternate_phone' => $profile?->alternate_phone,
+                'address' => $profile?->address,
+                'personal_website' => $profile?->personal_website,
+                'google_scholar_profile' => $profile?->google_scholar_profile,
+                'research_gate_profile' => $profile?->research_gate_profile,
+                'orcid_id' => $profile?->orcid_id,
+                'scopus_id' => $profile?->scopus_id,
+                'publons_id' => $profile?->publons_id,
+                'academic_portfolio_url' => $profile?->academic_portfolio_url,
+            ],
+            'academic_info' => [
+                'degree_id' => $lecturer->degree_id,
+                'degree_name' => $lecturer->degree->name ?? null,
+                'academic_rank_id' => $lecturer->academic_rank_id,
+                'academic_rank_name' => $lecturer->academicRank->name ?? null,
+                'teaching_specialization' => $profile?->teaching_specialization,
+                'research_area' => $profile?->research_area,
+            ],
+            'research_fields' => $researchAreasPayload,
+            'languages' => $languagePayload,
+            'work_histories' => $workPayload,
+            'latest_work_history' => $latestWorkPayload,
+            'educations' => $educationPayload,
+            'latest_education' => $latestEducationPayload,
+            'party_membership' => $partyPayload,
+        ];
+    }
+
+    private function buildApprovedResearchWorks(Lecturer $lecturer): array
+    {
+        $itemsByKind = [
+            'paper' => [],
+            'book' => [],
+            'project' => [],
+            'conference' => [],
+        ];
+        $countsByKind = [
+            'paper' => 0,
+            'book' => 0,
+            'project' => 0,
+            'conference' => 0,
+            'total' => 0,
+        ];
+
+        $rows = DB::table('research_activities as ra')
+            ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+            ->leftJoin('paper_details as pd', 'ra.id', '=', 'pd.activity_id')
+            ->leftJoin('book_details as bd', 'ra.id', '=', 'bd.activity_id')
+            ->leftJoin('project_details as prd', 'ra.id', '=', 'prd.activity_id')
+            ->leftJoin('conference_details as cd', 'ra.id', '=', 'cd.activity_id')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturer) {
+                $join->on('ra.id', '=', 'ram.activity_id')
+                    ->where('ram.lecturer_id', '=', $lecturer->id);
+            })
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->where('ast.code', '=', 'approved')
+            ->where(function ($query) use ($lecturer) {
+                $query->where('ra.owner_lecturer_id', '=', $lecturer->id)
+                    ->orWhereNotNull('ram.lecturer_id');
+            })
+            ->select([
+                'ra.id as activity_id',
+                'ra.activity_code',
+                'ra.title',
+                'ra.kind_id',
+                'ra.type_id',
+                'ra.academic_year_id',
+                'ra.status_id',
+                'ra.approved_at',
+                'ra.start_date',
+                'ra.end_date',
+                'ak.code as kind_code',
+                'ak.name as kind_name',
+                'at.code as type_code',
+                'at.name as type_name',
+                'ay.code as academic_year_code',
+                'ast.code as status_code',
+                'ast.name as status_name',
+                'ram.member_role_id',
+                'mr.name as member_role_name',
+                'pd.journal_name as paper_journal_name',
+                'pd.volume as paper_volume',
+                'pd.issue as paper_issue',
+                'pd.page_start as paper_page_start',
+                'pd.page_end as paper_page_end',
+                'pd.year as paper_year',
+                'bd.publisher as book_publisher',
+                'bd.year as book_year',
+                'prd.project_code as project_code',
+                'prd.decision_date as project_decision_date',
+                'prd.start_month as project_start_month',
+                'prd.end_month as project_end_month',
+                'cd.conference_name',
+                'cd.location as conference_location',
+                'cd.held_on as conference_held_on',
+            ])
+            ->orderByDesc('ra.approved_at')
+            ->orderByDesc('ra.id')
+            ->get();
+
+        $items = [];
+
+        foreach ($rows as $row) {
+            $item = $this->formatResearchWorkRow($row);
+            $kindCode = $row->kind_code ?? 'other';
+
+            $items[] = $item;
+
+            if (! array_key_exists($kindCode, $itemsByKind)) {
+                $itemsByKind[$kindCode] = [];
+                $countsByKind[$kindCode] = 0;
+            }
+
+            $itemsByKind[$kindCode][] = $item;
+            $countsByKind[$kindCode] = count($itemsByKind[$kindCode]);
+        }
+
+        $countsByKind['total'] = count($items);
+
+        return [
+            'counts_by_kind' => $countsByKind,
+            'items' => $items,
+            'items_by_kind' => $itemsByKind,
+        ];
+    }
+
+    private function formatResearchWorkRow(object $row): array
+    {
+        [$venue, $info, $workYear, $location] = $this->resolveResearchWorkInfo($row);
+
+        return [
+            'activity_id' => (int) $row->activity_id,
+            'activity_code' => $row->activity_code,
+            'title' => $row->title,
+            'kind_code' => $row->kind_code,
+            'kind_name' => $row->kind_name,
+            'type_code' => $row->type_code,
+            'type_name' => $row->type_name,
+            'academic_year_code' => $row->academic_year_code,
+            'status_code' => $row->status_code,
+            'status_name' => $row->status_name,
+            'work_year' => $workYear,
+            'venue' => $venue,
+            'info' => $info,
+            'location' => $location,
+            'member_role_id' => $row->member_role_id,
+            'member_role_name' => $row->member_role_name,
+            'approved_at' => $this->normalizeDateTime($row->approved_at),
+        ];
+    }
+
+    private function resolveResearchWorkInfo(object $row): array
+    {
+        $venue = null;
+        $info = null;
+        $location = null;
+
+        switch ($row->kind_code) {
+            case 'paper':
+                $venue = $row->paper_journal_name;
+                $parts = [];
+                if ($row->paper_journal_name) {
+                    $parts[] = $row->paper_journal_name;
+                }
+                $volumeIssue = $this->formatVolumeIssue($row->paper_volume, $row->paper_issue);
+                if ($volumeIssue) {
+                    $parts[] = $volumeIssue;
+                }
+                $pageRange = $this->formatPageRange($row->paper_page_start, $row->paper_page_end);
+                if ($pageRange) {
+                    $parts[] = $pageRange;
+                }
+                $info = $parts ? implode(', ', $parts) : null;
+                break;
+            case 'book':
+                $venue = $row->book_publisher;
+                $info = $row->book_publisher;
+                break;
+            case 'project':
+                $venue = $row->project_code;
+                $info = $row->project_code;
+                break;
+            case 'conference':
+                $venue = $row->conference_name;
+                $location = $row->conference_location;
+                $infoParts = array_filter([$row->conference_name, $row->conference_location]);
+                $info = $infoParts ? implode(' - ', $infoParts) : null;
+                break;
+            default:
+                $venue = null;
+                $info = null;
+                break;
+        }
+
+        $workYear = $this->resolveWorkYear($row);
+
+        return [$venue, $info, $workYear, $location];
+    }
+
+    private function resolveWorkYear(object $row): ?int
+    {
+        $candidates = [
+            $row->paper_year ?? null,
+            $row->book_year ?? null,
+            $this->extractYear($row->conference_held_on ?? null),
+            $this->extractYear($row->project_decision_date ?? null),
+            $this->extractYear($row->project_end_month ?? null),
+            $this->extractYear($row->project_start_month ?? null),
+            $this->extractYear($row->end_date ?? null),
+            $this->extractYear($row->start_date ?? null),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate) {
+                return (int) $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function formatVolumeIssue(?string $volume, ?string $issue): ?string
+    {
+        $volume = $volume ? trim((string) $volume) : '';
+        $issue = $issue ? trim((string) $issue) : '';
+
+        if ($volume === '' && $issue === '') {
+            return null;
+        }
+
+        if ($volume !== '' && $issue !== '') {
+            return 'Vol ' . $volume . ' No ' . $issue;
+        }
+
+        if ($volume !== '') {
+            return 'Vol ' . $volume;
+        }
+
+        return 'No ' . $issue;
+    }
+
+    private function formatPageRange(?int $start, ?int $end): ?string
+    {
+        if (! $start && ! $end) {
+            return null;
+        }
+
+        if ($start && $end) {
+            return 'pp. ' . $start . '-' . $end;
+        }
+
+        return 'p. ' . ($start ?: $end);
+    }
+
+    private function extractYear($value): ?int
+    {
+        if (! $value) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return (int) $value->format('Y');
+        }
+
+        $value = (string) $value;
+        if (strlen($value) < 4) {
+            return null;
+        }
+
+        return (int) substr($value, 0, 4);
+    }
+
+    private function normalizeDateTime($value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        return (string) $value;
     }
 
     private function normalizeAcademicTitlesItems(array $items): array

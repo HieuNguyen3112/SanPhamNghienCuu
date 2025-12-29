@@ -90,6 +90,78 @@ class ProfileApiTest extends TestCase
         ];
     }
 
+    protected function createResearchLookups(): array
+    {
+        $academicYearId = DB::table('academic_years')->insertGetId([
+            'code' => '2024-2025',
+            'start_date' => '2024-09-01',
+            'end_date' => '2025-08-31',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $statusApprovedId = DB::table('activity_statuses')->insertGetId([
+            'code' => 'approved',
+            'name' => 'Approved',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $statusDraftId = DB::table('activity_statuses')->insertGetId([
+            'code' => 'draft',
+            'name' => 'Draft',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $statusSubmittedId = DB::table('activity_statuses')->insertGetId([
+            'code' => 'submitted',
+            'name' => 'Submitted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $statusRejectedId = DB::table('activity_statuses')->insertGetId([
+            'code' => 'rejected',
+            'name' => 'Rejected',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $kindIds = [];
+        foreach ([
+            'paper' => 'Paper',
+            'book' => 'Book',
+            'project' => 'Project',
+            'conference' => 'Conference',
+        ] as $code => $name) {
+            $kindIds[$code] = DB::table('activity_kinds')->insertGetId([
+                'code' => $code,
+                'name' => $name,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $memberRoleId = DB::table('member_roles')->insertGetId([
+            'code' => 'principal',
+            'name' => 'Principal',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return [
+            'academic_year_id' => $academicYearId,
+            'status_approved_id' => $statusApprovedId,
+            'status_draft_id' => $statusDraftId,
+            'status_submitted_id' => $statusSubmittedId,
+            'status_rejected_id' => $statusRejectedId,
+            'kind_ids' => $kindIds,
+            'member_role_id' => $memberRoleId,
+        ];
+    }
+
     protected function createLecturerFor(User $user): Lecturer
     {
         if (! $this->department) {
@@ -159,6 +231,21 @@ class ProfileApiTest extends TestCase
                     'research_areas',
                     'work_histories',
                     'latest_work_history',
+                    'scientific_profile' => [
+                        'personal_info',
+                        'contact_info',
+                        'academic_info',
+                        'research_fields',
+                        'languages',
+                        'work_histories',
+                        'educations',
+                        'party_membership',
+                    ],
+                    'research_works' => [
+                        'counts_by_kind',
+                        'items',
+                        'items_by_kind',
+                    ],
                 ],
             ])
             ->assertJsonPath('data.user.id', $user->id)
@@ -185,6 +272,93 @@ class ProfileApiTest extends TestCase
                 ],
             ])
             ->assertJsonPath('data.user.id', $user->id);
+    }
+
+    /** @test */
+    public function scientific_profile_returns_approved_research_works_only()
+    {
+        [$user, $lecturer] = $this->actingAsLecturer();
+        $lookups = $this->createResearchLookups();
+
+        $approvedId = DB::table('research_activities')->insertGetId([
+            'activity_code' => 'ACT-APPROVED-1',
+            'owner_lecturer_id' => $lecturer->id,
+            'kind_id' => $lookups['kind_ids']['paper'],
+            'type_id' => null,
+            'academic_year_id' => $lookups['academic_year_id'],
+            'status_id' => $lookups['status_approved_id'],
+            'title' => 'Approved Paper',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-06-01',
+            'quantity' => 1,
+            'submitted_at' => now(),
+            'approved_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('paper_details')->insert([
+            'activity_id' => $approvedId,
+            'journal_name' => 'Approved Journal',
+            'year' => 2024,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('research_activity_members')->insert([
+            'activity_id' => $approvedId,
+            'lecturer_id' => $lecturer->id,
+            'member_role_id' => $lookups['member_role_id'],
+            'contribution_share' => 1,
+            'hours_assigned' => 40,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $rejectedId = DB::table('research_activities')->insertGetId([
+            'activity_code' => 'ACT-REJECTED-1',
+            'owner_lecturer_id' => $lecturer->id,
+            'kind_id' => $lookups['kind_ids']['paper'],
+            'type_id' => null,
+            'academic_year_id' => $lookups['academic_year_id'],
+            'status_id' => $lookups['status_rejected_id'],
+            'title' => 'Rejected Paper',
+            'start_date' => '2024-02-01',
+            'end_date' => '2024-07-01',
+            'quantity' => 1,
+            'submitted_at' => now(),
+            'approved_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('paper_details')->insert([
+            'activity_id' => $rejectedId,
+            'journal_name' => 'Rejected Journal',
+            'year' => 2024,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('research_activity_members')->insert([
+            'activity_id' => $rejectedId,
+            'lecturer_id' => $lecturer->id,
+            'member_role_id' => $lookups['member_role_id'],
+            'contribution_share' => 1,
+            'hours_assigned' => 40,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/profile/me')
+            ->assertStatus(200)
+            ->assertJsonPath('data.research_works.counts_by_kind.paper', 1)
+            ->assertJsonPath('data.research_works.counts_by_kind.total', 1)
+            ->assertJsonPath('data.research_works.items.0.activity_id', $approvedId)
+            ->assertJsonPath('data.research_works.items.0.status_code', 'approved');
+
+        $items = $response->json('data.research_works.items');
+        $this->assertCount(1, $items);
     }
 
     /** @test */
@@ -815,5 +989,110 @@ class ProfileApiTest extends TestCase
 
         $this->deleteJson('/api/profile/educations/' . $history->id)
             ->assertStatus(403);
+    }
+
+    /** @test */
+    public function guest_cannot_create_research_activity()
+    {
+        $this->postJson('/api/research-activities', [])
+            ->assertStatus(401);
+    }
+
+    /** @test */
+    public function lecturer_can_create_draft_research_activity_and_not_in_approved_list()
+    {
+        [$user, $lecturer] = $this->actingAsLecturer();
+        $lookups = $this->createResearchLookups();
+
+        Sanctum::actingAs($user);
+
+        $payload = [
+            'kind_id' => $lookups['kind_ids']['paper'],
+            'type_id' => null,
+            'academic_year_id' => $lookups['academic_year_id'],
+            'title' => 'Draft Paper',
+            'abstract' => null,
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-06-01',
+            'quantity' => 1,
+            'notes' => null,
+        ];
+
+        $response = $this->postJson('/api/research-activities', $payload)
+            ->assertStatus(201)
+            ->assertJsonPath('data.status_id', $lookups['status_draft_id']);
+
+        $activityId = $response->json('data.id');
+
+        $this->assertDatabaseHas('research_activities', [
+            'id' => $activityId,
+            'owner_lecturer_id' => $lecturer->id,
+            'status_id' => $lookups['status_draft_id'],
+        ]);
+
+        $this->putJson('/api/research-activities/' . $activityId . '/paper_details', [
+            'journal_name' => 'Draft Journal',
+            'year' => 2024,
+        ])->assertStatus(200);
+
+        $profileResponse = $this->getJson('/api/profile/me')
+            ->assertStatus(200);
+
+        $this->assertEquals(0, $profileResponse->json('data.research_works.counts_by_kind.paper'));
+    }
+
+    /** @test */
+    public function create_research_activity_requires_title()
+    {
+        [$user] = $this->actingAsLecturer();
+        $lookups = $this->createResearchLookups();
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/research-activities', [
+            'kind_id' => $lookups['kind_ids']['paper'],
+            'academic_year_id' => $lookups['academic_year_id'],
+        ])->assertStatus(422);
+    }
+
+    /** @test */
+    public function lecturer_can_submit_draft_research_activity()
+    {
+        [$user, $lecturer] = $this->actingAsLecturer();
+        $lookups = $this->createResearchLookups();
+
+        $activityId = DB::table('research_activities')->insertGetId([
+            'activity_code' => 'ACT-DRAFT-1',
+            'owner_lecturer_id' => $lecturer->id,
+            'kind_id' => $lookups['kind_ids']['paper'],
+            'type_id' => null,
+            'academic_year_id' => $lookups['academic_year_id'],
+            'status_id' => $lookups['status_draft_id'],
+            'title' => 'Draft Paper',
+            'start_date' => '2024-01-01',
+            'end_date' => '2024-05-01',
+            'quantity' => 1,
+            'submitted_at' => null,
+            'approved_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/research-activities/' . $activityId . '/submit')
+            ->assertStatus(200)
+            ->assertJsonPath('data.status_id', $lookups['status_submitted_id']);
+
+        $this->assertDatabaseHas('research_activities', [
+            'id' => $activityId,
+            'status_id' => $lookups['status_submitted_id'],
+        ]);
+
+        $this->assertDatabaseHas('activity_status_histories', [
+            'activity_id' => $activityId,
+            'from_status_id' => $lookups['status_draft_id'],
+            'to_status_id' => $lookups['status_submitted_id'],
+        ]);
     }
 }

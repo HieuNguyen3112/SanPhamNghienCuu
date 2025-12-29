@@ -78,7 +78,11 @@ export function useFacultyResearchWorkApprovalProvider() {
     filtering.applyResearchWorkFilterConditions();
   }
 
-  function approve(payload: { researchWorkIdentifier: number }): void {
+  function approve(payload: {
+    researchWorkIdentifier: number;
+    officialResearchHours?: number | null;
+    memberHours?: { authorIdentifier: number; officialHours: number }[];
+  }): void {
     api.approveResearchWorkAtFacultyLevel(payload);
     filtering.applyResearchWorkFilterConditions();
   }

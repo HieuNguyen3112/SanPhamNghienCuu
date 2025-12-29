@@ -242,7 +242,7 @@
           <ParticipantsTable
             v-model="form.members"
             :lecturers="lecturers"
-            :memberRoles="filteredMemberRoles"
+            :memberRoles="articleMemberRoles"
             :readOnly="readOnly"
             :currentLecturerId="currentLecturerId"
             :hoursByLecturerId="hoursByLecturerId"
@@ -275,6 +275,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, type ComputedRef } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { FileText } from "lucide-vue-next";
 import JournalSelect from "../../shared/components/JournalSelect.vue";
 
@@ -283,6 +284,7 @@ import ParticipantsTable from "../../shared/components/ParticipantsTable.vue";
 import EvidenceUpload from "../../shared/components/EvidenceUpload.vue";
 import HoursSummaryPanel from "../../shared/components/HoursSummaryPanel.vue";
 
+import { mapStatusCodeToUi } from "../../shared/contracts/declarationSharedContract";
 import type {
   AcademicYearDto,
   ActivityTypeDto,
@@ -302,6 +304,8 @@ import {
   fetch_activity_statuses,
 } from "../../shared/services/catalogs.service";
 import {
+  fetch_activity,
+  fetch_current_lecturer_id,
   submit_activity,
   upsert_activity_base,
   upsert_members,
@@ -315,6 +319,9 @@ import {
   articleAllowedMemberRoleCodes,
 } from "../ArticleDeclarationContract";
 
+const route = useRoute();
+const router = useRouter();
+
 // const academicYears = ref(await Promise.resolve([] as any[]));
 const academicYears = ref<AcademicYearDto[]>([]);
 const memberRoles = ref<MemberRoleDto[]>([]);
@@ -324,7 +331,7 @@ const types = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
 const submittedStatusId = ref<number>(0);
 
-const currentLecturerId = ref<number>(1);
+const currentLecturerId = ref<number>(0);
 
 const form = reactive<ArticleDeclarationFormModel>({
   activityId: null,
@@ -346,14 +353,29 @@ const form = reactive<ArticleDeclarationFormModel>({
   members: [],
 });
 const filteredMemberRoles = computed(() => {
-  const allowed = new Set<string>(
+  const preferredCodes = new Set<string>(
     articleAllowedMemberRoleCodes as readonly string[]
   );
-  const list = memberRoles.value.filter((r) => allowed.has(r.code));
+  const preferred = memberRoles.value.filter((r) =>
+    preferredCodes.has(r.code)
+  );
+  if (preferred.length > 0) return preferred;
 
-  // fallback để dropdown không rỗng nếu backend chưa seed đúng code
-  return list.length > 0 ? list : memberRoles.value;
+  const legacyCodes = new Set(["principal", "member"]);
+  const legacy = memberRoles.value.filter((r) => legacyCodes.has(r.code));
+  return legacy.length > 0 ? legacy : memberRoles.value;
 });
+const articleMemberRoles = computed(() =>
+  filteredMemberRoles.value.map((r) => {
+    if (r.code === "corresponding_author" || r.code === "principal") {
+      return { ...r, name: "Tác giả chính" };
+    }
+    if (r.code === "coauthor" || r.code === "member") {
+      return { ...r, name: "Đồng tác giả" };
+    }
+    return r;
+  })
+);
 const existingEvidence = ref<EvidenceFileDto[]>([]);
 const pendingEvidenceFiles = ref<any[]>([]);
 const pendingEvidenceLinks = ref<any[]>([]);
@@ -410,6 +432,7 @@ const canSubmit = computed(() => {
 });
 
 async function loadCatalogs() {
+  currentLecturerId.value = (await fetch_current_lecturer_id()) ?? 0;
   const [years, kinds, roles, fileTypes, statuses] = await Promise.all([
     fetch_academic_years(),
     fetch_activity_kinds(),
@@ -442,6 +465,50 @@ async function loadCatalogs() {
   }
 }
 
+async function loadDraftFromQuery() {
+  const raw = route.query.activity_id;
+  const rawValue = Array.isArray(raw) ? raw[0] : raw;
+  const activityId = rawValue ? Number(rawValue) : null;
+
+  if (!activityId || Number.isNaN(activityId)) return;
+
+  const data = await fetch_activity(activityId);
+  const activity = data.activity;
+  if (!activity) return;
+
+  form.activityId = activity.id;
+  form.academicYearId = activity.academic_year_id ?? null;
+  form.kindId = activity.kind_id ?? form.kindId;
+  form.typeId = activity.type_id ?? null;
+  form.title = activity.title ?? "";
+  form.abstract = activity.abstract ?? "";
+  form.notes = activity.notes ?? "";
+
+  if (data.detail_kind === "paper_details" && data.detail) {
+    const detail = data.detail as any;
+    form.journalName = detail.journal_name ?? "";
+    form.issn = detail.issn ?? "";
+    form.doi = detail.doi ?? "";
+    form.articleUrl = detail.article_url ?? "";
+    form.volume = detail.volume ?? "";
+    form.issue = detail.issue ?? "";
+    form.year = detail.year ?? null;
+    form.pageStart = detail.page_start ?? null;
+    form.pageEnd = detail.page_end ?? null;
+  }
+
+  form.members = (data.members ?? []).map((m) => ({
+    lecturer_id: m.lecturer_id,
+    member_role_id: m.member_role_id,
+    member_role_code: m.member_role_code ?? null,
+  }));
+
+  existingEvidence.value = data.evidence_files ?? [];
+
+  const statusCode = (activity.status_code ?? "draft") as any;
+  shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
+}
+
 async function onSearchLecturers(q: string) {
   lecturers.value = await search_lecturer_options(q);
 }
@@ -472,6 +539,12 @@ const shell = useDeclarationFormShell({
     } as any);
 
     form.activityId = saved.id;
+
+    if (saved.id) {
+      await router.replace({
+        query: { ...route.query, activity_id: String(saved.id) },
+      });
+    }
 
     await upsert_paper_details({
       activity_id: saved.id,
@@ -509,10 +582,11 @@ const shell = useDeclarationFormShell({
     }
   },
   on_submit: async () => {
-    if (!form.activityId) await shell.save_draft();
-    if (!form.activityId) throw new Error("Chưa có activity_id");
-    if (!submittedStatusId.value) throw new Error("Thiếu submitted status_id");
-    await submit_activity(form.activityId, submittedStatusId.value);
+    if (!form.activityId) {
+      await shell.save_draft();
+    }
+    if (!form.activityId) return;
+    await submit_activity(form.activityId);
   },
 });
 const memberRoleNameById: ComputedRef<Record<number, string>> = computed(() => {
@@ -540,7 +614,10 @@ const externalMembers = computed(() => {
   });
 });
 
-onMounted(loadCatalogs);
+onMounted(async () => {
+  await loadCatalogs();
+  await loadDraftFromQuery();
+});
 type JournalRank = "Q1" | "Q2" | "Q3" | "Q4" | "Q5" | "OTHER";
 
 async function searchJournals(q: string) {

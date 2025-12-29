@@ -289,6 +289,7 @@ import {
   fetch_activity_statuses,
 } from "../../shared/services/catalogs.service";
 import {
+  fetch_current_lecturer_id,
   submit_activity,
   upsert_activity_base,
   upsert_members,
@@ -310,7 +311,7 @@ const kindId = ref<number>(0);
 const submittedStatusId = ref<number>(0);
 
 // TODO: from GET /api/profile/me
-const currentLecturerId = ref<number>(1);
+const currentLecturerId = ref<number>(0);
 
 const form = reactive<ProjectDeclarationFormModel>({
   activityId: null,
@@ -416,6 +417,7 @@ const filteredMemberRoles = computed(() => {
   return list.length > 0 ? list : memberRoles.value;
 });
 async function loadCatalogs() {
+  currentLecturerId.value = (await fetch_current_lecturer_id()) ?? 0;
   const [years, kinds, roles, fileTypes, statuses] = await Promise.all([
     fetch_academic_years(),
     fetch_activity_kinds(),
@@ -528,7 +530,7 @@ const shell = useDeclarationFormShell({
     if (!form.activityId) {
       await shell.save_draft();
     }
-    if (!form.activityId) throw new Error("Chưa có activity_id");
+    if (!form.activityId) return;
     if (!submittedStatusId.value)
       throw new Error("Thiếu submitted status_id (catalog).");
     await submit_activity(form.activityId, submittedStatusId.value);

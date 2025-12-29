@@ -53,7 +53,9 @@
             @change="onStatusModeChange"
           >
             <option value="all">Tất cả</option>
-            <option value="approved">Chỉ Approved</option>
+            <option value="approved">Đã duyệt</option>
+            <option value="pending">Chờ duyệt</option>
+            <option value="rejected">Từ chối</option>
           </select>
         </div>
       </div>

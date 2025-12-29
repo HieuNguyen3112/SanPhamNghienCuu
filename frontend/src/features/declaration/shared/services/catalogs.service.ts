@@ -7,6 +7,7 @@ import type {
   LecturerOptionDto,
   MemberRoleDto,
 } from "../contracts/declarationSharedContract";
+import http from "@/lib/http";
 
 /**
  * TODO (backend):
@@ -19,7 +20,25 @@ import type {
  * - GET /api/lecturers/options?search=
  */
 
-const MOCK = true;
+const MOCK = false;
+
+const ROLE_LABELS_VI: Record<string, string> = {
+  principal: "Tác giả chính",
+  corresponding_author: "Tác giả chính",
+  coauthor: "Đồng tác giả",
+  member: "Thành viên",
+  secretary: "Thư ký",
+  chief_editor: "Chủ biên",
+};
+
+const PAPER_TYPE_LABELS_VI: Record<string, string> = {
+  hdgsnn_900: "HDGSNN 1-2 điểm (900 giờ)",
+  hdgsnn_600: "HDGSNN ≤ 1 điểm (600 giờ)",
+  hdgsnn_300: "Có ISSN/ISBN (300 giờ)",
+};
+
+const EXPECTED_PAPER_TYPE_CODES = ["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"];
+const EXPECTED_ACADEMIC_YEAR_CODES = ["2024-2025", "2025-2026"];
 
 const mock_academic_years: AcademicYearDto[] = [
   {
@@ -138,36 +157,109 @@ const mock_lecturer_options: LecturerOptionDto[] = [
 
 export async function fetch_academic_years(): Promise<AcademicYearDto[]> {
   if (MOCK) return mock_academic_years;
-  throw new Error("TODO: implement API fetch_academic_years()");
+  const { data } = await http.get<{ data: AcademicYearDto[] }>(
+    "/api/lookups/academic-years"
+  );
+  if (import.meta.env.DEV) {
+    const codes = new Set(data.data.map((y) => y.code));
+    const missing = EXPECTED_ACADEMIC_YEAR_CODES.filter((c) => !codes.has(c));
+    if (missing.length > 0) {
+      console.warn(
+        "[catalogs] Missing academic years in API:",
+        missing.join(", ")
+      );
+    }
+  }
+  return data.data;
 }
 
 export async function fetch_activity_kinds(): Promise<ActivityKindDto[]> {
   if (MOCK) return mock_kinds;
-  throw new Error("TODO: implement API fetch_activity_kinds()");
+  const { data } = await http.get<{ data: ActivityKindDto[] }>(
+    "/api/lookups/activity-kinds"
+  );
+  return data.data;
 }
 
 export async function fetch_activity_types_by_kind(
   kind_id: number
 ): Promise<ActivityTypeDto[]> {
   if (MOCK) return mock_types.filter((t) => t.kind_id === kind_id);
-  throw new Error("TODO: implement API fetch_activity_types_by_kind()");
+  const { data } = await http.get<{ data: ActivityTypeDto[] }>(
+    "/api/lookups/activity-types",
+    { params: { kind_id } }
+  );
+  let mapped = data.data.map((t) => ({
+    ...t,
+    name: PAPER_TYPE_LABELS_VI[t.code] ?? t.name,
+  }));
+
+  const expectedCodes = new Set(EXPECTED_PAPER_TYPE_CODES);
+  const missing = EXPECTED_PAPER_TYPE_CODES.filter(
+    (code) => !mapped.some((t) => t.code === code)
+  );
+  if (missing.length > 0) {
+    const { data: all } = await http.get<{ data: ActivityTypeDto[] }>(
+      "/api/lookups/activity-types"
+    );
+    const fallback = all.data
+      .filter((t) => expectedCodes.has(t.code))
+      .map((t) => ({
+        ...t,
+        name: PAPER_TYPE_LABELS_VI[t.code] ?? t.name,
+      }));
+
+    const byCode = new Map<string, ActivityTypeDto>();
+    for (const item of [...mapped, ...fallback]) {
+      byCode.set(item.code, item);
+    }
+    mapped = Array.from(byCode.values());
+  }
+
+  if (import.meta.env.DEV) {
+    const codes = new Set(mapped.map((t) => t.code));
+    const hasPaper = EXPECTED_PAPER_TYPE_CODES.some((c) => codes.has(c));
+    if (hasPaper) {
+      const missing = EXPECTED_PAPER_TYPE_CODES.filter((c) => !codes.has(c));
+      if (missing.length > 0) {
+        console.warn(
+          "[catalogs] Missing paper activity types in API:",
+          missing.join(", ")
+        );
+      }
+    }
+  }
+
+  return mapped;
 }
 
 export async function fetch_member_roles(): Promise<MemberRoleDto[]> {
   if (MOCK) return mock_roles;
-  throw new Error("TODO: implement API fetch_member_roles()");
+  const { data } = await http.get<{ data: MemberRoleDto[] }>(
+    "/api/lookups/member-roles"
+  );
+  return data.data.map((r) => ({
+    ...r,
+    name: ROLE_LABELS_VI[r.code] ?? r.name,
+  }));
 }
 
 export async function fetch_evidence_file_types(): Promise<
   EvidenceFileTypeDto[]
 > {
   if (MOCK) return mock_evidence_types;
-  throw new Error("TODO: implement API fetch_evidence_file_types()");
+  const { data } = await http.get<{ data: EvidenceFileTypeDto[] }>(
+    "/api/lookups/evidence-file-types"
+  );
+  return data.data;
 }
 
 export async function fetch_activity_statuses(): Promise<ActivityStatusDto[]> {
   if (MOCK) return mock_statuses;
-  throw new Error("TODO: implement API fetch_activity_statuses()");
+  const { data } = await http.get<{ data: ActivityStatusDto[] }>(
+    "/api/lookups/activity-statuses"
+  );
+  return data.data;
 }
 
 export async function search_lecturer_options(
@@ -182,5 +274,9 @@ export async function search_lecturer_options(
         l.code.toLowerCase().includes(q)
     );
   }
-  throw new Error("TODO: implement API search_lecturer_options()");
+  const { data } = await http.get<{ data: LecturerOptionDto[] }>(
+    "/api/lookups/lecturers",
+    { params: { search } }
+  );
+  return data.data;
 }

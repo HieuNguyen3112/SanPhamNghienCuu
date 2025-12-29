@@ -580,6 +580,8 @@ const emit = defineEmits<{
     payload: {
       researchWorkIdentifier: number;
       officialResearchHours: number | null; // tạm thời giữ API cũ
+
+      memberHours?: { authorIdentifier: number; officialHours: number }[];
     }
   ): void;
   (
@@ -794,6 +796,12 @@ function approveSelectedResearchWork(): void {
     officialResearchHours: canFinalizeHours.value
       ? Math.round(totalOfficialHours.value)
       : null,
+    memberHours: authorHourRows.value.map((row) => ({
+      authorIdentifier: row.authorIdentifier,
+      officialHours: Number(
+        officialHoursDraftByAuthorId.value[row.authorIdentifier] ?? 0
+      ),
+    })),
   });
 }
 
