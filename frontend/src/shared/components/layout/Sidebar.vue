@@ -7,17 +7,19 @@
     ]"
   >
     <!-- LOGO + NÚT MŨI TÊN -->
-    <div class="relative border-b border-slate-200 bg-white px-4 py-3">
-      <!-- Chevron collapse (desktop) -->
-
-      <div class="flex h-16 w-full items-center justify-center">
-        <img
-          src="/logo.png"
-          alt="University logo"
-          class="max-h-20 w-auto object-contain"
-        />
-      </div>
-    </div>
+  <div class="relative border-b border-slate-200 bg-white px-4 py-3">
+    <RouterLink
+      :to="{ name: 'public-home' }"
+      aria-label="Về trang chủ"
+      class="group flex h-16 w-full items-center justify-center rounded-xl outline-none focus:outline-none focus:ring-0 active:outline-none"
+    >
+    <img
+      src="/logo.png"
+      alt="University logo"
+      class="max-h-20 w-auto object-contain"
+    />
+    </RouterLink>
+  </div>
 
     <!-- THÔNG TIN GIẢNG VIÊN -->
     <div class="border-b border-slate-200 bg-slate-50 px-4 py-4">

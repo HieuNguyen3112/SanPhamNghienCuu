@@ -1,4 +1,3 @@
-<!-- src/layouts/MainLayout.vue -->
 <script setup lang="ts">
 import { ref } from "vue";
 import { RouterView, useRouter } from "vue-router";
@@ -21,7 +20,12 @@ const toggleSidebar = () => {
 
 const handleLogout = async () => {
   await userStore.logout();
-  await router.replace("/login");
+  await router.replace("/");
+};
+
+// ✅ NEW
+const handleGoHome = async () => {
+  await router.push("/");
 };
 </script>
 
@@ -38,6 +42,7 @@ const handleLogout = async () => {
         @toggle-sidebar="toggleSidebar"
         @change-password="isChangePasswordOpen = true"
         @logout="handleLogout"
+        @go-home="handleGoHome"
       />
 
       <main class="p-6 flex-1 overflow-y-auto bg-slate-50">
