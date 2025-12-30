@@ -5,7 +5,7 @@
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
-          title="Xét duyệt giờ nghiên cứu khoa học cho giảng viên "
+          title="Xét duyệt giờ nghiên cứu khoa học cho giảng viên"
           subtitle="Theo dõi tình hình xét duyệt giờ NCKH của giảng viên trong khoa"
           :show-export-pdf="false"
           :show-export-excel="false"
@@ -17,7 +17,7 @@
       <HourApprovalFilterPanel
         :filter="filter"
         :faculty-options="facultyOptions"
-        :loading="loadingList"
+        :loading="loadingList || loadingFaculties"
         :faculty-select-disabled="false"
         @update:filter="applyFilter"
         @reset="resetFilter"
@@ -28,7 +28,12 @@
           :rows="rows"
           :loading="loadingList"
           :error="errorList"
+          :current-page-number="page"
+          :page-size="perPage"
+          :total-item-count="total"
           @row-click="openRequestDetail"
+          @update:currentPageNumber="updatePage"
+          @update:pageSize="updatePageSize"
         />
       </div>
 
@@ -50,30 +55,48 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import HourApprovalFilterPanel from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalFilterPanel.vue";
 import HourApprovalTable from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalTable.vue";
 import HourApprovalDetailDrawer from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalDetailDrawer.vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
+import http from "@/lib/http";
 
 import type { FacultyOption } from "@/features/scientific/management/lecturer-hour-approval/contracts/hourApproval.contract";
-import { buildUniversityDb } from "@/features/scientific/management/lecturer-hour-approval/mock-data/hourApproval.mock";
-import { createHourApprovalService } from "@/features/scientific/management/lecturer-hour-approval/services/hourApprovalService";
+import { createUniversityHourApprovalService } from "@/features/scientific/management/lecturer-hour-approval/services/uniHoursApprovals.service";
 import { useHourApprovalManagement } from "@/features/scientific/management/lecturer-hour-approval/composables/useHourApprovalManagement";
 
-const facultyOptions: FacultyOption[] = [
-  { id: 10, name: "Khoa Công nghệ Thông tin" },
-  { id: 20, name: "Khoa Toán" },
-  { id: 30, name: "Khoa Kinh tế" },
-];
+const facultyOptions = ref<FacultyOption[]>([]);
+const loadingFaculties = ref(false);
 
-const service = createHourApprovalService(buildUniversityDb());
+async function loadFacultyOptions() {
+  loadingFaculties.value = true;
+  try {
+    const { data } = await http.get<{ data: FacultyOption[] }>(
+      "/api/lookups/faculties"
+    );
+    facultyOptions.value = (data.data ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+    }));
+  } catch (e) {
+    facultyOptions.value = [];
+  } finally {
+    loadingFaculties.value = false;
+  }
+}
+
+const service = createUniversityHourApprovalService();
 
 const {
   filter,
   rows,
   requestDetail,
   isDetailOpen,
+
+  page,
+  perPage,
+  total,
 
   loadingList,
   loadingDetail,
@@ -92,9 +115,12 @@ const {
   closeRequestDetail,
   approveRequest,
   rejectRequest,
+  updatePage,
+  updatePageSize,
 } = useHourApprovalManagement(service);
 
-onMounted(() => {
-  loadRequests();
+onMounted(async () => {
+  await loadFacultyOptions();
+  await loadRequests();
 });
 </script>

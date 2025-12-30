@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import { RotateCcw } from "lucide-vue-next";
 import type { LecturerHoursFilterModel } from "../services/lecturerHoursService";
-import type { AcademicYearOption } from "../mock-data/lecturerHoursCatalog.mock";
+import type { AcademicYearOption } from "../lecturerHours.contract";
 
 interface Props {
   filter: LecturerHoursFilterModel;

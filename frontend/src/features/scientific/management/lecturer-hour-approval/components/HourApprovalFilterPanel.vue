@@ -76,7 +76,7 @@
               class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-slate-400 focus:ring-0 disabled:bg-slate-50"
               :disabled="loading"
               :value="filter.searchText"
-              placeholder="Tên / mã giảng viên…"
+              placeholder="Tên / mã giảng viên..."
               @input="onChangeSearch"
             />
           </div>

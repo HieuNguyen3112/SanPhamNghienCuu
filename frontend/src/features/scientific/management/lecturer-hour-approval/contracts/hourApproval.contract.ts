@@ -34,10 +34,14 @@ export interface HourApprovalRequestSummaryDTO {
   faculty_name: string;
 
   activity_count: number;
+  works_count?: number;
   total_hours: number;
+  total_hours_requested?: number;
 
   submitted_at: string; // ISO
   status: HourApprovalRequestStatus;
+  status_code?: HourApprovalRequestStatus;
+  status_label?: string;
 }
 
 export interface HourApprovalRequestItemDTO {
@@ -65,13 +69,35 @@ export interface HourApprovalRequestDetailDTO {
 
   activity_count: number;
   total_hours: number;
+  total_hours_requested?: number;
+  total_hours_valid?: number;
 
   items: HourApprovalRequestItemDTO[];
 }
 
 export interface RejectPayloadDTO {
   reason_code: HourApprovalRejectReasonCode;
-  reason_note: string | null;
+  reason_detail: string | null;
+}
+
+export interface HourApprovalListResponseDTO {
+  success: boolean;
+  message: string;
+  data: {
+    items: HourApprovalRequestSummaryDTO[];
+    pagination: {
+      page: number;
+      per_page: number;
+      total: number;
+      last_page: number;
+    };
+  };
+}
+
+export interface HourApprovalDetailResponseDTO {
+  success: boolean;
+  message: string;
+  data: HourApprovalRequestDetailDTO;
 }
 
 /** ========== Models (camelCase) ========== */
@@ -141,9 +167,9 @@ export const hourApprovalMappers = {
       facultyId: dto.faculty_id,
       facultyName: dto.faculty_name,
       activityCount: dto.activity_count,
-      totalHours: dto.total_hours,
+      totalHours: dto.total_hours ?? dto.total_hours_requested ?? 0,
       submittedAt: dto.submitted_at,
-      status: dto.status,
+      status: dto.status_code ?? dto.status,
     };
   },
 
@@ -159,7 +185,7 @@ export const hourApprovalMappers = {
       status: dto.status,
       noteFromLecturer: dto.note_from_lecturer,
       activityCount: dto.activity_count,
-      totalHours: dto.total_hours,
+      totalHours: dto.total_hours ?? dto.total_hours_requested ?? 0,
       items: dto.items.map((item) => ({
         activityId: item.activity_id,
         activityTitle: item.activity_title,
@@ -173,7 +199,7 @@ export const hourApprovalMappers = {
   rejectPayloadToDto(payload: RejectPayload): RejectPayloadDTO {
     return {
       reason_code: payload.reasonCode,
-      reason_note: payload.reasonNote,
+      reason_detail: payload.reasonNote,
     };
   },
 };

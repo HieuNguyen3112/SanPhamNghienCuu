@@ -2,69 +2,125 @@ import { lecturerHoursApi } from "../api/lecturerHoursApi";
 import type {
   LecturerHoursOverview,
   LecturerHoursDetailRow,
+  AcademicYearOption,
+  FacultyOption,
+  KpiStatusOption,
 } from "../lecturerHours.contract";
 import {
   lecturerHoursOverviewMapper,
   lecturerHoursDetailMapper,
+  academicYearOptionMapper,
+  facultyOptionMapper,
+  kpiStatusOptionMapper,
 } from "../lecturerHours.contract";
 
 export type KpiStatusFilter = "all" | "hit" | "miss";
 
 export interface LecturerHoursFilterModel {
-  yearId: number;
+  yearId: number | null;
   facultyId: number | null; // null = all (university)
   kpiStatus: KpiStatusFilter;
   keyword: string;
 }
 
-function normalizeKeyword(keyword: string) {
-  return keyword.trim().toLowerCase();
+export interface LecturerHoursPaginationModel {
+  page: number;
+  perPage: number;
 }
 
-function computeDifferenceHours(row: LecturerHoursOverview) {
-  return row.hoursTotal - row.requiredHours;
+export interface LecturerHoursOverviewTotals {
+  totalLecturers: number;
+  hitCount: number;
+  missCount: number;
+  hitRate: number;
+}
+
+export interface LecturerHoursOverviewOptions {
+  academicYears: AcademicYearOption[];
+  faculties: FacultyOption[];
+  kpiStatuses: KpiStatusOption[];
+}
+
+export interface LecturerHoursOverviewMeta {
+  pagination: {
+    currentPage: number;
+    perPage: number;
+    total: number;
+    lastPage: number;
+  } | null;
+  filters: {
+    yearId: number | null;
+    facultyId: number | null;
+    kpiStatus: KpiStatusFilter;
+    keyword: string;
+  };
+}
+
+export interface LecturerHoursOverviewPayload {
+  overview: LecturerHoursOverview[];
+  totals: LecturerHoursOverviewTotals;
+  options: LecturerHoursOverviewOptions;
+  meta: LecturerHoursOverviewMeta;
 }
 
 export const lecturerHoursService = {
   async loadOverview(
-    filter: LecturerHoursFilterModel
-  ): Promise<LecturerHoursOverview[]> {
-    const overviewDtos = await lecturerHoursApi.readOverview({
-      academic_year_id: filter.yearId,
+    filter: LecturerHoursFilterModel,
+    pagination: LecturerHoursPaginationModel
+  ): Promise<LecturerHoursOverviewPayload> {
+    const response = await lecturerHoursApi.readOverview({
+      academic_year_id: filter.yearId ?? undefined,
       faculty_id: filter.facultyId ?? undefined,
+      kpi_status: filter.kpiStatus,
+      q: filter.keyword,
+      page: pagination.page,
+      per_page: pagination.perPage,
     });
 
-    const overview = overviewDtos.map(lecturerHoursOverviewMapper.fromDto);
+    const overview = response.data.map(lecturerHoursOverviewMapper.fromDto);
 
-    const keyword = normalizeKeyword(filter.keyword);
-    const filteredByKeyword =
-      keyword.length === 0
-        ? overview
-        : overview.filter((row) => {
-            return (
-              row.lecturerFullName.toLowerCase().includes(keyword) ||
-              row.lecturerCode.toLowerCase().includes(keyword)
-            );
-          });
+    const totals = {
+      totalLecturers: response.meta.totals.total_lecturers,
+      hitCount: response.meta.totals.met_count,
+      missCount: response.meta.totals.missing_count,
+      hitRate: response.meta.totals.kpi_ratio_percent,
+    };
 
-    const filteredByKpi =
-      filter.kpiStatus === "all"
-        ? filteredByKeyword
-        : filteredByKeyword.filter((row) => {
-            const diff = computeDifferenceHours(row);
-            return filter.kpiStatus === "hit" ? diff >= 0 : diff < 0;
-          });
+    const options = {
+      academicYears: response.meta.options.academic_years.map(
+        academicYearOptionMapper.fromDto
+      ),
+      faculties: response.meta.options.faculties.map(facultyOptionMapper.fromDto),
+      kpiStatuses: response.meta.options.kpi_statuses.map(
+        kpiStatusOptionMapper.fromDto
+      ),
+    };
 
-    // Sort: thiếu trước, sau đó theo tên
-    return [...filteredByKpi].sort((a, b) => {
-      const aDiff = computeDifferenceHours(a);
-      const bDiff = computeDifferenceHours(b);
+    const paginationMeta = response.meta.pagination
+      ? {
+          currentPage: response.meta.pagination.current_page,
+          perPage: response.meta.pagination.per_page,
+          total: response.meta.pagination.total,
+          lastPage: response.meta.pagination.last_page,
+        }
+      : null;
 
-      if (aDiff >= 0 && bDiff < 0) return 1;
-      if (aDiff < 0 && bDiff >= 0) return -1;
+    const meta = {
+      pagination: paginationMeta,
+      filters: {
+        yearId: response.meta.filters.academic_year_id ?? null,
+        facultyId: response.meta.filters.faculty_id ?? null,
+        kpiStatus: (response.meta.filters.kpi_status as KpiStatusFilter) ?? "all",
+        keyword: response.meta.filters.q ?? "",
+      },
+    };
 
-      return a.lecturerFullName.localeCompare(b.lecturerFullName, "vi");
-    });
+    return {
+      overview,
+      totals,
+      options,
+      meta,
+    };
   },
 
   async loadDetail(
@@ -76,9 +132,8 @@ export const lecturerHoursService = {
       academic_year_id: yearId,
     });
 
-    const detail = lecturerHoursDetailMapper.fromDto(detailDto);
+    const detail = lecturerHoursDetailMapper.fromDto(detailDto.data);
 
-    // Sort: giờ giảm dần
     return [...detail.rows].sort((a, b) => b.hoursConverted - a.hoursConverted);
   },
 };

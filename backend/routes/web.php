@@ -6,6 +6,8 @@ use App\Http\Controllers\Auth\RegistrationController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\ProfileController;
 
+Route::get('/', fn() => response()->json(['ok' => true], 200));
+
 // AUTH (session/cookie, co CSRF)
 Route::middleware(['web'])->group(function () {
     // Cong khai cho dang nhap/dang ky

@@ -11,7 +11,7 @@
           </h1>
           <p class="text-sm text-slate-600">
             Danh sách giảng viên chưa đạt định mức giờ NCKH theo năm học
-            (read-only, chỉ gửi cảnh báo).
+            (chỉ xem, chỉ gửi cảnh báo).
           </p>
         </div>
       </section>

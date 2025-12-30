@@ -15,8 +15,8 @@ export type WarningNotificationRequestStateFilterCondition =
   | "REQUESTED";
 
 /**
- * ✅ Lý do cảnh báo (manager chọn trước khi bấm "Cảnh báo")
- * BE có thể lưu reason_code + reason_note vào bảng log/notifications.
+ * Lý do cảnh báo (manager chọn trước khi bấm "Cảnh báo").
+ * BE có thể lưu reason_code + reason_note vào log/notifications.
  */
 export type ResearchHourWarningReasonCode =
   | "MISSING_HOURS"
@@ -36,12 +36,13 @@ export const RESEARCH_HOUR_WARNING_REASON_OPTIONS: ResearchHourWarningReasonOpti
     {
       code: "MISSING_HOURS",
       label: "Thiếu giờ NCKH",
-      description: "Giảng viên chưa đạt định mức giờ NCKH theo năm học.",
+      description:
+        "Giảng viên chưa đạt định mức giờ NCKH theo năm học.",
     },
     {
       code: "DEADLINE_NEAR",
       label: "Sắp hết hạn kê khai",
-      description: "Gần đến hạn chót kê khai/xét duyệt giờ NCKH.",
+      description: "Gần đến hạn chốt kê khai/xét duyệt giờ NCKH.",
     },
     {
       code: "DEADLINE_PASSED",
@@ -62,7 +63,7 @@ export const RESEARCH_HOUR_WARNING_REASON_OPTIONS: ResearchHourWarningReasonOpti
   ];
 
 /* =========================
- * DTO (snake_case) - giả lập BE
+ * DTO (snake_case)
  * ========================= */
 
 export interface FacultyOptionDTO {

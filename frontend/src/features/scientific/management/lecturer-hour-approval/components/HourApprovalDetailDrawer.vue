@@ -82,7 +82,7 @@
           <!-- Body -->
           <div class="flex-1 overflow-auto px-4 py-4 lg:px-5">
             <div v-if="loadingDetail" class="text-sm text-slate-700">
-              Đang tải chi tiết…
+              Đang tải chi tiết...
             </div>
 
             <div

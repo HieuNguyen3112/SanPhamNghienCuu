@@ -16,7 +16,7 @@
                 Chi tiết cảnh báo
               </div>
               <div v-if="entry" class="mt-1 text-xs text-slate-500">
-                {{ entry.lecturerFullName }} • {{ entry.lecturerCode }}
+                {{ entry.lecturerFullName }} - {{ entry.lecturerCode }}
               </div>
             </div>
 
@@ -112,7 +112,7 @@
               </div>
             </div>
 
-            <!-- ✅ Reason picker -->
+            <!-- Reason picker -->
             <div class="rounded-2xl border border-slate-200 bg-white p-4">
               <div class="flex items-center gap-2">
                 <AlertTriangle class="h-4 w-4 text-slate-700" />
@@ -155,8 +155,8 @@
                   v-model="reasonNote"
                   :placeholder="
                     selectedReasonCode === 'OTHER'
-                      ? 'Vui lòng nhập lý do cụ thể…'
-                      : 'Nhập ghi chú…'
+                      ? 'Vui lòng nhập lý do cụ thể...'
+                      : 'Nhập ghi chú...'
                   "
                 />
                 <div v-if="localError" class="mt-2 text-xs text-rose-700">
@@ -192,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import { AlertTriangle, Send, X } from "lucide-vue-next";
 import type {
   AcademicYearIdentifier,

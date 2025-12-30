@@ -61,7 +61,7 @@ export function useResearchHourWarningManagement(
 
   const isFacultyLocked = computed(() => facultyOptions.value.length === 1);
 
-  // ✅ để UI table/pagination không phụ thuộc BE (BE có thể paginate sau)
+  // Client-side filter for now; backend can paginate later.
   const filteredEntries = computed(() => entryList.value);
 
   async function loadOverview() {
@@ -79,13 +79,13 @@ export function useResearchHourWarningManagement(
 
       overview.value = overviewFromDto(dto);
 
-      // nếu BCN khoa: facultyOptions có 1 item => auto set filter về đúng khoa
+      // If this is a faculty-scoped view, lock to the single faculty.
       if (isFacultyLocked.value && overview.value.facultyOptionList[0]) {
         filter.value.selectedFacultyIdentifier =
           overview.value.facultyOptionList[0].facultyIdentifier;
       }
 
-      // nếu năm hiện tại không có trong list -> fallback
+      // If current year is missing, fall back to the first option.
       const yearExists = overview.value.academicYearOptionList.some(
         (y) =>
           y.academicYearIdentifier ===
@@ -104,7 +104,6 @@ export function useResearchHourWarningManagement(
 
   function patchFilter(next: Partial<ResearchHourWarningFilterState>) {
     filter.value = { ...filter.value, ...next };
-    // P0: reload ngay (sau này muốn debounce thì bọc setTimeout)
     void loadOverview();
   }
 
@@ -153,10 +152,8 @@ export function useResearchHourWarningManagement(
         reason_note: payload.reasonNote,
       });
 
-      // reload để cập nhật "Đã cảnh báo" + timestamp + reason
       await loadOverview();
 
-      // giữ modal mở nhưng refresh selectedEntry theo dữ liệu mới
       if (selectedEntry.value) {
         const refreshed = entryList.value.find(
           (x) =>

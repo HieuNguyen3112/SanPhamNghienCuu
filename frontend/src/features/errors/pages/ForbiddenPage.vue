@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="min-h-screen bg-slate-100 flex items-center justify-center px-4">
     <div class="max-w-md w-full rounded-lg bg-white p-8 shadow text-center space-y-3">
       <h1 class="text-3xl font-semibold text-slate-900">403</h1>

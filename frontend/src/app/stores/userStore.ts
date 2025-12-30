@@ -126,7 +126,7 @@ export const useUserStore = defineStore("user", {
               ? "Unauthenticated"
               : status === 403
               ? "Forbidden"
-              : "Không th? t?i thông tin ngu?i dùng");
+              : "Khï¿½ng th? t?i thï¿½ng tin ngu?i dï¿½ng");
           this.currentUser = null;
           this.currentRole = null;
           return null;

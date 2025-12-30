@@ -48,6 +48,60 @@ export interface LecturerHoursDetailDTO {
   rows: LecturerHoursDetailRowDTO[];
 }
 
+export interface AcademicYearOptionDTO {
+  id: number;
+  code: string;
+  is_active: boolean;
+}
+
+export interface FacultyOptionDTO {
+  id: number;
+  name: string;
+}
+
+export interface KpiStatusOptionDTO {
+  code: string;
+  label: string;
+}
+
+export interface LecturerHoursOverviewResponseDTO {
+  data: LecturerHoursOverviewDTO[];
+  meta: {
+    totals: {
+      total_lecturers: number;
+      met_count: number;
+      missing_count: number;
+      kpi_ratio_percent: number;
+    };
+    pagination: {
+      current_page: number;
+      per_page: number;
+      total: number;
+      last_page: number;
+    } | null;
+    filters: {
+      academic_year_id: number | null;
+      faculty_id: number | null;
+      kpi_status: string;
+      q: string;
+    };
+    options: {
+      faculties: FacultyOptionDTO[];
+      academic_years: AcademicYearOptionDTO[];
+      kpi_statuses: KpiStatusOptionDTO[];
+    };
+  };
+}
+
+export interface LecturerHoursDetailResponseDTO {
+  data: LecturerHoursDetailDTO & {
+    lecturer_code?: string;
+    lecturer_full_name?: string;
+    faculty_name?: string | null;
+    department_name?: string | null;
+  };
+}
+
 // =========================
 // UI Models (camelCase)
 // =========================
@@ -84,6 +138,22 @@ export interface LecturerHoursDetail {
   lecturerId: number;
   academicYearId: number;
   rows: LecturerHoursDetailRow[];
+}
+
+export interface AcademicYearOption {
+  id: number;
+  code: string;
+  isActive: boolean;
+}
+
+export interface FacultyOption {
+  id: number;
+  name: string;
+}
+
+export interface KpiStatusOption {
+  code: string;
+  label: string;
 }
 
 // =========================
@@ -175,6 +245,34 @@ export const lecturerHoursDetailMapper = {
       lecturer_id: model.lecturerId,
       academic_year_id: model.academicYearId,
       rows: model.rows.map(mapDetailRowToDto),
+    };
+  },
+};
+
+export const academicYearOptionMapper = {
+  fromDto(dto: AcademicYearOptionDTO): AcademicYearOption {
+    return {
+      id: dto.id,
+      code: dto.code,
+      isActive: dto.is_active,
+    };
+  },
+};
+
+export const facultyOptionMapper = {
+  fromDto(dto: FacultyOptionDTO): FacultyOption {
+    return {
+      id: dto.id,
+      name: dto.name,
+    };
+  },
+};
+
+export const kpiStatusOptionMapper = {
+  fromDto(dto: KpiStatusOptionDTO): KpiStatusOption {
+    return {
+      code: dto.code,
+      label: dto.label,
     };
   },
 };

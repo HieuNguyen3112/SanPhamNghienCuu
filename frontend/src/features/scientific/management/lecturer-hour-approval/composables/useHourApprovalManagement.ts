@@ -32,6 +32,11 @@ export function useHourApprovalManagement(
   const requestDetail = ref<HourApprovalRequestDetail | null>(null);
   const isDetailOpen = ref(false);
 
+  const page = ref(1);
+  const perPage = ref(12);
+  const total = ref(0);
+  const lastPage = ref(1);
+
   const loadingList = ref(false);
   const loadingDetail = ref(false);
   const loadingApprove = ref(false);
@@ -46,11 +51,17 @@ export function useHourApprovalManagement(
     loadingList.value = true;
     errorList.value = null;
     try {
-      const dtoRows = await service.getRequests({ ...filter });
-      rows.value = dtoRows.map(hourApprovalMappers.summaryFromDto);
+      const response = await service.getRequests({ ...filter }, page.value, perPage.value);
+      rows.value = response.data.items.map(hourApprovalMappers.summaryFromDto);
+      total.value = response.data.pagination.total;
+      lastPage.value = response.data.pagination.last_page;
+      page.value = response.data.pagination.page;
+      perPage.value = response.data.pagination.per_page;
     } catch (e) {
       errorList.value = e instanceof Error ? e.message : String(e);
       rows.value = [];
+      total.value = 0;
+      lastPage.value = 1;
     } finally {
       loadingList.value = false;
     }
@@ -58,11 +69,13 @@ export function useHourApprovalManagement(
 
   async function applyFilter(nextFilter: Partial<HourApprovalFilter>) {
     Object.assign(filter, nextFilter);
+    page.value = 1;
     await loadRequests();
   }
 
   async function resetFilter() {
     Object.assign(filter, createDefaultHourApprovalFilter());
+    page.value = 1;
     await loadRequests();
   }
 
@@ -126,12 +139,27 @@ export function useHourApprovalManagement(
     }
   }
 
+  async function updatePage(nextPage: number) {
+    page.value = Math.min(Math.max(1, nextPage), lastPage.value);
+    await loadRequests();
+  }
+
+  async function updatePageSize(nextSize: number) {
+    if (!Number.isFinite(nextSize) || nextSize <= 0) return;
+    perPage.value = nextSize;
+    page.value = 1;
+    await loadRequests();
+  }
+
   return {
     filter,
     rows,
-    selectedRequestId,
     requestDetail,
     isDetailOpen,
+
+    page,
+    perPage,
+    total,
 
     loadingList,
     loadingDetail,
@@ -150,5 +178,7 @@ export function useHourApprovalManagement(
     closeRequestDetail,
     approveRequest,
     rejectRequest,
+    updatePage,
+    updatePageSize,
   };
 }

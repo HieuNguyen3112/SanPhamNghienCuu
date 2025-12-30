@@ -59,7 +59,7 @@ class SessionAuthController extends Controller
         $data = $request->validate([
             'email'             => ['required', 'email'],
             'password'          => ['required', 'string'],
-            'role'              => ['required', 'string', Rule::in($allowedRoles)],
+            'role'              => ['nullable', 'string', Rule::in($allowedRoles)],
             'remember'          => ['sometimes', 'boolean'],
         ]);
 
@@ -67,7 +67,7 @@ class SessionAuthController extends Controller
             ['email' => $data['email'], 'password' => $data['password']],
             $data['remember'] ?? false
         )) {
-            return response()->json(['message' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
+            return response()->json(['message' => 'Invalid credentials'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         /** @var \App\Models\User|null $user */
@@ -82,18 +82,21 @@ class SessionAuthController extends Controller
             return response()->json(['message' => 'Email not verified'], Response::HTTP_FORBIDDEN);
         }
 
-        $backendRolesForRequest = RoleMapper::canonicalToBackend($data['role']);
-        $hasAcceptedRole = false;
-        foreach ($backendRolesForRequest as $backendRole) {
-            if ($user->hasRole($backendRole)) {
-                $hasAcceptedRole = true;
-                break;
+        $requestedRole = $data['role'] ?? null;
+        if ($requestedRole !== null) {
+            $backendRolesForRequest = RoleMapper::canonicalToBackend($requestedRole);
+            $hasAcceptedRole = false;
+            foreach ($backendRolesForRequest as $backendRole) {
+                if ($user->hasRole($backendRole)) {
+                    $hasAcceptedRole = true;
+                    break;
+                }
             }
-        }
 
-        if (! $hasAcceptedRole) {
-            Auth::guard('web')->logout();
-            return response()->json(['message' => 'Role not allowed for this user'], Response::HTTP_FORBIDDEN);
+            if (! $hasAcceptedRole) {
+                Auth::guard('web')->logout();
+                return response()->json(['message' => 'Role not allowed for this user'], Response::HTTP_FORBIDDEN);
+            }
         }
 
         $request->session()->regenerate();

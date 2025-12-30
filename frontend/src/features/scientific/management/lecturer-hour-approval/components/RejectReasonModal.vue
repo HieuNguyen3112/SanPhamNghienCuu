@@ -100,7 +100,7 @@
                     class="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm focus:border-slate-400 focus:ring-0"
                     rows="3"
                     :value="reasonNote"
-                    placeholder="Nhập lý do…"
+                    placeholder="Nhập lý do..."
                     @input="
                       reasonNote = ($event.target as HTMLTextAreaElement).value
                     "
@@ -181,7 +181,7 @@ watch(
 const validationError = computed(() => {
   if (reasonCode.value !== "other") return null;
   if (!reasonNote.value.trim())
-    return "Vui lòng nhập nội dung cho “Lý do khác”.";
+    return "Vui lòng nhập nội dung cho lý do khác.";
   return null;
 });
 

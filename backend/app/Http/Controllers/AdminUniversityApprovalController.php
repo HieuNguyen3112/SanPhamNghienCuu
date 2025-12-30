@@ -242,6 +242,7 @@ class AdminUniversityApprovalController extends Controller
         $existingMembers = DB::table('research_activity_members')
             ->where('activity_id', $activity)
             ->pluck('lecturer_id')
+            ->map(fn($id) => (int) $id)
             ->all();
 
         sort($memberIds);

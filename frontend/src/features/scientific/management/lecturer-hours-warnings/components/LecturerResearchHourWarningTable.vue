@@ -2,7 +2,7 @@
   <div
     class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
   >
-    <div v-if="loading" class="p-4 text-sm text-slate-700">Đang tải…</div>
+    <div v-if="loading" class="p-4 text-sm text-slate-700">Đang tải...</div>
 
     <div v-else-if="error" class="p-4">
       <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">

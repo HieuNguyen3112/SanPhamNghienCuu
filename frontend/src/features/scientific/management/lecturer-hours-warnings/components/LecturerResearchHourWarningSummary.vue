@@ -8,10 +8,9 @@
       <div class="text-sm font-semibold text-slate-900">Tổng quan nhanh</div>
     </div>
 
-    <div v-if="loading" class="mt-3 text-sm text-slate-700">Đang tải…</div>
+    <div v-if="loading" class="mt-3 text-sm text-slate-700">Đang tải...</div>
     <div v-else-if="error" class="mt-3 text-sm text-rose-700">{{ error }}</div>
 
-    <!-- ✅ giữ nguyên khung grid, chỉ đổi UI card bên trong -->
     <div v-else-if="summaryStatistics" class="mt-3 grid gap-3 md:grid-cols-4">
       <div
         class="group rounded-xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
@@ -143,7 +142,7 @@
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="text-xs font-medium text-slate-700">
-              Căn cứ đối soát
+              Chuẩn giờ đối soát
             </div>
             <div
               class="mt-1 text-lg font-semibold tracking-tight text-slate-900"

@@ -9,6 +9,9 @@ use App\Http\Controllers\LookupController;
 use App\Http\Controllers\ResearchActivityController;
 use App\Http\Controllers\AdminResearchWorkController;
 use App\Http\Controllers\AdminUniversityApprovalController;
+use App\Http\Controllers\AdminLecturerHoursController;
+use App\Http\Controllers\AdminLecturerHourApprovalController;
+use App\Http\Controllers\AdminLecturerHourWarningController;
 
 // TOKEN-BASED (Sanctum Bearer)
 Route::prefix('auth')->group(function () {
@@ -87,6 +90,21 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::get('/lecturers/summary', [AdminResearchWorkController::class, 'lecturerSummary']);
         Route::get('/lecturers/{lecturer}/approved', [AdminResearchWorkController::class, 'approvedByLecturer']);
         Route::get('/activities/{activity}/approved', [AdminResearchWorkController::class, 'approvedDetail']);
+    });
+
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])
+    ->prefix('admin/hours')
+    ->group(function () {
+        Route::get('/lecturers/summary/export/excel', [AdminLecturerHoursController::class, 'exportSummaryExcel']);
+        Route::get('/lecturers/summary/export/pdf', [AdminLecturerHoursController::class, 'exportSummaryPdf']);
+        Route::get('/lecturers/summary', [AdminLecturerHoursController::class, 'index']);
+        Route::get('/lecturers/{lecturer}', [AdminLecturerHoursController::class, 'show']);
+        Route::get('/approvals', [AdminLecturerHourApprovalController::class, 'index']);
+        Route::get('/approvals/{requestId}', [AdminLecturerHourApprovalController::class, 'show']);
+        Route::put('/approvals/{requestId}/approve', [AdminLecturerHourApprovalController::class, 'approve']);
+        Route::put('/approvals/{requestId}/reject', [AdminLecturerHourApprovalController::class, 'reject']);
+        Route::get('/warnings', [AdminLecturerHourWarningController::class, 'index']);
+        Route::post('/warnings/{lecturerId}/send', [AdminLecturerHourWarningController::class, 'sendWarning']);
     });
 
 Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])

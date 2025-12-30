@@ -8,10 +8,10 @@
           title="Quản lý giờ nghiên cứu khoa học theo giảng viên"
           subtitle="Theo dõi tình hình thực hiện giờ NCKH của giảng viên trong khoa"
           :year-options="yearOptions"
-          :selected-year-id="filter.yearId"
+          :selected-year-id="filter.yearId ?? undefined"
           @change-year="applyFilter({ yearId: $event })"
-          @export-excel="onExportExcel"
-          @export-pdf="onExportPdf"
+          @exportPdfClicked="onExportPdf"
+          @exportExcelClicked="onExportExcel"
         />
       </div>
       <div class="mt-4">
@@ -37,7 +37,12 @@
           :overview="overview"
           :loading="loadingOverview"
           :error="errorOverview"
+          :current-page-number="currentPageNumber"
+          :page-size="pageSize"
+          :total-item-count="totalItemCount"
           @view="openDrawer"
+          @update:currentPageNumber="updatePage"
+          @update:pageSize="updatePageSize"
         />
       </div>
 
@@ -62,19 +67,19 @@ import HoursKpiOverview from "@/features/scientific/management/lecturer-hours-ma
 import LecturerHoursTable from "@/features/scientific/management/lecturer-hours-management/components/LecturerHoursTable.vue";
 import LecturerHoursDrawer from "@/features/scientific/management/lecturer-hours-management/components/LecturerHoursDrawer.vue";
 import { useLecturerHoursManagement } from "@/features/scientific/management/lecturer-hours-management/composables/useLecturerHoursManagement";
-import { mockAcademicYears } from "@/features/scientific/management/lecturer-hours-management/mock-data/lecturerHoursCatalog.mock";
-
-const yearOptions = mockAcademicYears;
+import {
+  exportHoursExcel,
+  exportHoursPdf,
+} from "@/features/scientific/management/lecturer-hours-management/services/lecturerHoursExport.service";
 
 // Faculty scope: ví dụ khoa CNTT id=10
 const facultyScopeId = 10;
 
-const initialYearId =
-  yearOptions.find((y) => y.isActive)?.id ?? yearOptions[0]?.id ?? 1;
-
 const {
   filter,
   overview,
+
+  yearOptions,
 
   selectedLecturerOverview,
   drawerOpen,
@@ -84,6 +89,10 @@ const {
   hitCount,
   missCount,
   hitRate,
+
+  currentPageNumber,
+  pageSize,
+  totalItemCount,
 
   loadingOverview,
   loadingDetail,
@@ -96,25 +105,55 @@ const {
   resetFilter,
   openDrawer,
   closeDrawer,
+  updatePage,
+  updatePageSize,
 } = useLecturerHoursManagement({
-  initialYearId,
+  initialYearId: null,
   initialFacultyId: facultyScopeId,
 });
 
 const selectedAcademicYearCode = computed(() => {
-  return yearOptions.find((y) => y.id === filter.yearId)?.code ?? "—";
+  return yearOptions.value.find((y) => y.id === filter.yearId)?.code ?? "";
 });
 
-function onExportExcel() {
-  // UI only
-  // eslint-disable-next-line no-console
-  console.log("Export Excel (UI only)");
+function buildExportParams() {
+  return {
+    faculty_id: filter.facultyId ?? null,
+    academic_year_id: filter.yearId ?? null,
+    kpi_status: filter.kpiStatus,
+    q: filter.keyword,
+  };
 }
 
-function onExportPdf() {
-  // UI only
-  // eslint-disable-next-line no-console
-  console.log("Export PDF (UI only)");
+function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+async function onExportExcel() {
+  try {
+    const result = await exportHoursExcel(buildExportParams());
+    downloadBlob(result.blob, result.filename);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(error);
+  }
+}
+
+async function onExportPdf() {
+  try {
+    const result = await exportHoursPdf(buildExportParams());
+    downloadBlob(result.blob, result.filename);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(error);
+  }
 }
 
 onMounted(() => {

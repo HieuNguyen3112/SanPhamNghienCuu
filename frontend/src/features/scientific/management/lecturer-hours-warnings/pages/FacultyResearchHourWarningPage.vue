@@ -8,6 +8,6 @@ import { createFacultyResearchHourWarningService } from "../services/researchHou
 
 // TODO: lấy facultyIdentifier từ auth/session (claims) thay vì hardcode
 const service = createFacultyResearchHourWarningService({
-  facultyIdentifierLocked: "FACULTY_IT",
+  facultyIdentifierLocked: "CNTT",
 });
 </script>

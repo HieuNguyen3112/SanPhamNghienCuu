@@ -1,7 +1,7 @@
 <template>
   <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
     <div v-if="loading" class="p-4 text-sm text-slate-700">
-      Đang tải danh sách…
+      Đang tải danh sách...
     </div>
 
     <div v-else-if="error" class="p-4">
@@ -37,7 +37,7 @@
 
         <tbody class="divide-y divide-slate-200">
           <tr
-            v-for="row in pagedRows"
+            v-for="row in rows"
             :key="row.requestId"
             class="cursor-pointer hover:bg-slate-50"
             @click="emit('row-click', row.requestId)"
@@ -81,28 +81,27 @@
       </table>
     </div>
 
-    <!-- ✅ Dùng SharedPaginationControls của bạn -->
     <div
-      v-if="!loading && !error && rows.length > 0"
+      v-if="!loading && !error && totalItemCount > 0"
       class="border-t border-slate-200 px-4 py-3"
     >
       <SharedPaginationControls
-        :total-item-count="rows.length"
+        :total-item-count="totalItemCount"
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
         display-mode="FULL"
         record-summary-mode="PAGE_COUNT"
         record-summary-unit-label="yêu cầu"
         container-class-name="w-full"
-        @update:currentPageNumber="currentPageNumber = $event"
-        @update:pageSize="pageSize = $event"
+        @update:currentPageNumber="emit('update:currentPageNumber', $event)"
+        @update:pageSize="emit('update:pageSize', $event)"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import type {
   HourApprovalRequestSummary,
   HourApprovalRequestStatus,
@@ -115,31 +114,21 @@ interface Props {
   rows: HourApprovalRequestSummary[];
   loading: boolean;
   error: string | null;
+  currentPageNumber: number;
+  pageSize: number;
+  totalItemCount: number;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
   (e: "row-click", requestId: number): void;
+  (e: "update:currentPageNumber", value: number): void;
+  (e: "update:pageSize", value: number): void;
 }>();
 
-const currentPageNumber = ref(1);
-const pageSize = ref(12);
-
-/**
- * ✅ Chỉ reset page khi dataset đổi (do filter/reload)
- * Không reset khi pageSize đổi, vì SharedPaginationControls đã tự clamp + emit page mới.
- */
-watch(
-  () => props.rows.length,
-  () => {
-    currentPageNumber.value = 1;
-  }
-);
-
-const pagedRows = computed(() => {
-  const startIndex = (currentPageNumber.value - 1) * pageSize.value;
-  return props.rows.slice(startIndex, startIndex + pageSize.value);
-});
+const currentPageNumber = computed(() => props.currentPageNumber);
+const pageSize = computed(() => props.pageSize);
+const totalItemCount = computed(() => props.totalItemCount);
 
 function formatHours(v: number) {
   return Number.isFinite(v) ? v.toFixed(0) : "0";

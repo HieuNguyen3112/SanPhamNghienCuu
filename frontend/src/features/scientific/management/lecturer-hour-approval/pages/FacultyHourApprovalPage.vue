@@ -5,7 +5,7 @@
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
-          title="Xét duyệt giờ nghiên cứu khoa học cho giảng viên "
+          title="Xét duyệt giờ nghiên cứu khoa học cho giảng viên"
           subtitle="Theo dõi tình hình xét duyệt giờ NCKH của giảng viên trong khoa"
           :show-export-pdf="false"
           :show-export-excel="false"
@@ -28,7 +28,12 @@
           :rows="rows"
           :loading="loadingList"
           :error="errorList"
+          :current-page-number="page"
+          :page-size="perPage"
+          :total-item-count="total"
           @row-click="openRequestDetail"
+          @update:currentPageNumber="updatePage"
+          @update:pageSize="updatePageSize"
         />
       </div>
 
@@ -73,6 +78,10 @@ const {
   requestDetail,
   isDetailOpen,
 
+  page,
+  perPage,
+  total,
+
   loadingList,
   loadingDetail,
   loadingApprove,
@@ -90,6 +99,8 @@ const {
   closeRequestDetail,
   approveRequest,
   rejectRequest,
+  updatePage,
+  updatePageSize,
 } = useHourApprovalManagement(service, {
   facultyId: 10, // BCN khoa cố định khoa
 });

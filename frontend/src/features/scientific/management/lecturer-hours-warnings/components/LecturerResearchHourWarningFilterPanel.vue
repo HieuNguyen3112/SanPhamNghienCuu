@@ -21,7 +21,7 @@
               :key="f.facultyIdentifier"
               :value="f.facultyIdentifier"
             >
-              {{ f.facultyShortName }} — {{ f.facultyFullName }}
+              {{ f.facultyShortName }} - {{ f.facultyFullName }}
             </option>
           </select>
           <ChevronDown
@@ -108,18 +108,19 @@
             class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-slate-300 focus:outline-none"
             :disabled="loading"
             :value="filter.keyword"
-            placeholder="Mã GV / họ tên…"
+            placeholder="Mã GV / họ tên..."
             @input="onChangeKeyword"
           />
         </div>
-        <!-- Reset -->
       </div>
+
+      <!-- Reset -->
       <div class="md:col-span-2 md:flex md:justify-end">
         <button
           type="button"
           class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
           :disabled="loading"
-          @click="$emit('reset')"
+          @click="emit('reset')"
         >
           <RotateCcw class="h-4 w-4" />
           Đặt lại
@@ -137,7 +138,7 @@ import type {
 } from "../contracts/lecturerResearchHourWarning.contract";
 import type { ResearchHourWarningFilterState } from "../composables/useResearchHourWarningManagement";
 
-const props = defineProps<{
+defineProps<{
   filter: ResearchHourWarningFilterState;
   loading: boolean;
 
@@ -146,7 +147,7 @@ const props = defineProps<{
   facultySelectLocked: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:filter", partial: Partial<ResearchHourWarningFilterState>): void;
   (e: "reset"): void;
 }>();
@@ -154,13 +155,13 @@ defineEmits<{
 function onChangeFaculty(e: Event) {
   const v = (e.target as HTMLSelectElement)
     .value as ResearchHourWarningFilterState["selectedFacultyIdentifier"];
-  (props as any).$emit?.("update:filter", { selectedFacultyIdentifier: v });
+  emit("update:filter", { selectedFacultyIdentifier: v });
 }
 
 function onChangeYear(e: Event) {
   const v = (e.target as HTMLSelectElement)
     .value as ResearchHourWarningFilterState["selectedAcademicYearIdentifier"];
-  (props as any).$emit?.("update:filter", {
+  emit("update:filter", {
     selectedAcademicYearIdentifier: v,
   });
 }
@@ -168,17 +169,17 @@ function onChangeYear(e: Event) {
 function onChangeSeverity(e: Event) {
   const v = (e.target as HTMLSelectElement)
     .value as ResearchHourWarningFilterState["severityFilter"];
-  (props as any).$emit?.("update:filter", { severityFilter: v });
+  emit("update:filter", { severityFilter: v });
 }
 
 function onChangeNotifyState(e: Event) {
   const v = (e.target as HTMLSelectElement)
     .value as ResearchHourWarningFilterState["notificationStateFilter"];
-  (props as any).$emit?.("update:filter", { notificationStateFilter: v });
+  emit("update:filter", { notificationStateFilter: v });
 }
 
 function onChangeKeyword(e: Event) {
   const v = (e.target as HTMLInputElement).value;
-  (props as any).$emit?.("update:filter", { keyword: v });
+  emit("update:filter", { keyword: v });
 }
 </script>

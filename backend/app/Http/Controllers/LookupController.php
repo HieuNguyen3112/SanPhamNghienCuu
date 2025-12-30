@@ -49,7 +49,17 @@ class LookupController extends Controller
             $query->where('faculty_id', $request->input('faculty_id'));
         }
 
-        $data = $query->orderBy('name')->get();
+        $data = $query
+            ->orderBy('name')
+            ->get()
+            ->map(function (Department $department) {
+                return [
+                    'id' => (int) $department->id,
+                    'faculty_id' => (int) $department->faculty_id,
+                    'code' => $department->code,
+                    'name' => $department->name,
+                ];
+            });
 
         return response()->json(['data' => $data], Response::HTTP_OK);
     }

@@ -107,7 +107,7 @@ const detailsById: Record<number, HourApprovalRequestDetailDTO> = {
     items: [
       {
         activity_id: 501,
-        activity_title: "Nghiên cứu tối ưu hoá truy vấn cơ sở dữ liệu",
+        activity_title: "Nghiên cứu tối ưu hóa truy vấn cơ sở dữ liệu",
         activity_kind_name: "Bài báo",
         member_role_name: "Chủ nhiệm",
         hours_converted: 45,
@@ -186,7 +186,7 @@ const detailsById: Record<number, HourApprovalRequestDetailDTO> = {
       },
       {
         activity_id: 602,
-        activity_title: "Tối ưu hóa lồi và ứng dụng",
+        activity_title: "Tối ưu hóa lũy thừa và ứng dụng",
         activity_kind_name: "Bài báo",
         member_role_name: "Thành viên",
         hours_converted: 20,
@@ -233,7 +233,7 @@ const detailsById: Record<number, HourApprovalRequestDetailDTO> = {
     submitted_at: summaries[4]!.submitted_at,
     status: "pending",
     note_from_lecturer:
-      "Danh sách công trình đã được duyệt nội dung, kính nhờ xét duyệt giờ.",
+      "Danh sách công trình đã duyệt nội dung, kính nhờ xét duyệt giờ.",
     activity_count: 5,
     total_hours: 150,
     items: [
@@ -322,7 +322,7 @@ export function buildFacultyDb(facultyId: number): HourApprovalMockDatabase {
 
 /**
  * dataset cho QLKH trường:
- * giả định đây là “yêu cầu đã qua khoa” (mock). Hiện trả toàn bộ.
+ * giả định đây là “yêu cầu đã qua khoa” (mock). Hiển thị toàn bộ.
  * TODO(BE): khi có stage, API trường sẽ chỉ trả request đã được khoa forward.
  */
 export function buildUniversityDb(): HourApprovalMockDatabase {

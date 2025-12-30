@@ -15,8 +15,20 @@ class LookupSeeder extends Seeder
         $now = now();
 
         $faculties = [
-            ['code' => 'FOS', 'name' => 'Faculty of Science'],
-            ['code' => 'FOE', 'name' => 'Faculty of Education'],
+            ['code' => 'FOS', 'name' => 'Khoa Khoa học tự nhiên'],
+            ['code' => 'FOE', 'name' => 'Khoa Khoa học Giáo dục'],
+            ['code' => 'CNTT', 'name' => 'Khoa Công nghệ Thông tin'],
+            ['code' => 'TOANTIN', 'name' => 'Khoa Toán - Tin'],
+            ['code' => 'NGUVAN', 'name' => 'Khoa Ngữ văn'],
+            ['code' => 'LICHSU', 'name' => 'Khoa Lịch sử'],
+            ['code' => 'DIALY', 'name' => 'Khoa Địa lý'],
+            ['code' => 'VATLY', 'name' => 'Khoa Vật lý'],
+            ['code' => 'HOAHOC', 'name' => 'Khoa Hóa học'],
+            ['code' => 'SINHHOC', 'name' => 'Khoa Sinh học'],
+            ['code' => 'TIENGANH', 'name' => 'Khoa Tiếng Anh'],
+            ['code' => 'GDMN', 'name' => 'Khoa Giáo dục Mầm non'],
+            ['code' => 'GDTIEUHOC', 'name' => 'Khoa Giáo dục Tiểu học'],
+            ['code' => 'GDCT', 'name' => 'Khoa Giáo dục Chính trị'],
         ];
 
         $facultyIds = [];
@@ -26,6 +38,12 @@ class LookupSeeder extends Seeder
                 ->value('id');
 
             if ($existingId) {
+                DB::table('faculties')
+                    ->where('id', $existingId)
+                    ->update([
+                        'name' => $faculty['name'],
+                        'updated_at' => $now,
+                    ]);
                 $facultyIds[$faculty['code']] = $existingId;
                 continue;
             }

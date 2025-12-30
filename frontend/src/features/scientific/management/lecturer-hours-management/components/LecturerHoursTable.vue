@@ -1,7 +1,7 @@
 <template>
   <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
     <div v-if="loading" class="p-4 text-sm text-slate-700">
-      Đang tải danh sách…
+      Đang tải danh sách...
     </div>
 
     <div v-else-if="error" class="p-4">
@@ -35,7 +35,7 @@
 
         <tbody class="divide-y divide-slate-200">
           <tr
-            v-for="row in pagedRows"
+            v-for="row in overview"
             :key="row.lecturerId"
             class="cursor-pointer hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
             role="button"
@@ -88,22 +88,22 @@
       class="border-t border-slate-200 px-4 py-3"
     >
       <PaginationControl
-        :total-item-count="overview.length"
+        :total-item-count="totalItemCount"
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
         display-mode="FULL"
         record-summary-mode="PAGE_COUNT"
         record-summary-unit-label="giảng viên"
         container-class-name="w-full"
-        @update:currentPageNumber="currentPageNumber = $event"
-        @update:pageSize="pageSize = $event"
+        @update:currentPageNumber="emit('update:currentPageNumber', $event)"
+        @update:pageSize="emit('update:pageSize', $event)"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import type { LecturerHoursOverview } from "../lecturerHours.contract";
 
 import PaginationControl from "@/shared/components/layout/SharedPaginationControls.vue";
@@ -113,29 +113,23 @@ interface Props {
   overview: LecturerHoursOverview[];
   loading: boolean;
   error: string | null;
+  currentPageNumber: number;
+  pageSize: number;
+  totalItemCount: number;
 }
 
 interface Emits {
   (e: "view", lecturerId: number): void;
+  (e: "update:currentPageNumber", value: number): void;
+  (e: "update:pageSize", value: number): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const currentPageNumber = ref(1);
-const pageSize = ref(12);
-
-watch(
-  () => [props.overview.length, pageSize.value],
-  () => {
-    currentPageNumber.value = 1;
-  }
-);
-
-const pagedRows = computed(() => {
-  const startIndex = (currentPageNumber.value - 1) * pageSize.value;
-  return props.overview.slice(startIndex, startIndex + pageSize.value);
-});
+const currentPageNumber = computed(() => props.currentPageNumber);
+const pageSize = computed(() => props.pageSize);
+const totalItemCount = computed(() => props.totalItemCount);
 
 function computeDifference(row: LecturerHoursOverview) {
   return row.hoursTotal - row.requiredHours;

@@ -21,6 +21,8 @@ class DatabaseSeeder extends Seeder
         LecturerProfileDemoSeeder::class,
         ResearchLookupSeeder::class,
         ResearchActivityDemoSeeder::class,
+        LecturerHourApprovalDemoSeeder::class,
+        LecturerHourWarningDemoSeeder::class,
     ]);
 }
 

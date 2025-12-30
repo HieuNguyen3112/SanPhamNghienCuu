@@ -108,6 +108,7 @@ class ResearchLookupSeeder extends Seeder
         $approvalStages = [
             ['code' => 'assistant', 'name' => 'Assistant', 'order_no' => 1],
             ['code' => 'manager', 'name' => 'Manager', 'order_no' => 2],
+            ['code' => 'hours', 'name' => 'Hours Approval', 'order_no' => 3],
         ];
 
         foreach ($approvalStages as $stage) {

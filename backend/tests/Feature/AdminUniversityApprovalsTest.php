@@ -80,6 +80,75 @@ class AdminUniversityApprovalsTest extends TestCase
     }
 
     /** @test */
+    public function unauthenticated_cannot_finalize_university_approval()
+    {
+        [$activityId] = $this->seedPendingUniversityActivity();
+
+        $this->putJson("/api/admin/uni-approvals/{$activityId}/finalize", [])
+            ->assertStatus(401);
+    }
+
+    /** @test */
+    public function non_admin_cannot_finalize_university_approval()
+    {
+        $user = User::create([
+            'name' => 'Lecturer Finalize',
+            'email' => 'gv-finalize@local.test',
+            'password' => 'password',
+        ]);
+        $user->syncRoles(['GV']);
+
+        [$activityId] = $this->seedPendingUniversityActivity();
+
+        Sanctum::actingAs($user);
+
+        $this->putJson("/api/admin/uni-approvals/{$activityId}/finalize", [])
+            ->assertStatus(403);
+    }
+
+    /** @test */
+    public function finalize_requires_pending_university_status()
+    {
+        $admin = $this->createAdminUser();
+        [$activityId, $memberIds] = $this->seedPendingUniversityActivity();
+
+        $managerStageId = DB::table('approval_stages')->where('code', 'manager')->value('id');
+        DB::table('activity_approvals')
+            ->where('activity_id', $activityId)
+            ->where('stage_id', $managerStageId)
+            ->update([
+                'status' => 'approved',
+                'decided_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        Sanctum::actingAs($admin);
+
+        $payload = [
+            'members' => [
+                ['lecturer_id' => $memberIds[0], 'official_hours' => 10],
+                ['lecturer_id' => $memberIds[1], 'official_hours' => 10],
+            ],
+        ];
+
+        $this->putJson("/api/admin/uni-approvals/{$activityId}/finalize", $payload)
+            ->assertStatus(409);
+    }
+
+    /** @test */
+    public function finalize_validates_payload()
+    {
+        $admin = $this->createAdminUser();
+        [$activityId] = $this->seedPendingUniversityActivity();
+
+        Sanctum::actingAs($admin);
+
+        $this->putJson("/api/admin/uni-approvals/{$activityId}/finalize", [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['members']);
+    }
+
+    /** @test */
     public function admin_can_finalize_university_approval()
     {
         $admin = $this->createAdminUser();
@@ -118,6 +187,78 @@ class AdminUniversityApprovalsTest extends TestCase
             ->all();
         $this->assertSame(120.0, (float) $hours[$memberIds[0]]);
         $this->assertSame(80.0, (float) $hours[$memberIds[1]]);
+    }
+
+    /** @test */
+    public function unauthenticated_cannot_reject_university_approval()
+    {
+        [$activityId] = $this->seedPendingUniversityActivity();
+
+        $this->putJson("/api/admin/uni-approvals/{$activityId}/reject", [])
+            ->assertStatus(401);
+    }
+
+    /** @test */
+    public function non_admin_cannot_reject_university_approval()
+    {
+        $user = User::create([
+            'name' => 'Lecturer Reject',
+            'email' => 'gv-reject@local.test',
+            'password' => 'password',
+        ]);
+        $user->syncRoles(['GV']);
+
+        [$activityId] = $this->seedPendingUniversityActivity();
+
+        Sanctum::actingAs($user);
+
+        $this->putJson("/api/admin/uni-approvals/{$activityId}/reject", [])
+            ->assertStatus(403);
+    }
+
+    /** @test */
+    public function reject_requires_pending_university_status()
+    {
+        $admin = $this->createAdminUser();
+        [$activityId] = $this->seedPendingUniversityActivity();
+
+        $managerStageId = DB::table('approval_stages')->where('code', 'manager')->value('id');
+        DB::table('activity_approvals')
+            ->where('activity_id', $activityId)
+            ->where('stage_id', $managerStageId)
+            ->update([
+                'status' => 'approved',
+                'decided_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        Sanctum::actingAs($admin);
+
+        $payload = [
+            'reason_type' => 'WRONG_HOUR_CONVERSION',
+            'reason_detail' => 'Sai quy doi gio',
+        ];
+
+        $this->putJson("/api/admin/uni-approvals/{$activityId}/reject", $payload)
+            ->assertStatus(409);
+    }
+
+    /** @test */
+    public function reject_requires_reason_detail_for_other()
+    {
+        $admin = $this->createAdminUser();
+        [$activityId] = $this->seedPendingUniversityActivity();
+
+        Sanctum::actingAs($admin);
+
+        $payload = [
+            'reason_type' => 'OTHER',
+            'reason_detail' => 'abc',
+        ];
+
+        $this->putJson("/api/admin/uni-approvals/{$activityId}/reject", $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['reason_detail']);
     }
 
     /** @test */

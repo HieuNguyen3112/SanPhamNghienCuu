@@ -13,8 +13,7 @@ class MeEndpointTest extends TestCase
 
     private function ensureRole(string $name): Role
     {
-        return Role::findByName($name, 'web')
-            ?? Role::create(['name' => $name, 'guard_name' => 'web']);
+        return Role::findOrCreate($name, 'web');
     }
 
     public function test_guest_get_me_returns_401_json(): void
