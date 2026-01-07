@@ -5,11 +5,13 @@
   >
     <!-- Logo HCMUE -->
     <div class="flex items-center justify-center">
-      <img
-        src="/logo.png"
-        alt="Logo Trường Đại học Sư phạm Thành phố Hồ Chí Minh"
-        class="h-32 w-auto"
-      />
+      <RouterLink to="/" aria-label="Về trang chủ" class="inline-block">
+  <img
+      src="/logo.png"
+      alt="University logo"
+      class="max-h-20 w-auto object-contain"
+    />
+</RouterLink>
     </div>
 
     <!-- University name -->

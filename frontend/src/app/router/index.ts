@@ -9,15 +9,19 @@ import { useUserStore } from "@/app/stores/userStore";
 import MainLayout from "@/layouts/MainLayout.vue";
 import LoginPage from "@/features/auth/pages/LoginPage.vue";
 
-// Features
+// ✅ Public HomePage
+import HomePage from "@/features/search/pages/HomePage.vue";
+
+// Features (✅ lấy đúng import paths từ index.ts 2)
 import { profileRoutes } from "@/features/profile/routes";
 import { declarationRoutes } from "@/features/declaration/routes";
 import { searchRoutes } from "@/features/research-work-search/routes";
 import { researchWorksRoutes } from "@/features/scientific/routes";
 import { UserManagerRoutes } from "@/features/system/routes";
 import { reportRoutes } from "@/features/reports/routes";
+
 // =====================
-// CẤU HÌNH ROUTE CHUẨN
+// ROUTES
 // =====================
 const routes: RouteRecordRaw[] = [
   {
@@ -26,28 +30,50 @@ const routes: RouteRecordRaw[] = [
     component: LoginPage,
     meta: { guestOnly: true },
   },
+
+  /**
+   * ✅ PUBLIC HOME (ALWAYS PUBLIC)
+   * - "/" luôn hiển thị trang tra cứu công khai
+   * - initAuth: để guard init session -> header biết login hay chưa
+   */
+  {
+    path: "/",
+    name: "public-home",
+    component: HomePage,
+    meta: { initAuth: true },
+  },
+
+  /**
+   * ✅ PRIVATE APP SHELL (AUTH REQUIRED)
+   * - Giữ các route private như hiện tại
+   */
   {
     path: "/",
     component: MainLayout,
     meta: { requiresAuth: true },
     children: [
-      { path: "", redirect: "/profile" },
+      // Optional: /me -> /profile
+      { path: "me", redirect: "/profile" },
+
+      // Routes modules
       ...profileRoutes,
       ...declarationRoutes,
-
       ...searchRoutes,
       ...researchWorksRoutes,
       ...UserManagerRoutes,
       ...reportRoutes,
     ],
   },
+
   {
     path: "/403",
     name: "forbidden",
     component: () => import("@/features/errors/pages/ForbiddenPage.vue"),
     meta: { requiresAuth: true },
   },
-  { path: "/:pathMatch(.*)*", redirect: "/login", meta: { guestOnly: true } },
+
+  // Unknown -> về public home
+  { path: "/:pathMatch(.*)*", redirect: "/" },
 ];
 
 const router = createRouter({
@@ -64,16 +90,25 @@ router.beforeEach(async (to) => {
   const isGuestOnly = to.matched.some(
     (record) => record.meta.guestOnly === true
   );
+  const needsInitAuth = to.matched.some(
+    (record) => (record.meta as any).initAuth === true
+  );
+
   const requiredRoles = to.matched
     .map((record) => record.meta.roles as string[] | undefined)
     .find((roles) => Array.isArray(roles) && roles.length);
 
-  if (!userStore.isInitialized) {
+  const needsSession =
+    requiresAuth || isGuestOnly || Boolean(requiredRoles) || needsInitAuth;
+
+  // ✅ dùng đúng init method từ index.ts 2
+  if (needsSession && !userStore.isInitialized) {
     await userStore.ensureAuthInitialized();
   }
 
   const isAuthenticated = userStore.isAuthenticated;
 
+  // ✅ Luồng bạn muốn: bấm /login nếu đã login -> chuyển thẳng /profile
   if (isGuestOnly && isAuthenticated) {
     return { path: "/profile", replace: true };
   }
