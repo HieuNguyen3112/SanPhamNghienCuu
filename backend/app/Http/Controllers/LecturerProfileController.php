@@ -57,6 +57,10 @@ class LecturerProfileController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
+        if (! $user->hasRole('GV')) {
+            return response()->json(['message' => 'forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
         $this->authorize('update', $lecturer);
 
         $lecturerFields = [
@@ -223,7 +227,7 @@ class LecturerProfileController extends Controller
         $this->authorize('update', $lecturer);
 
         $payload = $request->validate([
-            'items' => ['required', 'array'],
+            'items' => ['nullable', 'array'],
             'items.*' => ['nullable'],
             'teaching_specialization' => ['nullable', 'string'],
         ]);
@@ -363,7 +367,7 @@ class LecturerProfileController extends Controller
 
         $history = LecturerTrainingHistory::findOrFail($id);
 
-        if ($history->lecturer_id !== $lecturer->id) {
+        if ((int) $history->lecturer_id !== (int) $lecturer->id) {
             return response()->json(['message' => 'forbidden'], Response::HTTP_FORBIDDEN);
         }
 
@@ -398,7 +402,7 @@ class LecturerProfileController extends Controller
 
         $history = LecturerTrainingHistory::findOrFail($id);
 
-        if ($history->lecturer_id !== $lecturer->id) {
+        if ((int) $history->lecturer_id !== (int) $lecturer->id) {
             return response()->json(['message' => 'forbidden'], Response::HTTP_FORBIDDEN);
         }
 
@@ -421,13 +425,13 @@ class LecturerProfileController extends Controller
 
         $this->authorize('update', $lecturer);
 
-        $payload = $request->validate([
+        Validator::make($request->all(), [
             'items' => ['required', 'array'],
             'items.*' => ['array'],
             'items.*.id' => ['nullable', 'integer'],
-        ]);
+        ])->validate();
 
-        $items = $payload['items'] ?? [];
+        $items = $request->input('items', []);
 
         $synced = DB::transaction(function () use ($lecturer, $items) {
             if (count($items) === 0) {
@@ -584,13 +588,13 @@ class LecturerProfileController extends Controller
 
         $this->authorize('update', $lecturer);
 
-        $payload = $request->validate([
+        Validator::make($request->all(), [
             'items' => ['required', 'array'],
             'items.*' => ['array'],
             'items.*.id' => ['nullable', 'integer'],
-        ]);
+        ])->validate();
 
-        $items = $payload['items'] ?? [];
+        $items = $request->input('items', []);
 
         $synced = DB::transaction(function () use ($lecturer, $items) {
             if (count($items) === 0) {
@@ -759,7 +763,7 @@ class LecturerProfileController extends Controller
             return null;
         }
 
-        return Lecturer::create([
+        $lecturer = Lecturer::create([
             'user_id' => $user->id,
             'code' => 'GV-' . $user->id,
             'full_name' => $user->name ?? $user->email ?? ('Lecturer ' . $user->id),
@@ -770,6 +774,10 @@ class LecturerProfileController extends Controller
             'academic_rank_id' => null,
             'active' => true,
         ]);
+
+        $user->setRelation('lecturer', $lecturer);
+
+        return $lecturer;
     }
 
     private function buildScientificProfileSummary(

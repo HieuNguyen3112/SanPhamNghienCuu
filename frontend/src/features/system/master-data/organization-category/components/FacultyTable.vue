@@ -1,4 +1,3 @@
-<!-- src/features/organization-category/components/FacultyTable.vue -->
 <template>
   <div
     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
@@ -19,12 +18,13 @@
               $emit('update:search', ($event.target as HTMLInputElement).value)
             "
             type="text"
-            placeholder="Tìm theo mã/tên khoa…"
+            placeholder="Tìm theo mã/tên khoa..."
             class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-slate-300 focus:outline-none sm:w-[280px]"
           />
         </div>
 
         <button
+          v-if="allowCreate"
           class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
           @click="$emit('create')"
         >
@@ -40,7 +40,7 @@
           <thead class="sticky top-0 z-10 bg-slate-50">
             <tr class="text-xs font-semibold text-slate-600">
               <th class="w-[72px] px-4 py-3">STT</th>
-              <th class="px-4 py-3">Mã khoa</th>
+              <th class="px-4 py-3">M? khoa</th>
               <th class="px-4 py-3">Tên khoa</th>
               <th class="px-4 py-3">Tên viết tắt</th>
               <th class="px-4 py-3">Trạng thái</th>
@@ -52,7 +52,7 @@
           <tbody>
             <tr v-if="loading">
               <td colspan="7" class="px-4 py-8 text-center text-slate-600">
-                Đang tải dữ liệu…
+                Đang tải dữ liệu...
               </td>
             </tr>
 
@@ -82,17 +82,12 @@
                 {{ row.name }}
               </td>
 
-              <!-- Missing in schema -->
-              <td class="px-4 py-3 text-slate-500">—</td>
+              <td class="px-4 py-3 text-slate-500" title="Chưa có cột trong DB">
+                -
+              </td>
 
-              <!-- Missing in schema -->
-              <td class="px-4 py-3">
-                <span
-                  class="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
-                  title="TODO: cần faculties.is_active (schema chưa có)"
-                >
-                  —
-                </span>
+              <td class="px-4 py-3 text-slate-500" title="Chưa có cột trong DB">
+                -
               </td>
 
               <td class="px-4 py-3 text-slate-700">
@@ -101,6 +96,7 @@
 
               <td class="px-4 py-3 text-right">
                 <button
+                  v-if="allowEdit"
                   class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   @click="$emit('edit', row)"
                 >
@@ -134,16 +130,24 @@ import type { Faculty } from "../contracts/organizationCategory.contract";
 import { formatDateTime } from "../contracts/organizationCategory.contract";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
-defineProps<{
-  loading: boolean;
-  items: Faculty[];
+withDefaults(
+  defineProps<{
+    loading: boolean;
+    items: Faculty[];
 
-  totalItemCount: number;
-  currentPageNumber: number; // 1-based
-  pageSize: number;
+    totalItemCount: number;
+    currentPageNumber: number; // 1-based
+    pageSize: number;
 
-  search: string;
-}>();
+    search: string;
+    allowCreate?: boolean;
+    allowEdit?: boolean;
+  }>(),
+  {
+    allowCreate: true,
+    allowEdit: true,
+  }
+);
 
 defineEmits<{
   (e: "update:search", value: string): void;

@@ -1,8 +1,3 @@
-// File: src/features/lecturer-hours-overview/contracts/lecturerHoursOverviewContracts.ts
-
-// NOTE: Các field "batch" là DTO derived / mock vì schema hiện chưa có entity batch.
-// TODO(BE): cần endpoint/DTO computed hoặc thêm bảng hour_approval_batches.
-
 export type HoursBatchStatus = "approved" | "pending" | "rejected";
 
 export interface HoursOverview {
@@ -19,7 +14,7 @@ export interface HoursDistributionItem {
   kindId: number;
   label: string;
   hours: number;
-  percentage: number; // 0..100
+  percentage: number;
 }
 
 export interface HoursApprovalBatchSummary {
@@ -30,8 +25,8 @@ export interface HoursApprovalBatchSummary {
   academicYearCode: string;
 
   status: HoursBatchStatus;
-  submittedAt: string; // ISO
-  decidedAt: string | null; // ISO
+  submittedAt: string;
+  decidedAt: string | null;
   totalHours: number;
 }
 

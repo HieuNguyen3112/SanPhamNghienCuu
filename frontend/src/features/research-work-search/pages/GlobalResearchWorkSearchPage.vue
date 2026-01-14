@@ -6,6 +6,10 @@
         :filter="filterDraft"
         :loading="loadingList"
         :faculty-options="facultyOptions"
+        :work-type-options="workTypeOptions"
+        :author-role-options="authorRoleOptions"
+        :status-options="statusOptions"
+        :management-level-options="managementLevelOptions"
         :year-options="years"
         :lecturer-suggestions="lecturerSuggestions"
         :result-count-text="resultCountText"
@@ -19,7 +23,10 @@
         :rows="rows"
         :loading="loadingList"
         :error="errorList"
+        :pagination="pagination"
         @open-detail="openDetail"
+        @update:page="onPageChange"
+        @update:pageSize="onPageSizeChange"
       />
 
       <!-- Detail Panel -->
@@ -29,6 +36,7 @@
         :loading="loadingDetail"
         :error="errorDetail"
         @close="closeDetail"
+        @download="downloadAttachment"
       />
     </div>
   </div>
@@ -44,13 +52,18 @@ import type { GlobalResearchWorkSearchFilter } from "../contracts/globalResearch
 
 const {
   facultyOptions,
-  lecturerSuggestions,
+  workTypeOptions,
+  authorRoleOptions,
+  statusOptions,
+  managementLevelOptions,
   years,
+  lecturerSuggestions,
 
   filterDraft,
   rows,
   loadingList,
   errorList,
+  pagination,
   resultCountText,
 
   detailOpen,
@@ -58,10 +71,13 @@ const {
   loadingDetail,
   errorDetail,
 
+  loadLookups,
   search,
   reset,
+  fetchList,
   openDetail,
   closeDetail,
+  downloadAttachment,
 } = useGlobalResearchWorkSearch();
 
 function onUpdateFilter(partial: Partial<GlobalResearchWorkSearchFilter>) {
@@ -69,7 +85,17 @@ function onUpdateFilter(partial: Partial<GlobalResearchWorkSearchFilter>) {
 }
 
 onMounted(() => {
-  // load initial with default filter (approved)
-  void search();
+  void (async () => {
+    await loadLookups();
+    await search();
+  })();
 });
+
+function onPageChange(page: number) {
+  void fetchList(page);
+}
+
+function onPageSizeChange(pageSize: number) {
+  void fetchList(1, pageSize);
+}
 </script>

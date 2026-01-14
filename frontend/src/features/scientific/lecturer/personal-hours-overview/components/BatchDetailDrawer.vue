@@ -1,4 +1,3 @@
-// File: src/features/lecturer-hours-overview/components/BatchDetailDrawer.vue
 <template>
   <Teleport to="body">
     <Transition
@@ -57,7 +56,7 @@
                 class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 @click="emit('close')"
               >
-                ✕
+                Đóng
               </button>
             </div>
           </div>
@@ -67,7 +66,7 @@
               v-if="loading"
               class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"
             >
-              Đang tải chi tiết…
+              Đang tải chi tiết...
             </div>
 
             <div
@@ -96,23 +95,10 @@
                   />
                   <InfoRow
                     label="Ngày duyệt"
-                    :value="
-                      detail.decidedAt ? formatDate(detail.decidedAt) : '–'
-                    "
+                    :value="detail.decidedAt ? formatDate(detail.decidedAt) : '—'"
                   />
-                  <InfoRow
-                    label="Trạng thái"
-                    :value="statusLabel(detail.status)"
-                  />
-                  <InfoRow
-                    label="Tổng giờ"
-                    :value="String(detail.totalHours)"
-                  />
-                </div>
-
-                <div class="mt-3 text-xs text-slate-500">
-                  TODO(BE): “đợt xét duyệt” hiện là mock/DTO derived — schema
-                  chưa có entity batch.
+                  <InfoRow label="Trạng thái" :value="statusLabel(detail.status)" />
+                  <InfoRow label="Tổng giờ" :value="String(detail.totalHours)" />
                 </div>
               </section>
 
@@ -179,7 +165,7 @@
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               @click="emit('close')"
             >
-              ← Quay lại
+              Quay lại
             </button>
           </div>
         </div>

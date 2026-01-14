@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from "vue";
+﻿import { computed, onMounted, ref } from "vue";
 import type {
   LecturerResearchHourShortfallWarningEntry,
   LecturerResearchHourWarningOverview,
@@ -96,7 +96,8 @@ export function useResearchHourWarningManagement(
           overview.value.academicYearOptionList[0].academicYearIdentifier;
       }
     } catch (e) {
-      error.value = e instanceof Error ? e.message : String(e);
+      console.error(e);
+      error.value = "Không tải được dữ liệu. Vui lòng thử lại.";
     } finally {
       loading.value = false;
     }
@@ -163,7 +164,8 @@ export function useResearchHourWarningManagement(
         if (refreshed) selectedEntry.value = refreshed;
       }
     } catch (e) {
-      submitWarningError.value = e instanceof Error ? e.message : String(e);
+      console.error(e);
+      submitWarningError.value = "Không thể gửi cảnh báo. Vui lòng thử lại.";
     } finally {
       submittingWarning.value = false;
     }

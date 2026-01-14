@@ -1,6 +1,5 @@
 <template>
   <Teleport to="body">
-    <!-- Overlay -->
     <Transition
       enter-active-class="transition-opacity duration-200"
       enter-from-class="opacity-0"
@@ -17,7 +16,6 @@
       />
     </Transition>
 
-    <!-- Drawer (desktop) / Fullscreen (mobile) -->
     <Transition
       enter-active-class="transition-transform duration-200 ease-out"
       enter-from-class="translate-x-full"
@@ -33,7 +31,6 @@
         aria-modal="true"
       >
         <div class="flex h-full flex-col">
-          <!-- Header -->
           <div class="border-b border-slate-200 px-4 py-4">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -47,7 +44,7 @@
                       :is="typeIcon(detail.typeKey)"
                       class="mr-1 h-4 w-4"
                     />
-                    {{ typeLabel(detail.typeKey) }}
+                    {{ detail.typeLabel }}
                   </span>
 
                   <span
@@ -55,11 +52,11 @@
                     class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1"
                     :class="statusPillClass(detail.statusCode)"
                   >
-                    {{ statusLabel(detail.statusCode) }}
+                    {{ detail.statusLabel }}
                   </span>
 
                   <span v-if="detail" class="text-xs text-slate-500">
-                    • Năm {{ detail.year }}
+                    • Năm {{ detail.year ?? "-" }}
                   </span>
                 </div>
 
@@ -80,10 +77,9 @@
             </div>
           </div>
 
-          <!-- Body -->
           <div class="flex-1 overflow-auto p-4">
             <div v-if="loading" class="text-sm text-slate-700">
-              Đang tải chi tiết…
+              Đang tải chi tiết...
             </div>
 
             <div
@@ -97,7 +93,6 @@
             </div>
 
             <template v-else-if="detail">
-              <!-- Card 1: Info -->
               <div
                 class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
               >
@@ -129,7 +124,6 @@
                 </div>
               </div>
 
-              <!-- Card 2: Participants -->
               <div
                 class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
               >
@@ -151,13 +145,13 @@
                     <tbody class="divide-y divide-slate-200">
                       <tr
                         v-for="p in detail.participants"
-                        :key="p.name + p.roleLabel"
+                        :key="p.lecturerId + p.roleKey"
                       >
                         <td class="px-3 py-2 font-medium text-slate-900">
-                          {{ p.name }}
+                          {{ p.lecturerName }}
                         </td>
                         <td class="px-3 py-2 text-slate-700">
-                          {{ p.facultyName }}
+                          {{ p.unitName || "Chưa rõ" }}
                         </td>
                         <td class="px-3 py-2 text-slate-700">
                           {{ p.roleLabel }}
@@ -168,7 +162,6 @@
                 </div>
               </div>
 
-              <!-- Card 3: Files -->
               <div
                 class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
               >
@@ -200,23 +193,21 @@
                           {{ f.label }}
                         </div>
                         <div class="mt-0.5 truncate text-xs text-slate-500">
-                          {{ f.url }}
+                          {{ f.fileName || f.url }}
                         </div>
                       </div>
                     </div>
 
                     <div class="flex items-center gap-2">
-                      <a
-                        v-if="f.kind === 'pdf'"
-                        :href="f.url"
-                        download
-                        target="_blank"
-                        rel="noopener"
+                      <button
+                        v-if="f.kind === 'file'"
+                        type="button"
                         class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                        @click="emit('download', f)"
                       >
                         <Download class="h-4 w-4" />
                         Tải xuống
-                      </a>
+                      </button>
 
                       <a
                         v-else
@@ -239,7 +230,6 @@
             </div>
           </div>
 
-          <!-- Footer -->
           <div class="border-t border-slate-200 bg-white px-4 py-3">
             <button
               type="button"
@@ -256,7 +246,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
 import {
   BookOpen,
   Download,
@@ -269,17 +258,16 @@ import {
 } from "lucide-vue-next";
 import type {
   ResearchWorkDetail,
+  ResearchWorkFile,
   ResearchWorkFileKind,
   ResearchWorkTypeKey,
 } from "../contracts/globalResearchWorkSearch.contract";
 import {
-  statusLabel,
   statusPillClass,
   typeBadgeClass,
-  typeLabel,
 } from "../contracts/globalResearchWorkSearch.contract";
 
-const props = defineProps<{
+defineProps<{
   open: boolean;
   detail: ResearchWorkDetail | null;
   loading: boolean;
@@ -288,19 +276,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "close"): void;
+  (e: "download", file: ResearchWorkFile): void;
 }>();
 
-const detail = computed(() => props.detail);
-
-function typeIcon(typeKey: ResearchWorkTypeKey) {
-  if (typeKey === "article") return FileText;
+function typeIcon(typeKey: ResearchWorkTypeKey | string) {
+  if (typeKey === "paper") return FileText;
   if (typeKey === "project") return FlaskConical;
   if (typeKey === "book") return BookOpen;
   return Presentation;
 }
 
 function fileIcon(kind: ResearchWorkFileKind) {
-  if (kind === "pdf") return FileText;
+  if (kind === "file") return FileText;
   return Link2;
 }
 </script>

@@ -22,7 +22,7 @@
         @click="emit('reset')"
       >
         <RotateCcw class="h-4 w-4" />
-        Reset
+        Đặt lại
       </button>
     </div>
 
@@ -37,7 +37,7 @@
           <input
             class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-slate-300 focus:outline-none"
             :value="modelValue.keyword"
-            placeholder="Tên người / công trình / tài khoản / đối tượng..."
+            placeholder="Tìm theo người thực hiện / hành động / đối tượng / đường dẫn..."
             @input="
               update('keyword', ($event.target as HTMLInputElement).value)
             "
@@ -65,7 +65,7 @@
 
       <!-- Group -->
       <div class="md:col-span-2">
-        <label class="text-xs font-medium text-slate-600">Loại hành động</label>
+        <label class="text-xs font-medium text-slate-600">Nhóm hành động</label>
         <select
           class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
           :value="modelValue.actionGroup"
@@ -79,6 +79,30 @@
           <option value="ALL">Tất cả</option>
           <option v-for="g in groupOptions" :key="g.value" :value="g.value">
             {{ g.label }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Action code -->
+      <div class="md:col-span-3">
+        <label class="text-xs font-medium text-slate-600">Mã hành động</label>
+        <select
+          class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
+          :value="modelValue.actionCode"
+          @change="
+            update(
+              'actionCode',
+              ($event.target as HTMLSelectElement).value as any
+            )
+          "
+        >
+          <option value="ALL">Tất cả</option>
+          <option
+            v-for="c in actionCodeOptions"
+            :key="c.code"
+            :value="c.code"
+          >
+            {{ c.label }} ({{ c.code }})
           </option>
         </select>
       </div>
@@ -150,6 +174,25 @@
         </select>
       </div>
 
+      <!-- Result -->
+      <div class="md:col-span-2">
+        <label class="text-xs font-medium text-slate-600">Kết quả</label>
+        <select
+          class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
+          :value="modelValue.result"
+          @change="
+            update(
+              'result',
+              ($event.target as HTMLSelectElement).value as any
+            )
+          "
+        >
+          <option value="ALL">Tất cả</option>
+          <option value="success">Thành công</option>
+          <option value="failure">Thất bại</option>
+        </select>
+      </div>
+
       <!-- Apply -->
       <div class="md:col-span-2">
         <button
@@ -176,6 +219,7 @@
 <script setup lang="ts">
 import type {
   ActorOption,
+  AuditActionCodeOption,
   AuditLogFilters,
   AuditActionGroup,
   FacultyOption,
@@ -186,6 +230,7 @@ const props = defineProps<{
   modelValue: AuditLogFilters;
   actors: ActorOption[];
   faculties: FacultyOption[];
+  actionCodeOptions: AuditActionCodeOption[];
   groupOptions: Array<{ value: AuditActionGroup; label: string }>;
   showFacultyFilter: boolean;
   isLoading: boolean;

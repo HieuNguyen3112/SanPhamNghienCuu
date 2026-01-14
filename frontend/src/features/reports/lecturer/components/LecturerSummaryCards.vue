@@ -31,13 +31,10 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import type { LecturerReportSummary } from "../lecturerReportTypes";
 
 const componentProperties = defineProps<{
-  totalLecturerCount: number;
-  numberOfDoctorLecturers: number;
-  numberOfMasterLecturers: number;
-  numberOfBachelorLecturers: number;
-  numberOfProfessorAndAssociateProfessorLecturers: number;
+  summary: LecturerReportSummary;
 }>();
 
 const PeopleIcon = {
@@ -97,7 +94,7 @@ const summaryCardDefinitions = computed(() => {
     {
       summaryCardIdentifier: "totalLecturerCount",
       summaryCardTitle: "Tổng số giảng viên",
-      summaryCardValue: componentProperties.totalLecturerCount,
+      summaryCardValue: componentProperties.summary.totalLecturers,
       summaryCardDescription: "Tổng nhân sự giảng dạy theo bộ lọc",
       summaryCardIconComponent: PeopleIcon,
       summaryCardIconBackgroundClassName: "bg-slate-100",
@@ -105,7 +102,7 @@ const summaryCardDefinitions = computed(() => {
     {
       summaryCardIdentifier: "doctorLecturerCount",
       summaryCardTitle: "Tiến sĩ",
-      summaryCardValue: componentProperties.numberOfDoctorLecturers,
+      summaryCardValue: componentProperties.summary.doctorCount,
       summaryCardDescription: "Trình độ Tiến sĩ",
       summaryCardIconComponent: DoctorIcon,
       summaryCardIconBackgroundClassName: "bg-indigo-50",
@@ -113,7 +110,7 @@ const summaryCardDefinitions = computed(() => {
     {
       summaryCardIdentifier: "masterLecturerCount",
       summaryCardTitle: "Thạc sĩ",
-      summaryCardValue: componentProperties.numberOfMasterLecturers,
+      summaryCardValue: componentProperties.summary.masterCount,
       summaryCardDescription: "Trình độ Thạc sĩ",
       summaryCardIconComponent: MasterIcon,
       summaryCardIconBackgroundClassName: "bg-blue-50",
@@ -121,17 +118,16 @@ const summaryCardDefinitions = computed(() => {
     {
       summaryCardIdentifier: "bachelorLecturerCount",
       summaryCardTitle: "Đại học",
-      summaryCardValue: componentProperties.numberOfBachelorLecturers,
+      summaryCardValue: componentProperties.summary.bachelorCount,
       summaryCardDescription: "Trình độ Đại học",
       summaryCardIconComponent: BachelorIcon,
       summaryCardIconBackgroundClassName: "bg-slate-50",
     },
     {
       summaryCardIdentifier: "academicRankLecturerCount",
-      summaryCardTitle: "Giáo sư / Phó Giáo sư",
-      summaryCardValue:
-        componentProperties.numberOfProfessorAndAssociateProfessorLecturers,
-      summaryCardDescription: "Nhóm có học hàm",
+      summaryCardTitle: "Giáo sư / Phó GS",
+      summaryCardValue: componentProperties.summary.professorAssociateCount,
+      summaryCardDescription: "Nhóm học hàm",
       summaryCardIconComponent: AcademicRankIcon,
       summaryCardIconBackgroundClassName: "bg-amber-50",
     },

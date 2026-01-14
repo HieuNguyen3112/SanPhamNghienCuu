@@ -1,6 +1,18 @@
 export type CatalogStatus = "active" | "inactive" | "locked";
 
 /** ========= Schema DTOs (snake_case) ========= */
+export interface PaginationDTO {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+export interface ListResponseDTO<T> {
+  items: T[];
+  pagination: PaginationDTO;
+}
+
 export interface AcademicYearDTO {
   id: number;
   code: string; // VARCHAR9
@@ -68,28 +80,20 @@ export interface HourRuleDerivedDTO extends HourRuleDTO {
   is_locked: boolean;
 }
 
-/** Tab 2 derived (schema missing) */
-export interface WorkloadQuotaRuleDerivedDTO {
-  id: number;
-  academic_year_id: number;
-  // proposed: academic_rank_id -> academic_ranks.id
-  academic_rank_id: number;
-  required_hours: string;
-  notes: string | null;
+export interface WorkloadQuotaDerivedDTO extends WorkloadQuotaDTO {
   is_active: boolean;
   is_locked: boolean;
-  created_at: string;
-  updated_at: string;
 }
 
-/** Tab 3 derived “period” (schema missing) */
-export interface AcademicYearPeriodDerivedDTO {
-  id: number;
-  name: string;
-  start_date: string;
-  end_date: string;
-  status: CatalogStatus; // active|inactive|locked
+export interface AcademicYearDerivedDTO extends AcademicYearDTO {
   is_locked: boolean;
+}
+
+export interface ResearchHoursMetaDTO {
+  academic_years: AcademicYearDTO[];
+  activity_kinds: ActivityKindDTO[];
+  activity_types: ActivityTypeDTO[];
+  statuses: Array<{ key: string; label: string }>;
 }
 
 /** ========= UI Models (camelCase) ========= */
@@ -141,8 +145,6 @@ export interface HoursQuotaRow {
   id: number;
   academicYearId: number;
   academicYearCode: string;
-  academicRankId: number;
-  academicRankName: string;
   requiredHours: number;
   notes: string;
   isActive: boolean;
@@ -151,17 +153,12 @@ export interface HoursQuotaRow {
 
 export interface HoursQuotaDraft {
   academicYearId: number | null;
-  academicRankId: number | null;
   requiredHours: number | null;
   notes: string;
-  isActive: boolean;
 }
 
 export type HoursQuotaErrors = Partial<
-  Record<
-    "academicYearId" | "academicRankId" | "requiredHours" | "notes",
-    string
-  >
+  Record<"academicYearId" | "requiredHours" | "notes", string>
 > &
   Record<string, string | undefined>;
 
@@ -253,13 +250,15 @@ export function workConversionRowFromDto(
     kindName: kind?.name ?? `#${dto.kind_id}`,
     typeId: dto.type_id,
     typeName: type?.name ?? (dto.type_id ? `#${dto.type_id}` : "—"),
-    hours: parseDecimalToNumber(dto.hours_total_per_activity),
+    hours: parseDecimalToNumber(
+      dto.hours_total_per_activity ?? dto.hours_per_occurrence
+    ),
     isActive: dto.is_active,
     isLocked: dto.is_locked,
     effectiveFrom: dto.effective_from,
     effectiveTo: dto.effective_to,
 
-    // schema missing -> UI-only + TODO persist
+    // UI-only (not persisted)
     notes: "",
   };
 }
@@ -274,14 +273,13 @@ export function validateWorkConversionDraft(
   if (d.hours === null || !Number.isFinite(d.hours) || d.hours <= 0)
     e.hours = "Số giờ phải > 0.";
   if (d.notes.length > 500)
-    e.notes = "Ghi chú tối đa 500 ký tự. (Cần backend hỗ trợ lưu)";
+    e.notes = "Ghi ch? t?i ?a 500 k? t?.";
   return e;
 }
 
 export function validateHoursQuotaDraft(d: HoursQuotaDraft): HoursQuotaErrors {
   const e: HoursQuotaErrors = {};
   if (!d.academicYearId) e.academicYearId = "Năm học là bắt buộc.";
-  if (!d.academicRankId) e.academicRankId = "Đối tượng là bắt buộc.";
   if (
     d.requiredHours === null ||
     !Number.isFinite(d.requiredHours) ||
@@ -304,9 +302,6 @@ export interface UpsertHourRulePayloadDTO {
   is_active: boolean;
   version: number;
 
-  /**
-   * TODO(P1): hour_rules.notes (schema missing) - currently NOT sent.
-   */
 }
 
 export function upsertHourRulePayloadFromDraft(

@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import {
   getErrorMessage,
   hasErrors,
@@ -25,6 +25,10 @@ export function useWorkConversionCatalog() {
   const kinds = ref<ActivityKindDTO[]>([]);
   const types = ref<ActivityTypeDTO[]>([]);
   const rows = ref<WorkConversionRow[]>([]);
+  const page = ref(1);
+  const pageSize = ref(10);
+  const totalItems = ref(0);
+  const totalPages = ref(1);
 
   const filter = reactive({
     academicYearId: 0 as number, // 0=all
@@ -69,28 +73,7 @@ export function useWorkConversionCatalog() {
     ].concat(list.map((t) => ({ value: t.id, label: t.name, hint: t.code })));
   });
 
-  const filteredRows = computed(() => {
-    const q = filter.q.trim().toLowerCase();
-
-    return rows.value.filter((r) => {
-      const byYear =
-        filter.academicYearId === 0
-          ? true
-          : r.academicYearId === filter.academicYearId;
-      const byStatus =
-        filter.status === "ALL"
-          ? true
-          : filter.status === "ACTIVE"
-          ? r.isActive
-          : !r.isActive;
-
-      const hay =
-        `${r.academicYearCode} ${r.kindName} ${r.typeName}`.toLowerCase();
-      const byQ = q ? hay.includes(q) : true;
-
-      return byYear && byStatus && byQ;
-    });
-  });
+  const filteredRows = computed(() => rows.value);
 
   function resetDraftErrors() {
     Object.assign(draftErrors, {});
@@ -137,20 +120,25 @@ export function useWorkConversionCatalog() {
     loading.value = true;
     error.value = null;
     try {
-      const [years, ks, ts, rules] = await Promise.all([
-        researchHoursCatalogService.getAcademicYears(),
-        researchHoursCatalogService.getActivityKinds(),
-        researchHoursCatalogService.getActivityTypes(),
-        researchHoursCatalogService.getHourRules(),
-      ]);
+      const meta = await researchHoursCatalogService.getMeta();
+      academicYears.value = meta.academic_years;
+      kinds.value = meta.activity_kinds;
+      types.value = meta.activity_types;
 
-      academicYears.value = years;
-      kinds.value = ks;
-      types.value = ts;
+      const res = await researchHoursCatalogService.listHourRules({
+        academic_year_id:
+          filter.academicYearId === 0 ? undefined : filter.academicYearId,
+        status: filter.status === "ALL" ? undefined : filter.status,
+        q: filter.q.trim() || undefined,
+        page: page.value,
+        per_page: pageSize.value,
+      });
 
-      rows.value = rules.map((dto) =>
-        workConversionRowFromDto(dto, years, ks, ts)
+      rows.value = res.items.map((dto) =>
+        workConversionRowFromDto(dto, academicYears.value, kinds.value, types.value)
       );
+      totalItems.value = res.pagination.total;
+      totalPages.value = res.pagination.last_page;
     } catch (e) {
       error.value = getErrorMessage(e, "Không tải được dữ liệu quy đổi giờ.");
     } finally {
@@ -180,9 +168,15 @@ export function useWorkConversionCatalog() {
         draft,
         academicYears.value
       );
-      await researchHoursCatalogService.upsertHourRule(payload);
+      if (modal.mode === "edit") {
+        await researchHoursCatalogService.updateHourRule(
+          modal.editingId,
+          payload
+        );
+      } else {
+        await researchHoursCatalogService.createHourRule(payload);
+      }
 
-      // TODO(P1): hour_rules.notes not persisted. Keep UI warning.
       closeModal();
       await fetch();
     } catch (e) {
@@ -207,6 +201,41 @@ export function useWorkConversionCatalog() {
     }
   }
 
+  function setPage(next: number) {
+    page.value = Math.max(1, Math.min(totalPages.value, next));
+    void fetch();
+  }
+
+  function setPageSize(next: number) {
+    pageSize.value = next;
+    page.value = 1;
+    void fetch();
+  }
+
+  let searchTimer: number | null = null;
+  watch(
+    () => filter.q,
+    () => {
+      if (searchTimer) window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => {
+        page.value = 1;
+        void fetch();
+      }, 300);
+    }
+  );
+
+  watch(
+    () => [filter.academicYearId, filter.status],
+    () => {
+      page.value = 1;
+      void fetch();
+    }
+  );
+
+  onBeforeUnmount(() => {
+    if (searchTimer) window.clearTimeout(searchTimer);
+  });
+
   return {
     loading,
     saving,
@@ -217,6 +246,10 @@ export function useWorkConversionCatalog() {
     types,
 
     rows,
+    page,
+    pageSize,
+    totalItems,
+    totalPages,
     filter,
     filteredRows,
 
@@ -229,6 +262,8 @@ export function useWorkConversionCatalog() {
     academicYearOptions,
 
     fetch,
+    setPage,
+    setPageSize,
     openCreate,
     openEdit,
     closeModal,

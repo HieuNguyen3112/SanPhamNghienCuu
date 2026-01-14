@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import {
   mapParticipationNotificationDtoToModel,
   type ParticipationNotification,
@@ -6,6 +6,7 @@ import {
 } from "../contracts/participationNotificationsContract";
 import {
   accept_participation_notification,
+  get_participation_notification_detail,
   list_participation_notifications,
   reject_participation_notification,
 } from "../services/participationNotifications.service";
@@ -19,11 +20,7 @@ export interface NotificationFilters {
   to: string; // YYYY-MM-DD
 }
 
-export function useParticipationNotifications(params: {
-  currentUserId: number;
-}) {
-  const { currentUserId } = params;
-
+export function useParticipationNotifications() {
   const loading = ref(false);
   const rows = ref<ParticipationNotification[]>([]);
 
@@ -36,77 +33,89 @@ export function useParticipationNotifications(params: {
 
   const currentPageNumber = ref(1);
   const pageSize = ref(8);
+  const totalItems = ref(0);
+  const totalPages = ref(1);
 
   const detailOpen = ref(false);
   const selectedId = ref<number | null>(null);
+  const selected = ref<ParticipationNotification | null>(null);
 
-  const selected = computed<ParticipationNotification | null>(() => {
-    if (!selectedId.value) return null;
-    return rows.value.find((x) => x.id === selectedId.value) ?? null;
-  });
+  const notificationMessage = ref<string | null>(null);
+  let notificationTimer: number | null = null;
 
-  const filteredRows = computed(() => {
-    const q = filters.value.q.trim().toLowerCase();
+  function setNotification(message: string) {
+    notificationMessage.value = message;
+    if (notificationTimer != null) {
+      window.clearTimeout(notificationTimer);
+    }
+    notificationTimer = window.setTimeout(() => {
+      notificationMessage.value = null;
+      notificationTimer = null;
+    }, 2500);
+  }
 
-    const from = filters.value.from
-      ? new Date(`${filters.value.from}T00:00:00`)
-      : null;
-    const to = filters.value.to
-      ? new Date(`${filters.value.to}T23:59:59`)
-      : null;
+  function buildListParams() {
+    return {
+      status: filters.value.status,
+      q: filters.value.q.trim() || undefined,
+      from: filters.value.from || undefined,
+      to: filters.value.to || undefined,
+      page: currentPageNumber.value,
+      per_page: pageSize.value,
+    };
+  }
 
-    return rows.value
-      .filter((x) =>
-        filters.value.status === "ALL"
-          ? true
-          : x.status === filters.value.status
-      )
-      .filter((x) => (q ? x.workTitle.toLowerCase().includes(q) : true))
-      .filter((x) => {
-        if (!from && !to) return true;
-        const dt = new Date(x.requestedAt);
-        if (from && dt < from) return false;
-        if (to && dt > to) return false;
-        return true;
-      })
-      .sort(
-        (a, b) =>
-          new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
-      );
-  });
+  async function loadList() {
+    loading.value = true;
+    try {
+      const response = await list_participation_notifications(buildListParams());
+      rows.value = response.items.map(mapParticipationNotificationDtoToModel);
+      totalItems.value = response.pagination.total;
+      totalPages.value = response.pagination.last_page;
+      currentPageNumber.value = response.pagination.page;
+      pageSize.value = response.pagination.per_page;
+    } catch (error) {
+      console.error(error);
+      rows.value = [];
+      totalItems.value = 0;
+      totalPages.value = 1;
+      setNotification("Unable to load participation requests. Please try again.");
+    } finally {
+      loading.value = false;
+    }
+  }
 
-  const totalPages = computed(() => {
-    const n = filteredRows.value.length;
-    return Math.max(1, Math.ceil(n / pageSize.value));
-  });
-
-  const pagedRows = computed(() => {
-    const start = (currentPageNumber.value - 1) * pageSize.value;
-    return filteredRows.value.slice(start, start + pageSize.value);
-  });
+  async function loadDetail(id: number) {
+    loading.value = true;
+    try {
+      const dto = await get_participation_notification_detail(id);
+      selected.value = mapParticipationNotificationDtoToModel(dto);
+    } catch (error) {
+      console.error(error);
+      selected.value = null;
+      setNotification("Unable to load request detail. Please try again.");
+    } finally {
+      loading.value = false;
+    }
+  }
 
   function resetFilters() {
     filters.value = { status: "ALL", q: "", from: "", to: "" };
+    currentPageNumber.value = 1;
+    loadList();
   }
 
   function openDetail(rowId: number) {
     selectedId.value = rowId;
     detailOpen.value = true;
+    selected.value = null;
+    loadDetail(rowId);
   }
 
   function closeDetail() {
     detailOpen.value = false;
     selectedId.value = null;
-  }
-
-  async function load() {
-    loading.value = true;
-    try {
-      const dtoList = await list_participation_notifications();
-      rows.value = dtoList.map(mapParticipationNotificationDtoToModel);
-    } finally {
-      loading.value = false;
-    }
+    selected.value = null;
   }
 
   async function acceptSelected() {
@@ -115,12 +124,14 @@ export function useParticipationNotifications(params: {
 
     loading.value = true;
     try {
-      const updatedDto = await accept_participation_notification(
-        selected.value.id,
-        currentUserId
-      );
+      const updatedDto = await accept_participation_notification(selected.value.id);
       const updated = mapParticipationNotificationDtoToModel(updatedDto);
+      selected.value = updated;
       rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
+      await loadList();
+    } catch (error) {
+      console.error(error);
+      setNotification("Unable to confirm participation. Please try again.");
     } finally {
       loading.value = false;
     }
@@ -134,11 +145,15 @@ export function useParticipationNotifications(params: {
     try {
       const updatedDto = await reject_participation_notification(
         selected.value.id,
-        currentUserId,
         reason
       );
       const updated = mapParticipationNotificationDtoToModel(updatedDto);
+      selected.value = updated;
       rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
+      await loadList();
+    } catch (error) {
+      console.error(error);
+      setNotification("Unable to reject participation. Please try again.");
     } finally {
       loading.value = false;
     }
@@ -146,20 +161,35 @@ export function useParticipationNotifications(params: {
 
   function onUpdateCurrentPageNumber(n: number) {
     currentPageNumber.value = n;
+    loadList();
   }
 
   function onUpdatePageSize(s: number) {
     pageSize.value = s;
     currentPageNumber.value = 1;
+    loadList();
   }
 
-  watch([filteredRows, pageSize], () => {
-    if (currentPageNumber.value > totalPages.value) {
-      currentPageNumber.value = totalPages.value;
+  let filterTimer: number | null = null;
+  watch(
+    () => [
+      filters.value.status,
+      filters.value.q,
+      filters.value.from,
+      filters.value.to,
+    ],
+    () => {
+      if (filterTimer != null) {
+        window.clearTimeout(filterTimer);
+      }
+      filterTimer = window.setTimeout(() => {
+        currentPageNumber.value = 1;
+        loadList();
+      }, 300);
     }
-  });
+  );
 
-  onMounted(load);
+  onMounted(loadList);
 
   return {
     loading,
@@ -171,8 +201,7 @@ export function useParticipationNotifications(params: {
     currentPageNumber,
     pageSize,
     totalPages,
-    filteredRows,
-    pagedRows,
+    totalItems,
     onUpdateCurrentPageNumber,
     onUpdatePageSize,
 
@@ -183,6 +212,7 @@ export function useParticipationNotifications(params: {
 
     acceptSelected,
     rejectSelected,
-    currentUserId,
+
+    notificationMessage,
   };
 }

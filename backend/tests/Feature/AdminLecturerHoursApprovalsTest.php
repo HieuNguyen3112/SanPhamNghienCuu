@@ -247,7 +247,7 @@ class AdminLecturerHoursApprovalsTest extends TestCase
     public function test_admin_can_approve_pending(): void
     {
         $seed = $this->seedBase();
-        $this->actingAsAdmin();
+        $admin = $this->actingAsAdmin();
 
         $this->putJson('/api/admin/hours/approvals/' . $seed['lecturer_id'] . '/approve')
             ->assertStatus(200)
@@ -257,6 +257,12 @@ class AdminLecturerHoursApprovalsTest extends TestCase
             'activity_id' => $seed['activity_id'],
             'stage_id' => $seed['stage_id'],
             'status' => 'approved',
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action_code' => 'HOURS_APPROVED',
+            'actor_user_id' => $admin->id,
+            'result_status' => 'success',
         ]);
     }
 
@@ -287,7 +293,7 @@ class AdminLecturerHoursApprovalsTest extends TestCase
     public function test_admin_can_reject_pending(): void
     {
         $seed = $this->seedBase();
-        $this->actingAsAdmin();
+        $admin = $this->actingAsAdmin();
 
         $this->putJson('/api/admin/hours/approvals/' . $seed['lecturer_id'] . '/reject', [
             'reason_code' => 'missing_evidence',
@@ -299,6 +305,12 @@ class AdminLecturerHoursApprovalsTest extends TestCase
             'activity_id' => $seed['activity_id'],
             'stage_id' => $seed['stage_id'],
             'status' => 'rejected',
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action_code' => 'HOURS_REJECTED',
+            'actor_user_id' => $admin->id,
+            'result_status' => 'success',
         ]);
     }
 }

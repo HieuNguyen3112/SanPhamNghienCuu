@@ -38,8 +38,8 @@ export interface ParticipationNotificationDto {
   confirmation_log?: ParticipationConfirmationLogDto;
 
   work_system_status: string;
-  members: ParticipationMemberDto[];
-  evidences: ParticipationEvidenceDto[];
+  members?: ParticipationMemberDto[];
+  evidences?: ParticipationEvidenceDto[];
 }
 
 /* =========================
@@ -93,6 +93,9 @@ export interface ParticipationNotification {
 export function mapParticipationNotificationDtoToModel(
   dto: ParticipationNotificationDto
 ): ParticipationNotification {
+  const members = dto.members ?? [];
+  const evidences = dto.evidences ?? [];
+
   return {
     id: dto.id,
     workTitle: dto.work_title,
@@ -111,7 +114,7 @@ export function mapParticipationNotificationDtoToModel(
         }
       : undefined,
     workSystemStatus: dto.work_system_status,
-    members: dto.members.map((m) => ({
+    members: members.map((m) => ({
       id: m.id,
       fullName: m.full_name,
       unit: m.unit,
@@ -119,7 +122,7 @@ export function mapParticipationNotificationDtoToModel(
       status: m.status,
       isCurrentUser: m.is_current_user,
     })),
-    evidences: dto.evidences.map((e) => ({
+    evidences: evidences.map((e) => ({
       id: e.id,
       type: e.type,
       label: e.label,

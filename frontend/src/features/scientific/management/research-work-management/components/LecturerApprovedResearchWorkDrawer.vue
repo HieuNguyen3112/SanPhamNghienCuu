@@ -38,11 +38,9 @@
                   {{ lecturerOverview?.lecturerFullName ?? "Giảng viên" }}
                 </div>
                 <div class="mt-1 text-sm text-slate-600">
-                  {{ lecturerOverview?.facultyName ?? "—" }}
+                  {{ lecturerOverview?.facultyName ?? "-" }}
                   <span class="text-slate-300">•</span>
-                  <span>{{
-                    lecturerOverview?.degreeName ?? "Chưa cập nhật học vị"
-                  }}</span>
+                  <span>{{ lecturerOverview?.degreeName ?? "Chưa cập nhật học vị" }}</span>
                 </div>
               </div>
               <button
@@ -62,19 +60,19 @@
                 </div>
               </div>
               <div class="rounded-xl bg-emerald-50 p-3">
-                <div class="text-xs text-emerald-700">Approved</div>
+                <div class="text-xs text-emerald-700">Đã duyệt</div>
                 <div class="mt-1 text-lg font-semibold text-emerald-900">
                   {{ lecturerOverview?.approvedCount ?? 0 }}
                 </div>
               </div>
               <div class="rounded-xl bg-amber-50 p-3">
-                <div class="text-xs text-amber-700">Pending</div>
+                <div class="text-xs text-amber-700">Chờ duyệt</div>
                 <div class="mt-1 text-lg font-semibold text-amber-900">
                   {{ lecturerOverview?.pendingCount ?? 0 }}
                 </div>
               </div>
               <div class="rounded-xl bg-rose-50 p-3">
-                <div class="text-xs text-rose-700">Rejected</div>
+                <div class="text-xs text-rose-700">Từ chối</div>
                 <div class="mt-1 text-lg font-semibold text-rose-900">
                   {{ lecturerOverview?.rejectedCount ?? 0 }}
                 </div>
@@ -111,6 +109,23 @@
               @open-detail="emitOpenDetail"
             />
           </div>
+
+          <div
+            v-if="pagination.total > 0"
+            class="border-t border-slate-200 px-5 py-3"
+          >
+            <PaginationControl
+              :total-item-count="pagination.total"
+              :current-page-number="pagination.page"
+              :page-size="pagination.perPage"
+              display-mode="FULL"
+              :show-record-summary="true"
+              record-summary-mode="PAGE_COUNT"
+              record-summary-unit-label="công trình"
+              @update:currentPageNumber="updatePage"
+              @update:pageSize="updatePageSize"
+            />
+          </div>
         </div>
       </aside>
     </Transition>
@@ -122,13 +137,16 @@ import ApprovedResearchWorkList from "./ApprovedResearchWorkList.vue";
 import type {
   ApprovedSummary,
   OverviewItem,
+  Pagination,
 } from "../lecturerResearchWork.contracts";
+import PaginationControl from "@/shared/components/layout/SharedPaginationControls.vue";
 import { X } from "lucide-vue-next";
 
 interface LecturerDrawerProps {
   isOpen: boolean;
   lecturerOverview: OverviewItem | null;
   approvedItems: ApprovedSummary[];
+  pagination: Pagination;
   isLoading: boolean;
   errorMessage: string | null;
 }
@@ -138,9 +156,11 @@ const approvedWorkEmptyStateMessage =
 interface LecturerDrawerEmits {
   (e: "close"): void;
   (e: "open-detail", activityId: number): void;
+  (e: "update-page", page: number): void;
+  (e: "update-page-size", perPage: number): void;
 }
 
-defineProps<LecturerDrawerProps>();
+const props = defineProps<LecturerDrawerProps>();
 const emit = defineEmits<LecturerDrawerEmits>();
 
 const emptyMessage = approvedWorkEmptyStateMessage;
@@ -151,5 +171,15 @@ function emitClose() {
 
 function emitOpenDetail(activityId: number) {
   emit("open-detail", activityId);
+}
+
+function updatePage(page: number) {
+  if (page === props.pagination.page) return;
+  emit("update-page", page);
+}
+
+function updatePageSize(perPage: number) {
+  if (perPage === props.pagination.perPage) return;
+  emit("update-page-size", perPage);
 }
 </script>

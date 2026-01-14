@@ -14,9 +14,10 @@
             @change="onChangeHoursMode"
           >
             <option value="all">Tất cả</option>
-            <option value="not_reviewed_hours">Chưa duyệt giờ</option>
-            <option value="waiting_hours">Chờ duyệt giờ</option>
-            <option value="hours_approved">Đã duyệt giờ</option>
+            <option value="not_submitted">Chưa duyệt giờ</option>
+            <option value="pending">Chờ duyệt giờ</option>
+            <option value="approved">Đã duyệt giờ</option>
+            <option value="rejected">Bị từ chối</option>
           </select>
         </div>
 
@@ -31,7 +32,7 @@
             <input
               class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-slate-400 focus:ring-0"
               :value="filter.keyword"
-              placeholder="Mã (RA-...) / tên công trình…"
+              placeholder="Mã (RA-...) / tên công trình..."
               @input="onChangeKeyword"
             />
           </div>
@@ -55,8 +56,8 @@
       class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
     >
       <span class="font-medium text-slate-900">Lưu ý:</span>
-      Danh sách chỉ gồm công trình đã được duyệt nội dung đầy đủ (Khoa +
-      Trường). Bộ lọc chỉ áp dụng cho trạng thái duyệt giờ.
+      Danh sách chỉ gồm công trình đã được duyệt nội dung đầy đủ (Khoa + Trường).
+      Bộ lọc chỉ áp dụng cho trạng thái duyệt giờ.
     </div>
   </div>
 </template>

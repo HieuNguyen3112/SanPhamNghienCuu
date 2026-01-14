@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
   >
@@ -147,7 +147,7 @@
                   "
                   aria-hidden="true"
                 >
-                  ✓
+                  x
                 </span>
               </button>
 
@@ -185,13 +185,6 @@
 
       <!-- actions (auto width, NEVER wrap) -->
       <div class="flex items-end justify-end gap-2">
-        <!-- <div
-          class="hidden text-xs text-slate-600 md:block whitespace-nowrap"
-          :class="loading ? 'opacity-60' : ''"
-        >
-          {{ resultCountText }}
-        </div> -->
-
         <button
           type="button"
           class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -222,7 +215,6 @@ import {
   Building2,
   ChevronDown,
   CircleDot,
-  Filter,
   RotateCcw,
   Search,
   Shield,
@@ -251,10 +243,6 @@ const emit = defineEmits<{
 
 const showUnitFilter = computed(() => props.unitOptions.length > 1);
 const selectedRoleSet = computed(() => new Set(props.filter.roleKeys));
-
-const resultCountText = computed(
-  () => `Kết quả: ${props.resultCount} giảng viên`
-);
 
 function update<K extends keyof LecturerAccountFilterState>(
   key: K,
@@ -312,11 +300,6 @@ function toggleRole(key: RoleKey) {
   if (next.has(key)) next.delete(key);
   else next.add(key);
   update("roleKeys", [...next]);
-}
-
-function removeRole(key: RoleKey) {
-  const next = props.filter.roleKeys.filter((k) => k !== key);
-  update("roleKeys", next);
 }
 
 function onDocClick(e: MouseEvent) {

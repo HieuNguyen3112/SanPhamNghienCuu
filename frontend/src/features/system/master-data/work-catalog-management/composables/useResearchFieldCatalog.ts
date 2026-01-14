@@ -1,8 +1,7 @@
 // File: src/features/master-data/work-catalog-management/composables/useResearchFieldCatalog.ts
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive, ref } from "vue";
 import {
   researchFieldFromDto,
-  toLowerSafe,
   type ResearchField,
   type ResearchFieldDTO,
 } from "../contracts/workCatalog.contract";
@@ -14,6 +13,7 @@ type FormErrors<T extends Record<string, unknown>> = Partial<
 
 export function useResearchFieldCatalog() {
   const researchFields = ref<ResearchField[]>([]);
+  const researchFieldTotal = ref(0);
 
   const qResearchField = ref("");
   const pageResearchField = ref(1);
@@ -46,35 +46,17 @@ export function useResearchFieldCatalog() {
   }
 
   async function load(): Promise<void> {
-    const dtos = await workCatalogService.listResearchFields();
-    researchFields.value = dtos.map(researchFieldFromDto);
+    const response = await workCatalogService.listResearchFields({
+      keyword: qResearchField.value.trim() || undefined,
+      page: pageResearchField.value,
+      per_page: pageSizeResearchField.value,
+    });
+    researchFields.value = response.items.map(researchFieldFromDto);
+    researchFieldTotal.value = response.pagination.total;
   }
 
-  function paginate<T>(items: T[], page: number, pageSize: number): T[] {
-    const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }
-
-  const filteredResearchFields = computed(() => {
-    const q = toLowerSafe(qResearchField.value);
-    return researchFields.value.filter(
-      (x) =>
-        toLowerSafe(x.name).includes(q) || toLowerSafe(x.code ?? "").includes(q)
-    );
-  });
-
-  const pagedResearchFields = computed(() =>
-    paginate(
-      filteredResearchFields.value,
-      pageResearchField.value,
-      pageSizeResearchField.value
-    )
-  );
-
-  watch(
-    [qResearchField, pageSizeResearchField],
-    () => (pageResearchField.value = 1)
-  );
+  const filteredResearchFields = computed(() => researchFields.value);
+  const pagedResearchFields = computed(() => researchFields.value);
 
   function openCreateResearchField() {
     modalMode.value = "create";
@@ -137,6 +119,7 @@ export function useResearchFieldCatalog() {
 
   return {
     researchFields,
+    researchFieldTotal,
     qResearchField,
     pageResearchField,
     pageSizeResearchField,

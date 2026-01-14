@@ -1,40 +1,73 @@
+import axios from "axios";
+import http, { ensureCsrfCookie } from "@/lib/http";
 import type {
-  ApprovedWorkRowDTO,
+  ApprovedWorkListResponseDTO,
   WorkDetailDTO,
 } from "../contracts/selectHoursRequest.contract";
-import {
-  approvedWorkRowDtoListMock,
-  getWorkDetailDtoMock,
-} from "../mock-data/approvedWorks.mock";
 
-function delay(ms: number) {
-  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+export interface LoadApprovedWorksParams {
+  status?: string;
+  q?: string;
+  page?: number;
+  per_page?: number;
 }
 
-function randomLatencyMs() {
-  return 200 + Math.floor(Math.random() * 200);
-}
+const extractErrorMessage = (err: unknown, fallback: string) => {
+  if (axios.isAxiosError(err)) {
+    const status = err.response?.status ?? 0;
+    if (status >= 500) return fallback;
+    const message = err.response?.data?.message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
 
-export async function loadApprovedWorksDTO(): Promise<ApprovedWorkRowDTO[]> {
-  await delay(randomLatencyMs());
-  return approvedWorkRowDtoListMock;
+  return err instanceof Error ? err.message : fallback;
+};
+
+export async function loadApprovedWorksDTO(
+  params: LoadApprovedWorksParams
+): Promise<ApprovedWorkListResponseDTO> {
+  try {
+    const cleanedParams: Record<string, unknown> = {
+      status: params.status ?? "all",
+      q: params.q?.trim() || undefined,
+      page: params.page,
+      per_page: params.per_page,
+    };
+
+    const response = await http.get<{ data: ApprovedWorkListResponseDTO }>(
+      "/api/lecturer/hours/calculate",
+      { params: cleanedParams }
+    );
+
+    return response.data.data;
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, "Không tải được danh sách."));
+  }
 }
 
 export async function loadWorkDetailDTO(
   activityId: number
 ): Promise<WorkDetailDTO> {
-  await delay(randomLatencyMs());
-  const dto = getWorkDetailDtoMock(activityId);
-  if (!dto) throw new Error("Không tìm thấy chi tiết công trình (mock).");
-  return dto;
+  try {
+    const response = await http.get<{ data: WorkDetailDTO }>(
+      `/api/lecturer/hours/calculate/${activityId}`
+    );
+
+    return response.data.data;
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, "Không tải được chi tiết."));
+  }
 }
 
 export async function submitHoursApprovalRequestDTO(payload: {
   activity_ids: number[];
 }): Promise<void> {
-  await delay(randomLatencyMs());
-  if (!payload.activity_ids || payload.activity_ids.length === 0) {
-    throw new Error("Payload không hợp lệ: activity_ids rỗng.");
+  try {
+    await ensureCsrfCookie();
+    await http.post("/api/lecturer/hours/calculate/submit", payload);
+  } catch (err) {
+    throw new Error(
+      extractErrorMessage(err, "Không gửi được yêu cầu xét duyệt giờ NCKH.")
+    );
   }
-  // mock: success
 }

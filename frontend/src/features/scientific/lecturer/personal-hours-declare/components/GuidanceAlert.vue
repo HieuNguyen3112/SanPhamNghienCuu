@@ -11,7 +11,7 @@
             Hướng dẫn kê khai & gửi xét duyệt giờ NCKH
           </div>
           <div class="mt-0.5 text-xs text-slate-600">
-            Chỉ các công trình đã được duyệt nội dung mới được tính giờ.
+            Chỉ công trình đã được duyệt nội dung mới được tính giờ.
           </div>
         </div>
       </div>

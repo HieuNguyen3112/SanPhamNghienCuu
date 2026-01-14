@@ -4,26 +4,25 @@
   >
     <div class="overflow-x-auto">
       <div class="flex flex-nowrap items-end gap-3">
-        <!-- Khoa -->
         <div class="w-[280px]">
           <label class="text-xs font-medium text-slate-700">Chọn khoa</label>
           <div class="relative mt-1">
             <select
               class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
-              :value="selectedFacultyIdentifier"
+              :value="selectedFacultyValue"
               @change="
-                updateSelectedFacultyIdentifier(
+                updateSelectedFacultyId(
                   ($event.target as HTMLSelectElement).value
                 )
               "
             >
-              <option value="ALL_FACULTIES">Tất cả khoa</option>
+              <option value="ALL">Tất cả khoa</option>
               <option
-                v-for="facultyOption in facultyOptions"
-                :key="facultyOption.facultyIdentifier"
-                :value="facultyOption.facultyIdentifier"
+                v-for="faculty in facultyOptions"
+                :key="faculty.id"
+                :value="faculty.id"
               >
-                {{ facultyOption.facultyDisplayName }}
+                {{ faculty.name }}
               </option>
             </select>
             <ChevronDown
@@ -32,26 +31,25 @@
           </div>
         </div>
 
-        <!-- Năm học -->
         <div class="w-[220px]">
           <label class="text-xs font-medium text-slate-700">Chọn năm học</label>
           <div class="relative mt-1">
             <select
               class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
-              :value="selectedAcademicYear"
+              :value="selectedAcademicYearValue"
               @change="
-                updateSelectedAcademicYear(
+                updateSelectedAcademicYearId(
                   ($event.target as HTMLSelectElement).value
                 )
               "
             >
-              <option value="ALL_ACADEMIC_YEARS">Tất cả năm học</option>
+              <option value="ALL">Tất cả năm học</option>
               <option
-                v-for="academicYearOption in academicYearOptions"
-                :key="academicYearOption"
-                :value="academicYearOption"
+                v-for="academicYear in academicYearOptions"
+                :key="academicYear.id"
+                :value="academicYear.id"
               >
-                {{ academicYearOption }}
+                {{ academicYear.code }}
               </option>
             </select>
             <ChevronDown
@@ -60,25 +58,26 @@
           </div>
         </div>
 
-        <!-- Trạng thái -->
         <div class="w-80">
-          <label class="text-xs font-medium text-slate-700"
-            >Trạng thái giờ NCKH</label
-          >
+          <label class="text-xs font-medium text-slate-700">
+            Trạng thái giờ NCKH
+          </label>
           <div class="relative mt-1">
             <select
               class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
-              :value="selectedResearchHourStatusFilterCondition"
+              :value="selectedStatusValue"
               @change="
-                updateSelectedResearchHourStatusFilterCondition(
-                  ($event.target as HTMLSelectElement).value as any
+                updateSelectedStatus(
+                  ($event.target as HTMLSelectElement).value
                 )
               "
             >
-              <option value="ALL">Tất cả</option>
-              <option value="MEETING_RESEARCH_HOUR_STANDARD">Đạt chuẩn</option>
-              <option value="NOT_MEETING_RESEARCH_HOUR_STANDARD">
-                Chưa đạt chuẩn
+              <option
+                v-for="status in statusOptions"
+                :key="status.code"
+                :value="status.code"
+              >
+                {{ status.label }}
               </option>
             </select>
             <ChevronDown
@@ -87,9 +86,7 @@
           </div>
         </div>
 
-        <!-- Reset (same line) -->
         <div class="ml-auto w-10">
-          <!-- label ẩn để canh đáy giống các ô select -->
           <label class="block text-xs font-medium text-transparent select-none">
             Đặt lại
           </label>
@@ -98,7 +95,7 @@
             type="button"
             class="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
             title="Đặt lại bộ lọc"
-            @click="resetLecturerResearchHourFilterConditions"
+            @click="resetFilters"
           >
             <RotateCcw class="h-4 w-4" />
           </button>
@@ -109,51 +106,76 @@
 </template>
 
 <script setup lang="ts">
-import type {
-  FacultyOption,
-  ResearchHourStatusFilterCondition,
-} from "../lecturerResearchHourModels";
+import { computed } from "vue";
 import { RotateCcw, ChevronDown } from "lucide-vue-next";
+import type {
+  HourResearchAcademicYearOption,
+  HourResearchFacultyOption,
+  HourResearchStatusCode,
+  HourResearchStatusOption,
+} from "../hourResearchReportTypes";
 
 const componentProperties = defineProps<{
-  facultyOptions: FacultyOption[];
-  academicYearOptions: string[];
-  selectedFacultyIdentifier: string;
-  selectedAcademicYear: string;
-  selectedResearchHourStatusFilterCondition: ResearchHourStatusFilterCondition;
+  facultyOptions: HourResearchFacultyOption[];
+  academicYearOptions: HourResearchAcademicYearOption[];
+  statusOptions: HourResearchStatusOption[];
+  selectedFacultyId: number | "ALL";
+  selectedAcademicYearId: number | "ALL";
+  selectedStatus: HourResearchStatusCode | "ALL";
 }>();
 
 const componentEvents = defineEmits<{
-  (
-    eventName: "update:selectedFacultyIdentifier",
-    facultyIdentifier: string
-  ): void;
-  (eventName: "update:selectedAcademicYear", academicYear: string): void;
-  (
-    eventName: "update:selectedResearchHourStatusFilterCondition",
-    selectedResearchHourStatusFilterCondition: ResearchHourStatusFilterCondition
-  ): void;
-  (eventName: "resetLecturerResearchHourFilterConditions"): void;
+  (eventName: "update:selectedFacultyId", facultyId: number | "ALL"): void;
+  (eventName: "update:selectedAcademicYearId", academicYearId: number | "ALL"): void;
+  (eventName: "update:selectedStatus", status: HourResearchStatusCode | "ALL"): void;
+  (eventName: "resetFilters"): void;
 }>();
 
-function updateSelectedFacultyIdentifier(facultyIdentifier: string): void {
-  componentEvents("update:selectedFacultyIdentifier", facultyIdentifier);
-}
+const selectedFacultyValue = computed(() =>
+  componentProperties.selectedFacultyId === "ALL"
+    ? "ALL"
+    : String(componentProperties.selectedFacultyId)
+);
 
-function updateSelectedAcademicYear(academicYear: string): void {
-  componentEvents("update:selectedAcademicYear", academicYear);
-}
+const selectedAcademicYearValue = computed(() =>
+  componentProperties.selectedAcademicYearId === "ALL"
+    ? "ALL"
+    : String(componentProperties.selectedAcademicYearId)
+);
 
-function updateSelectedResearchHourStatusFilterCondition(
-  selectedResearchHourStatusFilterCondition: ResearchHourStatusFilterCondition
-): void {
+const selectedStatusValue = computed(() => componentProperties.selectedStatus);
+
+function updateSelectedFacultyId(value: string): void {
+  if (value === "ALL") {
+    componentEvents("update:selectedFacultyId", "ALL");
+    return;
+  }
+
+  const parsed = Number(value);
   componentEvents(
-    "update:selectedResearchHourStatusFilterCondition",
-    selectedResearchHourStatusFilterCondition
+    "update:selectedFacultyId",
+    Number.isNaN(parsed) ? "ALL" : parsed
   );
 }
 
-function resetLecturerResearchHourFilterConditions(): void {
-  componentEvents("resetLecturerResearchHourFilterConditions");
+function updateSelectedAcademicYearId(value: string): void {
+  if (value === "ALL") {
+    componentEvents("update:selectedAcademicYearId", "ALL");
+    return;
+  }
+
+  const parsed = Number(value);
+  componentEvents(
+    "update:selectedAcademicYearId",
+    Number.isNaN(parsed) ? "ALL" : parsed
+  );
+}
+
+function updateSelectedStatus(value: string): void {
+  componentEvents("update:selectedStatus", value as HourResearchStatusCode);
+}
+
+function resetFilters(): void {
+  componentEvents("resetFilters");
 }
 </script>

@@ -89,7 +89,7 @@
           class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 md:w-auto disabled:opacity-60"
           :disabled="loading"
           @click="emit('reset')"
-          title="Đặt lại bộ lọc"
+          title="Đặt lại"
         >
           <Filter class="h-5 w-5 text-slate-700" />
           <span class="hidden md:inline">Đặt lại</span>

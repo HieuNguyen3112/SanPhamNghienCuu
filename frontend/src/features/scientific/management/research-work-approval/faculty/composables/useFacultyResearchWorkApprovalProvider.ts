@@ -1,52 +1,69 @@
-import { computed, onMounted, ref } from "vue";
+﻿import { computed, onMounted, ref, watch } from "vue";
 import type {
   ResearchWorkApprovalEntry,
   ResearchWorkApprovalUiConfiguration,
   ResearchWorkRejectionReasonType,
+  ResearchWorkType,
 } from "../../shared/models/researchWorkApprovalModels";
-import { useResearchWorkApprovalMockApi } from "../../shared/composables/useResearchWorkApprovalMockApi";
 import { useResearchWorkApprovalFiltering } from "../../shared/composables/useResearchWorkApprovalFiltering";
 import { useResearchWorkApprovalDisplayMapping } from "../../shared/composables/useResearchWorkApprovalDisplayMapping";
+import {
+  approveFacultyApproval,
+  fetchFacultyApprovalDetail,
+  fetchFacultyApprovals,
+  fetchFacultyApprovalLookups,
+  rejectFacultyApproval,
+  type FacultyApprovalDetailResponse,
+  type FacultyApprovalListItem,
+} from "../../shared/services/facultyApproval.service";
 
 export function useFacultyResearchWorkApprovalProvider() {
-  const currentUserFacultyIdentifier = "FACULTY_INFORMATION_TECHNOLOGY";
-  const currentUserFacultyDisplayName = "Khoa Công nghệ thông tin";
-
   const uiConfiguration = ref<ResearchWorkApprovalUiConfiguration>({
     approvalScopeIdentifier: "FACULTY_SCOPE",
-    pageTitle: `Duyệt công trình nghiên cứu – ${currentUserFacultyDisplayName}`,
+    pageTitle: "Duyệt công trình nghiên cứu ở cấp khoa",
     pageSubtitle:
-      "Xét duyệt công trình do giảng viên trong khoa kê khai trước khi chuyển lên cấp trường",
+      "Xác nhận công trình do giảng viên trong khoa kê khai trước khi chuyển lên cấp trường",
     summaryStripText:
       "Các công trình dưới đây cần được khoa xác nhận trước khi gửi lên cấp trường",
     isDepartmentFilterVisible: false,
     isOfficialResearchHoursEditable: false,
     tableActionButtonLabel: "Xem & duyệt",
-    drawerTitle: "Hồ sơ công trình – Cấp khoa",
-    drawerSubtitle: "Khoa → Trường",
+    drawerTitle: "Hồ sơ công trình ở cấp khoa",
+    drawerSubtitle: "Khoa ở Trường",
     primaryActionButtonLabel: "Duyệt & chuyển lên cấp trường",
     dangerActionButtonLabel: "Từ chối",
   });
 
-  const api = useResearchWorkApprovalMockApi();
   const displayMapping = useResearchWorkApprovalDisplayMapping({
     approvalScopeIdentifier: "FACULTY_SCOPE",
   });
 
+  const researchWorkApprovalList = ref<ResearchWorkApprovalEntry[]>([]);
   const filtering = useResearchWorkApprovalFiltering({
     approvalScopeIdentifier: "FACULTY_SCOPE",
-    researchWorkApprovalListRef: api.researchWorkApprovalList,
+    researchWorkApprovalListRef: researchWorkApprovalList,
     isDepartmentFilterVisible: false,
-    forcedDepartmentIdentifier: currentUserFacultyIdentifier,
+    forcedDepartmentIdentifier: null,
   });
 
   const isDetailDrawerOpen = ref<boolean>(false);
   const selectedResearchWorkApprovalEntry =
     ref<ResearchWorkApprovalEntry | null>(null);
 
+  const pendingCount = ref<number>(0);
+  const lookupReady = ref(false);
+  const academicYearIdByCode = ref<Record<string, number>>({});
+  const facultyIdentifierById = ref<Record<number, string>>({});
+
+  const toastMessage = ref<string | null>(null);
+  let toastTimer: number | null = null;
+
   const totalPendingResearchWorkCount = computed<number>(() => {
     const pendingValue = displayMapping.getPendingApprovalStatusValue();
-    return api.researchWorkApprovalList.value.filter(
+    if (pendingCount.value > 0 || researchWorkApprovalList.value.length === 0) {
+      return pendingCount.value;
+    }
+    return researchWorkApprovalList.value.filter(
       (entry) => entry.approvalStatus === pendingValue
     ).length;
   });
@@ -55,11 +72,21 @@ export function useFacultyResearchWorkApprovalProvider() {
     () => `Chờ duyệt: ${totalPendingResearchWorkCount.value} công trình`
   );
 
+  function showToast(message: string): void {
+    toastMessage.value = message;
+    if (toastTimer != null) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      toastMessage.value = null;
+      toastTimer = null;
+    }, 3500);
+  }
+
   function openResearchWorkDetailDrawer(
     entry: ResearchWorkApprovalEntry
   ): void {
     selectedResearchWorkApprovalEntry.value = entry;
     isDetailDrawerOpen.value = true;
+    loadDetail(entry.researchWorkIdentifier);
   }
 
   function closeResearchWorkDetailDrawer(): void {
@@ -67,42 +94,323 @@ export function useFacultyResearchWorkApprovalProvider() {
     selectedResearchWorkApprovalEntry.value = null;
   }
 
-  async function load(): Promise<void> {
-    await api.loadResearchWorkApprovalList({
-      approvalScopeIdentifier: "FACULTY_SCOPE",
-      facultyIdentifier: currentUserFacultyIdentifier,
-      totalResearchWorkCount: 60,
-      seedValue: 20251218,
+  async function loadLookups(): Promise<void> {
+    const response = await fetchFacultyApprovalLookups();
+    const lookups = response.data;
+
+    academicYearIdByCode.value = {};
+    filtering.academicYearOptions.value = lookups.academic_years.map((year) => {
+      academicYearIdByCode.value[year.code] = year.id;
+      return year.code;
     });
 
+    const activeYear = lookups.academic_years.find((year) => year.is_active);
+    if (activeYear) {
+      filtering.selectedAcademicYear.value = activeYear.code;
+    }
+
+    facultyIdentifierById.value = {
+      [lookups.faculty.id]: `FACULTY_${lookups.faculty.id}`,
+    };
+
+    filtering.departmentOptions.value = [
+      {
+        departmentIdentifier: `FACULTY_${lookups.faculty.id}`,
+        departmentDisplayName: lookups.faculty.name,
+      },
+    ];
+
+    uiConfiguration.value = {
+      ...uiConfiguration.value,
+      pageTitle: `Duyệt công trình nghiên cứu ở cấp khoa ${lookups.faculty.name}`,
+    };
+
+    lookupReady.value = true;
+  }
+
+  function mapKindCodeToResearchWorkType(kindCode: string): ResearchWorkType {
+    const mapping: Record<string, ResearchWorkType> = {
+      paper: "JOURNAL_ARTICLE",
+      project: "RESEARCH_PROJECT",
+      conference: "CONFERENCE_PROCEEDING",
+      book: "BOOK_CHAPTER",
+    };
+    return mapping[kindCode] ?? "JOURNAL_ARTICLE";
+  }
+
+  function mapAuthors(item: FacultyApprovalListItem, submitterId: number) {
+    return item.authors.map((author) => {
+      const isPrimary =
+        author.member_role_code === "principal" ||
+        author.member_role_code === "corresponding_author" ||
+        author.member_role_code === "chief_editor";
+      return {
+        authorIdentifier: author.lecturer_id,
+        authorDisplayName: `${author.lecturer_full_name} (${author.lecturer_code})`,
+        authorFacultyIdentifier:
+          facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
+          "ALL_DEPARTMENTS",
+        authorFacultyDisplayName:
+          author.faculty_name ?? author.department_name ?? "",
+        isPrimaryAuthor: isPrimary,
+        isSubmittingLecturer: author.lecturer_id === submitterId,
+      };
+    });
+  }
+
+  function mapListEntry(item: FacultyApprovalListItem): ResearchWorkApprovalEntry {
+    const facultyIdentifier =
+      facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
+      "ALL_DEPARTMENTS";
+
+    return {
+      researchWorkIdentifier: item.activity_id,
+      researchWorkTitle: item.title,
+      submittingLecturerDisplayName: `${item.lecturer.full_name} (${item.lecturer.code})`,
+      facultyIdentifier,
+      facultyDisplayName:
+        item.lecturer.faculty_name ?? item.lecturer.department_name ?? "",
+      academicYear: item.academic_year_code ?? "",
+      researchWorkType: mapKindCodeToResearchWorkType(item.kind_code),
+      submittedAtDateTimeString: item.submitted_at ?? "",
+
+      facultyReviewedAtDateTimeString: null,
+      facultyApprovedAtDateTimeString: null,
+      facultyApprovalNote: null,
+      facultyRejectionReasonType: null,
+      facultyRejectionReasonDetail: null,
+
+      universityReviewedAtDateTimeString: null,
+      universityRejectionReasonType: null,
+      universityRejectionReasonDetail: null,
+
+      lecturerDeclaredResearchHours: item.declared_hours ?? 0,
+      recommendedResearchHoursByPolicy: 0,
+      officialResearchHours: item.official_hours ?? 0,
+
+      approvalStatus: item.approval_status as any,
+
+      evidenceAttachmentList: Array.from(
+        { length: item.evidence_count ?? 0 },
+        (_, index) => ({
+          evidenceAttachmentIdentifier: index + 1,
+          evidenceAttachmentDisplayName: "",
+          evidenceAttachmentFileType: "",
+          evidenceAttachmentPreviewUrl: "",
+        })
+      ),
+      researchWorkAuthorList: mapAuthors(item, item.lecturer.id),
+      coAuthorList: [],
+      approvalHistoryList: [],
+    };
+  }
+
+  function mapDetailEntry(
+    detail: FacultyApprovalDetailResponse
+  ): ResearchWorkApprovalEntry {
+    const item = detail.activity;
+    const facultyIdentifier =
+      facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
+      "ALL_DEPARTMENTS";
+
+    const authorList = detail.members.map((member) => {
+      const isPrimary =
+        member.member_role_code === "principal" ||
+        member.member_role_code === "corresponding_author" ||
+        member.member_role_code === "chief_editor";
+      const entry: any = {
+        authorIdentifier: member.lecturer_id,
+        authorDisplayName: `${member.lecturer_full_name} (${member.lecturer_code})`,
+        authorFacultyIdentifier:
+          facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
+          "ALL_DEPARTMENTS",
+        authorFacultyDisplayName: member.faculty_name ?? "",
+        isPrimaryAuthor: isPrimary,
+        isSubmittingLecturer: member.lecturer_id === item.lecturer.id,
+        declaredHours: member.declared_hours,
+        recommendedHoursByPolicy: member.recommended_hours,
+        officialHours: member.official_hours,
+      };
+      return entry;
+    });
+
+    const approvalHistoryList = detail.approvals
+      .filter((approval) => approval.decided_at)
+      .map((approval) => {
+        const reviewAction =
+          approval.status === "approved"
+            ? "Duyệt"
+            : approval.status === "rejected"
+            ? "Từ chối"
+            : "Chờ duyệt";
+        const reviewLevel =
+          approval.stage_code === "assistant" ? "Cấp khoa" : "Cấp trường";
+        return {
+          historyIdentifier: approval.id,
+          reviewLevelDisplayName: reviewLevel,
+          reviewActionDisplayName: reviewAction,
+          reviewedAtDateTimeString: approval.decided_at ?? "",
+          reviewNote:
+            approval.note ??
+            (reviewAction === "Duyệt"
+              ? `${reviewLevel} đã duyệt.`
+              : `${reviewLevel} cập nhật trạng thái.`),
+        };
+      });
+
+    return {
+      researchWorkIdentifier: item.activity_id,
+      researchWorkTitle: item.title,
+      submittingLecturerDisplayName: `${item.lecturer.full_name} (${item.lecturer.code})`,
+      facultyIdentifier,
+      facultyDisplayName:
+        item.lecturer.faculty_name ?? item.lecturer.department_name ?? "",
+      academicYear: item.academic_year_code ?? "",
+      researchWorkType: mapKindCodeToResearchWorkType(item.kind_code),
+      submittedAtDateTimeString: item.submitted_at ?? "",
+
+      facultyReviewedAtDateTimeString: null,
+      facultyApprovedAtDateTimeString: null,
+      facultyApprovalNote: null,
+      facultyRejectionReasonType: null,
+      facultyRejectionReasonDetail: null,
+
+      universityReviewedAtDateTimeString: null,
+      universityRejectionReasonType: null,
+      universityRejectionReasonDetail: null,
+
+      lecturerDeclaredResearchHours: item.declared_hours ?? 0,
+      recommendedResearchHoursByPolicy: 0,
+      officialResearchHours: item.official_hours ?? 0,
+
+      approvalStatus: item.approval_status as any,
+
+      evidenceAttachmentList: detail.evidence_files.map((file) => ({
+        evidenceAttachmentIdentifier: file.id,
+        evidenceAttachmentDisplayName: file.original_name ?? "",
+        evidenceAttachmentFileType: file.file_type_name ?? "",
+        evidenceAttachmentPreviewUrl: file.url ?? "#",
+      })),
+      researchWorkAuthorList: authorList as any,
+      coAuthorList: [],
+      approvalHistoryList,
+    };
+  }
+
+  function resolveKindCodeFilter(
+    selected: ResearchWorkType | "ALL_RESEARCH_WORK_TYPES"
+  ) {
+    if (selected === "ALL_RESEARCH_WORK_TYPES") return null;
+    if (selected === "JOURNAL_ARTICLE") return "paper";
+    if (selected === "RESEARCH_PROJECT") return "project";
+    if (selected === "CONFERENCE_PROCEEDING") return "conference";
+    if (selected === "BOOK_CHAPTER") return "book";
+    return null;
+  }
+
+  async function loadList(): Promise<void> {
+    if (!lookupReady.value) return;
+
+    const selectedYear = filtering.selectedAcademicYear.value;
+    const selectedType = filtering.selectedResearchWorkType.value;
+    const selectedStatus = filtering.selectedApprovalStatus.value;
+    const keyword = filtering.selectedLecturerOrResearchWorkKeyword.value;
+
+    if (selectedType === "STUDENT_SUPERVISION") {
+      researchWorkApprovalList.value = [];
+      pendingCount.value = 0;
+      filtering.applyResearchWorkFilterConditions();
+      return;
+    }
+
+    const academicYearId =
+      selectedYear === "ALL_ACADEMIC_YEARS"
+        ? null
+        : academicYearIdByCode.value[selectedYear] ?? null;
+
+    const kindCode = resolveKindCodeFilter(selectedType);
+
+    const response = await fetchFacultyApprovals({
+      academic_year_id: academicYearId,
+      kind_code: kindCode,
+      status:
+        selectedStatus === "ALL_APPROVAL_STATUSES" ? null : selectedStatus,
+      q: keyword,
+    });
+
+    researchWorkApprovalList.value = response.data.map(mapListEntry);
+    pendingCount.value = response.meta?.counters?.pending ?? 0;
     filtering.applyResearchWorkFilterConditions();
   }
 
-  function approve(payload: {
+  async function loadDetail(activityId: number): Promise<void> {
+    try {
+      const detail = await fetchFacultyApprovalDetail(activityId);
+      selectedResearchWorkApprovalEntry.value = mapDetailEntry(detail);
+    } catch (error) {
+      console.error(error);
+      showToast("Không tải được chi tiết. Vui lòng thử lại.");
+    }
+  }
+
+  async function approve(payload: {
     researchWorkIdentifier: number;
-    officialResearchHours?: number | null;
+    officialResearchHours: number | null;
     memberHours?: { authorIdentifier: number; officialHours: number }[];
-  }): void {
-    api.approveResearchWorkAtFacultyLevel(payload);
-    filtering.applyResearchWorkFilterConditions();
+  }): Promise<void> {
+    try {
+      await approveFacultyApproval(payload.researchWorkIdentifier);
+      showToast("Đã duyệt và chuyển lên cấp trường.");
+      await loadList();
+      closeResearchWorkDetailDrawer();
+    } catch (error) {
+      console.error(error);
+      showToast("Không thể duyệt công trình. Vui lòng thử lại.");
+    }
   }
 
-  function reject(payload: {
+  async function reject(payload: {
     researchWorkIdentifier: number;
     rejectionReasonType: ResearchWorkRejectionReasonType;
     rejectionReasonDetail: string | null;
-  }): void {
-    api.rejectResearchWorkAtFacultyLevel({
-      researchWorkIdentifier: payload.researchWorkIdentifier,
-      rejectionReasonType: payload.rejectionReasonType,
-      rejectionReasonDetail: payload.rejectionReasonDetail,
-    });
-    filtering.applyResearchWorkFilterConditions();
+  }): Promise<void> {
+    try {
+      await rejectFacultyApproval(payload.researchWorkIdentifier, {
+        reason_type: payload.rejectionReasonType,
+        reason_detail: payload.rejectionReasonDetail,
+      });
+      showToast("Đã từ chối công trình.");
+      await loadList();
+      closeResearchWorkDetailDrawer();
+    } catch (error) {
+      console.error(error);
+      showToast("Không thể từ chối công trình. Vui lòng thử lại.");
+    }
   }
 
   onMounted(() => {
-    load();
+    loadLookups().then(loadList).catch((error) => {
+      console.error(error);
+      showToast("Không tải được dữ liệu. Vui lòng thử lại.");
+    });
   });
+
+  watch(
+    [
+      filtering.selectedAcademicYear,
+      filtering.selectedDepartmentIdentifier,
+      filtering.selectedResearchWorkType,
+      filtering.selectedApprovalStatus,
+      filtering.selectedLecturerOrResearchWorkKeyword,
+    ],
+    () => {
+      if (!lookupReady.value) return;
+      loadList().catch((error) => {
+        console.error(error);
+        showToast("Không tải được dữ liệu. Vui lòng thử lại.");
+      });
+    }
+  );
 
   return {
     uiConfiguration,
@@ -111,9 +419,11 @@ export function useFacultyResearchWorkApprovalProvider() {
     pageSubtitle: computed(() => uiConfiguration.value.pageSubtitle),
     pendingBadgeText,
 
+    toastMessage,
+
     filterPanelHelperText: computed(
       () =>
-        "Không có bộ lọc khoa vì phạm vi đã cố định theo khoa đăng nhập, giúp tránh duyệt nhầm ngoài phạm vi quản lý."
+        "Không có bộ lọc khoa vì phạm vi đã cố định theo khoa đăng nhập, giúp tránh duyệt sai phạm vi."
     ),
 
     academicYearOptions: filtering.academicYearOptions,
@@ -141,11 +451,11 @@ export function useFacultyResearchWorkApprovalProvider() {
 
     drawerHelperText: computed(
       () =>
-        "Màn hình cấp khoa xác nhận hồ sơ và minh chứng trước khi chuyển lên cấp trường."
+        "Khoa xác nhận hồ sơ và minh chứng trước khi chuyển lên cấp trường."
     ),
     drawerFooterHelperText: computed(
       () =>
-        "Khoa chỉ xác nhận hồ sơ và minh chứng; không chỉnh sửa giờ NCKH tại màn hình này."
+        "Khoa chỉ xác nhận hồ sơ; không chỉnh sửa giờ NCKH ở màn hình này."
     ),
 
     rejectionReasonOptionList: computed(() =>

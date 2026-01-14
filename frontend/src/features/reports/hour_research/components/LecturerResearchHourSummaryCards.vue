@@ -85,7 +85,7 @@ const summaryCardDescriptors = [
     iconPath: "M4 19V5M8 17V9M12 19v-6M16 17v-8M20 19V7",
   },
   {
-    title: "Tỷ lệ giảng viên đạt chuẩn (%)",
+    title: "Tỉ lệ giảng viên đạt chuẩn (%)",
     subtitle: "Mức độ đáp ứng chuẩn",
     formattedValue: `${formatDecimalValue(
       componentProperties.lecturerMeetingResearchHourStandardPercentage

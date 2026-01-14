@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-slate-50">
-    <div class="mx-auto w-full p-4 md:p-6">
+    <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
@@ -9,296 +9,239 @@
           subtitle="Tổng quan tình hình thực hiện giờ NCKH của giảng viên"
           :show-export-pdf="true"
           :show-export-excel="true"
-          @exportPdfClicked="showExportNotImplementedMessage('PDF')"
-          @exportExcelClicked="showExportNotImplementedMessage('Excel')"
+          @exportPdfClicked="handleExport('pdf')"
+          @exportExcelClicked="handleExport('excel')"
         />
       </div>
 
-      <div class="mt-4 space-y-4">
-        <LecturerResearchHourFilterPanel
-          v-if="lecturerResearchHourStatisticsResponse"
-          :faculty-options="
-            lecturerResearchHourStatisticsResponse.facultyOptions
-          "
-          :academic-year-options="
-            lecturerResearchHourStatisticsResponse.academicYearOptions
-          "
-          v-model:selectedFacultyIdentifier="selectedFacultyIdentifier"
-          v-model:selectedAcademicYear="selectedAcademicYear"
-          v-model:selectedResearchHourStatusFilterCondition="
-            selectedResearchHourStatusFilterCondition
-          "
-          @resetLecturerResearchHourFilterConditions="
-            resetLecturerResearchHourFilterConditions
-          "
-        />
+      <LecturerResearchHourFilterPanel
+        :faculty-options="filterOptions.faculties"
+        :academic-year-options="filterOptions.academicYears"
+        :status-options="filterOptions.statusOptions"
+        v-model:selectedFacultyId="selectedFacultyId"
+        v-model:selectedAcademicYearId="selectedAcademicYearId"
+        v-model:selectedStatus="selectedStatus"
+        @resetFilters="resetFilters"
+      />
 
-        <LecturerResearchHourSummaryCards
-          :total-lecturer-count="totalLecturerCount"
-          :total-research-hour-count="totalResearchHourCount"
-          :average-research-hours-per-lecturer="averageResearchHoursPerLecturer"
-          :lecturer-meeting-research-hour-standard-percentage="
-            lecturerMeetingResearchHourStandardPercentage
-          "
-        />
+      <div
+        v-if="errorMessage"
+        class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 shadow-sm"
+      >
+        {{ errorMessage }}
+      </div>
 
-        <LecturerResearchHourChartSection
-          :lecturer-research-hour-records="filteredLecturerResearchHourRecords"
-        />
+      <LecturerResearchHourSummaryCards
+        :total-lecturer-count="kpis.lecturerCount"
+        :total-research-hour-count="kpis.totalHours"
+        :average-research-hours-per-lecturer="kpis.avgHours"
+        :lecturer-meeting-research-hour-standard-percentage="kpis.complianceRate"
+      />
 
-        <LecturerResearchHourStatisticsTable
-          :lecturer-research-hour-records="filteredLecturerResearchHourRecords"
-        />
+      <LecturerResearchHourChartSection :charts="charts" />
+
+      <LecturerResearchHourStatisticsTable
+        :rows="table.items"
+        :pagination="table.pagination"
+        :loading="isLoading"
+        @pageChanged="changePage"
+        @pageSizeChanged="changePageSize"
+      />
+
+      <div
+        v-if="notificationMessage"
+        class="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 shadow-sm"
+      >
+        {{ notificationMessage }}
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import LecturerResearchHourFilterPanel from "../components/LecturerResearchHourFilterPanel.vue";
 import LecturerResearchHourSummaryCards from "../components/LecturerResearchHourSummaryCards.vue";
 import LecturerResearchHourChartSection from "../components/LecturerResearchHourChartSection.vue";
 import LecturerResearchHourStatisticsTable from "../components/LecturerResearchHourStatisticsTable.vue";
-
+import {
+  exportHourResearchReportExcel,
+  exportHourResearchReportPdf,
+  fetchHourResearchReport,
+  fetchHourResearchReportFilters,
+} from "../api/hourResearchReportApi";
 import type {
-  LecturerResearchHourRecord,
-  LecturerResearchHourStatisticsResponse,
-  ResearchHourStatusFilterCondition,
-} from "../lecturerResearchHourModels";
+  HourResearchReportCharts,
+  HourResearchReportFiltersResponse,
+  HourResearchReportKpis,
+  HourResearchReportTable,
+  HourResearchStatusCode,
+} from "../hourResearchReportTypes";
 
-/**
- * REQUIRED VARIABLES
- * - Các biến lọc được đặt ở cấp trang để đảm bảo Filter Panel chỉ lo UI,
- *   còn trang chịu trách nhiệm điều phối dữ liệu và trạng thái.
- */
-const lecturerResearchHourStatisticsResponse =
-  ref<LecturerResearchHourStatisticsResponse | null>(null);
-const temporaryNotificationMessage = ref("");
-const selectedFacultyIdentifier = ref<string>("ALL_FACULTIES");
-const selectedAcademicYear = ref<string>("ALL_ACADEMIC_YEARS");
-const selectedResearchHourStatusFilterCondition =
-  ref<ResearchHourStatusFilterCondition>("ALL");
+const selectedFacultyId = ref<number | "ALL">("ALL");
+const selectedAcademicYearId = ref<number | "ALL">("ALL");
+const selectedStatus = ref<HourResearchStatusCode>("all");
 
-const filteredLecturerResearchHourRecords = ref<LecturerResearchHourRecord[]>(
-  []
-);
+const page = ref(1);
+const pageSize = ref(12);
 
-/**
- * REQUIRED FUNCTIONS
- * - Giữ logic “đủ đơn giản để đọc” và dễ mở rộng cho demo / đồ án.
- */
-function loadLecturerResearchHourStatistics(): void {
-  // Vì là demo UI, mock dữ liệu giúp tập trung vào trải nghiệm và cấu trúc màn hình.
-  const mockFacultyOptions = [
-    {
-      facultyIdentifier: "FACULTY_INFORMATION_TECHNOLOGY",
-      facultyDisplayName: "Khoa Công nghệ thông tin",
-    },
-    {
-      facultyIdentifier: "FACULTY_ECONOMICS",
-      facultyDisplayName: "Khoa Kinh tế",
-    },
-    {
-      facultyIdentifier: "FACULTY_EDUCATION",
-      facultyDisplayName: "Khoa Sư phạm",
-    },
-    { facultyIdentifier: "FACULTY_LAW", facultyDisplayName: "Khoa Luật" },
-  ];
+const isLoading = ref(false);
+const errorMessage = ref("");
+const notificationMessage = ref("");
+const exporting = ref<"pdf" | "excel" | null>(null);
 
-  const mockAcademicYearOptions = ["2022-2023", "2023-2024", "2024-2025"];
+const filterOptions = ref<HourResearchReportFiltersResponse>({
+  faculties: [],
+  academicYears: [],
+  statusOptions: [],
+});
 
-  const mockLecturerResearchHourRecords: LecturerResearchHourRecord[] = [
-    {
-      lecturerIdentifier: "LECTURER_001",
-      lecturerDisplayName: "Nguyễn Văn An",
-      facultyIdentifier: "FACULTY_INFORMATION_TECHNOLOGY",
-      facultyDisplayName: "Khoa Công nghệ thông tin",
-      academicYear: "2024-2025",
-      totalResearchHourCount: 120,
-      researchHourStandardCount: 100,
-    },
-    {
-      lecturerIdentifier: "LECTURER_002",
-      lecturerDisplayName: "Trần Thị Bình",
-      facultyIdentifier: "FACULTY_INFORMATION_TECHNOLOGY",
-      facultyDisplayName: "Khoa Công nghệ thông tin",
-      academicYear: "2024-2025",
-      totalResearchHourCount: 70,
-      researchHourStandardCount: 100,
-    },
-    {
-      lecturerIdentifier: "LECTURER_003",
-      lecturerDisplayName: "Lê Minh Châu",
-      facultyIdentifier: "FACULTY_ECONOMICS",
-      facultyDisplayName: "Khoa Kinh tế",
-      academicYear: "2024-2025",
-      totalResearchHourCount: 95,
-      researchHourStandardCount: 90,
-    },
-    {
-      lecturerIdentifier: "LECTURER_004",
-      lecturerDisplayName: "Phạm Quốc Dũng",
-      facultyIdentifier: "FACULTY_ECONOMICS",
-      facultyDisplayName: "Khoa Kinh tế",
-      academicYear: "2023-2024",
-      totalResearchHourCount: 40,
-      researchHourStandardCount: 90,
-    },
-    {
-      lecturerIdentifier: "LECTURER_005",
-      lecturerDisplayName: "Võ Thị Hạnh",
-      facultyIdentifier: "FACULTY_EDUCATION",
-      facultyDisplayName: "Khoa Sư phạm",
-      academicYear: "2023-2024",
-      totalResearchHourCount: 110,
-      researchHourStandardCount: 100,
-    },
-    {
-      lecturerIdentifier: "LECTURER_006",
-      lecturerDisplayName: "Đặng Hoàng Khoa",
-      facultyIdentifier: "FACULTY_LAW",
-      facultyDisplayName: "Khoa Luật",
-      academicYear: "2022-2023",
-      totalResearchHourCount: 60,
-      researchHourStandardCount: 90,
-    },
-    {
-      lecturerIdentifier: "LECTURER_007",
-      lecturerDisplayName: "Nguyễn Thị Lan",
-      facultyIdentifier: "FACULTY_LAW",
-      facultyDisplayName: "Khoa Luật",
-      academicYear: "2024-2025",
-      totalResearchHourCount: 92,
-      researchHourStandardCount: 90,
-    },
-  ];
+const kpis = ref<HourResearchReportKpis>({
+  lecturerCount: 0,
+  totalHours: 0,
+  avgHours: 0,
+  metCount: 0,
+  notMetCount: 0,
+  complianceRate: 0,
+});
 
-  lecturerResearchHourStatisticsResponse.value = {
-    facultyOptions: mockFacultyOptions,
-    academicYearOptions: mockAcademicYearOptions,
-    lecturerResearchHourRecords: mockLecturerResearchHourRecords,
+const charts = ref<HourResearchReportCharts>({
+  hoursByFaculty: { labels: [], values: [] },
+  statusDistribution: { labels: [], values: [] },
+  hoursByYear: { labels: [], values: [] },
+});
+
+const table = ref<HourResearchReportTable>({
+  items: [],
+  pagination: { page: 1, perPage: 12, total: 0, lastPage: 1 },
+});
+
+function buildQueryParams() {
+  const params: Record<string, string | number> = {
+    page: page.value,
+    per_page: pageSize.value,
   };
 
-  applyLecturerResearchHourFilterConditions();
-}
-
-function calculateLecturerResearchHourStatus(
-  totalResearchHourCount: number,
-  researchHourStandardCount: number
-): ResearchHourStatusFilterCondition {
-  return totalResearchHourCount >= researchHourStandardCount
-    ? "MEETING_RESEARCH_HOUR_STANDARD"
-    : "NOT_MEETING_RESEARCH_HOUR_STANDARD";
-}
-
-function applyLecturerResearchHourFilterConditions(): void {
-  if (!lecturerResearchHourStatisticsResponse.value) {
-    filteredLecturerResearchHourRecords.value = [];
-    return;
+  if (selectedFacultyId.value !== "ALL") {
+    params.faculty_id = selectedFacultyId.value;
+  }
+  if (selectedAcademicYearId.value !== "ALL") {
+    params.academic_year_id = selectedAcademicYearId.value;
+  }
+  if (selectedStatus.value !== "all") {
+    params.status = selectedStatus.value;
   }
 
-  const sourceLecturerResearchHourRecords =
-    lecturerResearchHourStatisticsResponse.value.lecturerResearchHourRecords;
-
-  const filteredRecords = sourceLecturerResearchHourRecords.filter(
-    (lecturerResearchHourRecord) => {
-      const isFacultyMatching =
-        selectedFacultyIdentifier.value === "ALL_FACULTIES" ||
-        lecturerResearchHourRecord.facultyIdentifier ===
-          selectedFacultyIdentifier.value;
-
-      const isAcademicYearMatching =
-        selectedAcademicYear.value === "ALL_ACADEMIC_YEARS" ||
-        lecturerResearchHourRecord.academicYear === selectedAcademicYear.value;
-
-      const calculatedStatus = calculateLecturerResearchHourStatus(
-        lecturerResearchHourRecord.totalResearchHourCount,
-        lecturerResearchHourRecord.researchHourStandardCount
-      );
-
-      const isStatusMatching =
-        selectedResearchHourStatusFilterCondition.value === "ALL" ||
-        calculatedStatus === selectedResearchHourStatusFilterCondition.value;
-
-      return isFacultyMatching && isAcademicYearMatching && isStatusMatching;
-    }
-  );
-
-  // Sắp xếp nhẹ để người dùng đọc nhanh: khoa -> giảng viên
-  filteredLecturerResearchHourRecords.value = filteredRecords.sort(
-    (firstRecord, secondRecord) => {
-      const facultyComparison = firstRecord.facultyDisplayName.localeCompare(
-        secondRecord.facultyDisplayName
-      );
-      if (facultyComparison !== 0) return facultyComparison;
-      return firstRecord.lecturerDisplayName.localeCompare(
-        secondRecord.lecturerDisplayName
-      );
-    }
-  );
+  return params;
 }
 
-function resetLecturerResearchHourFilterConditions(): void {
-  selectedFacultyIdentifier.value = "ALL_FACULTIES";
-  selectedAcademicYear.value = "ALL_ACADEMIC_YEARS";
-  selectedResearchHourStatusFilterCondition.value = "ALL";
-  applyLecturerResearchHourFilterConditions();
+function buildExportParams() {
+  const params: Record<string, string | number> = {};
+
+  if (selectedFacultyId.value !== "ALL") {
+    params.faculty_id = selectedFacultyId.value;
+  }
+  if (selectedAcademicYearId.value !== "ALL") {
+    params.academic_year_id = selectedAcademicYearId.value;
+  }
+  if (selectedStatus.value !== "all") {
+    params.status = selectedStatus.value;
+  }
+
+  return params;
+}
+
+async function loadFilters() {
+  try {
+    filterOptions.value = await fetchHourResearchReportFilters();
+  } catch (error) {
+    console.error(error);
+    errorMessage.value =
+      "Không thể tải dữ liệu bộ lọc. Vui lòng thử lại.";
+  }
+}
+
+async function loadReport() {
+  isLoading.value = true;
+  errorMessage.value = "";
+  try {
+    const data = await fetchHourResearchReport(buildQueryParams());
+    kpis.value = data.kpis;
+    charts.value = data.charts;
+    table.value = data.table;
+    page.value = data.table.pagination.page;
+    pageSize.value = data.table.pagination.perPage;
+  } catch (error) {
+    console.error(error);
+    errorMessage.value =
+      "Không thể tải báo cáo giờ NCKH. Vui lòng thử lại.";
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+function resetFilters() {
+  selectedFacultyId.value = "ALL";
+  selectedAcademicYearId.value = "ALL";
+  selectedStatus.value = "all";
+  page.value = 1;
+  void loadReport();
+}
+
+function changePage(nextPage: number) {
+  page.value = nextPage;
+  void loadReport();
+}
+
+function changePageSize(nextPageSize: number) {
+  pageSize.value = nextPageSize;
+  page.value = 1;
+  void loadReport();
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+}
+
+async function handleExport(type: "pdf" | "excel") {
+  if (exporting.value) return;
+  exporting.value = type;
+
+  try {
+    const params = buildExportParams();
+    const result =
+      type === "excel"
+        ? await exportHourResearchReportExcel(params)
+        : await exportHourResearchReportPdf(params);
+    downloadBlob(result.blob, result.filename);
+    notificationMessage.value = "Xuất báo cáo thành công.";
+  } catch (error) {
+    console.error(error);
+    notificationMessage.value = "Không thể xuất báo cáo. Vui lòng thử lại.";
+  } finally {
+    exporting.value = null;
+    window.setTimeout(() => {
+      notificationMessage.value = "";
+    }, 2500);
+  }
 }
 
 watch(
-  [
-    selectedFacultyIdentifier,
-    selectedAcademicYear,
-    selectedResearchHourStatusFilterCondition,
-  ],
-  () => applyLecturerResearchHourFilterConditions()
+  [selectedFacultyId, selectedAcademicYearId, selectedStatus],
+  () => {
+    page.value = 1;
+    void loadReport();
+  }
 );
 
-/**
- * REQUIRED KPI VARIABLES
- * - Tính theo “danh sách đã lọc” để đảm bảo người dùng thấy KPI khớp với màn hình hiện tại.
- */
-const totalLecturerCount = computed<number>(
-  () => filteredLecturerResearchHourRecords.value.length
-);
-
-const totalResearchHourCount = computed<number>(() => {
-  return filteredLecturerResearchHourRecords.value.reduce(
-    (runningTotal, lecturerResearchHourRecord) =>
-      runningTotal + lecturerResearchHourRecord.totalResearchHourCount,
-    0
-  );
-});
-
-const averageResearchHoursPerLecturer = computed<number>(() => {
-  if (totalLecturerCount.value === 0) return 0;
-  return totalResearchHourCount.value / totalLecturerCount.value;
-});
-
-const lecturerMeetingResearchHourStandardPercentage = computed<number>(() => {
-  if (totalLecturerCount.value === 0) return 0;
-
-  const meetingStandardLecturerCount =
-    filteredLecturerResearchHourRecords.value.filter(
-      (lecturerResearchHourRecord) => {
-        return (
-          lecturerResearchHourRecord.totalResearchHourCount >=
-          lecturerResearchHourRecord.researchHourStandardCount
-        );
-      }
-    ).length;
-
-  return (meetingStandardLecturerCount / totalLecturerCount.value) * 100;
-});
-function showExportNotImplementedMessage(exportFormatName: "PDF" | "Excel") {
-  temporaryNotificationMessage.value = `Chức năng xuất ${exportFormatName} hiện chỉ là giao diện (UI-only) theo yêu cầu.`;
-  window.setTimeout(() => {
-    temporaryNotificationMessage.value = "";
-  }, 2500);
-}
-onMounted(() => {
-  loadLecturerResearchHourStatistics();
+onMounted(async () => {
+  await loadFilters();
+  await loadReport();
 });
 </script>

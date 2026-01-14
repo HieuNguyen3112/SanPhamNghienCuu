@@ -1,4 +1,3 @@
-// src/features/personal-research-works/composables/usePersonalResearchWorks.ts
 import { computed, ref } from "vue";
 import {
   mapper,
@@ -8,6 +7,16 @@ import {
   type PersonalWorkRow,
 } from "../contracts/personalResearchWorksContracts";
 import { personalResearchWorksService } from "../services/personalResearchWorksService";
+
+type SortKey = "updatedAt" | "title" | "workYear" | "roleName";
+type SortOrder = "asc" | "desc";
+
+const sortKeyMap: Record<SortKey, string> = {
+  updatedAt: "updated_at",
+  title: "title",
+  workYear: "work_year",
+  roleName: "role_name",
+};
 
 export function usePersonalResearchWorks() {
   const stats = ref<PersonalStats>({
@@ -19,12 +28,18 @@ export function usePersonalResearchWorks() {
   });
 
   const filterTab = ref<PersonalWorkFilterTab>("all");
-
   const rows = ref<PersonalWorkRow[]>([]);
 
   const selectedWorkId = ref<number | null>(null);
   const isDetailOpen = ref(false);
   const selectedWorkDetail = ref<PersonalWorkDetail | null>(null);
+
+  const currentPageNumber = ref(1);
+  const pageSize = ref(12);
+  const totalItemCount = ref(0);
+
+  const sortKey = ref<SortKey>("updatedAt");
+  const sortOrder = ref<SortOrder>("desc");
 
   const loadingList = ref(false);
   const errorList = ref<string | null>(null);
@@ -34,15 +49,14 @@ export function usePersonalResearchWorks() {
 
   const activeRow = computed(() => {
     if (!selectedWorkId.value) return null;
-    return (
-      rows.value.find((r) => r.activityId === selectedWorkId.value) ?? null
-    );
+    return rows.value.find((r) => r.activityId === selectedWorkId.value) ?? null;
   });
 
-  async function loadStats() {
-    const dto = await personalResearchWorksService.get_stats();
-    stats.value = mapper.statsFromDto(dto);
-  }
+  const buildSortParam = () => {
+    const key = sortKeyMap[sortKey.value] ?? "updated_at";
+    const dir = sortOrder.value === "asc" ? "asc" : "desc";
+    return `${key}:${dir}`;
+  };
 
   async function loadWorks() {
     loadingList.value = true;
@@ -50,10 +64,18 @@ export function usePersonalResearchWorks() {
 
     try {
       const tabDto = mapper.tab.toDto(filterTab.value);
-      const dtos = await personalResearchWorksService.get_works_by_tab(tabDto);
-      rows.value = dtos.map(mapper.rowFromDto);
+      const dto = await personalResearchWorksService.getIndex({
+        status: tabDto,
+        page: currentPageNumber.value,
+        per_page: pageSize.value,
+        sort: buildSortParam(),
+      });
+
+      stats.value = mapper.statsFromDto(dto.stats);
+      rows.value = dto.items.map(mapper.rowFromDto);
+      totalItemCount.value = dto.pagination.total;
     } catch (err) {
-      errorList.value = err instanceof Error ? err.message : "Unknown error";
+      errorList.value = err instanceof Error ? err.message : "Failed to load works.";
     } finally {
       loadingList.value = false;
     }
@@ -61,6 +83,7 @@ export function usePersonalResearchWorks() {
 
   async function changeTab(nextTab: PersonalWorkFilterTab) {
     filterTab.value = nextTab;
+    currentPageNumber.value = 1;
     await loadWorks();
   }
 
@@ -86,10 +109,10 @@ export function usePersonalResearchWorks() {
     errorDetail.value = null;
 
     try {
-      const dto = await personalResearchWorksService.get_work_detail(workId);
+      const dto = await personalResearchWorksService.getDetail(workId);
       selectedWorkDetail.value = mapper.detailFromDto(dto);
     } catch (err) {
-      errorDetail.value = err instanceof Error ? err.message : "Unknown error";
+      errorDetail.value = err instanceof Error ? err.message : "Failed to load work detail.";
     } finally {
       loadingDetail.value = false;
     }
@@ -101,20 +124,26 @@ export function usePersonalResearchWorks() {
     window.location.assign(`/ke-khai-cong-trinh/${workId}`);
   }
 
-  async function copyFromRejected(workId: number) {
-    // Create a new draft row from rejected one
-    const copiedDto = await personalResearchWorksService.copy_rejected_work(
-      workId
-    );
-    // refresh list + stats, and go to edit
-    await Promise.all([loadStats(), loadWorks()]);
-    goToEditDraft(copiedDto.activity_id);
+  function copyFromRejected(workId: number) {
+    goToEditDraft(workId);
   }
 
-  async function createNewDraft() {
-    const createdDto = await personalResearchWorksService.create_new_draft();
-    await Promise.all([loadStats(), loadWorks()]);
-    goToEditDraft(createdDto.activity_id);
+  async function handleSortChange(nextKey: SortKey, nextOrder: SortOrder) {
+    sortKey.value = nextKey;
+    sortOrder.value = nextOrder;
+    currentPageNumber.value = 1;
+    await loadWorks();
+  }
+
+  async function setPage(nextPage: number) {
+    currentPageNumber.value = nextPage;
+    await loadWorks();
+  }
+
+  async function setPageSize(nextSize: number) {
+    pageSize.value = nextSize;
+    currentPageNumber.value = 1;
+    await loadWorks();
   }
 
   return {
@@ -122,6 +151,12 @@ export function usePersonalResearchWorks() {
     stats,
     filterTab,
     rows,
+    totalItemCount,
+
+    currentPageNumber,
+    pageSize,
+    sortKey,
+    sortOrder,
 
     selectedWorkId,
     isDetailOpen,
@@ -135,7 +170,6 @@ export function usePersonalResearchWorks() {
     activeRow,
 
     // actions
-    loadStats,
     loadWorks,
     changeTab,
     selectCard,
@@ -143,6 +177,8 @@ export function usePersonalResearchWorks() {
     closeDetail,
     goToEditDraft,
     copyFromRejected,
-    createNewDraft,
+    handleSortChange,
+    setPage,
+    setPageSize,
   };
 }

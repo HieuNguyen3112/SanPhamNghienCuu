@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ResearchWorkApprovalScopeIdentifier,
   ResearchWorkApprovalStatus,
   ResearchWorkRejectionReasonType,
@@ -22,7 +22,7 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
   }
 
   function getApprovalStatusOptionList(): { value: string; label: string }[] {
-    // WHY: filter options phụ thuộc scope để tránh hiển thị “trạng thái không thuộc phạm vi”
+    // WHY: Filter options phụ thuộc scope để tránh hiển thị trạng thái không thuộc phạm vi.
     if (parameters.approvalScopeIdentifier === "FACULTY_SCOPE") {
       return [
         { value: "ALL_APPROVAL_STATUSES", label: "Tất cả trạng thái" },
@@ -60,7 +60,8 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
   ): string {
     const mapping: Record<ResearchWorkApprovalStatus, string> = {
       PENDING_FACULTY_APPROVAL: "Chờ khoa duyệt",
-      APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY: "Đã chuyển lên cấp trường",
+      APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY:
+        "Đã chuyển lên cấp trường",
       REJECTED_BY_FACULTY: "Bị từ chối ở cấp khoa",
 
       PENDING_UNIVERSITY_APPROVAL: "Chờ duyệt cấp trường",

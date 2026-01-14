@@ -1,14 +1,21 @@
-// src/features/organization-category/contracts/organizationCategory.contract.ts
+﻿// src/features/organization-category/contracts/organizationCategory.contract.ts
 
 export type TabKey = "faculties" | "departments";
 
-/** ========= DTOs (snake_case) — KHỚP schema ========= */
+/** ========= DTOs (snake_case) ========= */
 export interface FacultyDTO {
   id: number;
   code: string; // VARCHAR50
   name: string; // VARCHAR255
   created_at: string;
   updated_at: string;
+  lecturers_count?: number;
+}
+
+export interface FacultyOptionDTO {
+  id: number;
+  code: string;
+  name: string;
 }
 
 export interface DepartmentDTO {
@@ -18,9 +25,11 @@ export interface DepartmentDTO {
   name: string; // VARCHAR255
   created_at: string;
   updated_at: string;
+  lecturers_count?: number;
+  faculty?: FacultyOptionDTO | null;
 }
 
-/** ========= Upsert payloads (snake_case) — chỉ dùng cột thật ========= */
+/** ========= Upsert payloads (snake_case) ========= */
 export interface FacultyUpsertDTO {
   code: string;
   name: string;
@@ -32,6 +41,23 @@ export interface DepartmentUpsertDTO {
   name: string;
 }
 
+export interface PaginationDTO {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+export interface FacultyListResponseDTO {
+  items: FacultyDTO[];
+  pagination: PaginationDTO;
+}
+
+export interface DepartmentListResponseDTO {
+  items: DepartmentDTO[];
+  pagination: PaginationDTO;
+}
+
 /** ========= UI Models (camelCase) ========= */
 export interface Faculty {
   id: number;
@@ -39,6 +65,13 @@ export interface Faculty {
   name: string;
   createdAt: string;
   updatedAt: string;
+  lecturersCount: number;
+}
+
+export interface FacultyOption {
+  id: number;
+  code: string;
+  name: string;
 }
 
 export interface Department {
@@ -48,9 +81,11 @@ export interface Department {
   name: string;
   createdAt: string;
   updatedAt: string;
+  lecturersCount: number;
 
   /** join display only */
   facultyName?: string;
+  facultyCode?: string;
 }
 
 /** ========= Mappers ========= */
@@ -61,6 +96,15 @@ export function facultyFromDto(dto: FacultyDTO): Faculty {
     name: dto.name,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
+    lecturersCount: dto.lecturers_count ?? 0,
+  };
+}
+
+export function facultyOptionFromDto(dto: FacultyOptionDTO): FacultyOption {
+  return {
+    id: dto.id,
+    code: dto.code,
+    name: dto.name,
   };
 }
 
@@ -72,6 +116,9 @@ export function departmentFromDto(dto: DepartmentDTO): Department {
     name: dto.name,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
+    lecturersCount: dto.lecturers_count ?? 0,
+    facultyName: dto.faculty?.name,
+    facultyCode: dto.faculty?.code,
   };
 }
 

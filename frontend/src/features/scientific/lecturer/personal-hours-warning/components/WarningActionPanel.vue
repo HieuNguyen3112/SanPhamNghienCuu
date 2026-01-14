@@ -7,13 +7,13 @@
           <h3 class="text-sm font-semibold text-slate-900">Gợi ý cho bạn</h3>
         </div>
         <p class="mt-1 text-sm text-slate-600">
-          Một vài hành động nhanh để xử lý các cảnh báo liên quan đến giờ NCKH.
+          Một vài hành động nhanh giúp xử lý các cảnh báo liên quan đến giờ NCKH.
         </p>
       </div>
     </div>
 
     <div v-if="loading" class="mt-4 text-sm text-slate-700">
-      Đang tải gợi ý…
+      Đang tải gợi ý...
     </div>
 
     <div
@@ -50,13 +50,24 @@
 
         <div class="mt-3 flex items-center gap-2">
           <RouterLink
-            v-if="item.ctaTo && item.ctaLabel"
+            v-if="item.ctaTo && item.ctaLabel && !isExternal(item.ctaTo)"
             :to="item.ctaTo"
             class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
           >
             <ArrowRight class="h-4 w-4" />
             {{ item.ctaLabel }}
           </RouterLink>
+
+          <a
+            v-else-if="item.ctaTo && item.ctaLabel"
+            :href="item.ctaTo"
+            target="_blank"
+            rel="noreferrer"
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+          >
+            <ArrowRight class="h-4 w-4" />
+            {{ item.ctaLabel }}
+          </a>
 
           <button
             v-else
@@ -82,4 +93,6 @@ defineProps<{
   loading: boolean;
   error: string | null;
 }>();
+
+const isExternal = (path: string) => path.startsWith("http");
 </script>

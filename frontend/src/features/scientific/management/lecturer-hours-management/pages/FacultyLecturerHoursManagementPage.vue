@@ -68,12 +68,10 @@ import LecturerHoursTable from "@/features/scientific/management/lecturer-hours-
 import LecturerHoursDrawer from "@/features/scientific/management/lecturer-hours-management/components/LecturerHoursDrawer.vue";
 import { useLecturerHoursManagement } from "@/features/scientific/management/lecturer-hours-management/composables/useLecturerHoursManagement";
 import {
-  exportHoursExcel,
-  exportHoursPdf,
-} from "@/features/scientific/management/lecturer-hours-management/services/lecturerHoursExport.service";
-
-// Faculty scope: ví dụ khoa CNTT id=10
-const facultyScopeId = 10;
+  exportFacultyHoursExcel,
+  exportFacultyHoursPdf,
+} from "@/features/scientific/management/lecturer-hours-management/services/facultyLecturerHoursExport.service";
+import { facultyLecturerHoursService } from "@/features/scientific/management/lecturer-hours-management/services/facultyLecturerHoursService";
 
 const {
   filter,
@@ -109,7 +107,8 @@ const {
   updatePageSize,
 } = useLecturerHoursManagement({
   initialYearId: null,
-  initialFacultyId: facultyScopeId,
+  initialFacultyId: null,
+  service: facultyLecturerHoursService,
 });
 
 const selectedAcademicYearCode = computed(() => {
@@ -118,7 +117,6 @@ const selectedAcademicYearCode = computed(() => {
 
 function buildExportParams() {
   return {
-    faculty_id: filter.facultyId ?? null,
     academic_year_id: filter.yearId ?? null,
     kpi_status: filter.kpiStatus,
     q: filter.keyword,
@@ -138,7 +136,7 @@ function downloadBlob(blob: Blob, filename: string) {
 
 async function onExportExcel() {
   try {
-    const result = await exportHoursExcel(buildExportParams());
+    const result = await exportFacultyHoursExcel(buildExportParams());
     downloadBlob(result.blob, result.filename);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -148,7 +146,7 @@ async function onExportExcel() {
 
 async function onExportPdf() {
   try {
-    const result = await exportHoursPdf(buildExportParams());
+    const result = await exportFacultyHoursPdf(buildExportParams());
     downloadBlob(result.blob, result.filename);
   } catch (error) {
     // eslint-disable-next-line no-console

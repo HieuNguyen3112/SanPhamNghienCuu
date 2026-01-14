@@ -6,6 +6,7 @@ export type ExportSummaryParams = {
   academic_year_id?: number | null;
   q?: string;
   status_mode?: string;
+  count_status?: string;
 };
 
 export type ExportResult = {
@@ -73,5 +74,25 @@ export async function exportLecturerSummaryPdf(
     "/api/admin/works/lecturers/summary/export/pdf",
     params,
     "works_summary_lecturers.pdf"
+  );
+}
+
+export async function exportFacultySummaryExcel(
+  params: ExportSummaryParams
+): Promise<ExportResult> {
+  return exportSummary(
+    "/api/faculty/works/export/excel",
+    params,
+    "faculty_works_summary.xlsx"
+  );
+}
+
+export async function exportFacultySummaryPdf(
+  params: ExportSummaryParams
+): Promise<ExportResult> {
+  return exportSummary(
+    "/api/faculty/works/export/pdf",
+    params,
+    "faculty_works_summary.pdf"
   );
 }

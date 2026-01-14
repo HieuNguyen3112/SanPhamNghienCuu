@@ -23,7 +23,9 @@
     </div>
 
     <div v-else-if="overviewItems.length === 0" class="p-6">
-      <div class="text-sm text-slate-600">Không có dữ liệu phù hợp bộ lọc.</div>
+      <div class="text-sm text-slate-600">
+        Không có dữ liệu phù hợp bộ lọc.
+      </div>
     </div>
 
     <div v-else class="overflow-auto">
@@ -66,7 +68,7 @@
 
         <tbody>
           <tr
-            v-for="item in pagedItems"
+            v-for="item in overviewItems"
             :key="item.lecturerId"
             class="cursor-pointer hover:bg-slate-50"
             tabindex="0"
@@ -117,12 +119,11 @@
         </tbody>
       </table>
 
-      <!-- ✅ Dùng pagination xài chung -->
       <div class="border-t border-slate-200 px-4 py-3">
         <PaginationControl
-          :total-item-count="overviewItems.length"
-          :current-page-number="currentPageNumber"
-          :page-size="pageSize"
+          :total-item-count="pagination.total"
+          :current-page-number="pagination.page"
+          :page-size="pagination.perPage"
           display-mode="FULL"
           :show-record-summary="true"
           record-summary-mode="PAGE_COUNT"
@@ -136,49 +137,39 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import type { OverviewItem } from "../lecturerResearchWork.contracts";
-
-// ⚠️ sửa path theo đúng nơi bạn đặt component phân trang dùng chung
+import type {
+  OverviewItem,
+  Pagination,
+} from "../lecturerResearchWork.contracts";
 import PaginationControl from "@/shared/components/layout/SharedPaginationControls.vue";
 
 interface SummaryTableProps {
   overviewItems: OverviewItem[];
+  pagination: Pagination;
   isLoading: boolean;
   errorMessage: string | null;
 }
 
 interface SummaryTableEmits {
   (e: "open-lecturer", lecturerId: number): void;
+  (e: "update-page", page: number): void;
+  (e: "update-page-size", perPage: number): void;
 }
 
 const props = defineProps<SummaryTableProps>();
 const emit = defineEmits<SummaryTableEmits>();
-
-const currentPageNumber = ref(1);
-const pageSize = ref(8);
-
-const pagedItems = computed(() => {
-  const startIndex = (currentPageNumber.value - 1) * pageSize.value;
-  return props.overviewItems.slice(startIndex, startIndex + pageSize.value);
-});
-
-watch(
-  () => props.overviewItems,
-  () => {
-    currentPageNumber.value = 1;
-  }
-);
 
 function emitOpenLecturerDrawer(lecturerId: number) {
   emit("open-lecturer", lecturerId);
 }
 
 function updateCurrentPageNumber(nextPageNumber: number) {
-  currentPageNumber.value = nextPageNumber;
+  if (nextPageNumber === props.pagination.page) return;
+  emit("update-page", nextPageNumber);
 }
 
 function updatePageSize(nextPageSize: number) {
-  pageSize.value = nextPageSize;
+  if (nextPageSize === props.pagination.perPage) return;
+  emit("update-page-size", nextPageSize);
 }
 </script>

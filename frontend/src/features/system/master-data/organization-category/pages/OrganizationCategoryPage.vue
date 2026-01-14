@@ -1,4 +1,3 @@
-<!-- src/features/system/master-data/organization-category/pages/OrganizationCategoryPage.vue -->
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
@@ -7,7 +6,7 @@
       >
         <PageHeader
           title="Danh mục tổ chức"
-          subtitle="Quản lý cơ cấu tổ chức phục vụ quản lý giảng viên và công trình NCKH"
+          subtitle="Quản lý cơ cấu tổ chức phục vụ quản lý giảng viên và công trình NCKH."
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"
@@ -45,35 +44,42 @@
       <FacultyTable
         v-if="activeTab === 'faculties'"
         :loading="loading"
-        :items="facultyPagedItems"
+        :items="faculties"
         :total-item-count="facultyTotalItemCount"
         :current-page-number="facultyCurrentPageNumber"
         :page-size="facultyPageSize"
+        :allow-create="!isFacultyScope"
+        :allow-edit="!isFacultyScope"
         v-model:search="facultySearch"
         @create="openCreateFaculty"
         @edit="openEditFaculty"
-        @update:currentPageNumber="facultyCurrentPageNumber = $event"
-        @update:pageSize="facultyPageSize = $event"
+        @update:currentPageNumber="updateFacultyPage"
+        @update:pageSize="updateFacultyPageSize"
       />
 
       <DepartmentTable
         v-else
         :loading="loading"
-        :items="departmentPagedItems"
+        :items="departments"
         :total-item-count="departmentTotalItemCount"
         :current-page-number="departmentCurrentPageNumber"
         :page-size="departmentPageSize"
-        :faculty-options="faculties"
+        :faculty-options="facultyOptions"
+        :allow-create="true"
+        :allow-edit="true"
+        :faculty-select-disabled="isFacultyScope"
+        :show-all-faculty-option="!isFacultyScope"
         v-model:search="departmentSearch"
         v-model:faculty-id="departmentFacultyId"
         @create="openCreateDepartment"
         @edit="openEditDepartment"
-        @update:currentPageNumber="departmentCurrentPageNumber = $event"
-        @update:pageSize="departmentPageSize = $event"
+        @update:currentPageNumber="updateDepartmentPage"
+        @update:pageSize="updateDepartmentPageSize"
       />
 
       <!-- Modals -->
       <FacultyForm
+        v-if="!isFacultyScope"
         :open="facultyFormOpen"
         :loading="loading"
         :editing="editingFaculty"
@@ -85,7 +91,7 @@
         :open="departmentFormOpen"
         :loading="loading"
         :editing="editingDepartment"
-        :faculty-options="faculties"
+        :faculty-options="facultyOptions"
         @close="closeDepartmentForm"
         @submit="saveDepartment"
       />
@@ -97,6 +103,7 @@
 import { computed, onMounted } from "vue";
 import { University, Building2 } from "lucide-vue-next";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
+import { useUserStore } from "@/app/stores/userStore";
 
 import FacultyTable from "../components/FacultyTable.vue";
 import FacultyForm from "../components/FacultyForm.vue";
@@ -105,25 +112,29 @@ import DepartmentForm from "../components/DepartmentForm.vue";
 import { useOrganizationCategory } from "../composables/useOrganizationCategory";
 import type { TabKey } from "../contracts/organizationCategory.contract";
 
+const userStore = useUserStore();
+const scope = userStore.role === "DEPARTMENT_BOARD" ? "FACULTY" : "UNIVERSITY";
+const isFacultyScope = computed(() => scope === "FACULTY");
+
 const {
   activeTab,
   loading,
   error,
 
   faculties,
+  facultyOptions,
+  departments,
 
   facultySearch,
   facultyPageSize,
   facultyCurrentPageNumber,
   facultyTotalItemCount,
-  facultyPagedItems,
 
   departmentSearch,
   departmentFacultyId,
   departmentPageSize,
   departmentCurrentPageNumber,
   departmentTotalItemCount,
-  departmentPagedItems,
 
   facultyFormOpen,
   editingFaculty,
@@ -140,11 +151,20 @@ const {
   saveDepartment,
 
   refreshAll,
-} = useOrganizationCategory();
+
+  updateFacultyPage,
+  updateFacultyPageSize,
+  updateDepartmentPage,
+  updateDepartmentPageSize,
+} = useOrganizationCategory(scope);
 
 const tabList = [
   { key: "faculties" as const, label: "Khoa", icon: University },
-  { key: "departments" as const, label: "Đơn vị trực thuộc", icon: Building2 },
+  {
+    key: "departments" as const,
+    label: "Đơn vị trực thuộc",
+    icon: Building2,
+  },
 ];
 
 function tabButtonClass(key: TabKey) {

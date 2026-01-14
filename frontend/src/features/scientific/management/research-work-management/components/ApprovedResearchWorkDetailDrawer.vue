@@ -38,7 +38,7 @@
                   <span
                     class="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
                   >
-                    Approved
+                    Đã duyệt
                   </span>
                   <div class="text-xs text-slate-500">
                     {{ detail ? detail.academicYearCode : "" }}
@@ -50,11 +50,11 @@
                   {{ detail?.title ?? "Chi tiết công trình" }}
                 </div>
                 <div class="mt-1 text-sm text-slate-600">
-                  {{ detail?.typeName ?? detail?.kindName ?? "—" }}
+                  {{ detail?.typeName ?? detail?.kindName ?? "-" }}
                   <span class="text-slate-300">•</span>
                   <span
-                    >Approved:
-                    {{ detail ? formatDate(detail.approvedAt) : "—" }}</span
+                    >Đã duyệt:
+                    {{ detail ? formatDate(detail.approvedAt) : "-" }}</span
                   >
                 </div>
               </div>
@@ -123,8 +123,8 @@
                     <div class="text-xs text-slate-600">
                       {{
                         author.contributionShare
-                          ? `Tỷ lệ: ${author.contributionShare}`
-                          : "—"
+                          ? `Tỉ lệ: ${author.contributionShare}`
+                          : "-"
                       }}
                     </div>
                   </li>
@@ -229,7 +229,7 @@
                   <div>
                     <span class="text-slate-500">Người duyệt:</span>
                     <span class="font-medium text-slate-900">
-                      {{ detail.finalApproval.decidedByUserName ?? "—" }}
+                      {{ detail.finalApproval.decidedByUserName ?? "-" }}
                     </span>
                   </div>
                   <div>
@@ -238,7 +238,7 @@
                       {{
                         detail.finalApproval.decidedAt
                           ? formatDate(detail.finalApproval.decidedAt)
-                          : "—"
+                          : "-"
                       }}
                     </span>
                   </div>
@@ -265,6 +265,8 @@ import type {
   Evidence,
 } from "../lecturerResearchWork.contracts";
 import { ArrowLeftToLine } from "lucide-vue-next";
+import http from "@/lib/http";
+
 interface DetailDrawerProps {
   isOpen: boolean;
   detail: ApprovedDetail | null;
@@ -276,7 +278,8 @@ interface DetailDrawerEmits {
   (e: "back"): void;
   (e: "close"): void;
 }
-const detailEmptyEvidenceMessage = "Chưa có minh chứng cho công trình này.";
+const detailEmptyEvidenceMessage =
+  "Chưa có minh chứng cho công trình này.";
 
 const props = defineProps<DetailDrawerProps>();
 const emit = defineEmits<DetailDrawerEmits>();
@@ -308,10 +311,10 @@ function formatDate(iso: string) {
   return date.toLocaleString("vi-VN");
 }
 
-function formatFileSize(sizeBytes: number) {
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return "0 B";
+function formatFileSize(sizeBytes: number | null) {
+  if (!Number.isFinite(sizeBytes) || (sizeBytes ?? 0) <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
-  let value = sizeBytes;
+  let value = sizeBytes as number;
   let unitIndex = 0;
   while (value >= 1024 && unitIndex < units.length - 1) {
     value /= 1024;
@@ -321,10 +324,20 @@ function formatFileSize(sizeBytes: number) {
 }
 
 function openEvidenceUrl(item: Evidence) {
-  // NOTE: production should build signed URL if disk='s3'
-  // Here we demo with a pseudo-public url.
-  const evidenceUrl =
-    item.disk === "s3" ? `https://example.com/${item.path}` : item.path;
-  window.open(evidenceUrl, "_blank", "noreferrer");
+  const baseUrl = http.defaults.baseURL ?? window.location.origin;
+
+  if (item.disk === "url") {
+    window.open(item.path, "_blank", "noreferrer");
+    return;
+  }
+
+  const rawUrl = item.downloadUrl ?? item.path;
+  if (!rawUrl) return;
+
+  const resolvedUrl = rawUrl.startsWith("http")
+    ? rawUrl
+    : new URL(rawUrl, baseUrl).toString();
+
+  window.open(resolvedUrl, "_blank", "noreferrer");
 }
 </script>

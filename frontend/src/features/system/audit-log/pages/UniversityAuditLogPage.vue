@@ -5,6 +5,7 @@
         v-model="draftFilters"
         :actors="actors"
         :faculties="faculties"
+        :action-code-options="actionCodeOptions"
         :group-options="groupOptions"
         :show-faculty-filter="true"
         :is-loading="isLoading"
@@ -28,6 +29,8 @@
       <AuditLogDetailDrawer
         :open="!!selectedEntry"
         :entry="selectedEntry"
+        :loading="detailLoading"
+        :error="detailError"
         @close="closeDetail"
         @view-target="onViewTarget"
       />
@@ -53,8 +56,11 @@ const router = useRouter();
 const {
   isLoading,
   error,
+  detailLoading,
+  detailError,
   actors,
   faculties,
+  actionCodeOptions,
   draftFilters,
   dateRangeInvalid,
   page,

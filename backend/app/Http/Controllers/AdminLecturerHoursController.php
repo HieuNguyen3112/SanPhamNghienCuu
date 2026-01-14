@@ -101,9 +101,9 @@ class AdminLecturerHoursController extends Controller
                 'lecturer_id' => (int) $lecturerRow->lecturer_id,
                 'lecturer_code' => $lecturerRow->lecturer_code,
                 'lecturer_full_name' => $lecturerRow->lecturer_full_name,
-                'faculty_id' => $lecturerRow->faculty_id,
+                'faculty_id' => $lecturerRow->faculty_id ? (int) $lecturerRow->faculty_id : null,
                 'faculty_name' => $lecturerRow->faculty_name,
-                'department_id' => $lecturerRow->department_id,
+                'department_id' => $lecturerRow->department_id ? (int) $lecturerRow->department_id : null,
                 'department_name' => $lecturerRow->department_name,
                 'degree_name' => $lecturerRow->degree_name,
                 'academic_rank_name' => $lecturerRow->academic_rank_name,
@@ -116,7 +116,7 @@ class AdminLecturerHoursController extends Controller
                 'kpi_status' => $kpiStatus,
                 'rows' => $detailRows,
             ],
-        ], Response::HTTP_OK);
+        ], Response::HTTP_OK, [], JSON_PRESERVE_ZERO_FRACTION);
     }
 
     public function exportSummaryExcel(Request $request)
@@ -230,9 +230,9 @@ class AdminLecturerHoursController extends Controller
                 'lecturer_id' => (int) $row->lecturer_id,
                 'lecturer_code' => $row->lecturer_code,
                 'lecturer_full_name' => $row->lecturer_full_name,
-                'faculty_id' => $row->faculty_id,
+                'faculty_id' => $row->faculty_id ? (int) $row->faculty_id : null,
                 'faculty_name' => $row->faculty_name,
-                'department_id' => $row->department_id,
+                'department_id' => $row->department_id ? (int) $row->department_id : null,
                 'department_name' => $row->department_name,
                 'degree_name' => $row->degree_name,
                 'academic_rank_name' => $row->academic_rank_name,

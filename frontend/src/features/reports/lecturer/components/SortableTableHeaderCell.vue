@@ -19,25 +19,15 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-
-export type LecturerSortFieldIdentifier =
-  | "lecturerFullName"
-  | "departmentName"
-  | "genderCategory"
-  | "educationLevelCategory"
-  | "academicRankCategory"
-  | "teachingExperienceYears";
-
-export type LecturerSortDirection = "Ascending" | "Descending";
-
-export interface LecturerSortCondition {
-  sortFieldIdentifier: LecturerSortFieldIdentifier;
-  sortDirection: LecturerSortDirection;
-}
+import type {
+  LecturerSortCondition,
+  LecturerSortDirection,
+  LecturerSortField,
+} from "../lecturerReportTypes";
 
 const componentProperties = defineProps<{
   headerTitle: string;
-  sortFieldIdentifier: LecturerSortFieldIdentifier;
+  sortFieldIdentifier: LecturerSortField;
   currentSortCondition: LecturerSortCondition;
   isRightAligned?: boolean;
 }>();
@@ -58,7 +48,7 @@ const isActiveSortField = computed(() => {
 
 const sortDirectionIconText = computed(() => {
   if (!isActiveSortField.value) return "↕";
-  return componentProperties.currentSortCondition.sortDirection === "Ascending"
+  return componentProperties.currentSortCondition.sortDirection === "asc"
     ? "↑"
     : "↓";
 });
@@ -66,9 +56,9 @@ const sortDirectionIconText = computed(() => {
 function requestSortChange() {
   const nextSortDirection: LecturerSortDirection =
     isActiveSortField.value &&
-    componentProperties.currentSortCondition.sortDirection === "Ascending"
-      ? "Descending"
-      : "Ascending";
+    componentProperties.currentSortCondition.sortDirection === "asc"
+      ? "desc"
+      : "asc";
 
   emitComponentEvent("sortRequested", {
     sortFieldIdentifier: componentProperties.sortFieldIdentifier,

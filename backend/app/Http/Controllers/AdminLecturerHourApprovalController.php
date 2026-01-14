@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
+use App\Support\AuditLogger;
 
 class AdminLecturerHourApprovalController extends Controller
 {
@@ -239,6 +240,29 @@ class AdminLecturerHourApprovalController extends Controller
                 'updated_at' => now(),
             ]);
 
+        $context = $this->buildHoursApprovalContext($stageId, $requestId);
+        AuditLogger::log($request, [
+            'action_group' => 'approval',
+            'action_code' => 'HOURS_APPROVED',
+            'action_label' => 'Duyệt giờ NCKH',
+            'severity' => 'important',
+            'result_status' => 'success',
+            'target_type' => 'hours_request',
+            'target_id' => $requestId,
+            'target_display' => $context['lecturer_name']
+                ? 'Yêu cầu duyệt giờ: ' . $context['lecturer_name']
+                : 'Yêu cầu duyệt giờ',
+            'faculty_id' => $context['faculty_id'],
+            'request_http_status' => Response::HTTP_OK,
+            'changes' => [
+                'lecturer_id' => $requestId,
+                'lecturer_code' => $context['lecturer_code'],
+                'academic_year_code' => $context['academic_year_code'],
+                'works_count' => $context['works_count'],
+                'total_hours' => $context['total_hours'],
+            ],
+        ], $request->user());
+
         return $this->show($request, $requestId);
     }
 
@@ -287,6 +311,31 @@ class AdminLecturerHourApprovalController extends Controller
                 'updated_at' => now(),
             ]);
 
+        $context = $this->buildHoursApprovalContext($stageId, $requestId);
+        AuditLogger::log($request, [
+            'action_group' => 'approval',
+            'action_code' => 'HOURS_REJECTED',
+            'action_label' => 'Từ chối duyệt giờ NCKH',
+            'severity' => 'important',
+            'result_status' => 'success',
+            'target_type' => 'hours_request',
+            'target_id' => $requestId,
+            'target_display' => $context['lecturer_name']
+                ? 'Yêu cầu duyệt giờ: ' . $context['lecturer_name']
+                : 'Yêu cầu duyệt giờ',
+            'faculty_id' => $context['faculty_id'],
+            'request_http_status' => Response::HTTP_OK,
+            'changes' => [
+                'lecturer_id' => $requestId,
+                'lecturer_code' => $context['lecturer_code'],
+                'academic_year_code' => $context['academic_year_code'],
+                'works_count' => $context['works_count'],
+                'total_hours' => $context['total_hours'],
+                'reason_code' => $validated['reason_code'],
+                'reason_detail' => $validated['reason_detail'] ?? null,
+            ],
+        ], $request->user());
+
         return $this->show($request, $requestId);
     }
 
@@ -307,6 +356,45 @@ class AdminLecturerHourApprovalController extends Controller
     {
         $id = DB::table('approval_stages')->where('code', 'hours')->value('id');
         return $id ? (int) $id : null;
+    }
+
+    private function buildHoursApprovalContext(int $stageId, int $lecturerId): array
+    {
+        $lecturer = DB::table('lecturers as l')
+            ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
+            ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
+            ->where('l.id', $lecturerId)
+            ->select([
+                'l.code as lecturer_code',
+                'l.full_name as lecturer_name',
+                'f.id as faculty_id',
+                'f.name as faculty_name',
+            ])
+            ->first();
+
+        $summary = DB::table('activity_approvals as aa')
+            ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturerId);
+            })
+            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+            ->where('aa.stage_id', $stageId)
+            ->where('ra.owner_lecturer_id', $lecturerId)
+            ->selectRaw('COUNT(DISTINCT ra.id) as works_count')
+            ->selectRaw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as total_hours')
+            ->selectRaw('MAX(ay.code) as academic_year_code')
+            ->first();
+
+        return [
+            'lecturer_code' => $lecturer?->lecturer_code,
+            'lecturer_name' => $lecturer?->lecturer_name,
+            'faculty_id' => $lecturer?->faculty_id ? (int) $lecturer->faculty_id : null,
+            'faculty_name' => $lecturer?->faculty_name,
+            'works_count' => $summary?->works_count ? (int) $summary->works_count : 0,
+            'total_hours' => $summary?->total_hours ? (float) $summary->total_hours : 0.0,
+            'academic_year_code' => $summary?->academic_year_code,
+        ];
     }
 
     private function statusLabel(string $status): string

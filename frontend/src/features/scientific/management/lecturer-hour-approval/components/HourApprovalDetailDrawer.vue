@@ -30,7 +30,6 @@
         aria-modal="true"
       >
         <div class="flex h-full flex-col">
-          <!-- Header -->
           <div class="border-b border-slate-200 px-4 py-4 lg:px-5">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -79,7 +78,6 @@
             </div>
           </div>
 
-          <!-- Body -->
           <div class="flex-1 overflow-auto px-4 py-4 lg:px-5">
             <div v-if="loadingDetail" class="text-sm text-slate-700">
               Đang tải chi tiết...
@@ -102,9 +100,9 @@
                 <div class="text-sm font-semibold text-slate-900">
                   Danh sách công trình trong yêu cầu
                 </div>
-                <span class="text-xs text-slate-500"
-                  >Chỉ hiển thị công trình đã duyệt nội dung</span
-                >
+                <span class="text-xs text-slate-500">
+                  Chỉ hiển thị công trình đã duyệt nội dung
+                </span>
               </div>
 
               <div class="overflow-hidden rounded-xl border border-slate-200">
@@ -171,7 +169,6 @@
             </template>
           </div>
 
-          <!-- Action bar -->
           <div class="border-t border-slate-200 bg-white px-4 py-3 lg:px-5">
             <div class="flex items-center justify-between gap-2">
               <div v-if="detail" class="text-xs text-slate-600">

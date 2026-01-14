@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <ResearchHourWarningManagementPage :service="service" />
 </template>
 
@@ -6,8 +6,5 @@
 import ResearchHourWarningManagementPage from "./ResearchHourWarningManagementPage.vue";
 import { createFacultyResearchHourWarningService } from "../services/researchHourWarningService";
 
-// TODO: lấy facultyIdentifier từ auth/session (claims) thay vì hardcode
-const service = createFacultyResearchHourWarningService({
-  facultyIdentifierLocked: "CNTT",
-});
+const service = createFacultyResearchHourWarningService();
 </script>

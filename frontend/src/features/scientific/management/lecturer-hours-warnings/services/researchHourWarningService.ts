@@ -1,4 +1,4 @@
-import http from "@/lib/http";
+﻿import http from "@/lib/http";
 import type {
   AcademicYearIdentifier,
   FacultyIdentifier,
@@ -25,7 +25,10 @@ function normalizeParams(params: Record<string, string>) {
   return cleaned;
 }
 
-async function fetchOverview(filter: ResearchHourWarningFilterDTO) {
+async function fetchOverview(
+  filter: ResearchHourWarningFilterDTO,
+  basePath: string
+) {
   const params = normalizeParams({
     faculty_identifier: filter.faculty_identifier,
     academic_year_identifier: filter.academic_year_identifier,
@@ -35,57 +38,40 @@ async function fetchOverview(filter: ResearchHourWarningFilterDTO) {
   });
 
   const { data } = await http.get<{ data: LecturerResearchHourWarningOverviewDTO }>(
-    "/api/admin/hours/warnings",
+    basePath,
     { params }
   );
 
   return data.data;
 }
 
-async function sendWarning(payload: RequestWarningNotificationDTO) {
-  await http.post(
-    `/api/admin/hours/warnings/${payload.lecturer_identifier}/send`,
-    payload
-  );
+async function sendWarning(
+  payload: RequestWarningNotificationDTO,
+  basePath: string
+) {
+  await http.post(`${basePath}/${payload.lecturer_identifier}/send`, payload);
 }
 
 export function createUniversityResearchHourWarningService(): ResearchHourWarningService {
+  const basePath = "/api/admin/hours/warnings";
   return {
     async getOverview(filter) {
-      return fetchOverview(filter);
+      return fetchOverview(filter, basePath);
     },
     async requestWarningNotification(payload) {
-      await sendWarning(payload);
+      await sendWarning(payload, basePath);
     },
   };
 }
 
-export function createFacultyResearchHourWarningService(params: {
-  facultyIdentifierLocked: FacultyIdentifier;
-}): ResearchHourWarningService {
+export function createFacultyResearchHourWarningService(): ResearchHourWarningService {
+  const basePath = "/api/faculty/hours/warnings";
   return {
     async getOverview(filter) {
-      const normalizedFilter: ResearchHourWarningFilterDTO = {
-        ...filter,
-        faculty_identifier: params.facultyIdentifierLocked,
-      };
-
-      const dto = await fetchOverview(normalizedFilter);
-      const locked = params.facultyIdentifierLocked;
-
-      const facultyOptionList = dto.faculty_option_list.filter(
-        (f) =>
-          f.faculty_identifier === locked || f.faculty_short_name === locked
-      );
-
-      return {
-        ...dto,
-        faculty_option_list:
-          facultyOptionList.length > 0 ? facultyOptionList : dto.faculty_option_list,
-      };
+      return fetchOverview(filter, basePath);
     },
     async requestWarningNotification(payload) {
-      await sendWarning(payload);
+      await sendWarning(payload, basePath);
     },
   };
 }

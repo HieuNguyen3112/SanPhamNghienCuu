@@ -26,21 +26,21 @@ const config = computed<ChartConfiguration>(() => ({
       {
         label: "ISI",
         data: props.isi,
-        backgroundColor: "rgba(15, 23, 42, 0.25)", // slate-900 soft
+        backgroundColor: "rgba(15, 23, 42, 0.25)",
         borderWidth: 0,
         stack: "stack-1",
       },
       {
         label: "Scopus",
         data: props.scopus,
-        backgroundColor: "rgba(59, 130, 246, 0.22)", // blue-500 soft
+        backgroundColor: "rgba(59, 130, 246, 0.22)",
         borderWidth: 0,
         stack: "stack-1",
       },
       {
         label: "Hội nghị",
         data: props.conference,
-        backgroundColor: "rgba(100, 116, 139, 0.25)", // slate-500 soft
+        backgroundColor: "rgba(100, 116, 139, 0.25)",
         borderWidth: 0,
         stack: "stack-1",
       },

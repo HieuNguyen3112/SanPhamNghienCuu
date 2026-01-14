@@ -58,7 +58,9 @@ export function useHourApprovalManagement(
       page.value = response.data.pagination.page;
       perPage.value = response.data.pagination.per_page;
     } catch (e) {
-      errorList.value = e instanceof Error ? e.message : String(e);
+      // eslint-disable-next-line no-console
+      console.error(e);
+      errorList.value = "Không tải được dữ liệu. Vui lòng thử lại.";
       rows.value = [];
       total.value = 0;
       lastPage.value = 1;
@@ -90,7 +92,9 @@ export function useHourApprovalManagement(
       const dto = await service.getRequestDetail(requestId);
       requestDetail.value = hourApprovalMappers.detailFromDto(dto);
     } catch (e) {
-      errorDetail.value = e instanceof Error ? e.message : String(e);
+      // eslint-disable-next-line no-console
+      console.error(e);
+      errorDetail.value = "Không tải được chi tiết. Vui lòng thử lại.";
       requestDetail.value = null;
     } finally {
       loadingDetail.value = false;
@@ -114,7 +118,9 @@ export function useHourApprovalManagement(
         await openRequestDetail(requestId);
       }
     } catch (e) {
-      errorApprove.value = e instanceof Error ? e.message : String(e);
+      // eslint-disable-next-line no-console
+      console.error(e);
+      errorApprove.value = "Không thể duyệt yêu cầu. Vui lòng thử lại.";
     } finally {
       loadingApprove.value = false;
     }
@@ -133,7 +139,9 @@ export function useHourApprovalManagement(
         await openRequestDetail(requestId);
       }
     } catch (e) {
-      errorReject.value = e instanceof Error ? e.message : String(e);
+      // eslint-disable-next-line no-console
+      console.error(e);
+      errorReject.value = "Không thể từ chối yêu cầu. Vui lòng thử lại.";
     } finally {
       loadingReject.value = false;
     }

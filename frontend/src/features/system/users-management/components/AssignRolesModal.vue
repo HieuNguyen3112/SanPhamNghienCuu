@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="open" class="fixed inset-0 z-50">
     <div class="absolute inset-0 bg-slate-900/40" @click="emit('close')" />
 
@@ -15,8 +15,8 @@
                 Phân quyền tài khoản
               </div>
               <div class="mt-1 text-xs text-slate-500">
-                Việc phân quyền ảnh hưởng đến phạm vi truy cập dữ liệu. Vui lòng
-                kiểm tra kỹ trước khi lưu.
+                Việc phân quyền ảnh hưởng đến phạm vi truy cập dữ liệu. Vui
+                lòng kiểm tra kỹ trước khi lưu.
               </div>
             </div>
             <button

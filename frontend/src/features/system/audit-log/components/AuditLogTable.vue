@@ -86,9 +86,7 @@
                 class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1"
                 :class="resultBadgeClass(row.result.status)"
               >
-                {{
-                  row.result.status === "success" ? "Thành công" : "Thất bại"
-                }}
+                {{ row.result.status === "success" ? "Thành công" : "Thất bại" }}
               </span>
             </td>
           </tr>
@@ -96,7 +94,6 @@
       </table>
     </div>
 
-    <!-- Pagination (MUST use SharedPaginationControls) -->
     <div class="border-t border-slate-200 px-4 py-3 md:px-6">
       <SharedPaginationControls
         :total-item-count="totalItems"
@@ -128,14 +125,12 @@ import {
   ClipboardCheck,
 } from "lucide-vue-next";
 
-// ✅ dùng component bạn đưa (đổi đúng path theo dự án)
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
-const props = defineProps<{
+defineProps<{
   entries: AuditLogEntry[];
   isLoading: boolean;
   error: string | null;
-
   page: number;
   pageSize: number;
   totalItems: number;

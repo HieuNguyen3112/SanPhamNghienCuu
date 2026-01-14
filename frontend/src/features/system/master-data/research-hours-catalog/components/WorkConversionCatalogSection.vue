@@ -96,7 +96,7 @@
               <td class="px-4 py-4 text-slate-600" colspan="6">Đang tải...</td>
             </tr>
 
-            <tr v-else-if="vm.filteredRows.length === 0">
+            <tr v-else-if="vm.rows.length === 0">
               <td class="px-4 py-4 text-slate-600" colspan="6">
                 Không có dữ liệu.
               </td>
@@ -104,7 +104,7 @@
 
             <tr
               v-else
-              v-for="r in pagedRows"
+              v-for="r in vm.rows"
               :key="r.id"
               class="border-t border-slate-100 hover:bg-slate-50"
             >
@@ -164,17 +164,16 @@
 
       <!-- Pagination (required by project) -->
       <div class="border-t border-slate-200 bg-white px-4 py-3">
-        <!-- TODO: ensure import path matches project -->
         <SharedPaginationControls
-          :total-item-count="vm.filteredRows.length"
-          :current-page-number="currentPageNumber"
-          :page-size="pageSize"
+          :total-item-count="vm.totalItems"
+          :current-page-number="vm.page"
+          :page-size="vm.pageSize"
           display-mode="FULL"
           record-summary-mode="PAGE_COUNT"
           record-summary-unit-label="quy đổi"
           container-class-name="w-full"
-          @update:currentPageNumber="currentPageNumber = $event"
-          @update:pageSize="pageSize = $event"
+          @update:currentPageNumber="vm.setPage"
+          @update:pageSize="vm.setPageSize"
         />
       </div>
     </div>
@@ -292,12 +291,10 @@
             v-model.trim="vm.draft.notes"
             rows="3"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-            placeholder="TODO(P1): hour_rules.notes (schema chưa có) — hiện chỉ hiển thị ở UI."
+            placeholder="Nh?p ghi ch? (kh?ng l?u v?o h? th?ng)"
           ></textarea>
           <p class="mt-1 text-xs text-slate-500">
-            TODO(P1): cần thêm
-            <code class="rounded bg-slate-100 px-1">hour_rules.notes</code> để
-            lưu ghi chú.
+            Ghi ch? ch? hi?n th? t?i UI, kh?ng l?u v?o CSDL.
           </p>
           <p v-if="vm.draftErrors.notes" class="mt-1 text-xs text-rose-600">
             {{ vm.draftErrors.notes }}
@@ -324,12 +321,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive } from "vue";
 import { Plus, Pencil, CheckCircle2, PauseCircle, Lock } from "lucide-vue-next";
 import CatalogModalShell from "./CatalogModalShell.vue";
 import ConfirmActionModal from "./ConfirmActionModal.vue";
 
-// TODO: ensure correct shared component path in your project
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 import type { WorkConversionErrors } from "../contracts/researchHoursCatalog.contract";
 import type { WorkConversionRow } from "../contracts/researchHoursCatalog.contract";
@@ -345,7 +341,10 @@ const props = defineProps<{
       status: "ALL" | "ACTIVE" | "INACTIVE";
       q: string;
     };
-    filteredRows: WorkConversionRow[];
+    rows: WorkConversionRow[];
+    page: number;
+    pageSize: number;
+    totalItems: number;
 
     academicYearOptions: Array<{ value: number; label: string }>;
     kindOptions: Array<{ value: number; label: string }>;
@@ -367,37 +366,10 @@ const props = defineProps<{
     closeModal: () => void;
     save: () => Promise<void> | void;
     setActiveWithConfirm: (id: number, isActive: boolean) => Promise<void>;
+    setPage: (page: number) => void;
+    setPageSize: (pageSize: number) => void;
   };
 }>();
-const currentPageNumber = ref(1);
-const pageSize = ref(10);
-
-const pagedRows = computed<WorkConversionRow[]>(() => {
-  const start = (currentPageNumber.value - 1) * pageSize.value;
-  return props.vm.filteredRows.slice(start, start + pageSize.value);
-});
-
-// reset về trang 1 khi filter/search đổi
-watch(
-  () => [
-    props.vm.filter.academicYearId,
-    props.vm.filter.status,
-    props.vm.filter.q,
-  ],
-  () => {
-    currentPageNumber.value = 1;
-  }
-);
-
-// clamp nếu pageSize đổi hoặc số dòng đổi làm vượt trang
-watch(
-  () => [props.vm.filteredRows.length, pageSize.value],
-  () => {
-    const total = props.vm.filteredRows.length;
-    const maxPage = Math.max(1, Math.ceil(total / pageSize.value));
-    if (currentPageNumber.value > maxPage) currentPageNumber.value = maxPage;
-  }
-);
 
 // map select option 0 -> null for typeId
 const typeIdOrZero = computed<number>({

@@ -8,8 +8,7 @@
       <div class="text-sm text-slate-600">
         <div class="font-medium text-slate-900">Năm học / Đợt tính giờ</div>
         <div class="mt-0.5 text-xs text-slate-500">
-          TODO(P0): “Đợt” + “Đã khóa” cần schema/DTO; hiện hiển thị mock để đúng
-          UI spec.
+          Quản lý năm học áp dụng tính giờ NCKH.
         </div>
       </div>
 
@@ -86,7 +85,7 @@
               <td class="px-4 py-4 text-slate-600" colspan="5">Đang tải...</td>
             </tr>
 
-            <tr v-else-if="vm.filteredRows.length === 0">
+            <tr v-else-if="vm.rows.length === 0">
               <td class="px-4 py-4 text-slate-600" colspan="5">
                 Không có dữ liệu.
               </td>
@@ -94,7 +93,7 @@
 
             <tr
               v-else
-              v-for="r in pagedRows"
+              v-for="r in vm.rows"
               :key="`${r.kind}-${r.id}`"
               class="border-t border-slate-100 hover:bg-slate-50"
             >
@@ -132,13 +131,15 @@
                     type="button"
                     class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                     :disabled="r.isLocked || r.kind !== 'academic_year'"
-                    @click="r.kind === 'academic_year' && vm.openEditYear(r)"
+                    @click="
+                      r.kind === 'academic_year' && !r.isLocked && vm.openEditYear(r)
+                    "
                     :title="
                       r.kind !== 'academic_year'
-                        ? 'TODO(P0): edit period cần backend'
+                        ? 'Chỉ cho phép sửa năm học'
                         : r.isLocked
                         ? 'Đã khóa'
-                        : 'Sửa'
+                        : ''
                     "
                   >
                     <Pencil class="h-3.5 w-3.5" />
@@ -163,15 +164,15 @@
 
       <div class="border-t border-slate-200 bg-white px-4 py-3">
         <SharedPaginationControls
-          :total-item-count="vm.filteredRows.length"
-          :current-page-number="currentPageNumber"
-          :page-size="pageSize"
+          :total-item-count="vm.totalItems"
+          :current-page-number="vm.page"
+          :page-size="vm.pageSize"
           display-mode="FULL"
           record-summary-mode="PAGE_COUNT"
           record-summary-unit-label="mốc thời gian"
           container-class-name="w-full"
-          @update:currentPageNumber="currentPageNumber = $event"
-          @update:pageSize="pageSize = $event"
+          @update:currentPageNumber="vm.setPage"
+          @update:pageSize="vm.setPageSize"
         />
       </div>
     </div>
@@ -211,7 +212,7 @@
             <option value="active">Đang áp dụng</option>
           </select>
           <p class="mt-1 text-xs text-slate-500">
-            TODO: backend cần enforce chỉ 1 năm học “Đang áp dụng”.
+            Hệ thống chỉ cho phép một năm học “Đang áp dụng”.
           </p>
         </div>
 
@@ -243,12 +244,6 @@
           </p>
         </div>
 
-        <div
-          class="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
-        >
-          TODO(P0): “Đợt tính giờ” cần bảng/endpoint riêng. “Đã khóa” nên là
-          status/flag từ backend.
-        </div>
       </div>
     </CatalogModalShell>
 
@@ -269,7 +264,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { reactive } from "vue";
 import { Plus, Pencil, CheckCircle2, PauseCircle, Lock } from "lucide-vue-next";
 import CatalogModalShell from "./CatalogModalShell.vue";
 import ConfirmActionModal from "./ConfirmActionModal.vue";
@@ -289,7 +284,10 @@ const props = defineProps<{
       status: "ALL" | "active" | "inactive" | "locked";
       q: string;
     };
-    filteredRows: AcademicYearPeriodRow[];
+    rows: AcademicYearPeriodRow[];
+    page: number;
+    pageSize: number;
+    totalItems: number;
 
     statusLabel: (s: "active" | "inactive" | "locked") => string;
 
@@ -307,36 +305,10 @@ const props = defineProps<{
     closeModal: () => void;
     saveYear: () => Promise<void> | void;
     setActiveYearWithConfirm: (id: number) => Promise<void>;
+    setPage: (page: number) => void;
+    setPageSize: (pageSize: number) => void;
   };
 }>();
-
-// ✅ Pagination state đúng theo SharedPaginationControls
-const currentPageNumber = ref(1);
-const pageSize = ref(10);
-
-// ✅ Slice rows theo trang
-const pagedRows = computed<AcademicYearPeriodRow[]>(() => {
-  const start = (currentPageNumber.value - 1) * pageSize.value;
-  return props.vm.filteredRows.slice(start, start + pageSize.value);
-});
-
-// ✅ Reset về trang 1 khi filter/search thay đổi
-watch(
-  () => [props.vm.filter.kind, props.vm.filter.status, props.vm.filter.q],
-  () => {
-    currentPageNumber.value = 1;
-  }
-);
-
-// ✅ Clamp page nếu pageSize đổi làm “vượt trang”
-watch(
-  () => [props.vm.filteredRows.length, pageSize.value],
-  () => {
-    const total = props.vm.filteredRows.length;
-    const maxPage = Math.max(1, Math.ceil(total / pageSize.value));
-    if (currentPageNumber.value > maxPage) currentPageNumber.value = maxPage;
-  }
-);
 
 const confirm = reactive({
   open: false,

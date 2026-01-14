@@ -1,66 +1,74 @@
-export type HoursAlertLevelDTO = "danger" | "warning" | "info";
+export type HoursWarningSeverityDTO = "danger" | "warning" | "info";
+export type HoursWarningsTabDTO = "all" | "danger" | "warning" | "done";
+export type HoursWarningStatusDTO = "unseen" | "seen" | "resolved";
 
-export type HoursAlertsFilterStatus = "all" | "danger" | "warning" | "done";
-
-/**
- * DTO (snake_case) - backend computed (P0)
- * Sources:
- * - lecturer_yearly_hours.hours_total
- * - workload_quotas.required_hours
- * - academic_years.code
- * - academic_years.end_date (proxy deadline) OR academic_years.hours_declaration_deadline (future)
- */
-export interface HoursAlertsSummaryDTO {
+export interface HoursWarningsSummaryDTO {
+  academic_year_id: number;
   academic_year_code: string;
-  hours_total: number;
   required_hours: number;
-
-  // P0: deadline field missing in schema -> derived/proxy
-  deadline_date: string; // DATE ISO (YYYY-MM-DD)
-  days_remaining: number; // derived (can be negative)
+  approved_hours: number;
+  pending_hours: number;
+  rejected_hours: number;
+  total_hours_current: number;
+  shortage_hours: number;
+  deadline_date: string | null;
+  days_remaining: number | null;
 }
 
-export interface HoursAlertItemDTO {
-  id: number; // derived
-  level: HoursAlertLevelDTO;
-
-  title: string; // derived
-  description: string; // derived
-
-  // optional time hints
-  updated_at: string | null; // DATETIME ISO (derived from e.g. lecturer_yearly_hours.updated_at)
-  deadline_date: string | null; // DATE ISO
-
-  // CTA
-  cta_label: string | null; // derived
-  cta_to: string | null; // route path (derived)
-
-  // P0: needs persistence table -> mock only
-  is_seen: boolean;
+export interface HoursWarningItemDTO {
+  id: number;
+  type_key: string;
+  severity_key: HoursWarningSeverityDTO;
+  title: string;
+  message: string;
+  status_key: HoursWarningStatusDTO;
+  updated_at: string | null;
+  deadline_at: string | null;
+  action?: {
+    label?: string | null;
+    route_path?: string | null;
+    external_url?: string | null;
+  };
 }
 
-export interface HoursAlertActionSuggestionDTO {
-  id: number; // derived
+export interface HoursWarningSuggestionDTO {
+  id: number;
   title: string;
   description: string;
   cta_label: string | null;
   cta_to: string | null;
 }
 
+export interface HoursWarningsResponseDTO {
+  summary: HoursWarningsSummaryDTO;
+  tab_counts: { all: number; danger: number; warning: number; done: number };
+  items: HoursWarningItemDTO[];
+  pagination: { page: number; per_page: number; total: number; last_page: number };
+  suggestions: HoursWarningSuggestionDTO[];
+}
+
+export interface HoursWarningSeenResponseDTO {
+  id: number;
+  status_key: HoursWarningStatusDTO;
+  seen_at: string | null;
+}
+
 /* =========================
  * UI Models (camelCase)
  * ========================= */
-export type HoursAlertLevel = "danger" | "warning" | "info";
-export type HoursAlertsFilter = HoursAlertsFilterStatus;
+export type HoursAlertLevel = HoursWarningSeverityDTO;
+export type HoursAlertsFilter = HoursWarningsTabDTO;
 
 export interface HoursAlertsSummary {
   academicYearCode: string;
-  hoursTotal: number;
   requiredHours: number;
-  missingHours: number;
-
-  deadlineDate: string;
-  daysRemaining: number;
+  approvedHours: number;
+  pendingHours: number;
+  rejectedHours: number;
+  totalHoursCurrent: number;
+  shortageHours: number;
+  deadlineDate: string | null;
+  daysRemaining: number | null;
 }
 
 export interface HoursAlertItem {
@@ -68,13 +76,13 @@ export interface HoursAlertItem {
   level: HoursAlertLevel;
   title: string;
   description: string;
-
+  statusKey: HoursWarningStatusDTO;
+  statusLabel: string;
   updatedAt: string | null;
   deadlineDate: string | null;
-
   ctaLabel: string | null;
   ctaTo: string | null;
-
+  ctaExternal: boolean;
   isSeen: boolean;
 }
 
@@ -90,37 +98,49 @@ export interface HoursAlertActionSuggestion {
  * Mappers
  * ========================= */
 export function hoursAlertsSummaryFromDto(
-  dto: HoursAlertsSummaryDTO
+  dto: HoursWarningsSummaryDTO
 ): HoursAlertsSummary {
-  const missing = Math.max(0, dto.required_hours - dto.hours_total);
-
   return {
     academicYearCode: dto.academic_year_code,
-    hoursTotal: dto.hours_total,
     requiredHours: dto.required_hours,
-    missingHours: missing,
-
+    approvedHours: dto.approved_hours,
+    pendingHours: dto.pending_hours,
+    rejectedHours: dto.rejected_hours,
+    totalHoursCurrent: dto.total_hours_current,
+    shortageHours: dto.shortage_hours,
     deadlineDate: dto.deadline_date,
     daysRemaining: dto.days_remaining,
   };
 }
 
-export function hoursAlertItemFromDto(dto: HoursAlertItemDTO): HoursAlertItem {
+function statusLabel(status: HoursWarningStatusDTO): string {
+  if (status === "resolved") return "Đã xử lý";
+  if (status === "seen") return "Đã xem";
+  return "Chưa xử lý";
+}
+
+export function hoursAlertItemFromDto(dto: HoursWarningItemDTO): HoursAlertItem {
+  const action = dto.action ?? {};
+  const ctaTo = action.route_path ?? action.external_url ?? null;
+  const isExternal = Boolean(action.external_url);
   return {
     id: dto.id,
-    level: dto.level,
+    level: dto.severity_key,
     title: dto.title,
-    description: dto.description,
+    description: dto.message,
+    statusKey: dto.status_key,
+    statusLabel: statusLabel(dto.status_key),
     updatedAt: dto.updated_at,
-    deadlineDate: dto.deadline_date,
-    ctaLabel: dto.cta_label,
-    ctaTo: dto.cta_to,
-    isSeen: dto.is_seen,
+    deadlineDate: dto.deadline_at,
+    ctaLabel: action.label ?? null,
+    ctaTo,
+    ctaExternal: isExternal,
+    isSeen: dto.status_key !== "unseen",
   };
 }
 
 export function hoursAlertActionSuggestionFromDto(
-  dto: HoursAlertActionSuggestionDTO
+  dto: HoursWarningSuggestionDTO
 ): HoursAlertActionSuggestion {
   return {
     id: dto.id,
@@ -140,7 +160,6 @@ export function formatHours(value: number): string {
 }
 
 export function formatDateVietnamese(dateIso: string): string {
-  // Expecting YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ
   const date = new Date(dateIso);
   if (Number.isNaN(date.getTime())) return dateIso;
 
@@ -150,8 +169,8 @@ export function formatDateVietnamese(dateIso: string): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-export function formatRelativeDaysFromNow(days: number): string {
-  if (!Number.isFinite(days)) return "";
+export function formatRelativeDaysFromNow(days: number | null): string {
+  if (days === null || !Number.isFinite(days)) return "";
   if (days === 0) return "Hôm nay";
   if (days > 0) return `Còn ${days} ngày`;
   return `Quá hạn ${Math.abs(days)} ngày`;

@@ -230,3 +230,15 @@ export function formatDateTime(value: string): string {
 export function toLowerSafe(v: string | null | undefined): string {
   return (v ?? "").toLowerCase();
 }
+
+export interface PaginationDTO {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+export interface WorkCatalogListResponseDTO<T> {
+  items: T[];
+  pagination: PaginationDTO;
+}

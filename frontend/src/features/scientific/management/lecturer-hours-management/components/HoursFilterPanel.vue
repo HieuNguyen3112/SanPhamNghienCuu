@@ -3,16 +3,13 @@
     <div
       class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
     >
-      <!-- ✅ Grid filters: slot nằm TRONG grid => không inject thì không chiếm ô -->
       <div class="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <!-- Extra filter slot (University page inject Khoa) -->
         <slot
           name="extraFilter"
           :filter="filter"
           :updateFilter="emitUpdateFilter"
         />
 
-        <!-- YEAR -->
         <div>
           <label class="text-xs text-slate-600">Năm học</label>
           <select
@@ -26,7 +23,6 @@
           </select>
         </div>
 
-        <!-- KPI STATUS -->
         <div>
           <label class="text-xs text-slate-600">Trạng thái KPI</label>
           <select
@@ -35,24 +31,22 @@
             @change="onChangeKpiStatus"
           >
             <option value="all">Tất cả</option>
-            <option value="hit">Đủ</option>
+            <option value="hit">Đạt</option>
             <option value="miss">Thiếu</option>
           </select>
         </div>
 
-        <!-- KEYWORD -->
         <div>
           <label class="text-xs text-slate-600">Tìm giảng viên</label>
           <input
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
             :value="filter.keyword"
-            placeholder="Mã / Họ tên…"
+            placeholder="Mã / Họ tên..."
             @input="onChangeKeyword"
           />
         </div>
       </div>
 
-      <!-- ✅ Reset nằm bên phải (ngoài grid) -->
       <div class="flex justify-end">
         <button
           type="button"

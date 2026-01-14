@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="open" class="fixed inset-0 z-50">
     <div class="absolute inset-0 bg-slate-900/40" @click="$emit('close')" />
 
@@ -67,7 +67,7 @@
                   }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-slate-600">Còn thiếu</span>
+                  <span class="text-slate-600">Cần thiếu</span>
                   <span class="font-semibold text-slate-900">{{
                     formatHours(entry.remainingHours)
                   }}</span>

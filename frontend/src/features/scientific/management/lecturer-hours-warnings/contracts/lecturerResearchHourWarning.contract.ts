@@ -1,4 +1,4 @@
-export type FacultyIdentifier = string;
+﻿export type FacultyIdentifier = string;
 export type AcademicYearIdentifier = string;
 
 export type ResearchHourShortfallSeverity = "MILD" | "MODERATE" | "SEVERE";
@@ -42,12 +42,14 @@ export const RESEARCH_HOUR_WARNING_REASON_OPTIONS: ResearchHourWarningReasonOpti
     {
       code: "DEADLINE_NEAR",
       label: "Sắp hết hạn kê khai",
-      description: "Gần đến hạn chốt kê khai/xét duyệt giờ NCKH.",
+      description:
+        "Gần đến hạn chốt kê khai/xét duyệt giờ NCKH.",
     },
     {
       code: "DEADLINE_PASSED",
       label: "Đã hết hạn kê khai",
-      description: "Đã quá hạn; cần xử lý theo quy định/biên bản.",
+      description:
+        "Đã quá hạn; cần xử lý theo quy định/biên bản.",
     },
     {
       code: "MISSING_EVIDENCE",

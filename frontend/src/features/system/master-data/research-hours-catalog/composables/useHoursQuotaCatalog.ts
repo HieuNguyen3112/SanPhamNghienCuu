@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import {
   getErrorMessage,
   hasErrors,
@@ -8,29 +8,16 @@ import {
   type HoursQuotaDraft,
   type HoursQuotaErrors,
   type HoursQuotaRow,
-  type WorkloadQuotaRuleDerivedDTO,
+  type WorkloadQuotaDerivedDTO,
 } from "../contracts/researchHoursCatalog.contract";
 import { researchHoursCatalogService } from "../services/researchHoursCatalogService";
 
 /**
  * TAB2 NOTE:
  * - Schema hiện tại thiếu dimension "đối tượng" + is_active/is_locked.
- * - UI chạy mock + TODO(P0) backend/schema.
  */
 
 type ModalMode = "create" | "edit";
-
-interface RankOption {
-  id: number;
-  name: string;
-}
-const draftErrors = reactive<HoursQuotaErrors>({});
-const RANKS: RankOption[] = [
-  { id: 101, name: "Giảng viên" },
-  { id: 102, name: "Giảng viên chính" },
-  { id: 103, name: "PGS" },
-  { id: 104, name: "GS" },
-];
 
 export function useHoursQuotaCatalog() {
   const loading = ref(false);
@@ -39,6 +26,10 @@ export function useHoursQuotaCatalog() {
 
   const academicYears = ref<AcademicYearDTO[]>([]);
   const rows = ref<HoursQuotaRow[]>([]);
+  const page = ref(1);
+  const pageSize = ref(10);
+  const totalItems = ref(0);
+  const totalPages = ref(1);
 
   const filter = reactive({
     academicYearId: 0 as number,
@@ -55,10 +46,8 @@ export function useHoursQuotaCatalog() {
 
   const draft = reactive<HoursQuotaDraft>({
     academicYearId: null,
-    academicRankId: null,
     requiredHours: null,
     notes: "",
-    isActive: true,
   });
 
   const draftErrors = reactive<HoursQuotaErrors>({});
@@ -71,28 +60,7 @@ export function useHoursQuotaCatalog() {
     }))
   );
 
-  const rankOptions = computed(() =>
-    RANKS.map((r) => ({ value: r.id, label: r.name }))
-  );
-
-  const filteredRows = computed(() => {
-    const q = filter.q.trim().toLowerCase();
-    return rows.value.filter((r) => {
-      const byYear =
-        filter.academicYearId === 0
-          ? true
-          : r.academicYearId === filter.academicYearId;
-      const byStatus =
-        filter.status === "ALL"
-          ? true
-          : filter.status === "ACTIVE"
-          ? r.isActive
-          : !r.isActive;
-      const hay = `${r.academicYearCode} ${r.academicRankName}`.toLowerCase();
-      const byQ = q ? hay.includes(q) : true;
-      return byYear && byStatus && byQ;
-    });
-  });
+  const filteredRows = computed(() => rows.value);
 
   function resetDraftErrors() {
     Object.assign(draftErrors, {});
@@ -108,10 +76,8 @@ export function useHoursQuotaCatalog() {
       academicYears.value.find((y) => y.is_active)?.id ??
       academicYears.value[0]?.id ??
       null;
-    draft.academicRankId = RANKS[0]?.id ?? null;
     draft.requiredHours = null;
     draft.notes = "";
-    draft.isActive = true;
     resetDraftErrors();
   }
 
@@ -122,10 +88,8 @@ export function useHoursQuotaCatalog() {
     modal.isLocked = row.isLocked;
 
     draft.academicYearId = row.academicYearId;
-    draft.academicRankId = row.academicRankId;
     draft.requiredHours = row.requiredHours;
     draft.notes = row.notes;
-    draft.isActive = row.isActive;
     resetDraftErrors();
   }
 
@@ -134,19 +98,16 @@ export function useHoursQuotaCatalog() {
   }
 
   function mapToRows(
-    dto: WorkloadQuotaRuleDerivedDTO[],
+    dto: WorkloadQuotaDerivedDTO[],
     years: AcademicYearDTO[]
   ): HoursQuotaRow[] {
     return dto.map((x) => {
       const year = years.find((y) => y.id === x.academic_year_id);
-      const rank = RANKS.find((r) => r.id === x.academic_rank_id);
 
       return {
         id: x.id,
         academicYearId: x.academic_year_id,
         academicYearCode: year?.code ?? "—",
-        academicRankId: x.academic_rank_id,
-        academicRankName: rank?.name ?? `#${x.academic_rank_id}`,
         requiredHours: parseDecimalToNumber(x.required_hours) ?? 0,
         notes: x.notes ?? "",
         isActive: x.is_active,
@@ -159,13 +120,21 @@ export function useHoursQuotaCatalog() {
     loading.value = true;
     error.value = null;
     try {
-      const [years, quotaRules] = await Promise.all([
-        researchHoursCatalogService.getAcademicYears(),
-        researchHoursCatalogService.getQuotaRules(),
-      ]);
+      const meta = await researchHoursCatalogService.getMeta();
+      academicYears.value = meta.academic_years;
 
-      academicYears.value = years;
-      rows.value = mapToRows(quotaRules, years);
+      const res = await researchHoursCatalogService.listWorkloadQuotas({
+        academic_year_id:
+          filter.academicYearId === 0 ? undefined : filter.academicYearId,
+        status: filter.status === "ALL" ? undefined : filter.status,
+        q: filter.q.trim() || undefined,
+        page: page.value,
+        per_page: pageSize.value,
+      });
+
+      rows.value = mapToRows(res.items, academicYears.value);
+      totalItems.value = res.pagination.total;
+      totalPages.value = res.pagination.last_page;
     } catch (e) {
       error.value = getErrorMessage(e, "Không tải được dữ liệu định mức.");
     } finally {
@@ -195,7 +164,22 @@ export function useHoursQuotaCatalog() {
     saving.value = true;
     error.value = null;
     try {
-      await researchHoursCatalogService.upsertQuotaRule();
+      const payload = {
+        required_hours: draft.requiredHours ?? 0,
+        notes: draft.notes.trim() || null,
+      };
+
+      if (modal.mode === "edit") {
+        await researchHoursCatalogService.updateWorkloadQuota(
+          modal.editingId,
+          payload
+        );
+      } else {
+        await researchHoursCatalogService.createWorkloadQuota({
+          academic_year_id: draft.academicYearId as number,
+          ...payload,
+        });
+      }
       closeModal();
       await fetch();
     } catch (e) {
@@ -206,19 +190,40 @@ export function useHoursQuotaCatalog() {
     }
   }
 
-  async function setActiveWithConfirm(_rowId: number, _isActive: boolean) {
-    saving.value = true;
-    error.value = null;
-    try {
-      await researchHoursCatalogService.setQuotaRuleActive();
-      await fetch();
-    } catch (e) {
-      error.value = getErrorMessage(e, "Cập nhật trạng thái thất bại.");
-      throw e;
-    } finally {
-      saving.value = false;
-    }
+  function setPage(next: number) {
+    page.value = Math.max(1, Math.min(totalPages.value, next));
+    void fetch();
   }
+
+  function setPageSize(next: number) {
+    pageSize.value = next;
+    page.value = 1;
+    void fetch();
+  }
+
+  let searchTimer: number | null = null;
+  watch(
+    () => filter.q,
+    () => {
+      if (searchTimer) window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => {
+        page.value = 1;
+        void fetch();
+      }, 300);
+    }
+  );
+
+  watch(
+    () => [filter.academicYearId, filter.status],
+    () => {
+      page.value = 1;
+      void fetch();
+    }
+  );
+
+  onBeforeUnmount(() => {
+    if (searchTimer) window.clearTimeout(searchTimer);
+  });
 
   return {
     loading,
@@ -226,11 +231,14 @@ export function useHoursQuotaCatalog() {
     error,
 
     rows,
+    page,
+    pageSize,
+    totalItems,
+    totalPages,
     filter,
     filteredRows,
 
     academicYearOptions,
-    rankOptions,
 
     modal,
     draft,
@@ -241,6 +249,7 @@ export function useHoursQuotaCatalog() {
     openEdit,
     closeModal,
     save,
-    setActiveWithConfirm,
+    setPage,
+    setPageSize,
   };
 }

@@ -1,8 +1,7 @@
 // File: src/features/master-data/work-catalog-management/composables/useConferenceCatalog.ts
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive, ref } from "vue";
 import {
   conferenceFromDto,
-  toLowerSafe,
   type Conference,
   type ConferenceDTO,
 } from "../contracts/workCatalog.contract";
@@ -14,6 +13,7 @@ type FormErrors<T extends Record<string, unknown>> = Partial<
 
 export function useConferenceCatalog() {
   const conferences = ref<Conference[]>([]);
+  const conferenceTotal = ref(0);
 
   const qConference = ref("");
   const pageConference = ref(1);
@@ -44,29 +44,17 @@ export function useConferenceCatalog() {
   }
 
   async function load(): Promise<void> {
-    const dtos = await workCatalogService.listConferences();
-    conferences.value = dtos.map(conferenceFromDto);
+    const response = await workCatalogService.listConferences({
+      keyword: qConference.value.trim() || undefined,
+      page: pageConference.value,
+      per_page: pageSizeConference.value,
+    });
+    conferences.value = response.items.map(conferenceFromDto);
+    conferenceTotal.value = response.pagination.total;
   }
 
-  function paginate<T>(items: T[], page: number, pageSize: number): T[] {
-    const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }
-
-  const filteredConferences = computed(() => {
-    const q = toLowerSafe(qConference.value);
-    return conferences.value.filter((x) => toLowerSafe(x.name).includes(q));
-  });
-
-  const pagedConferences = computed(() =>
-    paginate(
-      filteredConferences.value,
-      pageConference.value,
-      pageSizeConference.value
-    )
-  );
-
-  watch([qConference, pageSizeConference], () => (pageConference.value = 1));
+  const filteredConferences = computed(() => conferences.value);
+  const pagedConferences = computed(() => conferences.value);
 
   function openCreateConference() {
     modalMode.value = "create";
@@ -121,6 +109,7 @@ export function useConferenceCatalog() {
 
   return {
     conferences,
+    conferenceTotal,
     qConference,
     pageConference,
     pageSizeConference,

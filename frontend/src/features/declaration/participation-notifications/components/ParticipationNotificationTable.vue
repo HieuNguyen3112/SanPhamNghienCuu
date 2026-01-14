@@ -12,7 +12,7 @@ src/features/declaration/participation-notifications/components/ParticipationNot
         Hiển thị
         <span class="font-medium text-slate-900">{{ pagedRows.length }}</span>
         /
-        <span class="font-medium text-slate-900">{{ rows.length }}</span>
+        <span class="font-medium text-slate-900">{{ totalItemCount }}</span>
         yêu cầu
       </div>
 
@@ -118,7 +118,7 @@ src/features/declaration/participation-notifications/components/ParticipationNot
     <!-- Pagination (SharedPaginationControls đặt trong table) -->
     <div class="mt-3 flex justify-end">
       <SharedPaginationControls
-        :total-item-count="rows.length"
+        :total-item-count="totalItemCount"
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
         display-mode="FULL"
@@ -154,6 +154,8 @@ const props = defineProps<{
 
   currentPageNumber: number;
   pageSize: number;
+  totalItemCount: number;
+  totalPages: number;
 }>();
 
 const emit = defineEmits<{
@@ -163,17 +165,15 @@ const emit = defineEmits<{
 }>();
 
 const totalPages = computed(() => {
-  const n = props.rows.length;
-  return Math.max(1, Math.ceil(n / props.pageSize));
+  return Math.max(1, props.totalPages || 1);
 });
 
 const pagedRows = computed(() => {
-  const start = (props.currentPageNumber - 1) * props.pageSize;
-  return props.rows.slice(start, start + props.pageSize);
+  return props.rows;
 });
 
 watch(
-  () => [props.rows.length, props.pageSize, props.currentPageNumber],
+  () => [props.totalItemCount, props.pageSize, props.currentPageNumber],
   () => {
     if (props.currentPageNumber > totalPages.value) {
       emit("update:currentPageNumber", totalPages.value);

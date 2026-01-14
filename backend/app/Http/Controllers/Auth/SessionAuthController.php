@@ -12,6 +12,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Validation\Rule;
 use App\Support\RoleMapper;
+use App\Support\AuditLogger;
 
 class SessionAuthController extends Controller
 {
@@ -38,7 +39,7 @@ class SessionAuthController extends Controller
                     'id'    => $user->id,
                     'name'  => $user->name,
                     'email' => $user->email,
-                    'roles' => RoleMapper::backendListToCanonical($user->getRoleNames()->values()->all()),
+                    'roles' => $user->getRoleNames()->values()->all(),
                     'backend_roles' => $user->getRoleNames()->values()->all(),
                 ] : null,
             ], Response::HTTP_OK); // 200: keep SPA flow happy without creating a new session/token
@@ -67,6 +68,18 @@ class SessionAuthController extends Controller
             ['email' => $data['email'], 'password' => $data['password']],
             $data['remember'] ?? false
         )) {
+            AuditLogger::log($request, [
+                'action_group' => 'auth',
+                'action_code' => 'LOGIN_FAILED',
+                'action_label' => 'Đăng nhập thất bại',
+                'severity' => 'important',
+                'result_status' => 'failure',
+                'result_error_message' => 'Invalid credentials',
+                'actor_email' => $data['email'] ?? null,
+                'target_type' => 'system',
+                'target_display' => 'Hệ thống SPNC',
+                'request_http_status' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            ]);
             return response()->json(['message' => 'Invalid credentials'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -74,11 +87,34 @@ class SessionAuthController extends Controller
         $user = Auth::user();
         if (! $user instanceof User) {
             Auth::guard('web')->logout();
+            AuditLogger::log($request, [
+                'action_group' => 'auth',
+                'action_code' => 'LOGIN_FAILED',
+                'action_label' => 'Đăng nhập thất bại',
+                'severity' => 'important',
+                'result_status' => 'failure',
+                'result_error_message' => 'User not found',
+                'actor_email' => $data['email'] ?? null,
+                'target_type' => 'system',
+                'target_display' => 'Hệ thống SPNC',
+                'request_http_status' => Response::HTTP_INTERNAL_SERVER_ERROR,
+            ]);
             return response()->json(['message' => 'User not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         if ($user instanceof MustVerifyEmailContract && ! $user->hasVerifiedEmail()) {
             Auth::guard('web')->logout();
+            AuditLogger::log($request, [
+                'action_group' => 'auth',
+                'action_code' => 'LOGIN_FAILED',
+                'action_label' => 'Đăng nhập thất bại',
+                'severity' => 'important',
+                'result_status' => 'failure',
+                'result_error_message' => 'Email not verified',
+                'target_type' => 'system',
+                'target_display' => 'Hệ thống SPNC',
+                'request_http_status' => Response::HTTP_FORBIDDEN,
+            ], $user);
             return response()->json(['message' => 'Email not verified'], Response::HTTP_FORBIDDEN);
         }
 
@@ -95,6 +131,17 @@ class SessionAuthController extends Controller
 
             if (! $hasAcceptedRole) {
                 Auth::guard('web')->logout();
+                AuditLogger::log($request, [
+                    'action_group' => 'auth',
+                    'action_code' => 'LOGIN_FAILED',
+                    'action_label' => 'Đăng nhập thất bại',
+                    'severity' => 'important',
+                    'result_status' => 'failure',
+                    'result_error_message' => 'Role not allowed for this user',
+                    'target_type' => 'system',
+                    'target_display' => 'Hệ thống SPNC',
+                    'request_http_status' => Response::HTTP_FORBIDDEN,
+                ], $user);
                 return response()->json(['message' => 'Role not allowed for this user'], Response::HTTP_FORBIDDEN);
             }
         }
@@ -106,6 +153,16 @@ class SessionAuthController extends Controller
             'ip' => $request->ip(),
             'ua' => $request->userAgent(),
         ]);
+        AuditLogger::log($request, [
+            'action_group' => 'auth',
+            'action_code' => 'LOGIN_SUCCESS',
+            'action_label' => 'Đăng nhập thành công',
+            'severity' => 'normal',
+            'result_status' => 'success',
+            'target_type' => 'system',
+            'target_display' => 'Hệ thống SPNC',
+            'request_http_status' => Response::HTTP_OK,
+        ], $user);
 
         // SPA session login: không tạo Personal Access Token; token luôn null để giữ schema phản hồi cũ.
         return response()->json([
@@ -116,7 +173,7 @@ class SessionAuthController extends Controller
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
-                'roles' => RoleMapper::backendListToCanonical($user->getRoleNames()->values()->all()),
+                'roles' => $user->getRoleNames()->values()->all(),
                 'backend_roles' => $user->getRoleNames()->values()->all(),
             ],
         ], Response::HTTP_OK);
@@ -160,6 +217,16 @@ class SessionAuthController extends Controller
             'ua' => $request->userAgent(),
             'revoked_token_ids' => $tokenIds,
         ]);
+        AuditLogger::log($request, [
+            'action_group' => 'auth',
+            'action_code' => 'LOGOUT',
+            'action_label' => 'Đăng xuất',
+            'severity' => 'normal',
+            'result_status' => 'success',
+            'target_type' => 'system',
+            'target_display' => 'Hệ thống SPNC',
+            'request_http_status' => Response::HTTP_OK,
+        ], $user);
 
         return response()->json(['message' => 'ok'], Response::HTTP_OK);
     }

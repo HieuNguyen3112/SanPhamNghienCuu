@@ -1,4 +1,4 @@
-import { computed, ref, watch } from "vue";
+﻿import { computed, ref, watch } from "vue";
 import type {
   ResearchWorkApprovalEntry,
   ResearchWorkApprovalScopeIdentifier,
@@ -12,7 +12,7 @@ export function useResearchWorkApprovalFiltering(parameters: {
   researchWorkApprovalListRef: { value: ResearchWorkApprovalEntry[] };
 
   isDepartmentFilterVisible: boolean;
-  forcedDepartmentIdentifier: string | null; // faculty scope dùng để “khóa phạm vi”
+  forcedDepartmentIdentifier: string | null; // faculty scope dùng để khóa phạm vi.
 }) {
   const academicYearOptions = ref<string[]>([
     "2022-2023",
@@ -128,7 +128,7 @@ export function useResearchWorkApprovalFiltering(parameters: {
         );
       });
 
-    // WHY: ưu tiên pending lên đầu để giảm thời gian rà soát
+    // WHY: ưu tiên pending lên đầu để giảm thời gian rà soát.
     filteredResearchWorkApprovalList.value = nextFilteredList.sort(
       (firstEntry, secondEntry) => {
         const firstPriority =

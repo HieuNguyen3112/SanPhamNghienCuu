@@ -26,11 +26,9 @@
             <span class="text-slate-300">•</span>
             <span>{{ item.academicYearCode }}</span>
             <span class="text-slate-300">•</span>
-            <span>Approved: {{ formatDate(item.approvedAt) }}</span>
+            <span>Đã duyệt: {{ formatDate(item.approvedAt) }}</span>
           </div>
         </div>
-
-        <!-- bỏ nút Eye -->
       </div>
     </div>
   </div>

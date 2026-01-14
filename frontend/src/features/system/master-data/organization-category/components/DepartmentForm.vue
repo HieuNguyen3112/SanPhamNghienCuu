@@ -1,4 +1,4 @@
-<!-- src/features/organization-category/components/DepartmentForm.vue -->
+﻿<!-- src/features/organization-category/components/DepartmentForm.vue -->
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50">
@@ -37,9 +37,8 @@
                 <select
                   v-model="form.facultyId"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
-                  title="TODO: chỉ hiển thị khoa đang hoạt động khi có faculties.is_active"
                 >
-                  <option :value="0" disabled>Chọn khoa…</option>
+                  <option :value="0" disabled>Chọn khoa...</option>
                   <option v-for="f in facultyOptions" :key="f.id" :value="f.id">
                     {{ f.name }}
                   </option>
@@ -56,16 +55,15 @@
                 <input
                   v-model="form.code"
                   type="text"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:bg-slate-50"
                   placeholder="VD: BM-KTPM"
+                  :disabled="isCodeLocked"
                 />
                 <p v-if="errors.code" class="mt-1 text-xs text-rose-600">
                   {{ errors.code }}
                 </p>
-
-                <p class="mt-1 text-xs text-slate-500">
-                  * TODO nghiệp vụ: nếu đã có giảng viên → khóa sửa mã (cần API
-                  DTO has_lecturers/lecturers_count).
+                <p v-else-if="isCodeLocked" class="mt-1 text-xs text-amber-600">
+                  Không thể sửa mã khi đã có giảng viên.
                 </p>
               </div>
 
@@ -84,7 +82,7 @@
                 </p>
               </div>
 
-              <!-- Missing in schema -->
+              <!-- Không có trong schema -->
               <div class="md:col-span-1">
                 <label class="text-xs font-semibold text-slate-600"
                   >Loại đơn vị</label
@@ -93,15 +91,14 @@
                   disabled
                   class="mt-1 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
                 >
-                  <option>TODO: cần catalog department_types</option>
+                  <option>Chưa hỗ trợ trong DB</option>
                 </select>
                 <p class="mt-1 text-xs text-slate-500">
-                  TODO: thêm <code>department_types</code> +
-                  <code>departments.department_type_id</code>.
+                  Trường này chưa có trong DB.
                 </p>
               </div>
 
-              <!-- Missing in schema -->
+              <!-- Không có trong schema -->
               <div class="md:col-span-1">
                 <label class="text-xs font-semibold text-slate-600"
                   >Trạng thái</label
@@ -114,11 +111,11 @@
                   >
                     <span class="h-4 w-4 rounded-full bg-white" />
                   </span>
-                  <span>TODO: cần departments.is_active</span>
+                  <span>Chưa hỗ trợ trong DB</span>
                 </div>
               </div>
 
-              <!-- Missing in schema -->
+              <!-- Không có trong schema -->
               <div class="md:col-span-2">
                 <label class="text-xs font-semibold text-slate-600"
                   >Ghi chú</label
@@ -127,7 +124,7 @@
                   disabled
                   rows="3"
                   class="mt-1 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
-                  placeholder="TODO: cần departments.notes"
+                  placeholder="Chưa hỗ trợ trong DB"
                 />
               </div>
             </div>
@@ -160,18 +157,18 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from "vue";
+import { computed, reactive, watch } from "vue";
 import { Loader2, X } from "lucide-vue-next";
 import type {
   Department,
-  Faculty,
+  FacultyOption,
 } from "../contracts/organizationCategory.contract";
 
 const props = defineProps<{
   open: boolean;
   loading: boolean;
   editing: Department | null;
-  facultyOptions: Faculty[];
+  facultyOptions: FacultyOption[];
 }>();
 
 const emit = defineEmits<{
@@ -190,6 +187,10 @@ const form = reactive({
 
 const errors = reactive<{ facultyId?: string; code?: string; name?: string }>(
   {}
+);
+
+const isCodeLocked = computed(
+  () => (props.editing?.lecturersCount ?? 0) > 0
 );
 
 watch(

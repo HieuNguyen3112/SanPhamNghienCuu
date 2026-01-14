@@ -82,7 +82,9 @@ const workVm = computed(() => ({
 
   rows: work.rows.value,
   filter: work.filter,
-  filteredRows: work.filteredRows.value,
+  page: work.page.value,
+  pageSize: work.pageSize.value,
+  totalItems: work.totalItems.value,
 
   academicYearOptions: work.academicYearOptions.value,
   kindOptions: work.kindOptions.value,
@@ -97,6 +99,8 @@ const workVm = computed(() => ({
   closeModal: work.closeModal,
   save: work.save,
   setActiveWithConfirm: work.setActiveWithConfirm,
+  setPage: work.setPage,
+  setPageSize: work.setPageSize,
 }));
 
 const quotaVm = computed(() => ({
@@ -106,10 +110,11 @@ const quotaVm = computed(() => ({
 
   rows: quota.rows.value,
   filter: quota.filter,
-  filteredRows: quota.filteredRows.value,
+  page: quota.page.value,
+  pageSize: quota.pageSize.value,
+  totalItems: quota.totalItems.value,
 
   academicYearOptions: quota.academicYearOptions.value,
-  rankOptions: quota.rankOptions.value,
 
   modal: quota.modal,
   draft: quota.draft,
@@ -119,7 +124,8 @@ const quotaVm = computed(() => ({
   openEdit: quota.openEdit,
   closeModal: quota.closeModal,
   save: quota.save,
-  setActiveWithConfirm: quota.setActiveWithConfirm,
+  setPage: quota.setPage,
+  setPageSize: quota.setPageSize,
 }));
 
 const yearVm = computed(() => ({
@@ -129,7 +135,9 @@ const yearVm = computed(() => ({
 
   rows: year.rows.value,
   filter: year.filter,
-  filteredRows: year.filteredRows.value,
+  page: year.page.value,
+  pageSize: year.pageSize.value,
+  totalItems: year.totalItems.value,
 
   modal: year.modal,
   draft: year.draft,
@@ -140,6 +148,8 @@ const yearVm = computed(() => ({
   closeModal: year.closeModal,
   saveYear: year.saveYear,
   setActiveYearWithConfirm: year.setActiveYearWithConfirm,
+  setPage: year.setPage,
+  setPageSize: year.setPageSize,
 
   statusLabel: year.statusLabel,
 }));

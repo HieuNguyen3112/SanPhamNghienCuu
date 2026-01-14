@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+﻿import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type {
   AssignRolesPayload,
   LecturerAccount,
@@ -57,9 +57,13 @@ export function useLecturerAccountManagement(
     rowsDto.value.map(lecturerAccountFromDto)
   );
 
+  const currentPageNumber = ref(1);
+  const pageSize = ref(12);
+  const totalItems = ref(0);
+
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const resultCount = computed(() => rowsDto.value.length);
+  const resultCount = computed(() => totalItems.value);
 
   // toast
   const toastMessage = ref<string | null>(null);
@@ -114,8 +118,12 @@ export function useLecturerAccountManagement(
     loading.value = true;
     error.value = null;
     try {
-      unitOptions.value = await service.getUnitOptionsDTO();
-      await search();
+      const lookups = await service.getLookupsDTO();
+      unitOptions.value = lookups.units;
+      roleOptions.value = lookups.roles.length
+        ? lookups.roles
+        : DEFAULT_ROLE_OPTIONS;
+      await search({ resetPage: true });
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Không tải được dữ liệu.";
     } finally {
@@ -123,17 +131,38 @@ export function useLecturerAccountManagement(
     }
   }
 
-  async function search() {
+  async function fetchList() {
+    const response = await service.searchLecturerAccountsDTO(filter.value, {
+      page: currentPageNumber.value,
+      per_page: pageSize.value,
+    });
+    rowsDto.value = response.items;
+    totalItems.value = response.pagination.total;
+  }
+
+  async function search(options?: { resetPage?: boolean }) {
+    const resetPage = options?.resetPage ?? true;
+    if (resetPage) currentPageNumber.value = 1;
+
     loading.value = true;
     error.value = null;
     try {
-      rowsDto.value = await service.searchLecturerAccountsDTO(filter.value);
+      await fetchList();
     } catch (e) {
       error.value =
         e instanceof Error ? e.message : "Không tải được danh sách.";
     } finally {
       loading.value = false;
     }
+  }
+
+  async function updatePage(nextPage: number) {
+    currentPageNumber.value = nextPage;
+    await search({ resetPage: false });
+  }
+
+  function updatePageSize(nextPageSize: number) {
+    pageSize.value = nextPageSize;
   }
 
   // modal open/close
@@ -175,9 +204,10 @@ export function useLecturerAccountManagement(
       await service.updateLecturerAccountDTO(payload);
       showToast("Đã cập nhật thông tin giảng viên.");
       closeAllModals();
-      await search();
+      await search({ resetPage: false });
     } catch (e) {
-      savingError.value = e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value =
+        e instanceof Error ? e.message : "Không thể lưu.";
     } finally {
       savingEdit.value = false;
     }
@@ -190,9 +220,10 @@ export function useLecturerAccountManagement(
       await service.assignRolesDTO(payload);
       showToast("Đã lưu phân quyền.");
       closeAllModals();
-      await search();
+      await search({ resetPage: false });
     } catch (e) {
-      savingError.value = e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value =
+        e instanceof Error ? e.message : "Không thể lưu.";
     } finally {
       savingRoles.value = false;
     }
@@ -205,9 +236,10 @@ export function useLecturerAccountManagement(
       await service.toggleAccountStatusDTO(payload);
       showToast("Đã cập nhật trạng thái tài khoản.");
       closeAllModals();
-      await search();
+      await search({ resetPage: false });
     } catch (e) {
-      savingError.value = e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value =
+        e instanceof Error ? e.message : "Không thể lưu.";
     } finally {
       savingDeactivate.value = false;
     }
@@ -238,6 +270,9 @@ export function useLecturerAccountManagement(
     loading,
     error,
     resultCount,
+    currentPageNumber,
+    pageSize,
+    totalItems,
 
     // toast
     toastMessage,
@@ -258,6 +293,8 @@ export function useLecturerAccountManagement(
     updateFilter,
     resetFilter,
     search,
+    updatePage,
+    updatePageSize,
 
     openEdit,
     openRoles,

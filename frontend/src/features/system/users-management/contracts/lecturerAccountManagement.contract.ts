@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Lecturer Account Management - Contract
  *
  * - DTO is snake_case (simulating backend)
@@ -81,12 +81,12 @@ export const DEFAULT_ROLE_OPTIONS: RoleOption[] = [
   {
     key: "LECTURER",
     label: "Giảng viên",
-    description: "Quyền kê khai & theo dõi công trình cá nhân.",
+    description: "Quyền kê khai và theo dõi công trình cá nhân.",
   },
   {
     key: "DEPARTMENT_BOARD",
     label: "BCN Khoa",
-    description: "Quyền duyệt/giám sát công trình trong phạm vi khoa.",
+    description: "Quyền duyệt và giám sát công trình trong phạm vi khoa.",
   },
   {
     key: "SCIENCE_OFFICE",
@@ -146,8 +146,31 @@ export interface AssignRolesPayload {
 
 export interface ToggleAccountStatusPayload {
   id: number;
-  next_status: AccountStatus;
+  is_active: boolean;
   reason: string | null;
+}
+
+export interface LecturerAccountPaginationDTO {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+export interface LecturerAccountListResponseDTO {
+  items: LecturerAccountDTO[];
+  pagination: LecturerAccountPaginationDTO;
+}
+
+export interface StatusOption {
+  key: AccountStatus;
+  label: string;
+}
+
+export interface LecturerAccountLookupsDTO {
+  units: UnitOptionDTO[];
+  roles: RoleOption[];
+  statuses: StatusOption[];
 }
 
 /** Mapper DTO -> UI */

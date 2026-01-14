@@ -1,18 +1,23 @@
 // src/features/organization-category/composables/useOrganizationCategory.ts
-import { computed, ref, watch } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
 import type {
   TabKey,
   Faculty,
   Department,
+  FacultyOption,
 } from "../contracts/organizationCategory.contract";
 import {
   departmentFromDto,
   facultyFromDto,
+  facultyOptionFromDto,
 } from "../contracts/organizationCategory.contract";
 import { OrganizationCategoryService } from "../services/organizationCategoryService";
 
-export function useOrganizationCategory() {
-  const service = new OrganizationCategoryService();
+type Scope = "FACULTY" | "UNIVERSITY";
+
+export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
+  const isFacultyScope = scope === "FACULTY";
+  const service = new OrganizationCategoryService(scope);
 
   const activeTab = ref<TabKey>("faculties");
 
@@ -20,6 +25,7 @@ export function useOrganizationCategory() {
   const error = ref<string | null>(null);
 
   const faculties = ref<Faculty[]>([]);
+  const facultyOptions = ref<FacultyOption[]>([]);
   const departments = ref<Department[]>([]);
 
   // Filters
@@ -27,12 +33,14 @@ export function useOrganizationCategory() {
   const departmentSearch = ref("");
   const departmentFacultyId = ref<number | "ALL">("ALL");
 
-  // Pagination (tách riêng cho UX tốt hơn)
+  // Pagination
   const facultyPageSize = ref(12);
   const facultyCurrentPageNumber = ref(1);
+  const facultyTotalItemCount = ref(0);
 
   const departmentPageSize = ref(12);
   const departmentCurrentPageNumber = ref(1);
+  const departmentTotalItemCount = ref(0);
 
   // Modals
   const facultyFormOpen = ref(false);
@@ -41,26 +49,13 @@ export function useOrganizationCategory() {
   const departmentFormOpen = ref(false);
   const editingDepartment = ref<Department | null>(null);
 
-  async function refreshAll() {
+  let ignoreDepartmentFacultyWatch = false;
+
+  async function withLoading(task: () => Promise<void>) {
     loading.value = true;
     error.value = null;
     try {
-      const [facDtos, depDtos] = await Promise.all([
-        service.listFaculties(),
-        service.listDepartments(),
-      ]);
-
-      const fac = facDtos.map(facultyFromDto);
-      faculties.value = fac;
-
-      const facNameById = new Map(fac.map((f) => [f.id, f.name]));
-      departments.value = depDtos.map((d) => {
-        const m = departmentFromDto(d);
-        return { ...m, facultyName: facNameById.get(m.facultyId) ?? "—" };
-      });
-
-      facultyCurrentPageNumber.value = 1;
-      departmentCurrentPageNumber.value = 1;
+      await task();
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Không tải được dữ liệu.";
     } finally {
@@ -68,63 +63,91 @@ export function useOrganizationCategory() {
     }
   }
 
-  // ===== Faculty list computed =====
-  const filteredFaculties = computed(() => {
-    const q = facultySearch.value.trim().toLowerCase();
-    if (!q) return faculties.value;
-    return faculties.value.filter(
-      (x) =>
-        x.code.toLowerCase().includes(q) || x.name.toLowerCase().includes(q)
-    );
-  });
+  async function loadFacultyOptions() {
+    const list = await service.listFacultyOptions();
+    facultyOptions.value = list.map(facultyOptionFromDto);
 
-  const facultyTotalItemCount = computed(() => filteredFaculties.value.length);
+    if (isFacultyScope && facultyOptions.value.length) {
+      const scopedId = facultyOptions.value[0].id;
+      if (departmentFacultyId.value !== scopedId) {
+        ignoreDepartmentFacultyWatch = true;
+        departmentFacultyId.value = scopedId;
+        ignoreDepartmentFacultyWatch = false;
+      }
+    }
+  }
 
-  const facultyPagedItems = computed(() => {
-    const start = (facultyCurrentPageNumber.value - 1) * facultyPageSize.value;
-    return filteredFaculties.value.slice(start, start + facultyPageSize.value);
-  });
+  async function loadFaculties() {
+    const response = await service.listFaculties({
+      keyword: facultySearch.value.trim() || undefined,
+      page: facultyCurrentPageNumber.value,
+      per_page: facultyPageSize.value,
+    });
+    faculties.value = response.items.map(facultyFromDto);
+    facultyTotalItemCount.value = response.pagination.total;
+  }
 
-  // ===== Department list computed =====
-  const filteredDepartments = computed(() => {
-    const q = departmentSearch.value.trim().toLowerCase();
-    const byFaculty =
-      departmentFacultyId.value === "ALL"
-        ? departments.value
-        : departments.value.filter(
-            (d) => d.facultyId === departmentFacultyId.value
-          );
+  async function loadDepartments() {
+    const response = await service.listDepartments({
+      keyword: departmentSearch.value.trim() || undefined,
+      faculty_id:
+        departmentFacultyId.value === "ALL"
+          ? undefined
+          : departmentFacultyId.value,
+      page: departmentCurrentPageNumber.value,
+      per_page: departmentPageSize.value,
+    });
+    departments.value = response.items.map(departmentFromDto);
+    departmentTotalItemCount.value = response.pagination.total;
+  }
 
-    if (!q) return byFaculty;
+  async function refreshAll() {
+    await withLoading(async () => {
+      await loadFacultyOptions();
+      await Promise.all([loadFaculties(), loadDepartments()]);
+    });
+  }
 
-    return byFaculty.filter(
-      (x) =>
-        x.code.toLowerCase().includes(q) ||
-        x.name.toLowerCase().includes(q) ||
-        (x.facultyName ?? "").toLowerCase().includes(q)
-    );
-  });
+  async function refreshFaculties() {
+    await withLoading(async () => {
+      await loadFaculties();
+    });
+  }
 
-  const departmentTotalItemCount = computed(
-    () => filteredDepartments.value.length
-  );
+  async function refreshDepartments() {
+    await withLoading(async () => {
+      await loadDepartments();
+    });
+  }
 
-  const departmentPagedItems = computed(() => {
-    const start =
-      (departmentCurrentPageNumber.value - 1) * departmentPageSize.value;
-    return filteredDepartments.value.slice(
-      start,
-      start + departmentPageSize.value
-    );
-  });
-
-  // Reset page when filters change
+  // ===== Search debounce =====
+  let facultySearchTimer: number | null = null;
   watch(facultySearch, () => {
-    facultyCurrentPageNumber.value = 1;
+    if (facultySearchTimer) window.clearTimeout(facultySearchTimer);
+    facultySearchTimer = window.setTimeout(() => {
+      facultyCurrentPageNumber.value = 1;
+      void refreshFaculties();
+    }, 300);
   });
 
-  watch([departmentSearch, departmentFacultyId], () => {
+  let departmentSearchTimer: number | null = null;
+  watch(departmentSearch, () => {
+    if (departmentSearchTimer) window.clearTimeout(departmentSearchTimer);
+    departmentSearchTimer = window.setTimeout(() => {
+      departmentCurrentPageNumber.value = 1;
+      void refreshDepartments();
+    }, 300);
+  });
+
+  watch(departmentFacultyId, () => {
+    if (ignoreDepartmentFacultyWatch) return;
     departmentCurrentPageNumber.value = 1;
+    void refreshDepartments();
+  });
+
+  onBeforeUnmount(() => {
+    if (facultySearchTimer) window.clearTimeout(facultySearchTimer);
+    if (departmentSearchTimer) window.clearTimeout(departmentSearchTimer);
   });
 
   // ===== Actions =====
@@ -144,20 +167,15 @@ export function useOrganizationCategory() {
   }
 
   async function saveFaculty(payload: { code: string; name: string }) {
-    loading.value = true;
-    error.value = null;
-    try {
-      if (editingFaculty.value)
+    await withLoading(async () => {
+      if (editingFaculty.value) {
         await service.updateFaculty(editingFaculty.value.id, payload);
-      else await service.createFaculty(payload);
-
-      await refreshAll();
+      } else {
+        await service.createFaculty(payload);
+      }
+      await Promise.all([loadFacultyOptions(), loadFaculties(), loadDepartments()]);
       closeFacultyForm();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : "Lưu khoa thất bại.";
-    } finally {
-      loading.value = false;
-    }
+    });
   }
 
   function openCreateDepartment() {
@@ -180,9 +198,7 @@ export function useOrganizationCategory() {
     code: string;
     name: string;
   }) {
-    loading.value = true;
-    error.value = null;
-    try {
+    await withLoading(async () => {
       if (editingDepartment.value) {
         await service.updateDepartment(editingDepartment.value.id, {
           faculty_id: payload.facultyId,
@@ -196,14 +212,31 @@ export function useOrganizationCategory() {
           name: payload.name,
         });
       }
-
-      await refreshAll();
+      await Promise.all([loadFacultyOptions(), loadDepartments()]);
       closeDepartmentForm();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : "Lưu đơn vị thất bại.";
-    } finally {
-      loading.value = false;
-    }
+    });
+  }
+
+  async function updateFacultyPage(nextPage: number) {
+    facultyCurrentPageNumber.value = nextPage;
+    await refreshFaculties();
+  }
+
+  async function updateFacultyPageSize(nextPageSize: number) {
+    facultyPageSize.value = nextPageSize;
+    facultyCurrentPageNumber.value = 1;
+    await refreshFaculties();
+  }
+
+  async function updateDepartmentPage(nextPage: number) {
+    departmentCurrentPageNumber.value = nextPage;
+    await refreshDepartments();
+  }
+
+  async function updateDepartmentPageSize(nextPageSize: number) {
+    departmentPageSize.value = nextPageSize;
+    departmentCurrentPageNumber.value = 1;
+    await refreshDepartments();
   }
 
   return {
@@ -212,6 +245,7 @@ export function useOrganizationCategory() {
     error,
 
     faculties,
+    facultyOptions,
     departments,
 
     // filters
@@ -219,16 +253,14 @@ export function useOrganizationCategory() {
     departmentSearch,
     departmentFacultyId,
 
-    // pagination (đúng naming theo SharedPaginationControls)
+    // pagination
     facultyPageSize,
     facultyCurrentPageNumber,
     facultyTotalItemCount,
-    facultyPagedItems,
 
     departmentPageSize,
     departmentCurrentPageNumber,
     departmentTotalItemCount,
-    departmentPagedItems,
 
     // modals
     facultyFormOpen,
@@ -248,5 +280,10 @@ export function useOrganizationCategory() {
     openEditDepartment,
     closeDepartmentForm,
     saveDepartment,
+
+    updateFacultyPage,
+    updateFacultyPageSize,
+    updateDepartmentPage,
+    updateDepartmentPageSize,
   };
 }

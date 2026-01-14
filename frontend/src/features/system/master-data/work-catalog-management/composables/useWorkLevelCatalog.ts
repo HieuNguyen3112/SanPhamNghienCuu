@@ -1,7 +1,6 @@
 // File: src/features/master-data/work-catalog-management/composables/useWorkLevelCatalog.ts
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive, ref } from "vue";
 import {
-  toLowerSafe,
   workLevelFromDto,
   type WorkLevel,
   type WorkLevelDTO,
@@ -14,6 +13,7 @@ type FormErrors<T extends Record<string, unknown>> = Partial<
 
 export function useWorkLevelCatalog() {
   const workLevels = ref<WorkLevel[]>([]);
+  const workLevelTotal = ref(0);
 
   const qWorkLevel = ref("");
   const pageWorkLevel = ref(1);
@@ -44,28 +44,17 @@ export function useWorkLevelCatalog() {
   }
 
   async function load(): Promise<void> {
-    const dtos = await workCatalogService.listWorkLevels();
-    workLevels.value = dtos.map(workLevelFromDto);
+    const response = await workCatalogService.listWorkLevels({
+      keyword: qWorkLevel.value.trim() || undefined,
+      page: pageWorkLevel.value,
+      per_page: pageSizeWorkLevel.value,
+    });
+    workLevels.value = response.items.map(workLevelFromDto);
+    workLevelTotal.value = response.pagination.total;
   }
 
-  function paginate<T>(items: T[], page: number, pageSize: number): T[] {
-    const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }
-
-  const filteredWorkLevels = computed(() => {
-    const q = toLowerSafe(qWorkLevel.value);
-    return workLevels.value.filter((x) => toLowerSafe(x.name).includes(q));
-  });
-  const pagedWorkLevels = computed(() =>
-    paginate(
-      filteredWorkLevels.value,
-      pageWorkLevel.value,
-      pageSizeWorkLevel.value
-    )
-  );
-
-  watch([qWorkLevel, pageSizeWorkLevel], () => (pageWorkLevel.value = 1));
+  const filteredWorkLevels = computed(() => workLevels.value);
+  const pagedWorkLevels = computed(() => workLevels.value);
 
   function openCreateWorkLevel() {
     modalMode.value = "create";
@@ -125,6 +114,7 @@ export function useWorkLevelCatalog() {
 
   return {
     workLevels,
+    workLevelTotal,
     qWorkLevel,
     pageWorkLevel,
     pageSizeWorkLevel,

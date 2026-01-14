@@ -1,0 +1,173 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+
+class WorkCatalogSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $now = now();
+
+        $workTypes = [
+            ['name' => 'Paper', 'description' => 'Journal or conference paper', 'is_active' => true],
+            ['name' => 'Book', 'description' => 'Book or textbook', 'is_active' => true],
+            ['name' => 'Project', 'description' => 'Research project', 'is_active' => true],
+            ['name' => 'Conference', 'description' => 'Conference participation', 'is_active' => false],
+            ['name' => 'Other', 'description' => null, 'is_active' => true],
+        ];
+
+        foreach ($workTypes as $item) {
+            DB::table('work_types')->updateOrInsert(
+                ['name' => $item['name']],
+                [
+                    'description' => $item['description'],
+                    'is_active' => $item['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+        }
+
+        $workLevels = [
+            ['name' => 'International', 'priority' => 1, 'notes' => 'Top priority', 'is_active' => true],
+            ['name' => 'National', 'priority' => 2, 'notes' => null, 'is_active' => true],
+            ['name' => 'University', 'priority' => 3, 'notes' => null, 'is_active' => true],
+            ['name' => 'Faculty', 'priority' => 4, 'notes' => null, 'is_active' => true],
+            ['name' => 'Other', 'priority' => 5, 'notes' => null, 'is_active' => false],
+        ];
+
+        foreach ($workLevels as $item) {
+            DB::table('work_levels')->updateOrInsert(
+                ['name' => $item['name']],
+                [
+                    'priority' => $item['priority'],
+                    'notes' => $item['notes'],
+                    'is_active' => $item['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+        }
+
+        $journals = [
+            [
+                'name' => 'Journal of Advanced Research',
+                'address' => 'Cairo University, Giza, Egypt',
+                'issn' => '2090-1232',
+                'classification' => 'ISI',
+                'country' => 'Egypt',
+                'notes' => null,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Vietnam Journal of Science and Technology',
+                'address' => 'VAST, Hanoi, Vietnam',
+                'issn' => '0866-708X',
+                'classification' => 'SCOPUS',
+                'country' => 'Vietnam',
+                'notes' => 'Scopus indexed',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'International Journal of Computer Science',
+                'address' => 'USA',
+                'issn' => null,
+                'classification' => 'OTHER',
+                'country' => 'USA',
+                'notes' => 'ISSN pending',
+                'is_active' => false,
+            ],
+        ];
+
+        foreach ($journals as $item) {
+            $key = $item['issn'] ? ['issn' => $item['issn']] : ['name' => $item['name']];
+            DB::table('journals')->updateOrInsert(
+                $key,
+                [
+                    'name' => $item['name'],
+                    'address' => $item['address'],
+                    'issn' => $item['issn'],
+                    'classification' => $item['classification'],
+                    'country' => $item['country'],
+                    'notes' => $item['notes'],
+                    'is_active' => $item['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+        }
+
+        $journalIdByIssn = DB::table('journals')
+            ->whereNotNull('issn')
+            ->pluck('id', 'issn')
+            ->all();
+
+        $rankings = [
+            ['issn' => '2090-1232', 'rank' => 'Q2', 'effective_from' => now()->subMonths(6)->toDateString()],
+            ['issn' => '2090-1232', 'rank' => 'Q1', 'effective_from' => now()->subDays(20)->toDateString()],
+            ['issn' => '0866-708X', 'rank' => 'Q3', 'effective_from' => now()->subMonths(3)->toDateString()],
+        ];
+
+        foreach ($rankings as $item) {
+            $journalId = $journalIdByIssn[$item['issn']] ?? null;
+            if (! $journalId) {
+                continue;
+            }
+
+            DB::table('journal_rankings')->updateOrInsert(
+                ['journal_id' => $journalId, 'effective_from' => $item['effective_from']],
+                [
+                    'rank' => $item['rank'],
+                    'note' => null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+        }
+
+        $conferences = [
+            ['name' => 'International Conference on AI', 'level' => 'INTERNATIONAL', 'notes' => null, 'is_active' => true],
+            ['name' => 'University Science Conference', 'level' => 'UNIVERSITY', 'notes' => 'Annual', 'is_active' => true],
+            ['name' => 'Faculty Seminar', 'level' => 'FACULTY', 'notes' => null, 'is_active' => true],
+            ['name' => 'National Symposium on Education', 'level' => 'NATIONAL', 'notes' => null, 'is_active' => false],
+        ];
+
+        foreach ($conferences as $item) {
+            DB::table('conferences')->updateOrInsert(
+                ['name' => $item['name']],
+                [
+                    'level' => $item['level'],
+                    'notes' => $item['notes'],
+                    'is_active' => $item['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+        }
+
+        $researchFields = [
+            ['code' => 'AI', 'name' => 'Artificial Intelligence', 'description' => 'Machine learning, NLP', 'is_active' => true],
+            ['code' => 'EDU', 'name' => 'Education Science', 'description' => null, 'is_active' => true],
+            ['code' => 'SE', 'name' => 'Software Engineering', 'description' => null, 'is_active' => true],
+            ['code' => null, 'name' => 'Economics', 'description' => null, 'is_active' => false],
+        ];
+
+        foreach ($researchFields as $item) {
+            $key = $item['code'] ? ['code' => $item['code']] : ['name' => $item['name']];
+            DB::table('research_fields')->updateOrInsert(
+                $key,
+                [
+                    'code' => $item['code'],
+                    'name' => $item['name'],
+                    'description' => $item['description'],
+                    'is_active' => $item['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+        }
+    }
+}

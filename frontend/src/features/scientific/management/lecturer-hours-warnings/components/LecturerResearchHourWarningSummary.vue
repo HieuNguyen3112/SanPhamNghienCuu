@@ -1,4 +1,4 @@
-<!-- File: src/features/.../components/LecturerResearchHourWarningSummary.vue -->
+﻿<!-- File: src/features/.../components/LecturerResearchHourWarningSummary.vue -->
 <template>
   <section
     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
@@ -70,7 +70,7 @@
               }}
             </div>
             <div class="mt-1 text-sm text-slate-700">
-              Tổng số giờ NCKH còn thiếu
+              Tổng số giờ NCKH cần thiếu
             </div>
           </div>
 
@@ -100,7 +100,7 @@
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="text-xs font-medium text-slate-700">
-              Mức độ bình quân
+              Mức độ trung bình
             </div>
             <div
               class="mt-1 text-lg font-semibold tracking-tight text-slate-900"

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <!-- Header -->
@@ -10,8 +10,8 @@
             Cảnh báo giảng viên giờ NCKH
           </h1>
           <p class="text-sm text-slate-600">
-            Danh sách giảng viên chưa đạt định mức giờ NCKH theo năm học
-            (chỉ xem, chỉ gửi cảnh báo).
+            Danh sách giảng viên chưa đạt định mức giờ NCKH theo năm học (chỉ
+            xem, chỉ gửi cảnh báo).
           </p>
         </div>
       </section>

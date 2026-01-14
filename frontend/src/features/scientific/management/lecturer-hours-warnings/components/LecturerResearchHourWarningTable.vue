@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
   >
@@ -28,7 +28,7 @@
             <th>Khoa</th>
             <th class="text-right">Hiện có</th>
             <th class="text-right">Cần</th>
-            <th class="text-right">Còn thiếu</th>
+            <th class="text-right">Cần thiếu</th>
             <th class="text-center">Mức thiếu</th>
             <th class="text-center">Cảnh báo</th>
             <th class="w-12 text-right"></th>

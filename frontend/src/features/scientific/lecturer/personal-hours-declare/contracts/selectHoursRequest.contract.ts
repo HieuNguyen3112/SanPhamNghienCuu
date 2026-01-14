@@ -4,41 +4,49 @@ export type ActivityStatusCode =
   | "rejected"
   | "draft";
 
-/**
- * activity_approvals.status (enum ở DB của bạn):
- * pending | approved | rejected
- */
+// activity_approvals.status
 export type ApprovalStageStatus = "pending" | "approved" | "rejected";
 
-/**
- * Trạng thái “DUYỆT GIỜ” của công trình (derived)
- * - eligible: chưa gửi duyệt giờ
- * - submitted: đã gửi yêu cầu duyệt giờ (đang chờ)
- * - hours_approved: đã duyệt giờ
- */
-export type HoursRequestState = "eligible" | "submitted" | "hours_approved";
+// Hours approval status derived for the current lecturer
+export type HoursRequestState =
+  | "eligible"
+  | "submitted"
+  | "hours_approved"
+  | "rejected";
 
-/**
- * DTO (snake_case) - giả lập backend trả về
- * P0: assistant_approval_status + manager_approval_status lấy từ activity_approvals (join theo stage)
- * P0: hours_request_state là derived field (backend cần trả về)
- */
 export interface ApprovedWorkRowDTO {
   activity_id: number;
-  activity_code: string; // research_activities.activity_code
-  academic_year_code: string; // join academic_years.code
+  activity_code: string;
+  academic_year_code: string;
 
   title: string;
   kind_name: string;
 
   member_role_name: string;
-  hours_assigned: number | null; // research_activity_members.hours_assigned (nullable)
+  hours_assigned: number | null;
 
-  activity_status_code: ActivityStatusCode; // join activity_statuses.code (tham chiếu)
-  assistant_approval_status: ApprovalStageStatus; // activity_approvals.status where stage=assistant
-  manager_approval_status: ApprovalStageStatus; // activity_approvals.status where stage=manager
+  activity_status_code: ActivityStatusCode;
+  assistant_approval_status: ApprovalStageStatus;
+  manager_approval_status: ApprovalStageStatus;
 
-  hours_request_state: HoursRequestState; // derived
+  hours_request_state: HoursRequestState;
+}
+
+export interface ApprovedWorkPaginationDTO {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+export interface ApprovedWorkListSummaryDTO {
+  approved_count: number;
+}
+
+export interface ApprovedWorkListResponseDTO {
+  items: ApprovedWorkRowDTO[];
+  pagination: ApprovedWorkPaginationDTO;
+  summary: ApprovedWorkListSummaryDTO;
 }
 
 export interface WorkDetailDTO {
@@ -52,7 +60,7 @@ export interface WorkDetailDTO {
   member_role_name: string;
   contribution_share: number | null;
 
-  rule_summary: string; // derived
+  rule_summary: string;
   hours_for_lecturer: number | null;
 
   activity_status_code: ActivityStatusCode;
@@ -74,12 +82,9 @@ export interface ApprovedWorkRow {
   hoursAssigned: number | null;
 
   activityStatusCode: ActivityStatusCode;
-
-  // ✅ dùng để xác định “đã duyệt nội dung đủ 2 tầng”
   assistantApprovalStatus: ApprovalStageStatus;
   managerApprovalStatus: ApprovalStageStatus;
 
-  // ✅ trạng thái duyệt giờ
   hoursRequestState: HoursRequestState;
 }
 
@@ -104,12 +109,8 @@ export interface WorkDetail {
   hoursRequestState: HoursRequestState;
 }
 
-/**
- * Filter ở màn này: lọc theo “duyệt giờ”
- * (vì list đã là công trình hợp lệ nội dung rồi)
- */
 export interface WorksFilterState {
-  hoursMode: "all" | "not_reviewed_hours" | "waiting_hours" | "hours_approved";
+  hoursMode: "all" | "not_submitted" | "pending" | "approved" | "rejected";
   keyword: string;
 }
 
@@ -163,7 +164,6 @@ export function formatHours(value: number | null): string {
   return value.toFixed(0);
 }
 
-/** ✅ điều kiện hợp lệ nội dung: khoa + trường đều approved */
 export function isContentFullyApproved(
   row: Pick<
     ApprovedWorkRow,

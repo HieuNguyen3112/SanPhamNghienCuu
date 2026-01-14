@@ -36,7 +36,6 @@
         @reset="resetFilter"
       />
 
-      <!-- ✅ Action nằm trong Table -->
       <ApprovedWorksTable
         :rows="filteredWorks"
         :selectable-ids="selectableIds"
@@ -47,10 +46,15 @@
         :submit-error="submitError"
         :loading="loadingList"
         :error="errorList"
+        :current-page-number="currentPageNumber"
+        :page-size="pageSize"
+        :total-item-count="totalItemCount"
         @toggle-row="toggleWorkSelection"
         @toggle-select-all="toggleSelectAll"
         @open-detail="openWorkDetail"
         @submit-request="submitRequest"
+        @update:currentPageNumber="updateCurrentPageNumber"
+        @update:pageSize="updatePageSize"
       />
 
       <WorkDetailDrawer
@@ -97,10 +101,15 @@ const {
   totalApprovedCount,
   selectedCount,
   selectedHoursTotal,
+  currentPageNumber,
+  pageSize,
+  totalItemCount,
 
   loadApprovedWorks,
   applyFilter,
   resetFilter,
+  updateCurrentPageNumber,
+  updatePageSize,
 
   toggleWorkSelection,
   toggleSelectAll,

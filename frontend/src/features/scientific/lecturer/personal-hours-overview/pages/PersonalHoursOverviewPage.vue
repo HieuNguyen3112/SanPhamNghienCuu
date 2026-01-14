@@ -1,5 +1,3 @@
-// File:
-src/features/lecturer-hours-overview/pages/LecturerHoursOverviewPage.vue
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 md:p-6">
@@ -8,7 +6,7 @@ src/features/lecturer-hours-overview/pages/LecturerHoursOverviewPage.vue
       >
         <PageHeader
           title="Tổng quan giờ NCKH cá nhân"
-          subtitle="Thống kê giờ NCKH của bạn theo năm học và theo dõi lịch sử các đợt xét duyệt"
+          subtitle="Thống kê giờ NCKH theo năm học và theo dõi lịch sử các đợt xét duyệt"
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"

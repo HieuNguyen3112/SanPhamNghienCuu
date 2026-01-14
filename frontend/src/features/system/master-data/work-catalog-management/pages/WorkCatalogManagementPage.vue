@@ -39,7 +39,7 @@
             v-if="activeTab === 'work_type'"
             :rows="pagedWorkTypes"
             :start-index="(pageWorkType - 1) * pageSizeWorkType"
-            :total="filteredWorkTypes.length"
+            :total="workTypeTotal"
             :search="qWorkType"
             :page="pageWorkType"
             :page-size="pageSizeWorkType"
@@ -67,7 +67,7 @@
             v-else-if="activeTab === 'work_level'"
             :rows="pagedWorkLevels"
             :start-index="(pageWorkLevel - 1) * pageSizeWorkLevel"
-            :total="filteredWorkLevels.length"
+            :total="workLevelTotal"
             :search="qWorkLevel"
             :page="pageWorkLevel"
             :page-size="pageSizeWorkLevel"
@@ -94,7 +94,7 @@
             v-else-if="activeTab === 'journal'"
             :rows="pagedJournals"
             :start-index="(pageJournal - 1) * pageSizeJournal"
-            :total="filteredJournals.length"
+            :total="journalTotal"
             :search="qJournal"
             :page="pageJournal"
             :page-size="pageSizeJournal"
@@ -129,7 +129,7 @@
             v-else-if="activeTab === 'conference'"
             :rows="pagedConferences"
             :start-index="(pageConference - 1) * pageSizeConference"
-            :total="filteredConferences.length"
+            :total="conferenceTotal"
             :search="qConference"
             :page="pageConference"
             :page-size="pageSizeConference"
@@ -156,7 +156,7 @@
             v-else
             :rows="pagedResearchFields"
             :start-index="(pageResearchField - 1) * pageSizeResearchField"
-            :total="filteredResearchFields.length"
+            :total="researchFieldTotal"
             :search="qResearchField"
             :page="pageResearchField"
             :page-size="pageSizeResearchField"
@@ -245,6 +245,11 @@ const {
   pagedJournals,
   pagedConferences,
   pagedResearchFields,
+  workTypeTotal,
+  workLevelTotal,
+  journalTotal,
+  conferenceTotal,
+  researchFieldTotal,
 
   modalMode,
   modalWorkTypeOpen,

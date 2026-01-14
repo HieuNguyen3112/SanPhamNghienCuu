@@ -59,9 +59,12 @@
 
         <LecturerResearchWorkSummaryTable
           :overview-items="overviewItems"
+          :pagination="overviewPagination"
           :is-loading="isOverviewLoading"
           :error-message="overviewError"
           @open-lecturer="openLecturerDrawer"
+          @update-page="updateOverviewPage"
+          @update-page-size="updateOverviewPerPage"
         />
       </div>
 
@@ -69,10 +72,13 @@
         :is-open="isLecturerDrawerOpen"
         :lecturer-overview="selectedLecturerOverview"
         :approved-items="approvedItems"
+        :pagination="approvedPagination"
         :is-loading="isApprovedLoading"
         :error-message="approvedError"
         @close="closeLecturerDrawer"
         @open-detail="openDetail"
+        @update-page="updateApprovedPage"
+        @update-page-size="updateApprovedPerPage"
       />
 
       <ApprovedResearchWorkDetailDrawer
@@ -110,6 +116,7 @@ const {
   academicYearOptions,
 
   overviewItems,
+  overviewPagination,
   isOverviewLoading,
   overviewError,
 
@@ -118,6 +125,7 @@ const {
   isDetailDrawerOpen,
 
   approvedItems,
+  approvedPagination,
   isApprovedLoading,
   approvedError,
 
@@ -131,6 +139,10 @@ const {
   closeLecturerDrawer,
   openDetail,
   backToList,
+  updateOverviewPage,
+  updateOverviewPerPage,
+  updateApprovedPage,
+  updateApprovedPerPage,
 } = useLecturerResearchWorkManagement({ client });
 
 type ExportMessage = { type: "success" | "error" | "info"; text: string };

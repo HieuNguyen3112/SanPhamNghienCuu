@@ -9,205 +9,257 @@
           subtitle="Tổng quan nhân sự giảng dạy trong trường đại học"
           :show-export-pdf="true"
           :show-export-excel="true"
-          @exportPdfClicked="showExportNotImplementedMessage('PDF')"
-          @exportExcelClicked="showExportNotImplementedMessage('Excel')"
+          @exportPdfClicked="handleExport('pdf')"
+          @exportExcelClicked="handleExport('excel')"
         />
       </div>
+
       <LecturerFilterPanel
-        :lecturerFilterConditions="lecturerFilterConditions"
-        :availableDepartmentNames="availableDepartmentNames"
-        @lecturerFilterConditionsUpdated="applyLecturerFilterConditions"
-        @resetLecturerFilterConditionsRequested="resetLecturerFilterConditions"
-      />
-
-      <LecturerSummaryCards
-        :totalLecturerCount="totalLecturerCount"
-        :numberOfDoctorLecturers="numberOfDoctorLecturers"
-        :numberOfMasterLecturers="numberOfMasterLecturers"
-        :numberOfBachelorLecturers="numberOfBachelorLecturers"
-        :numberOfProfessorAndAssociateProfessorLecturers="
-          numberOfProfessorAndAssociateProfessorLecturers
-        "
-      />
-
-      <LecturerChartSection
-        :filteredLecturerRecords="filteredLecturerRecords"
-      />
-      <LecturerStatisticsTable
-        :filteredLecturerRecords="filteredLecturerRecords"
+        :filters="filters"
+        :faculty-options="filterOptions.faculties"
+        :degree-options="filterOptions.degrees"
+        :academic-rank-options="filterOptions.academicRanks"
+        :gender-options="filterOptions.genders"
+        @filtersUpdated="applyFilters"
+        @resetRequested="resetFilters"
       />
 
       <div
-        v-if="temporaryNotificationMessage"
+        v-if="errorMessage"
+        class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 shadow-sm"
+      >
+        {{ errorMessage }}
+      </div>
+
+      <LecturerSummaryCards :summary="summary" />
+
+      <LecturerChartSection :charts="charts" />
+
+      <LecturerStatisticsTable
+        :rows="table.items"
+        :pagination="table.pagination"
+        :sort="sort"
+        :loading="isLoading"
+        @sortChanged="applySort"
+        @pageChanged="changePage"
+        @pageSizeChanged="changePageSize"
+      />
+
+      <div
+        v-if="notificationMessage"
         class="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 shadow-sm"
       >
-        {{ temporaryNotificationMessage }}
+        {{ notificationMessage }}
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-
+import { onMounted, ref } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
-
 import LecturerFilterPanel from "../components/LecturerFilterPanel.vue";
 import LecturerSummaryCards from "../components/LecturerSummaryCards.vue";
 import LecturerChartSection from "../components/LecturerChartSection.vue";
 import LecturerStatisticsTable from "../components/LecturerStatisticsTable.vue";
-
+import {
+  exportLecturerReportExcel,
+  exportLecturerReportPdf,
+  fetchLecturerReport,
+  fetchLecturerReportFilters,
+} from "../api/lecturerReportApi";
 import type {
-  LecturerFilterConditions,
-  LecturerRecord,
-} from "../lecturerStatisticsTypes";
-import { lecturerMockRecords } from "../lecturerStatisticsMockData";
+  LecturerReportCharts,
+  LecturerReportFilters,
+  LecturerReportFiltersResponse,
+  LecturerReportSummary,
+  LecturerReportTable,
+  LecturerSortCondition,
+} from "../lecturerReportTypes";
 
-/**
- * Vì đây là trang quản trị, logic giữ đơn giản: lọc client-side trên mock data.
- * Mục tiêu là UI rõ ràng và dễ bảo trì, không tối ưu backend trong phạm vi yêu cầu.
- */
-const lecturerStatisticsResponse = ref<LecturerRecord[]>([]);
-const temporaryNotificationMessage = ref("");
+const defaultFilters: LecturerReportFilters = {
+  facultyId: "ALL",
+  degreeId: "ALL",
+  academicRankId: "ALL",
+  gender: "ALL",
+};
 
-const lecturerFilterConditions = ref<LecturerFilterConditions>({
-  selectedDepartmentName: "AllDepartments",
-  selectedEducationLevelCategory: "AllEducationLevels",
-  selectedAcademicRankCategory: "AllAcademicRanks",
-  selectedGenderCategory: "AllGenders",
+const filters = ref<LecturerReportFilters>({ ...defaultFilters });
+const sort = ref<LecturerSortCondition>({
+  sortFieldIdentifier: "full_name",
+  sortDirection: "asc",
 });
 
-const paginationState = ref({
-  currentPageNumber: 1,
-  rowsPerPageCount: 10,
-  totalPageCount: 1,
+const page = ref(1);
+const pageSize = ref(12);
+
+const isLoading = ref(false);
+const errorMessage = ref("");
+const notificationMessage = ref("");
+const exporting = ref<"pdf" | "excel" | null>(null);
+
+const filterOptions = ref<LecturerReportFiltersResponse>({
+  faculties: [],
+  degrees: [],
+  academicRanks: [],
+  genders: [],
 });
 
-function fetchLecturerStatistics() {
-  // Vì đang dùng mock, hàm này mô phỏng “nạp dữ liệu” để cấu trúc code giống dashboard thật
-  lecturerStatisticsResponse.value = lecturerMockRecords;
-}
-
-const availableDepartmentNames = computed(() => {
-  const departmentNameSet = new Set<string>();
-  for (const lecturerRecord of lecturerStatisticsResponse.value) {
-    departmentNameSet.add(lecturerRecord.departmentName);
-  }
-  return Array.from(departmentNameSet.values()).sort(
-    (firstValue, secondValue) => firstValue.localeCompare(secondValue)
-  );
+const summary = ref<LecturerReportSummary>({
+  totalLecturers: 0,
+  doctorCount: 0,
+  masterCount: 0,
+  bachelorCount: 0,
+  professorAssociateCount: 0,
 });
 
-const filteredLecturerRecords = computed(() => {
-  const currentFilterConditions = lecturerFilterConditions.value;
-
-  return lecturerStatisticsResponse.value.filter((lecturerRecord) => {
-    const isDepartmentMatch =
-      currentFilterConditions.selectedDepartmentName === "AllDepartments" ||
-      lecturerRecord.departmentName ===
-        currentFilterConditions.selectedDepartmentName;
-
-    const isEducationMatch =
-      currentFilterConditions.selectedEducationLevelCategory ===
-        "AllEducationLevels" ||
-      lecturerRecord.educationLevelCategory ===
-        currentFilterConditions.selectedEducationLevelCategory;
-
-    const isAcademicRankMatch =
-      currentFilterConditions.selectedAcademicRankCategory ===
-        "AllAcademicRanks" ||
-      lecturerRecord.academicRankCategory ===
-        currentFilterConditions.selectedAcademicRankCategory;
-
-    const isGenderMatch =
-      currentFilterConditions.selectedGenderCategory === "AllGenders" ||
-      lecturerRecord.genderCategory ===
-        currentFilterConditions.selectedGenderCategory;
-
-    return (
-      isDepartmentMatch &&
-      isEducationMatch &&
-      isAcademicRankMatch &&
-      isGenderMatch
-    );
-  });
+const charts = ref<LecturerReportCharts>({
+  byFaculty: { labels: [], values: [] },
+  byDegree: { labels: [], values: [] },
+  byAcademicRank: { labels: [], values: [] },
+  byGender: { labels: [], values: [] },
 });
 
-const totalLecturerCount = computed(() => filteredLecturerRecords.value.length);
-
-const numberOfDoctorLecturers = computed(() => {
-  return filteredLecturerRecords.value.filter(
-    (lecturerRecord) => lecturerRecord.educationLevelCategory === "Doctor"
-  ).length;
+const table = ref<LecturerReportTable>({
+  items: [],
+  pagination: { page: 1, perPage: 12, total: 0, lastPage: 1 },
 });
 
-const numberOfMasterLecturers = computed(() => {
-  return filteredLecturerRecords.value.filter(
-    (lecturerRecord) => lecturerRecord.educationLevelCategory === "Master"
-  ).length;
-});
-
-const numberOfBachelorLecturers = computed(() => {
-  return filteredLecturerRecords.value.filter(
-    (lecturerRecord) => lecturerRecord.educationLevelCategory === "Bachelor"
-  ).length;
-});
-
-const numberOfProfessorAndAssociateProfessorLecturers = computed(() => {
-  return filteredLecturerRecords.value.filter((lecturerRecord) => {
-    return (
-      lecturerRecord.academicRankCategory === "Professor" ||
-      lecturerRecord.academicRankCategory === "AssociateProfessor"
-    );
-  }).length;
-});
-
-function applyLecturerFilterConditions(
-  updatedLecturerFilterConditions: LecturerFilterConditions
-) {
-  lecturerFilterConditions.value = updatedLecturerFilterConditions;
-
-  // Khi thay đổi bộ lọc, quay về trang 1 để tránh “trang rỗng” gây nhầm lẫn cho quản trị viên
-  paginationState.value.currentPageNumber = 1;
-}
-
-function resetLecturerFilterConditions() {
-  lecturerFilterConditions.value = {
-    selectedDepartmentName: "AllDepartments",
-    selectedEducationLevelCategory: "AllEducationLevels",
-    selectedAcademicRankCategory: "AllAcademicRanks",
-    selectedGenderCategory: "AllGenders",
+function buildQueryParams() {
+  const params: Record<string, string | number> = {
+    sort: `${sort.value.sortFieldIdentifier}:${sort.value.sortDirection}`,
+    page: page.value,
+    per_page: pageSize.value,
   };
-  paginationState.value.currentPageNumber = 1;
+
+  if (filters.value.facultyId !== "ALL") {
+    params.faculty_id = filters.value.facultyId;
+  }
+  if (filters.value.degreeId !== "ALL") {
+    params.degree_id = filters.value.degreeId;
+  }
+  if (filters.value.academicRankId !== "ALL") {
+    params.academic_rank_id = filters.value.academicRankId;
+  }
+  if (filters.value.gender !== "ALL") {
+    params.gender = filters.value.gender;
+  }
+
+  return params;
 }
 
-function recalculateTotalPageCount() {
-  const totalRowCount = filteredLecturerRecords.value.length;
-  const totalPageCount = Math.max(
-    1,
-    Math.ceil(totalRowCount / paginationState.value.rowsPerPageCount)
-  );
-  paginationState.value.totalPageCount = totalPageCount;
+function buildExportParams() {
+  const params: Record<string, string | number> = {
+    sort: `${sort.value.sortFieldIdentifier}:${sort.value.sortDirection}`,
+  };
 
-  if (paginationState.value.currentPageNumber > totalPageCount) {
-    paginationState.value.currentPageNumber = totalPageCount;
+  if (filters.value.facultyId !== "ALL") {
+    params.faculty_id = filters.value.facultyId;
+  }
+  if (filters.value.degreeId !== "ALL") {
+    params.degree_id = filters.value.degreeId;
+  }
+  if (filters.value.academicRankId !== "ALL") {
+    params.academic_rank_id = filters.value.academicRankId;
+  }
+  if (filters.value.gender !== "ALL") {
+    params.gender = filters.value.gender;
+  }
+
+  return params;
+}
+
+async function loadFilters() {
+  try {
+    filterOptions.value = await fetchLecturerReportFilters();
+  } catch (error) {
+    console.error(error);
+    errorMessage.value =
+      "Không thể tải dữ liệu bộ lọc. Vui lòng thử lại.";
   }
 }
 
-function showExportNotImplementedMessage(exportFormatName: "PDF" | "Excel") {
-  temporaryNotificationMessage.value = `Chức năng xuất ${exportFormatName} hiện chỉ là giao diện (UI-only) theo yêu cầu.`;
-  window.setTimeout(() => {
-    temporaryNotificationMessage.value = "";
-  }, 2500);
+async function loadReport() {
+  isLoading.value = true;
+  errorMessage.value = "";
+  try {
+    const data = await fetchLecturerReport(buildQueryParams());
+    summary.value = data.summary;
+    charts.value = data.charts;
+    table.value = data.table;
+  } catch (error) {
+    console.error(error);
+    errorMessage.value =
+      "Không thể tải báo cáo giảng viên. Vui lòng thử lại.";
+  } finally {
+    isLoading.value = false;
+  }
 }
 
-fetchLecturerStatistics();
+function applyFilters(nextFilters: LecturerReportFilters) {
+  filters.value = { ...nextFilters };
+  page.value = 1;
+  void loadReport();
+}
 
-watch(
-  () => filteredLecturerRecords.value.length,
-  () => {
-    recalculateTotalPageCount();
-  },
-  { immediate: true }
-);
+function resetFilters() {
+  filters.value = { ...defaultFilters };
+  page.value = 1;
+  void loadReport();
+}
+
+function applySort(nextSort: LecturerSortCondition) {
+  sort.value = { ...nextSort };
+  page.value = 1;
+  void loadReport();
+}
+
+function changePage(nextPage: number) {
+  page.value = nextPage;
+  void loadReport();
+}
+
+function changePageSize(nextPageSize: number) {
+  pageSize.value = nextPageSize;
+  page.value = 1;
+  void loadReport();
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+}
+
+async function handleExport(type: "pdf" | "excel") {
+  if (exporting.value) return;
+  exporting.value = type;
+
+  try {
+    const params = buildExportParams();
+    const result =
+      type === "excel"
+        ? await exportLecturerReportExcel(params)
+        : await exportLecturerReportPdf(params);
+    downloadBlob(result.blob, result.filename);
+    notificationMessage.value = "Xuất báo cáo thành công.";
+  } catch (error) {
+    console.error(error);
+    notificationMessage.value =
+      "Không thể xuất báo cáo. Vui lòng thử lại.";
+  } finally {
+    exporting.value = null;
+    window.setTimeout(() => {
+      notificationMessage.value = "";
+    }, 2500);
+  }
+}
+
+onMounted(async () => {
+  await loadFilters();
+  await loadReport();
+});
 </script>

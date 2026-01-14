@@ -1,45 +1,50 @@
 import type {
-  ActorOptionDTO,
   AuditLogEntryDTO,
+  AuditLogListResponseDTO,
+  AuditLogMetaDTO,
   AuditLogQueryDTO,
-  FacultyOptionDTO,
 } from "../contracts/audit-log.contract";
 import {
-  auditLogMockActors,
-  auditLogMockEntries,
-  auditLogMockFaculties,
-} from "../mock-data/audit-log.mock";
+  getAuditLogDetailApi,
+  getAuditLogMetaApi,
+  listAuditLogsApi,
+} from "../api/auditLogsApi";
 
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+function resolveApiErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === "object" && error !== null) {
+    const anyError = error as {
+      message?: string;
+      response?: { data?: { message?: string } };
+    };
+    return anyError.response?.data?.message || anyError.message || fallback;
+  }
+  return fallback;
 }
 
 export async function fetchAuditLogEntries(
-  _query: AuditLogQueryDTO
-): Promise<AuditLogEntryDTO[]> {
-  // TODO: Replace by real API:
-  // GET /api/audit-logs (scope enforced in backend)
-  await sleep(250);
-  return auditLogMockEntries
-    .slice()
-    .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
+  query: AuditLogQueryDTO
+): Promise<AuditLogListResponseDTO> {
+  try {
+    return await listAuditLogsApi(query);
+  } catch (error) {
+    throw new Error(resolveApiErrorMessage(error, "Không tải được danh sách nhật ký."));
+  }
 }
 
-export async function fetchAuditActors(): Promise<ActorOptionDTO[]> {
-  // TODO: GET /api/audit-logs/actors
-  await sleep(150);
-  return auditLogMockActors;
+export async function fetchAuditLogDetail(
+  id: number
+): Promise<AuditLogEntryDTO> {
+  try {
+    return await getAuditLogDetailApi(id);
+  } catch (error) {
+    throw new Error(resolveApiErrorMessage(error, "Không tải được chi tiết nhật ký."));
+  }
 }
 
-export async function fetchFaculties(): Promise<FacultyOptionDTO[]> {
-  // TODO: GET /api/faculties
-  await sleep(150);
-  return auditLogMockFaculties;
-}
-
-export async function resolveMyFacultyId(): Promise<number> {
-  // TODO: Use:
-  // GET /api/profile/me -> lecturers.department_id -> departments.faculty_id
-  await sleep(120);
-  return 1; // mock: BCN thuộc khoa CNTT
+export async function fetchAuditLogMeta(): Promise<AuditLogMetaDTO> {
+  try {
+    return await getAuditLogMetaApi();
+  } catch (error) {
+    throw new Error(resolveApiErrorMessage(error, "Không tải được dữ liệu lọc."));
+  }
 }

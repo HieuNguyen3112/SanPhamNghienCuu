@@ -24,6 +24,11 @@ export function useSelectHoursRequest() {
     keyword: "",
   });
 
+  const currentPageNumber = ref(1);
+  const pageSize = ref(12);
+  const totalItemCount = ref(0);
+  const totalApprovedCount = ref(0);
+
   const drawerOpen = ref(false);
   const selectedActivityId = ref<number | null>(null);
   const workDetail = ref<WorkDetail | null>(null);
@@ -38,34 +43,8 @@ export function useSelectHoursRequest() {
   const submitError = ref<string | null>(null);
   const toastMessage = ref<string | null>(null);
 
-  /** ✅ chỉ công trình hợp lệ nội dung (Khoa + Trường duyệt) */
-  const contentApprovedWorks = computed(() =>
-    works.value.filter((w) => isContentFullyApproved(w))
-  );
-
-  const totalApprovedCount = computed(() => contentApprovedWorks.value.length);
-
-  /** ✅ lọc theo “duyệt giờ” + keyword */
-  const filteredWorks = computed(() => {
-    const keyword = filter.value.keyword.trim().toLowerCase();
-
-    return contentApprovedWorks.value.filter((w) => {
-      const matchHours =
-        filter.value.hoursMode === "all"
-          ? true
-          : filter.value.hoursMode === "not_reviewed_hours"
-          ? w.hoursRequestState === "eligible"
-          : filter.value.hoursMode === "waiting_hours"
-          ? w.hoursRequestState === "submitted"
-          : w.hoursRequestState === "hours_approved";
-
-      if (!matchHours) return false;
-
-      if (!keyword) return true;
-      const haystack = `${w.activityCode} ${w.title}`.toLowerCase();
-      return haystack.includes(keyword);
-    });
-  });
+  const contentApprovedWorks = computed(() => works.value);
+  const filteredWorks = computed(() => works.value);
 
   const selectedIds = computed<number[]>(() => [...selectedWorkIdSet.value]);
   const selectedCount = computed(() => selectedIds.value.length);
@@ -77,13 +56,13 @@ export function useSelectHoursRequest() {
       .reduce((sum, w) => sum + (w.hoursAssigned ?? 0), 0);
   });
 
-  /**
-   * ✅ selectableIds nên bám theo FILTER (để select all đúng những gì đang “theo dõi”)
-   * và chỉ chọn được khi: nội dung hợp lệ + hours_request_state=eligible
-   */
   const selectableIds = computed<number[]>(() =>
     filteredWorks.value
-      .filter((w) => w.hoursRequestState === "eligible")
+      .filter(
+        (w) =>
+          w.hoursRequestState === "eligible" ||
+          w.hoursRequestState === "rejected"
+      )
       .map((w) => w.activityId)
   );
 
@@ -92,15 +71,24 @@ export function useSelectHoursRequest() {
     errorList.value = null;
 
     try {
-      const dtoList = await loadApprovedWorksDTO();
-      works.value = dtoList.map(approvedWorkRowFromDto);
+      const dtoList = await loadApprovedWorksDTO({
+        status: filter.value.hoursMode,
+        q: filter.value.keyword,
+        page: currentPageNumber.value,
+        per_page: pageSize.value,
+      });
 
-      // dọn selection: chỉ giữ những item vẫn còn eligible & nội dung hợp lệ
+      works.value = dtoList.items.map(approvedWorkRowFromDto);
+      totalItemCount.value = dtoList.pagination.total;
+      totalApprovedCount.value = dtoList.summary.approved_count ?? 0;
+
       const selectable = new Set(
         works.value
           .filter(
             (w) =>
-              isContentFullyApproved(w) && w.hoursRequestState === "eligible"
+              isContentFullyApproved(w) &&
+              (w.hoursRequestState === "eligible" ||
+                w.hoursRequestState === "rejected")
           )
           .map((w) => w.activityId)
       );
@@ -119,10 +107,27 @@ export function useSelectHoursRequest() {
 
   function applyFilter(partial: Partial<WorksFilterState>) {
     filter.value = { ...filter.value, ...partial };
+    currentPageNumber.value = 1;
+    loadApprovedWorks();
   }
 
   function resetFilter() {
     filter.value = { hoursMode: "all", keyword: "" };
+    currentPageNumber.value = 1;
+    loadApprovedWorks();
+  }
+
+  function updateCurrentPageNumber(nextPage: number) {
+    if (nextPage === currentPageNumber.value) return;
+    currentPageNumber.value = nextPage;
+    loadApprovedWorks();
+  }
+
+  function updatePageSize(nextPageSize: number) {
+    if (nextPageSize === pageSize.value) return;
+    pageSize.value = nextPageSize;
+    currentPageNumber.value = 1;
+    loadApprovedWorks();
   }
 
   function toggleWorkSelection(payload: {
@@ -132,9 +137,12 @@ export function useSelectHoursRequest() {
     const row = works.value.find((w) => w.activityId === payload.activityId);
     if (!row) return;
 
-    // ✅ P0: phải hợp lệ nội dung + chưa gửi duyệt giờ
     if (!isContentFullyApproved(row)) return;
-    if (row.hoursRequestState !== "eligible") return;
+    if (
+      row.hoursRequestState !== "eligible" &&
+      row.hoursRequestState !== "rejected"
+    )
+      return;
 
     const next = new Set(selectedWorkIdSet.value);
     if (payload.nextChecked) next.add(payload.activityId);
@@ -192,18 +200,9 @@ export function useSelectHoursRequest() {
       const activityIds = [...selectedWorkIdSet.value];
       await submitHoursApprovalRequestDTO({ activity_ids: activityIds });
 
-      works.value = works.value.map((w) => {
-        if (
-          activityIds.includes(w.activityId) &&
-          isContentFullyApproved(w) &&
-          w.hoursRequestState === "eligible"
-        ) {
-          return { ...w, hoursRequestState: "submitted" };
-        }
-        return w;
-      });
-
       selectedWorkIdSet.value = new Set();
+      await loadApprovedWorks();
+
       toastMessage.value = "Đã gửi yêu cầu xét duyệt giờ NCKH lên Khoa.";
       window.setTimeout(() => (toastMessage.value = null), 2500);
     } catch (e) {
@@ -238,10 +237,15 @@ export function useSelectHoursRequest() {
     toastMessage,
 
     totalApprovedCount,
+    currentPageNumber,
+    pageSize,
+    totalItemCount,
 
     loadApprovedWorks,
     applyFilter,
     resetFilter,
+    updateCurrentPageNumber,
+    updatePageSize,
     toggleWorkSelection,
     toggleSelectAll,
     openWorkDetail,

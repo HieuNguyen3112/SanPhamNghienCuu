@@ -38,7 +38,7 @@
                   Chi tiết công trình
                 </div>
                 <div class="mt-1 text-xs text-slate-500">
-                  Chỉ xem — không chỉnh sửa
+                  Chỉ xem, không chỉnh sửa
                 </div>
               </div>
 
@@ -55,7 +55,7 @@
 
           <div class="flex-1 overflow-auto px-4 py-4">
             <div v-if="loading" class="text-sm text-slate-700">
-              Đang tải chi tiết…
+              Đang tải chi tiết...
             </div>
 
             <div
@@ -145,10 +145,14 @@
 
                 <div class="mt-3">
                   <span
-                    class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200"
+                    class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1"
+                    :class="hoursPillClass(detail)"
                   >
-                    <Check class="mr-1 h-4 w-4" />
-                    Đã duyệt
+                    <Check
+                      v-if="detail.hoursRequestState === 'hours_approved'"
+                      class="mr-1 h-4 w-4"
+                    />
+                    {{ hoursStatusLabel(detail) }}
                   </span>
                 </div>
               </div>
@@ -193,4 +197,21 @@ defineProps<{
 const emit = defineEmits<{
   (e: "close"): void;
 }>();
+
+function hoursStatusLabel(detail: WorkDetail) {
+  if (detail.hoursRequestState === "hours_approved") return "Đã duyệt giờ";
+  if (detail.hoursRequestState === "submitted") return "Chờ duyệt giờ";
+  if (detail.hoursRequestState === "rejected") return "Bị từ chối";
+  return "Chưa duyệt giờ";
+}
+
+function hoursPillClass(detail: WorkDetail) {
+  if (detail.hoursRequestState === "hours_approved")
+    return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  if (detail.hoursRequestState === "submitted")
+    return "bg-amber-50 text-amber-700 ring-amber-200";
+  if (detail.hoursRequestState === "rejected")
+    return "bg-rose-50 text-rose-700 ring-rose-200";
+  return "bg-slate-50 text-slate-700 ring-slate-200";
+}
 </script>

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="open" class="fixed inset-0 z-50">
     <div class="absolute inset-0 bg-slate-900/40" @click="emit('close')" />
 
@@ -152,14 +152,14 @@ import { reactive, watch, ref } from "vue";
 import { Save, X } from "lucide-vue-next";
 import type {
   LecturerAccount,
-  UnitOptionDTO,
+  UnitOption,
   UpdateLecturerAccountPayload,
 } from "../contracts/lecturerAccountManagement.contract";
 
 const props = defineProps<{
   open: boolean;
   account: LecturerAccount | null;
-  unitOptions: UnitOptionDTO[];
+  unitOptions: UnitOption[];
   saving: boolean;
   error: string | null;
 }>();

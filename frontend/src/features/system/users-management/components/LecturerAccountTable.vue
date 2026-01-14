@@ -1,10 +1,10 @@
-<!-- File: src/features/lecturer-account-management/components/LecturerAccountTable.vue -->
+﻿<!-- File: src/features/lecturer-account-management/components/LecturerAccountTable.vue -->
 <template>
   <div
     class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
   >
     <div v-if="loading" class="p-4 text-sm text-slate-700">
-      Đang tải danh sách…
+      Đang tải danh sách...
     </div>
 
     <div v-else-if="error" class="p-4">
@@ -25,7 +25,7 @@
       </div>
     </div>
 
-    <!-- ✅ Table scroll -->
+    <!-- Table scroll -->
     <div v-else class="max-h-[620px] overflow-auto" @scroll="closeMenu">
       <table class="min-w-full text-left text-sm">
         <thead
@@ -43,7 +43,7 @@
         </thead>
 
         <tbody class="divide-y divide-slate-200">
-          <tr v-for="row in pagedRows" :key="row.id" class="hover:bg-slate-50">
+          <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50">
             <td class="px-3 py-2">
               <div class="flex items-center gap-3">
                 <div
@@ -101,7 +101,7 @@
               </span>
             </td>
 
-            <!-- ✅ Action trigger -->
+            <!-- Action trigger -->
             <td class="px-3 py-2 text-right">
               <button
                 type="button"
@@ -117,13 +117,13 @@
       </table>
     </div>
 
-    <!-- ✅ Pagination footer -->
+    <!-- Pagination footer -->
     <div
       v-if="!loading && !error && rows.length > 0"
       class="border-t border-slate-200 px-4 py-3"
     >
       <SharedPaginationControls
-        :total-item-count="rows.length"
+        :total-item-count="totalItemCount"
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
         display-mode="FULL"
@@ -131,12 +131,12 @@
         record-summary-mode="RANGE"
         record-summary-unit-label="giảng viên"
         container-class-name="w-full"
-        @update:currentPageNumber="currentPageNumber = $event"
-        @update:pageSize="pageSize = $event"
+        @update:currentPageNumber="emit('update:currentPageNumber', $event)"
+        @update:pageSize="emit('update:pageSize', $event)"
       />
     </div>
 
-    <!-- ✅ Teleport menu => luôn nổi trên table -->
+    <!-- Teleport menu => luôn nổi trên table -->
     <Teleport to="body">
       <div v-if="openMenuId !== null && activeRow">
         <div class="fixed inset-0 z-9000" @click="closeMenu" />
@@ -206,30 +206,26 @@ const props = defineProps<{
   rows: LecturerAccount[];
   loading: boolean;
   error: string | null;
+  currentPageNumber: number;
+  pageSize: number;
+  totalItemCount: number;
 }>();
 
 const emit = defineEmits<{
   (e: "edit", id: number): void;
   (e: "roles", id: number): void;
   (e: "toggle-status", id: number): void;
+  (e: "update:currentPageNumber", value: number): void;
+  (e: "update:pageSize", value: number): void;
 }>();
-
-/** Pagination (client-side) */
-const currentPageNumber = ref(1);
-const pageSize = ref(12);
 
 watch(
   () => props.rows,
   () => {
-    currentPageNumber.value = 1;
+    closeMenu();
   },
   { deep: true }
 );
-
-const pagedRows = computed(() => {
-  const start = (currentPageNumber.value - 1) * pageSize.value;
-  return props.rows.slice(start, start + pageSize.value);
-});
 
 /** Teleport menu */
 const openMenuId = ref<number | null>(null);

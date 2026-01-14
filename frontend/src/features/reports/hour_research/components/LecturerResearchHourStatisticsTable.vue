@@ -8,98 +8,70 @@
           Danh sách giảng viên
         </h2>
         <p class="mt-1 text-xs text-slate-600">
-          Bảng dữ liệu phục vụ đối soát và tra cứu chi tiết theo từng giảng
-          viên.
+          Hiển thị {{ pagination.total }} giảng viên theo điều kiện lọc.
         </p>
       </div>
     </div>
 
     <div class="overflow-auto">
-      <table class="min-w-[900px] w-full border-collapse">
+      <table class="min-w-[900px] w-full border-collapse text-sm">
         <thead class="sticky top-0 z-10 bg-slate-50">
-          <tr class="border-b border-slate-200">
-            <th
-              class="px-4 py-3 text-left text-xs font-semibold text-slate-700"
-            >
-              Giảng viên
-            </th>
-            <th
-              class="px-4 py-3 text-left text-xs font-semibold text-slate-700"
-            >
-              Khoa
-            </th>
-            <th
-              class="px-4 py-3 text-right text-xs font-semibold text-slate-700"
-            >
+          <tr class="border-b border-slate-200 text-left text-slate-700">
+            <th class="px-4 py-3 text-xs font-semibold">Giảng viên</th>
+            <th class="px-4 py-3 text-xs font-semibold">Khoa</th>
+            <th class="px-4 py-3 text-right text-xs font-semibold">
               Tổng giờ NCKH
             </th>
-            <th
-              class="px-4 py-3 text-right text-xs font-semibold text-slate-700"
-            >
+            <th class="px-4 py-3 text-right text-xs font-semibold">
               Giờ chuẩn
             </th>
-            <th
-              class="px-4 py-3 text-left text-xs font-semibold text-slate-700"
-            >
-              Trạng thái
-            </th>
-            <th
-              class="px-4 py-3 text-left text-xs font-semibold text-slate-700"
-            >
-              Năm học
-            </th>
+            <th class="px-4 py-3 text-xs font-semibold">Trạng thái</th>
+            <th class="px-4 py-3 text-xs font-semibold">Năm học</th>
           </tr>
         </thead>
 
-        <tbody v-if="pagedLecturerResearchHourRecords.length > 0">
+        <tbody v-if="loading">
+          <tr>
+            <td colspan="6" class="px-4 py-8 text-center text-slate-500">
+              Đang tải dữ liệu...
+            </td>
+          </tr>
+        </tbody>
+
+        <tbody v-else-if="rows.length > 0">
           <tr
-            v-for="lecturerResearchHourRecord in pagedLecturerResearchHourRecords"
-            :key="
-              lecturerResearchHourRecord.lecturerIdentifier +
-              '-' +
-              lecturerResearchHourRecord.academicYear
-            "
+            v-for="row in rows"
+            :key="`${row.lecturerId}-${row.academicYearId ?? 'na'}`"
             class="border-b border-slate-100 hover:bg-slate-50"
           >
-            <td class="px-4 py-3 text-sm font-medium text-slate-900">
-              {{ lecturerResearchHourRecord.lecturerDisplayName }}
+            <td class="px-4 py-3 font-medium text-slate-900">
+              {{ row.lecturerName }}
             </td>
-            <td class="px-4 py-3 text-sm text-slate-700">
-              {{ lecturerResearchHourRecord.facultyDisplayName }}
+            <td class="px-4 py-3 text-slate-700">
+              {{ row.facultyName ?? "Chưa rõ" }}
             </td>
-            <td class="px-4 py-3 text-right text-sm text-slate-800">
-              {{
-                formatIntegerValue(
-                  lecturerResearchHourRecord.totalResearchHourCount
-                )
-              }}
+            <td class="px-4 py-3 text-right text-slate-800">
+              {{ formatIntegerValue(row.totalHours) }}
             </td>
-            <td class="px-4 py-3 text-right text-sm text-slate-800">
-              {{
-                formatIntegerValue(
-                  lecturerResearchHourRecord.researchHourStandardCount
-                )
-              }}
+            <td class="px-4 py-3 text-right text-slate-800">
+              {{ formatIntegerValue(row.requiredHours) }}
             </td>
             <td class="px-4 py-3">
               <span
                 class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold"
-                :class="getStatusBadgeClassName(lecturerResearchHourRecord)"
+                :class="getStatusBadgeClassName(row.status)"
               >
-                {{ getStatusLabel(lecturerResearchHourRecord) }}
+                {{ getStatusLabel(row.status) }}
               </span>
             </td>
-            <td class="px-4 py-3 text-sm text-slate-700">
-              {{ lecturerResearchHourRecord.academicYear }}
+            <td class="px-4 py-3 text-slate-700">
+              {{ row.academicYearCode ?? "-" }}
             </td>
           </tr>
         </tbody>
       </table>
 
-      <div
-        v-if="pagedLecturerResearchHourRecords.length === 0"
-        class="p-10 text-center"
-      >
+      <div v-if="!loading && rows.length === 0" class="p-10 text-center">
         <div
           class="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-slate-50"
         >
@@ -128,78 +100,48 @@
 
     <div class="border-t border-slate-200 p-4">
       <SharedPaginationControls
-        :total-item-count="lecturerResearchHourRecords.length"
-        :current-page-number="currentPageNumber"
-        :page-size="pageSize"
+        :total-item-count="pagination.total"
+        :current-page-number="pagination.page"
+        :page-size="pagination.perPage"
         display-mode="FULL"
         :show-record-summary="true"
         record-summary-mode="PAGE_COUNT"
-        record-summary-unit-label="giảng viên "
-        @update:currentPageNumber="(v) => (currentPageNumber = v)"
-        @update:pageSize="(v) => (pageSize = v)"
+        record-summary-unit-label="giảng viên"
+        @update:currentPageNumber="emitComponentEvent('pageChanged', $event)"
+        @update:pageSize="emitComponentEvent('pageSizeChanged', $event)"
       />
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import type { LecturerResearchHourRecord } from "../lecturerResearchHourModels";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
+import type {
+  HourResearchReportPagination,
+  HourResearchReportRow,
+} from "../hourResearchReportTypes";
 
 const componentProperties = defineProps<{
-  lecturerResearchHourRecords: LecturerResearchHourRecord[];
+  rows: HourResearchReportRow[];
+  pagination: HourResearchReportPagination;
+  loading: boolean;
 }>();
 
-const currentPageNumber = ref<number>(1);
-const pageSize = ref<number>(12);
-
-watch(
-  () => componentProperties.lecturerResearchHourRecords,
-  () => {
-    // Khi bộ lọc thay đổi, quay về trang đầu giúp trải nghiệm nhất quán (không rơi vào trang rỗng).
-    currentPageNumber.value = 1;
-  },
-  { deep: true }
-);
-
-// const totalPageCount = computed<number>(() => {
-//   const recordCount = componentProperties.lecturerResearchHourRecords.length;
-//   return Math.max(1, Math.ceil(recordCount / pageSize.value));
-// });
-
-const pagedLecturerResearchHourRecords = computed<LecturerResearchHourRecord[]>(
-  () => {
-    const startIndex = (currentPageNumber.value - 1) * pageSize.value;
-    const endIndex = startIndex + pageSize.value;
-    return componentProperties.lecturerResearchHourRecords.slice(
-      startIndex,
-      endIndex
-    );
-  }
-);
+const emitComponentEvent = defineEmits<{
+  (eventName: "pageChanged", page: number): void;
+  (eventName: "pageSizeChanged", pageSize: number): void;
+}>();
 
 function formatIntegerValue(value: number): string {
   return new Intl.NumberFormat("vi-VN").format(Math.round(value));
 }
 
-function getStatusLabel(
-  lecturerResearchHourRecord: LecturerResearchHourRecord
-): string {
-  return lecturerResearchHourRecord.totalResearchHourCount >=
-    lecturerResearchHourRecord.researchHourStandardCount
-    ? "Đạt"
-    : "Chưa đạt";
+function getStatusLabel(status: HourResearchReportRow["status"]): string {
+  return status === "met" ? "Đạt chuẩn" : "Chưa đạt";
 }
 
-function getStatusBadgeClassName(
-  lecturerResearchHourRecord: LecturerResearchHourRecord
-): string {
-  const isMeetingResearchHourStandard =
-    lecturerResearchHourRecord.totalResearchHourCount >=
-    lecturerResearchHourRecord.researchHourStandardCount;
-
-  return isMeetingResearchHourStandard
+function getStatusBadgeClassName(status: HourResearchReportRow["status"]): string {
+  return status === "met"
     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
     : "border-rose-200 bg-rose-50 text-rose-800";
 }

@@ -38,9 +38,9 @@
                 </div>
                 <div class="mt-1 text-xs text-slate-500">
                   {{ lecturer?.facultyName ?? "—" }}
-                  <span class="mx-1">•</span>
+                  <span class="mx-1">·</span>
                   {{ degreeRankLabel }}
-                  <span class="mx-1">•</span>
+                  <span class="mx-1">·</span>
                   Năm học: {{ academicYearCode }}
                 </div>
               </div>
@@ -78,19 +78,15 @@
             <div class="mt-5 rounded-2xl border border-slate-200 bg-white">
               <div class="border-b border-slate-200 px-4 py-3">
                 <div class="text-sm font-semibold text-slate-900">
-                  Danh sách công trình đã được phê duyệt và quy đổi giờ NCKH
+                  Danh sách công trình đã duyệt và quy đổi giờ NCKH
                 </div>
                 <div class="mt-1 text-xs text-slate-500">
-                  Chỉ hiển thị công trình đã duyệt (khoa + trường) và giờ đã quy
-                  đổi.
-                  <span class="ml-1 text-slate-400"
-                    >(Mock: backend/DTO đã lọc đúng)</span
-                  >
+                  Chỉ hiển thị công trình đã duyệt (khoa + trường) và giờ quy đổi.
                 </div>
               </div>
 
               <div v-if="loadingDetail" class="p-4 text-sm text-slate-700">
-                Đang tải chi tiết…
+                Đang tải chi tiết...
               </div>
 
               <div v-else-if="errorDetail" class="p-4">
@@ -156,14 +152,13 @@
 
             <div class="mt-5 rounded-2xl border p-4" :class="footerClass">
               <div class="text-sm font-medium" :class="footerTextClass">
-                <span v-if="difference >= 0"
-                  >🟢 Giảng viên đã hoàn thành định mức giờ NCKH.</span
-                >
-                <span v-else
-                  >🔴 Giảng viên còn thiếu
-                  {{ formatHours(Math.abs(difference)) }} giờ NCKH so với định
-                  mức.</span
-                >
+                <span v-if="difference >= 0">
+                  Giảng viên đã hoàn thành định mức giờ NCKH.
+                </span>
+                <span v-else>
+                  Giảng viên còn thiếu {{ formatHours(Math.abs(difference)) }} giờ
+                  NCKH so với định mức.
+                </span>
               </div>
             </div>
           </div>
@@ -215,7 +210,7 @@ const tone = computed<Tone>(() => {
 const degreeRankLabel = computed(() => {
   const degree = props.lecturer?.degreeName ?? "—";
   const rank = props.lecturer?.academicRankName ?? "—";
-  return `${degree} – ${rank}`;
+  return `${degree} · ${rank}`;
 });
 
 const footerClass = computed(() => {

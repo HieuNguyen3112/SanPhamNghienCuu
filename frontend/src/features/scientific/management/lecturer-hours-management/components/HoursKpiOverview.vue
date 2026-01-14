@@ -4,25 +4,25 @@
       title="Tổng số giảng viên"
       :value="String(totalLecturers)"
       tone="neutral"
-      icon="👥"
+      icon="ALL"
     />
     <KpiCard
       title="Đạt định mức"
       :value="String(hitCount)"
       tone="hit"
-      icon="🟢"
+      icon="OK"
     />
     <KpiCard
       title="Chưa đạt"
       :value="String(missCount)"
       tone="miss"
-      icon="🔴"
+      icon="MISS"
     />
     <KpiCard
       title="Tỷ lệ hoàn thành KPI"
       :value="`${hitRate.toFixed(1)}%`"
       :tone="hitRateTone"
-      icon="📈"
+      icon="%"
     />
   </div>
 </template>

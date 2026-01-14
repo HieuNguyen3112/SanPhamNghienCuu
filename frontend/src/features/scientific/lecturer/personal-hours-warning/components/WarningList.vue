@@ -4,7 +4,7 @@
       v-if="loading"
       class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700"
     >
-      Đang tải cảnh báo…
+      Đang tải cảnh báo...
     </div>
 
     <div
@@ -25,7 +25,7 @@
     >
       <div class="text-sm font-semibold text-slate-900">Không có cảnh báo</div>
       <div class="mt-1 text-xs text-slate-500">
-        Bạn đang ở trạng thái ổn hoặc bộ lọc không có dữ liệu.
+        Bạn đang ở trạng thái ổn hoặc chưa có dữ liệu phù hợp.
       </div>
     </div>
 
@@ -57,15 +57,13 @@
               <div class="flex items-center gap-2">
                 <span
                   class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1"
-                  :class="seenPillClass(alert.isSeen)"
+                  :class="seenPillClass(alert.statusKey)"
                 >
                   <component
                     :is="alert.isSeen ? CheckCircle2 : Info"
                     class="h-4 w-4"
                   />
-                  <span class="ml-1">{{
-                    alert.isSeen ? "Đã xem" : "Chưa xử lý"
-                  }}</span>
+                  <span class="ml-1">{{ alert.statusLabel }}</span>
                 </span>
               </div>
             </div>
@@ -105,13 +103,24 @@
 
               <div class="flex items-center gap-2">
                 <RouterLink
-                  v-if="alert.ctaTo && alert.ctaLabel"
+                  v-if="alert.ctaTo && alert.ctaLabel && !alert.ctaExternal"
                   :to="alert.ctaTo"
                   class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
                 >
                   <ArrowRight class="h-4 w-4" />
                   {{ alert.ctaLabel }}
                 </RouterLink>
+
+                <a
+                  v-else-if="alert.ctaTo && alert.ctaLabel"
+                  :href="alert.ctaTo"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+                >
+                  <ArrowRight class="h-4 w-4" />
+                  {{ alert.ctaLabel }}
+                </a>
 
                 <button
                   v-else
@@ -166,9 +175,9 @@ function iconToneClass(alert: HoursAlertItem) {
   return "bg-slate-50 text-slate-700 ring-slate-200";
 }
 
-function seenPillClass(isSeen: boolean) {
-  return isSeen
-    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-    : "bg-slate-50 text-slate-700 ring-slate-200";
+function seenPillClass(statusKey: string) {
+  return statusKey === "unseen"
+    ? "bg-slate-50 text-slate-700 ring-slate-200"
+    : "bg-emerald-50 text-emerald-700 ring-emerald-200";
 }
 </script>

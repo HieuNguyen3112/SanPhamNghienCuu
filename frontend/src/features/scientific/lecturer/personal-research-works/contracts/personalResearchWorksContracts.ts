@@ -25,6 +25,19 @@ export interface PersonalStatsDTO {
   draft_count: number;
 }
 
+export interface PersonalWorkPaginationDTO {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+export interface PersonalWorkIndexResponseDTO {
+  stats: PersonalStatsDTO;
+  items: PersonalWorkRowDTO[];
+  pagination: PersonalWorkPaginationDTO;
+}
+
 export interface PersonalWorkRowDTO {
   activity_id: number;
   activity_code: string;

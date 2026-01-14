@@ -19,6 +19,8 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
+    protected $guard_name = 'web';
+
     // Map -> users (mặc định). Nếu bạn rename bảng users, chỉnh lại $table.
     protected $table = 'users';
     protected $primaryKey = 'id';

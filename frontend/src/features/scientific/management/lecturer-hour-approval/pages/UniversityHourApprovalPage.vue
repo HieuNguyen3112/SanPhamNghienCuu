@@ -6,7 +6,7 @@
       >
         <PageHeader
           title="Xét duyệt giờ nghiên cứu khoa học cho giảng viên"
-          subtitle="Theo dõi tình hình xét duyệt giờ NCKH của giảng viên trong khoa"
+          subtitle="Theo dõi tình hình xét duyệt giờ NCKH của giảng viên trong trường"
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"

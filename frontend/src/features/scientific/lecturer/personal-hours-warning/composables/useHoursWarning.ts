@@ -10,16 +10,15 @@ import {
   hoursAlertItemFromDto,
   hoursAlertsSummaryFromDto,
 } from "../contracts/hoursWarning.contract";
-import {
-  loadHoursActionSuggestionsDTO,
-  loadHoursAlertListDTO,
-  loadHoursAlertsSummaryDTO,
-} from "../services/hoursWarningService";
+import { fetchHoursWarnings, markHoursWarningSeen } from "../services/hoursWarningService";
+
+const defaultCounts = { all: 0, danger: 0, warning: 0, done: 0 };
 
 export function useHoursWarning() {
   const summaryStatus = ref<HoursAlertsSummary | null>(null);
   const alerts = ref<HoursAlertItem[]>([]);
   const actionSuggestions = ref<HoursAlertActionSuggestion[]>([]);
+  const counts = ref({ ...defaultCounts });
 
   const filterStatus = ref<HoursAlertsFilter>("all");
 
@@ -32,78 +31,62 @@ export function useHoursWarning() {
   const loadingSuggestions = ref(false);
   const errorSuggestions = ref<string | null>(null);
 
-  const filteredAlerts = computed(() => {
-    const status = filterStatus.value;
-    const list = alerts.value;
+  const pagination = ref({ page: 1, perPage: 12, total: 0, lastPage: 1 });
 
-    if (status === "all") return list;
-    if (status === "danger") return list.filter((a) => a.level === "danger");
-    if (status === "warning") return list.filter((a) => a.level === "warning");
-    // done
-    return list.filter((a) => a.isSeen);
-  });
-
-  const counts = computed(() => {
-    const list = alerts.value;
-    return {
-      all: list.length,
-      danger: list.filter((a) => a.level === "danger").length,
-      warning: list.filter((a) => a.level === "warning").length,
-      done: list.filter((a) => a.isSeen).length,
-    };
-  });
+  const filteredAlerts = computed(() => alerts.value);
 
   async function loadAlerts() {
-    await Promise.all([loadSummary(), loadList(), loadSuggestions()]);
-  }
-
-  async function loadSummary() {
     loadingSummary.value = true;
+    loadingAlerts.value = true;
+    loadingSuggestions.value = true;
     errorSummary.value = null;
+    errorAlerts.value = null;
+    errorSuggestions.value = null;
+
     try {
-      const dto = await loadHoursAlertsSummaryDTO();
-      summaryStatus.value = hoursAlertsSummaryFromDto(dto);
+      const dto = await fetchHoursWarnings({
+        tab: filterStatus.value,
+        page: pagination.value.page,
+        per_page: pagination.value.perPage,
+      });
+
+      summaryStatus.value = hoursAlertsSummaryFromDto(dto.summary);
+      alerts.value = dto.items.map(hoursAlertItemFromDto);
+      counts.value = { ...defaultCounts, ...dto.tab_counts };
+      actionSuggestions.value = dto.suggestions.map(
+        hoursAlertActionSuggestionFromDto
+      );
+      pagination.value = {
+        page: dto.pagination.page,
+        perPage: dto.pagination.per_page,
+        total: dto.pagination.total,
+        lastPage: dto.pagination.last_page,
+      };
     } catch (e) {
-      errorSummary.value = e instanceof Error ? e.message : String(e);
+      const message = e instanceof Error ? e.message : String(e);
+      errorSummary.value = message;
+      errorAlerts.value = message;
+      errorSuggestions.value = message;
     } finally {
       loadingSummary.value = false;
-    }
-  }
-
-  async function loadList() {
-    loadingAlerts.value = true;
-    errorAlerts.value = null;
-    try {
-      const dtoList = await loadHoursAlertListDTO();
-      alerts.value = dtoList.map(hoursAlertItemFromDto);
-    } catch (e) {
-      errorAlerts.value = e instanceof Error ? e.message : String(e);
-    } finally {
       loadingAlerts.value = false;
-    }
-  }
-
-  async function loadSuggestions() {
-    loadingSuggestions.value = true;
-    errorSuggestions.value = null;
-    try {
-      const dtoList = await loadHoursActionSuggestionsDTO();
-      actionSuggestions.value = dtoList.map(hoursAlertActionSuggestionFromDto);
-    } catch (e) {
-      errorSuggestions.value = e instanceof Error ? e.message : String(e);
-    } finally {
       loadingSuggestions.value = false;
     }
   }
 
   function changeFilter(next: HoursAlertsFilter) {
     filterStatus.value = next;
+    pagination.value.page = 1;
+    loadAlerts();
   }
 
-  function markAsSeen(alertId: number) {
-    alerts.value = alerts.value.map((a) =>
-      a.id === alertId ? { ...a, isSeen: true } : a
-    );
+  async function markAsSeen(alertId: number) {
+    try {
+      await markHoursWarningSeen(alertId);
+      await loadAlerts();
+    } catch (e) {
+      errorAlerts.value = e instanceof Error ? e.message : String(e);
+    }
   }
 
   return {

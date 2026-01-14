@@ -17,7 +17,7 @@
       <HourApprovalFilterPanel
         :filter="filter"
         :faculty-options="facultyOptions"
-        :loading="loadingList"
+        :loading="loadingList || loadingLookups"
         :faculty-select-disabled="true"
         @update:filter="applyFilter"
         @reset="resetFilter"
@@ -55,22 +55,38 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import HourApprovalFilterPanel from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalFilterPanel.vue";
 import HourApprovalTable from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalTable.vue";
 import HourApprovalDetailDrawer from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalDetailDrawer.vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
+import http from "@/lib/http";
 
 import type { FacultyOption } from "@/features/scientific/management/lecturer-hour-approval/contracts/hourApproval.contract";
-import { buildFacultyDb } from "@/features/scientific/management/lecturer-hour-approval/mock-data/hourApproval.mock";
-import { createHourApprovalService } from "@/features/scientific/management/lecturer-hour-approval/services/hourApprovalService";
+import { createFacultyHourApprovalService } from "@/features/scientific/management/lecturer-hour-approval/services/facultyHoursApprovals.service";
 import { useHourApprovalManagement } from "@/features/scientific/management/lecturer-hour-approval/composables/useHourApprovalManagement";
 
-const facultyOptions: FacultyOption[] = [
-  { id: 10, name: "Khoa Công nghệ Thông tin" },
-];
+const facultyOptions = ref<FacultyOption[]>([]);
+const loadingLookups = ref(false);
 
-const service = createHourApprovalService(buildFacultyDb(10));
+async function loadLookups() {
+  loadingLookups.value = true;
+  try {
+    const { data } = await http.get<{ data: { faculties: FacultyOption[] } }>(
+      "/api/faculty/hours/approvals/lookups"
+    );
+    facultyOptions.value = (data.data?.faculties ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+    }));
+  } catch (e) {
+    facultyOptions.value = [];
+  } finally {
+    loadingLookups.value = false;
+  }
+}
+
+const service = createFacultyHourApprovalService();
 
 const {
   filter,
@@ -102,10 +118,14 @@ const {
   updatePage,
   updatePageSize,
 } = useHourApprovalManagement(service, {
-  facultyId: 10, // BCN khoa cố định khoa
+  facultyId: null,
 });
 
-onMounted(() => {
-  loadRequests();
+onMounted(async () => {
+  await loadLookups();
+  if (!filter.facultyId && facultyOptions.value[0]?.id) {
+    filter.facultyId = facultyOptions.value[0].id;
+  }
+  await loadRequests();
 });
 </script>

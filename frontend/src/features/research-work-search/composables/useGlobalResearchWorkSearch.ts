@@ -1,10 +1,17 @@
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useUserStore } from "@/app/stores/userStore";
 import type {
+  AuthorRoleOption,
+  DepartmentOption,
   FacultyOption,
   GlobalResearchWorkSearchFilter,
   LecturerSuggestion,
+  ManagementLevelOption,
   ResearchWorkDetail,
+  ResearchWorkFile,
   ResearchWorkSummary,
+  StatusOption,
+  WorkTypeOption,
 } from "../contracts/globalResearchWorkSearch.contract";
 import {
   detailFromDto,
@@ -12,13 +19,13 @@ import {
   summaryFromDto,
 } from "../contracts/globalResearchWorkSearch.contract";
 import {
-  getResearchWorkDetailDTO,
-  searchResearchWorksDTO,
-} from "../services/globalResearchWorkSearch.service";
-import {
-  facultyOptionsMock,
-  lecturerSuggestionsMock,
-} from "../mock-data/globalResearchWorkSearch.mock";
+  downloadWorkAttachment,
+  getLecturerSuggestions,
+  getWorkDetail,
+  getWorkSearchLookups,
+  searchWorks,
+  type ResearchWorkSearchScope,
+} from "../api/researchWorkSearchApi";
 
 function clampYearRange(filter: GlobalResearchWorkSearchFilter) {
   const from = filter.yearFrom;
@@ -29,30 +36,42 @@ function clampYearRange(filter: GlobalResearchWorkSearchFilter) {
   return filter;
 }
 
+function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+}
+
 export function useGlobalResearchWorkSearch() {
-  const facultyOptions = ref<FacultyOption[]>(facultyOptionsMock);
-  const lecturerSuggestions = ref<LecturerSuggestion[]>(
-    lecturerSuggestionsMock
+  const userStore = useUserStore();
+  const searchScope = computed<ResearchWorkSearchScope>(() =>
+    userStore.role === "LECTURER" ? "lecturer" : "admin"
   );
+  const isLecturer = computed(() => searchScope.value === "lecturer");
 
-  const years = computed<number[]>(() => {
-    const nowYear = new Date().getFullYear();
-    const list: number[] = [];
-    for (let y = nowYear; y >= nowYear - 10; y -= 1) list.push(y);
-    return list;
-  });
+  const facultyOptions = ref<FacultyOption[]>([]);
+  const departmentOptions = ref<DepartmentOption[]>([]);
+  const workTypeOptions = ref<WorkTypeOption[]>([]);
+  const authorRoleOptions = ref<AuthorRoleOption[]>([]);
+  const statusOptions = ref<StatusOption[]>([]);
+  const managementLevelOptions = ref<ManagementLevelOption[]>([]);
+  const years = ref<number[]>([]);
+  const lecturerSuggestions = ref<LecturerSuggestion[]>([]);
 
-  // draft filter on UI
   const filterDraft = ref<GlobalResearchWorkSearchFilter>({
     keyword: "",
     lecturerKeyword: "",
     facultyId: null,
-    typeKey: "all",
-    roleKey: "all",
+    departmentId: null,
+    workTypeId: null,
+    authorRole: null,
     yearFrom: null,
     yearTo: null,
-    statusCode: "approved", // default: approved
-    managementLevel: "all",
+    status: "approved",
+    managementLevel: null,
   });
 
   const appliedFilter = ref<GlobalResearchWorkSearchFilter>({
@@ -63,6 +82,13 @@ export function useGlobalResearchWorkSearch() {
   const loadingList = ref(false);
   const errorList = ref<string | null>(null);
 
+  const pagination = ref({
+    page: 1,
+    perPage: 12,
+    total: 0,
+    lastPage: 1,
+  });
+
   const detailOpen = ref(false);
   const selectedWorkId = ref<number | null>(null);
   const detail = ref<ResearchWorkDetail | null>(null);
@@ -70,39 +96,72 @@ export function useGlobalResearchWorkSearch() {
   const errorDetail = ref<string | null>(null);
 
   const resultCountText = computed(() => {
-    if (loadingList.value) return "";
-    if (errorList.value) return "";
-    return `Tìm thấy ${rows.value.length} công trình phù hợp`;
+    if (loadingList.value || errorList.value) return "";
+    return `Tìm thấy ${pagination.value.total} công trình phù hợp`;
   });
 
-  async function search() {
+  async function loadLookups() {
+    try {
+      const lookups = await getWorkSearchLookups(searchScope.value);
+      facultyOptions.value = lookups.faculties;
+      departmentOptions.value = lookups.departments;
+      workTypeOptions.value = lookups.work_types;
+      authorRoleOptions.value = lookups.author_roles;
+      if (isLecturer.value) {
+        const approvedOnly = lookups.statuses.filter(
+          (status) => status.code === "approved"
+        );
+        statusOptions.value = approvedOnly.length ? approvedOnly : lookups.statuses;
+        filterDraft.value = { ...filterDraft.value, status: "approved" };
+        appliedFilter.value = { ...appliedFilter.value, status: "approved" };
+      } else {
+        statusOptions.value = lookups.statuses;
+      }
+      managementLevelOptions.value = lookups.management_levels;
+      years.value = lookups.years;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function fetchList(nextPage?: number, nextPerPage?: number) {
     loadingList.value = true;
     errorList.value = null;
 
-    appliedFilter.value = clampYearRange({ ...filterDraft.value });
+    const page = nextPage ?? pagination.value.page;
+    const perPage = nextPerPage ?? pagination.value.perPage;
+    const filter = clampYearRange({ ...appliedFilter.value });
+    if (isLecturer.value) {
+      filter.status = "approved";
+    }
 
     try {
-      const dto = await searchResearchWorksDTO(
-        filterToDto(appliedFilter.value)
+      const dto = await searchWorks(
+        filterToDto(filter, page, perPage),
+        searchScope.value
       );
-
-      // mock faculty_id filtering by mapping id -> name in UI layer
-      const facultyId = appliedFilter.value.facultyId;
-      const facultyName =
-        facultyId != null
-          ? facultyOptions.value.find((f) => f.id === facultyId)?.name ?? null
-          : null;
-
-      const mapped = dto.map(summaryFromDto);
-
-      rows.value = facultyName
-        ? mapped.filter((r) => r.facultyName === facultyName)
-        : mapped;
+      rows.value = dto.table.items.map(summaryFromDto);
+      pagination.value = {
+        page: dto.table.pagination.page,
+        perPage: dto.table.pagination.per_page,
+        total: dto.table.pagination.total,
+        lastPage: dto.table.pagination.last_page,
+      };
     } catch (e) {
-      errorList.value = e instanceof Error ? e.message : String(e);
+      console.error(e);
+      errorList.value = "Không thể tải dữ liệu. Vui lòng thử lại.";
     } finally {
       loadingList.value = false;
     }
+  }
+
+  async function search() {
+    const nextFilter = clampYearRange({ ...filterDraft.value });
+    if (isLecturer.value) {
+      nextFilter.status = "approved";
+    }
+    appliedFilter.value = nextFilter;
+    await fetchList(1, pagination.value.perPage);
   }
 
   function reset() {
@@ -110,14 +169,16 @@ export function useGlobalResearchWorkSearch() {
       keyword: "",
       lecturerKeyword: "",
       facultyId: null,
-      typeKey: "all",
-      roleKey: "all",
+      departmentId: null,
+      workTypeId: null,
+      authorRole: null,
       yearFrom: null,
       yearTo: null,
-      statusCode: "approved",
-      managementLevel: "all",
+      status: "approved",
+      managementLevel: null,
     };
-    void search();
+    appliedFilter.value = { ...filterDraft.value };
+    void fetchList(1, pagination.value.perPage);
   }
 
   async function openDetail(workId: number) {
@@ -128,10 +189,11 @@ export function useGlobalResearchWorkSearch() {
     loadingDetail.value = true;
 
     try {
-      const dto = await getResearchWorkDetailDTO(workId);
+      const dto = await getWorkDetail(workId, searchScope.value);
       detail.value = detailFromDto(dto);
     } catch (e) {
-      errorDetail.value = e instanceof Error ? e.message : String(e);
+      console.error(e);
+      errorDetail.value = "Không thể tải chi tiết công trình.";
     } finally {
       loadingDetail.value = false;
     }
@@ -144,33 +206,75 @@ export function useGlobalResearchWorkSearch() {
     errorDetail.value = null;
   }
 
-  return {
-    // options
-    facultyOptions,
-    lecturerSuggestions,
-    years,
+  async function downloadAttachment(file: ResearchWorkFile) {
+    if (file.kind !== "file") {
+      window.open(file.url, "_blank", "noopener");
+      return;
+    }
 
-    // filter
+    try {
+      const result = await downloadWorkAttachment(file.fileId, searchScope.value);
+      downloadBlob(result.blob, result.filename);
+    } catch (e) {
+      console.error(e);
+      window.alert("Không thể tải tệp đính kèm. Vui lòng thử lại.");
+    }
+  }
+
+  let lecturerTimer: number | null = null;
+  watch(
+    () => filterDraft.value.lecturerKeyword,
+    (value) => {
+      if (lecturerTimer) window.clearTimeout(lecturerTimer);
+      lecturerTimer = window.setTimeout(async () => {
+        try {
+          const keyword = value.trim();
+          lecturerSuggestions.value = await getLecturerSuggestions(
+            keyword ? keyword : undefined
+          );
+        } catch (e) {
+          console.error(e);
+        }
+      }, 300);
+    },
+    { immediate: true }
+  );
+
+  onBeforeUnmount(() => {
+    if (lecturerTimer) window.clearTimeout(lecturerTimer);
+  });
+
+  return {
+    facultyOptions,
+    departmentOptions,
+    workTypeOptions,
+    authorRoleOptions,
+    statusOptions,
+    managementLevelOptions,
+    years,
+    lecturerSuggestions,
+
     filterDraft,
     appliedFilter,
 
-    // list
     rows,
     loadingList,
     errorList,
+    pagination,
     resultCountText,
 
-    // detail
     detailOpen,
     selectedWorkId,
     detail,
     loadingDetail,
     errorDetail,
 
-    // actions
+    loadLookups,
     search,
     reset,
+    fetchList,
     openDetail,
     closeDetail,
+    downloadAttachment,
   };
 }

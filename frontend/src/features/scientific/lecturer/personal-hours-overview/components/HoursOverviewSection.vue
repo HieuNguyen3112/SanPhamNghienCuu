@@ -1,5 +1,3 @@
-// File:
-src/features/lecturer-hours-overview/components/HoursOverviewSection.vue
 <template>
   <section
     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
@@ -15,7 +13,7 @@ src/features/lecturer-hours-overview/components/HoursOverviewSection.vue
       v-if="loading"
       class="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"
     >
-      Đang tải tổng quan…
+      Đang tải tổng quan...
     </div>
 
     <div
@@ -30,7 +28,6 @@ src/features/lecturer-hours-overview/components/HoursOverviewSection.vue
     </div>
 
     <div v-else class="mt-4 space-y-4">
-      <!-- Progress -->
       <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
@@ -62,7 +59,6 @@ src/features/lecturer-hours-overview/components/HoursOverviewSection.vue
         </div>
       </div>
 
-      <!-- Stat cards -->
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-xl border border-slate-200 bg-white p-4">
           <div

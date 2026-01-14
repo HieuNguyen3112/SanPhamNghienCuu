@@ -6,7 +6,7 @@
       >
         <PageHeader
           title="Cảnh báo giờ NCKH"
-          subtitle="Cảnh báo sớm – rõ ràng – hành động được để bạn không bỏ lỡ thời hạn và tình trạng giờ NCKH"
+          subtitle="Cảnh báo sớm để bạn kịp hành động và tránh thiếu giờ NCKH."
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"
@@ -14,21 +14,18 @@
         />
       </div>
 
-      <!-- SECTION 1: Header banner -->
       <AlertsHeaderBanner
         :summary="summaryStatus"
         :loading="loadingSummary"
         :error="errorSummary"
       />
 
-      <!-- SECTION 3: Filter (nhẹ) -->
       <AlertsFilterBar
         :filter-status="filterStatus"
         :counts="counts"
         @change="changeFilter"
       />
 
-      <!-- SECTION 2: Alerts list (core) -->
       <AlertsList
         :alerts="filteredAlerts"
         :loading="loadingAlerts"
@@ -36,7 +33,6 @@
         @mark-seen="markAsSeen"
       />
 
-      <!-- SECTION 4: Action panel -->
       <AlertsActionPanel
         :suggestions="actionSuggestions"
         :loading="loadingSuggestions"

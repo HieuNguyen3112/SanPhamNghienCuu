@@ -1,97 +1,161 @@
 import type {
   AcademicYearDTO,
+  AcademicYearDerivedDTO,
   ActivityKindDTO,
   ActivityTypeDTO,
   HourRuleDerivedDTO,
-  WorkloadQuotaRuleDerivedDTO,
-  AcademicYearPeriodDerivedDTO,
+  ListResponseDTO,
+  ResearchHoursMetaDTO,
   UpsertHourRulePayloadDTO,
+  WorkloadQuotaDerivedDTO,
 } from "../contracts/researchHoursCatalog.contract";
-import { researchHoursCatalogMock } from "../mock-data/researchHoursCatalog.mock";
+import {
+  applyAcademicYearApi,
+  createAcademicYearApi,
+  createHourRuleApi,
+  createWorkloadQuotaApi,
+  fetchResearchHoursMeta,
+  listAcademicYearsApi,
+  listHourRulesApi,
+  listWorkloadQuotasApi,
+  updateAcademicYearApi,
+  updateHourRuleApi,
+  updateHourRuleStatusApi,
+  updateWorkloadQuotaApi,
+} from "../api/researchHoursCatalogApi";
 
-const USE_MOCK = (import.meta.env.VITE_USE_MOCK ?? "true") === "true";
+let metaCache: ResearchHoursMetaDTO | null = null;
+let metaPromise: Promise<ResearchHoursMetaDTO> | null = null;
 
-function delay(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+async function loadMeta(force = false): Promise<ResearchHoursMetaDTO> {
+  if (!force && metaCache) return metaCache;
+  if (metaPromise) return metaPromise;
+
+  metaPromise = fetchResearchHoursMeta()
+    .then((data) => {
+      metaCache = data;
+      return data;
+    })
+    .finally(() => {
+      metaPromise = null;
+    });
+
+  return metaPromise;
 }
 
-/**
- * TODO: Replace mock with real API calls.
- * - hour_rules: GET/POST/PUT endpoints needed
- * - workload quota rules: schema & endpoints missing (P0)
- * - academic year periods: schema & endpoints missing (P0)
- */
 export const researchHoursCatalogService = {
+  async getMeta(): Promise<ResearchHoursMetaDTO> {
+    return loadMeta();
+  },
+
+  async refreshMeta(): Promise<ResearchHoursMetaDTO> {
+    metaCache = null;
+    return loadMeta(true);
+  },
+
   async getAcademicYears(): Promise<AcademicYearDTO[]> {
-    if (!USE_MOCK) {
-      // TODO endpoint
-      // const { data } = await http.get<AcademicYearDTO[]>("/api/academic-years");
-      // return data;
-      throw new Error("TODO: getAcademicYears endpoint");
-    }
-    await delay(180);
-    return researchHoursCatalogMock.academicYears();
+    const meta = await loadMeta();
+    return meta.academic_years;
   },
 
   async getActivityKinds(): Promise<ActivityKindDTO[]> {
-    if (!USE_MOCK) throw new Error("TODO: getActivityKinds endpoint");
-    await delay(120);
-    return researchHoursCatalogMock.activityKinds();
+    const meta = await loadMeta();
+    return meta.activity_kinds;
   },
 
   async getActivityTypes(): Promise<ActivityTypeDTO[]> {
-    if (!USE_MOCK) throw new Error("TODO: getActivityTypes endpoint");
-    await delay(120);
-    return researchHoursCatalogMock.activityTypes();
+    const meta = await loadMeta();
+    return meta.activity_types;
   },
 
-  async getHourRules(): Promise<HourRuleDerivedDTO[]> {
-    if (!USE_MOCK) throw new Error("TODO: getHourRules endpoint");
-    await delay(220);
-    return researchHoursCatalogMock.hourRules();
+  async listHourRules(params: {
+    academic_year_id?: number;
+    status?: string;
+    q?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<ListResponseDTO<HourRuleDerivedDTO>> {
+    return listHourRulesApi(params);
   },
 
-  async upsertHourRule(_payload: UpsertHourRulePayloadDTO): Promise<void> {
-    if (!USE_MOCK) throw new Error("TODO: upsertHourRule endpoint");
-    // mock: no persistence, just delay
-    await delay(260);
+  async createHourRule(payload: UpsertHourRulePayloadDTO): Promise<void> {
+    await createHourRuleApi({
+      ...payload,
+      hours_per_occurrence: null,
+      principal_fraction: null,
+      others_fraction_total: null,
+      max_occurrences_per_year: null,
+    });
   },
 
-  async setHourRuleActive(_id: number, _is_active: boolean): Promise<void> {
-    if (!USE_MOCK) throw new Error("TODO: setHourRuleActive endpoint");
-    await delay(200);
+  async updateHourRule(
+    id: number,
+    payload: UpsertHourRulePayloadDTO
+  ): Promise<void> {
+    await updateHourRuleApi(id, {
+      ...payload,
+      hours_per_occurrence: null,
+      principal_fraction: null,
+      others_fraction_total: null,
+      max_occurrences_per_year: null,
+    });
   },
 
-  async getQuotaRules(): Promise<WorkloadQuotaRuleDerivedDTO[]> {
-    if (!USE_MOCK) throw new Error("TODO(P0): quota rules schema+endpoint");
-    await delay(200);
-    return researchHoursCatalogMock.quotaRules();
+  async setHourRuleActive(id: number, is_active: boolean): Promise<void> {
+    await updateHourRuleStatusApi(id, is_active);
   },
 
-  async upsertQuotaRule(): Promise<void> {
-    if (!USE_MOCK) throw new Error("TODO(P0): upsertQuotaRule endpoint");
-    await delay(260);
+  async listWorkloadQuotas(params: {
+    academic_year_id?: number;
+    status?: string;
+    q?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<ListResponseDTO<WorkloadQuotaDerivedDTO>> {
+    return listWorkloadQuotasApi(params);
   },
 
-  async setQuotaRuleActive(): Promise<void> {
-    if (!USE_MOCK) throw new Error("TODO(P0): setQuotaRuleActive endpoint");
-    await delay(200);
+  async createWorkloadQuota(payload: {
+    academic_year_id: number;
+    required_hours: number;
+    notes?: string | null;
+  }): Promise<void> {
+    await createWorkloadQuotaApi(payload);
   },
 
-  async getAcademicYearPeriods(): Promise<AcademicYearPeriodDerivedDTO[]> {
-    if (!USE_MOCK)
-      throw new Error("TODO(P0): academic year periods schema+endpoint");
-    await delay(200);
-    return researchHoursCatalogMock.yearPeriods();
+  async updateWorkloadQuota(
+    id: number,
+    payload: { required_hours: number; notes?: string | null }
+  ): Promise<void> {
+    await updateWorkloadQuotaApi(id, payload);
   },
 
-  async upsertAcademicYear(): Promise<void> {
-    if (!USE_MOCK) throw new Error("TODO: upsertAcademicYear endpoint");
-    await delay(260);
+  async listAcademicYears(params: {
+    status?: string;
+    q?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<ListResponseDTO<AcademicYearDerivedDTO>> {
+    return listAcademicYearsApi(params);
   },
 
-  async setAcademicYearActive(): Promise<void> {
-    if (!USE_MOCK) throw new Error("TODO: setAcademicYearActive endpoint");
-    await delay(220);
+  async createAcademicYear(payload: {
+    code: string;
+    start_date: string;
+    end_date: string;
+    is_active: boolean;
+  }): Promise<void> {
+    await createAcademicYearApi(payload);
+  },
+
+  async updateAcademicYear(
+    id: number,
+    payload: { code: string; start_date: string; end_date: string; is_active: boolean }
+  ): Promise<void> {
+    await updateAcademicYearApi(id, payload);
+  },
+
+  async applyAcademicYear(id: number): Promise<void> {
+    await applyAcademicYearApi(id);
   },
 };

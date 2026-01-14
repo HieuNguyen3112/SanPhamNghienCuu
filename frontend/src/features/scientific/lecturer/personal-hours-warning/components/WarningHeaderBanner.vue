@@ -1,7 +1,7 @@
 <template>
   <div class="rounded-2xl border border-slate-200 bg-white p-4 md:p-6">
     <div v-if="loading" class="text-sm text-slate-700">
-      Đang tải trạng thái…
+      Đang tải trạng thái...
     </div>
 
     <div
@@ -37,7 +37,7 @@
           <div>
             <span class="text-slate-500">Giờ hiện tại:</span>
             <span class="ml-1 font-semibold text-slate-900">
-              {{ formatHours(summary.hoursTotal) }} /
+              {{ formatHours(summary.totalHoursCurrent) }} /
               {{ formatHours(summary.requiredHours) }}
             </span>
             <span class="ml-1 text-slate-500"
@@ -45,27 +45,22 @@
             >
           </div>
 
-          <div>
+          <div v-if="summary.deadlineDate">
             <span class="text-slate-500">Hạn chót:</span>
             <span class="ml-1 font-semibold text-slate-900">
               {{ formatDateVietnamese(summary.deadlineDate) }}
             </span>
-            <span class="ml-2 text-slate-500">
+            <span v-if="summary.daysRemaining !== null" class="ml-2 text-slate-500">
               • {{ formatRelativeDaysFromNow(summary.daysRemaining) }}
             </span>
           </div>
 
-          <div v-if="summary.missingHours > 0" class="md:col-span-2">
+          <div v-if="summary.shortageHours > 0" class="md:col-span-2">
             <span class="text-slate-500">Bạn còn thiếu:</span>
             <span class="ml-1 font-semibold" :class="missingToneClass">
-              {{ formatHours(summary.missingHours) }} giờ
+              {{ formatHours(summary.shortageHours) }} giờ
             </span>
           </div>
-        </div>
-
-        <div class="mt-2 text-xs text-slate-500">
-          * Hạn chót đang dùng dữ liệu mock (proxy). Khi có backend chuẩn, thay
-          bằng deadline kê khai thực tế.
         </div>
       </div>
     </div>
@@ -88,19 +83,23 @@ const props = defineProps<{
   error: string | null;
 }>();
 
+const hasDeadline = computed(() => Boolean(props.summary?.deadlineDate));
+
 const isDeadlinePassed = computed(() => {
-  if (!props.summary) return false;
+  if (!props.summary || !hasDeadline.value) return false;
+  if (props.summary.daysRemaining === null) return false;
   return props.summary.daysRemaining < 0;
 });
 
 const isDeadlineSoon = computed(() => {
-  if (!props.summary) return false;
+  if (!props.summary || !hasDeadline.value) return false;
+  if (props.summary.daysRemaining === null) return false;
   return props.summary.daysRemaining >= 0 && props.summary.daysRemaining <= 10;
 });
 
 const isMissingHours = computed(() => {
   if (!props.summary) return false;
-  return props.summary.missingHours > 0;
+  return props.summary.shortageHours > 0;
 });
 
 const headline = computed(() => {

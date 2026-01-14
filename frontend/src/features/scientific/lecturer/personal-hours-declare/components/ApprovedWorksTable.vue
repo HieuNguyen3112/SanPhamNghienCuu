@@ -1,7 +1,7 @@
 <template>
   <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
     <div v-if="loading" class="p-4 text-sm text-slate-700">
-      Đang tải danh sách…
+      Đang tải danh sách...
     </div>
 
     <div v-else-if="error" class="p-4">
@@ -45,7 +45,7 @@
 
         <tbody class="divide-y divide-slate-200">
           <tr
-            v-for="row in pagedRows"
+            v-for="row in rows"
             :key="row.activityId"
             class="hover:bg-slate-50"
           >
@@ -94,7 +94,8 @@
                 <span
                   v-if="
                     selectedIdSet.has(row.activityId) &&
-                    row.hoursRequestState === 'eligible'
+                    (row.hoursRequestState === 'eligible' ||
+                      row.hoursRequestState === 'rejected')
                   "
                   class="inline-flex items-center rounded-full bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 ring-1 ring-sky-200"
                 >
@@ -124,19 +125,19 @@
       class="border-t border-slate-200 px-4 py-3"
     >
       <SharedPaginationControls
-        :total-item-count="rows.length"
+        :total-item-count="totalItemCount"
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
         display-mode="FULL"
         record-summary-mode="PAGE_COUNT"
         record-summary-unit-label="công trình"
         container-class-name="w-full"
-        @update:currentPageNumber="currentPageNumber = $event"
-        @update:pageSize="pageSize = $event"
+        @update:currentPageNumber="emit('update:currentPageNumber', $event)"
+        @update:pageSize="emit('update:pageSize', $event)"
       />
     </div>
 
-    <!-- Action bar trong table card -->
+    <!-- Action bar -->
     <div class="border-t border-slate-200 bg-slate-50/40 px-4 py-3">
       <div
         class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
@@ -193,6 +194,10 @@ const props = defineProps<{
 
   loading: boolean;
   error: string | null;
+
+  currentPageNumber: number;
+  pageSize: number;
+  totalItemCount: number;
 }>();
 
 const emit = defineEmits<{
@@ -206,29 +211,11 @@ const emit = defineEmits<{
   ): void;
   (e: "open-detail", activityId: number): void;
   (e: "submit-request"): void;
+  (e: "update:currentPageNumber", value: number): void;
+  (e: "update:pageSize", value: number): void;
 }>();
 
 const selectedIdSet = computed(() => new Set(props.selectedIds));
-
-const currentPageNumber = ref(1);
-const pageSize = ref(12);
-
-watch(
-  () => [props.rows.length, pageSize.value],
-  () => {
-    currentPageNumber.value = 1;
-  }
-);
-
-const pagedRows = computed(() => {
-  const startIndex = (currentPageNumber.value - 1) * pageSize.value;
-  return props.rows.slice(startIndex, startIndex + pageSize.value);
-});
-
-/** ✅ giờ chỉ chọn được khi hours_request_state=eligible */
-function isCheckboxDisabled(row: ApprovedWorkRow) {
-  return row.hoursRequestState !== "eligible";
-}
 
 const selectedSelectableCount = computed(() => {
   const selected = selectedIdSet.value;
@@ -272,9 +259,17 @@ function onToggleRow(row: ApprovedWorkRow, event: Event) {
   emit("toggle-row", { activityId: row.activityId, nextChecked: checked });
 }
 
+function isCheckboxDisabled(row: ApprovedWorkRow) {
+  return (
+    row.hoursRequestState !== "eligible" &&
+    row.hoursRequestState !== "rejected"
+  );
+}
+
 function hoursStatusLabel(row: ApprovedWorkRow) {
   if (row.hoursRequestState === "hours_approved") return "Đã duyệt giờ";
   if (row.hoursRequestState === "submitted") return "Chờ duyệt giờ";
+  if (row.hoursRequestState === "rejected") return "Bị từ chối";
   return "Chưa duyệt giờ";
 }
 
@@ -283,6 +278,8 @@ function hoursPillClass(row: ApprovedWorkRow) {
     return "bg-emerald-50 text-emerald-700 ring-emerald-200";
   if (row.hoursRequestState === "submitted")
     return "bg-amber-50 text-amber-700 ring-amber-200";
+  if (row.hoursRequestState === "rejected")
+    return "bg-rose-50 text-rose-700 ring-rose-200";
   return "bg-slate-50 text-slate-700 ring-slate-200";
 }
 </script>

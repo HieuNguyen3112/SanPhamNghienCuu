@@ -41,6 +41,12 @@ class AuthApiTest extends TestCase
                 'user' => ['id', 'name', 'email', 'roles'],
             ])
             ->assertJsonPath('user.roles.0', 'GV');
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action_code' => 'LOGIN_SUCCESS',
+            'actor_user_id' => $user->id,
+            'result_status' => 'success',
+        ]);
     }
 
     /** @test */
@@ -61,5 +67,29 @@ class AuthApiTest extends TestCase
 
         $res->assertStatus(422)
             ->assertJson(['message' => 'Invalid credentials']);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action_code' => 'LOGIN_FAILED',
+            'actor_email' => 'gv@example.com',
+            'result_status' => 'failure',
+        ]);
+    }
+
+    /** @test */
+    public function logout_creates_audit_log()
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user, 'web');
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+
+        $this->postJson('/logout')
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action_code' => 'LOGOUT',
+            'actor_user_id' => $user->id,
+            'result_status' => 'success',
+        ]);
     }
 }

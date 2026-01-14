@@ -1,10 +1,6 @@
 <template>
-  <div
-    class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
-  >
-    <div
-      class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
-    >
+  <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div class="min-w-0">
         <div class="text-base font-semibold text-slate-900 md:text-lg">
           Tra cứu công trình khoa học
@@ -50,7 +46,7 @@
           <input
             class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-slate-400 focus:ring-0"
             :value="filter.keyword"
-            placeholder="Tên công trình / tạp chí / NXB…"
+            placeholder="Tên công trình / tạp chí / NXB / DOI..."
             @input="onChangeKeyword"
             @keydown.enter.prevent="emit('search')"
           />
@@ -70,7 +66,7 @@
           <input
             class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-slate-400 focus:ring-0"
             :value="filter.lecturerKeyword"
-            placeholder="Nhập tên / mã giảng viên…"
+            placeholder="Nhập tên / mã giảng viên..."
             @input="onChangeLecturerKeyword"
             @focus="isLecturerDropdownOpen = true"
             @keydown.enter.prevent="emit('search')"
@@ -94,7 +90,7 @@
                 {{ s.lecturer_name }}
               </div>
               <div class="mt-0.5 text-xs text-slate-500">
-                {{ s.lecturer_code }} • {{ s.faculty_name }}
+                {{ s.lecturer_code }} • {{ s.unit_name || "Chưa rõ đơn vị" }}
               </div>
             </div>
             <ChevronRight class="mt-1 h-4 w-4 text-slate-400" />
@@ -126,14 +122,13 @@
         </label>
         <select
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
-          :value="filter.typeKey"
+          :value="filter.workTypeId ?? ''"
           @change="onChangeType"
         >
-          <option value="all">Tất cả</option>
-          <option value="article">Bài báo khoa học</option>
-          <option value="project">Đề tài</option>
-          <option value="book">Sách / Giáo trình</option>
-          <option value="conference">Hội nghị / Hội thảo</option>
+          <option value="">Tất cả</option>
+          <option v-for="t in workTypeOptions" :key="t.id" :value="t.id">
+            {{ t.name }}
+          </option>
         </select>
       </div>
 
@@ -144,13 +139,13 @@
         </label>
         <select
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
-          :value="filter.roleKey"
+          :value="filter.authorRole ?? ''"
           @change="onChangeRole"
         >
-          <option value="all">Tất cả</option>
-          <option value="lead">Chủ nhiệm / Tác giả chính / Chủ biên</option>
-          <option value="coauthor">Đồng tác giả</option>
-          <option value="member">Thành viên</option>
+          <option value="">Tất cả</option>
+          <option v-for="r in authorRoleOptions" :key="r.id" :value="r.code">
+            {{ r.name }}
+          </option>
         </select>
       </div>
 
@@ -165,7 +160,7 @@
             :value="filter.yearFrom ?? ''"
             @change="onChangeYearFrom"
           >
-            <option value="">—</option>
+            <option value="">-</option>
             <option v-for="y in yearOptions" :key="y" :value="y">
               {{ y }}
             </option>
@@ -181,7 +176,7 @@
             :value="filter.yearTo ?? ''"
             @change="onChangeYearTo"
           >
-            <option value="">—</option>
+            <option value="">-</option>
             <option v-for="y in yearOptions" :key="y" :value="y">
               {{ y }}
             </option>
@@ -196,13 +191,13 @@
         </label>
         <select
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
-          :value="filter.statusCode"
+          :value="filter.status ?? ''"
           @change="onChangeStatus"
         >
-          <option value="approved">Đã duyệt</option>
-          <option value="submitted">Chờ duyệt</option>
-          <option value="rejected">Bị từ chối</option>
-          <option value="all">Tất cả</option>
+          <option value="">Tất cả</option>
+          <option v-for="s in statusOptions" :key="s.id" :value="s.code">
+            {{ s.name }}
+          </option>
         </select>
       </div>
 
@@ -213,14 +208,17 @@
         </label>
         <select
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
-          :value="filter.managementLevel"
+          :value="filter.managementLevel ?? ''"
           @change="onChangeLevel"
         >
-          <option value="all">Tất cả</option>
-          <option value="faculty">Cấp Khoa</option>
-          <option value="university">Cấp Trường</option>
-          <option value="ministry">Cấp Bộ</option>
-          <option value="other">Khác</option>
+          <option value="">Tất cả</option>
+          <option
+            v-for="lvl in managementLevelOptions"
+            :key="lvl.id"
+            :value="lvl.code"
+          >
+            {{ lvl.name }}
+          </option>
         </select>
       </div>
     </div>
@@ -235,9 +233,13 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 import { ChevronRight, RotateCcw, Search, User } from "lucide-vue-next";
 import type {
+  AuthorRoleOption,
   FacultyOption,
   GlobalResearchWorkSearchFilter,
   LecturerSuggestion,
+  ManagementLevelOption,
+  StatusOption,
+  WorkTypeOption,
 } from "../contracts/globalResearchWorkSearch.contract";
 import { normalizeText } from "../contracts/globalResearchWorkSearch.contract";
 
@@ -246,6 +248,10 @@ const props = defineProps<{
   loading: boolean;
 
   facultyOptions: FacultyOption[];
+  workTypeOptions: WorkTypeOption[];
+  authorRoleOptions: AuthorRoleOption[];
+  statusOptions: StatusOption[];
+  managementLevelOptions: ManagementLevelOption[];
   yearOptions: number[];
   lecturerSuggestions: LecturerSuggestion[];
 
@@ -274,16 +280,13 @@ function onChangeFaculty(event: Event) {
 }
 
 function onChangeType(event: Event) {
-  emit("update:filter", {
-    typeKey: (event.target as HTMLSelectElement)
-      .value as GlobalResearchWorkSearchFilter["typeKey"],
-  });
+  const v = (event.target as HTMLSelectElement).value;
+  emit("update:filter", { workTypeId: v ? Number(v) : null });
 }
 
 function onChangeRole(event: Event) {
   emit("update:filter", {
-    roleKey: (event.target as HTMLSelectElement)
-      .value as GlobalResearchWorkSearchFilter["roleKey"],
+    authorRole: (event.target as HTMLSelectElement).value || null,
   });
 }
 
@@ -299,19 +302,16 @@ function onChangeYearTo(event: Event) {
 
 function onChangeStatus(event: Event) {
   emit("update:filter", {
-    statusCode: (event.target as HTMLSelectElement)
-      .value as GlobalResearchWorkSearchFilter["statusCode"],
+    status: (event.target as HTMLSelectElement).value || null,
   });
 }
 
 function onChangeLevel(event: Event) {
   emit("update:filter", {
-    managementLevel: (event.target as HTMLSelectElement)
-      .value as GlobalResearchWorkSearchFilter["managementLevel"],
+    managementLevel: (event.target as HTMLSelectElement).value || null,
   });
 }
 
-/** ===== simple autocomplete (mock) ===== */
 const isLecturerDropdownOpen = ref(false);
 
 const lecturerSuggestionList = computed(() => {
@@ -321,7 +321,7 @@ const lecturerSuggestionList = computed(() => {
   return props.lecturerSuggestions
     .filter((s) => {
       const hay = normalizeText(
-        `${s.lecturer_name} ${s.lecturer_code} ${s.faculty_name}`
+        `${s.lecturer_name} ${s.lecturer_code} ${s.unit_name ?? ""}`
       );
       return hay.includes(kw);
     })

@@ -1,17 +1,16 @@
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import {
   getErrorMessage,
   statusLabel,
-  type AcademicYearDTO,
   type AcademicYearPeriodRow,
-  type AcademicYearPeriodDerivedDTO,
+  type AcademicYearDerivedDTO,
 } from "../contracts/researchHoursCatalog.contract";
 import { researchHoursCatalogService } from "../services/researchHoursCatalogService";
 
 /**
  * TAB3 NOTE:
- * - academic_years có: code,start_date,end_date,is_active
- * - “Đợt” + “locked” là missing (P0) => UI mock + TODO backend
+ * - academic_years: code,start_date,end_date,is_active
+ * - ??t t?nh gi? ch?a c? d? li?u; UI hi?n ch? qu?n l? n?m h?c.
  */
 
 type ModalMode = "create" | "edit";
@@ -35,8 +34,10 @@ export function useAcademicYearPeriodCatalog() {
   const error = ref<string | null>(null);
 
   const rows = ref<AcademicYearPeriodRow[]>([]);
-  const academicYears = ref<AcademicYearDTO[]>([]);
-  const periods = ref<AcademicYearPeriodDerivedDTO[]>([]);
+  const page = ref(1);
+  const pageSize = ref(10);
+  const totalItems = ref(0);
+  const totalPages = ref(1);
 
   const filter = reactive({
     kind: "ALL" as "ALL" | "academic_year" | "period",
@@ -61,17 +62,7 @@ export function useAcademicYearPeriodCatalog() {
 
   const draftErrors = reactive<AcademicYearErrors>({});
 
-  const filteredRows = computed(() => {
-    const q = filter.q.trim().toLowerCase();
-    return rows.value.filter((r) => {
-      const byKind = filter.kind === "ALL" ? true : r.kind === filter.kind;
-      const byStatus =
-        filter.status === "ALL" ? true : r.status === filter.status;
-      const hay = `${r.name} ${r.startDate} ${r.endDate}`.toLowerCase();
-      const byQ = q ? hay.includes(q) : true;
-      return byKind && byStatus && byQ;
-    });
-  });
+  const filteredRows = computed(() => rows.value);
 
   function resetDraftErrors() {
     Object.assign(draftErrors, {});
@@ -122,48 +113,56 @@ export function useAcademicYearPeriodCatalog() {
     return !Object.values(draftErrors).some(Boolean);
   }
 
-  function mapRows(
-    years: AcademicYearDTO[],
-    ps: AcademicYearPeriodDerivedDTO[]
-  ): AcademicYearPeriodRow[] {
-    const yearRows: AcademicYearPeriodRow[] = years.map((y) => ({
-      id: y.id,
-      kind: "academic_year",
-      name: y.code,
-      startDate: y.start_date,
-      endDate: y.end_date,
-      status: y.is_active ? "active" : "inactive",
-      // schema missing locked -> derive false for years in this mock
-      isLocked: false,
-    }));
-
-    const periodRows: AcademicYearPeriodRow[] = ps.map((p) => ({
-      id: p.id,
-      kind: "period",
-      name: p.name,
-      startDate: p.start_date,
-      endDate: p.end_date,
-      status: p.status,
-      isLocked: p.is_locked,
-    }));
-
-    return [...yearRows, ...periodRows].sort((a, b) =>
-      a.startDate < b.startDate ? 1 : -1
-    );
+  function mapRows(years: AcademicYearDerivedDTO[]): AcademicYearPeriodRow[] {
+    return years
+      .map((y) => ({
+        id: y.id,
+        kind: "academic_year",
+        name: y.code,
+        startDate: y.start_date,
+        endDate: y.end_date,
+        status: y.is_active ? "active" : y.is_locked ? "locked" : "inactive",
+        isLocked: y.is_locked,
+      }))
+      .sort((a, b) => (a.startDate < b.startDate ? 1 : -1));
   }
 
   async function fetch() {
     loading.value = true;
     error.value = null;
     try {
-      const [years, ps] = await Promise.all([
-        researchHoursCatalogService.getAcademicYears(),
-        researchHoursCatalogService.getAcademicYearPeriods(),
-      ]);
+      if (filter.kind === "period") {
+        rows.value = [];
+        totalItems.value = 0;
+        totalPages.value = 1;
+        return;
+      }
 
-      academicYears.value = years;
-      periods.value = ps;
-      rows.value = mapRows(years, ps);
+      const statusParam =
+        filter.status === "ALL" || filter.status === "locked"
+          ? undefined
+          : filter.status;
+
+      const perPage = filter.status === "locked" ? 100 : pageSize.value;
+      const res = await researchHoursCatalogService.listAcademicYears({
+        status: statusParam,
+        q: filter.q.trim() || undefined,
+        page: page.value,
+        per_page: perPage,
+      });
+
+      let mapped = mapRows(res.items);
+      if (filter.status === "locked") {
+        mapped = mapped.filter((r) => r.isLocked);
+        rows.value = mapped;
+        totalItems.value = mapped.length;
+        totalPages.value = 1;
+        return;
+      }
+
+      rows.value = mapped;
+      totalItems.value = res.pagination.total;
+      totalPages.value = res.pagination.last_page;
     } catch (e) {
       error.value = getErrorMessage(e, "Không tải được năm học/đợt.");
     } finally {
@@ -183,8 +182,22 @@ export function useAcademicYearPeriodCatalog() {
     saving.value = true;
     error.value = null;
     try {
-      // TODO: upsert academic_years
-      await researchHoursCatalogService.upsertAcademicYear();
+      const payload = {
+        code: draft.code.trim(),
+        start_date: draft.startDate,
+        end_date: draft.endDate,
+        is_active: draft.status === "active",
+      };
+
+      if (modal.mode === "edit") {
+        await researchHoursCatalogService.updateAcademicYear(
+          modal.editingId,
+          payload
+        );
+      } else {
+        await researchHoursCatalogService.createAcademicYear(payload);
+      }
+      await researchHoursCatalogService.refreshMeta();
       closeModal();
       await fetch();
     } catch (e) {
@@ -196,11 +209,11 @@ export function useAcademicYearPeriodCatalog() {
   }
 
   async function setActiveYearWithConfirm(_id: number) {
-    // TODO: enforce single active year in backend
     saving.value = true;
     error.value = null;
     try {
-      await researchHoursCatalogService.setAcademicYearActive();
+      await researchHoursCatalogService.applyAcademicYear(_id);
+      await researchHoursCatalogService.refreshMeta();
       await fetch();
     } catch (e) {
       error.value = getErrorMessage(e, "Cập nhật trạng thái thất bại.");
@@ -210,12 +223,51 @@ export function useAcademicYearPeriodCatalog() {
     }
   }
 
+  function setPage(next: number) {
+    page.value = Math.max(1, Math.min(totalPages.value, next));
+    void fetch();
+  }
+
+  function setPageSize(next: number) {
+    pageSize.value = next;
+    page.value = 1;
+    void fetch();
+  }
+
+  let searchTimer: number | null = null;
+  watch(
+    () => filter.q,
+    () => {
+      if (searchTimer) window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => {
+        page.value = 1;
+        void fetch();
+      }, 300);
+    }
+  );
+
+  watch(
+    () => [filter.kind, filter.status],
+    () => {
+      page.value = 1;
+      void fetch();
+    }
+  );
+
+  onBeforeUnmount(() => {
+    if (searchTimer) window.clearTimeout(searchTimer);
+  });
+
   return {
     loading,
     saving,
     error,
 
     rows,
+    page,
+    pageSize,
+    totalItems,
+    totalPages,
     filter,
     filteredRows,
 
@@ -229,6 +281,8 @@ export function useAcademicYearPeriodCatalog() {
     closeModal,
     saveYear,
     setActiveYearWithConfirm,
+    setPage,
+    setPageSize,
 
     statusLabel,
   };

@@ -3,7 +3,7 @@
     class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
   >
     <div v-if="loading" class="p-4 text-sm text-slate-700">
-      Đang tải danh sách…
+      Đang tải danh sách...
     </div>
 
     <div v-else-if="error" class="p-4">
@@ -42,7 +42,7 @@
 
         <tbody class="divide-y divide-slate-200">
           <tr
-            v-for="row in pagedRows"
+            v-for="row in rows"
             :key="row.workId"
             class="cursor-pointer hover:bg-slate-50"
             @click="emit('open-detail', row.workId)"
@@ -71,7 +71,7 @@
                 class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1"
                 :class="typeBadgeClass(row.typeKey)"
               >
-                {{ typeLabel(row.typeKey) }}
+                {{ row.typeLabel }}
               </span>
             </td>
 
@@ -80,21 +80,21 @@
                 <User class="h-4 w-4 text-slate-400" />
                 <div class="min-w-0">
                   <div class="truncate font-medium text-slate-900">
-                    {{ row.primaryLecturerName }}
+                    {{ row.mainLecturerName }}
                   </div>
                   <div class="mt-0.5 text-xs text-slate-500">
-                    {{ row.primaryLecturerCode }}
+                    {{ row.mainLecturerCode }}
                   </div>
                 </div>
               </div>
             </td>
 
             <td class="px-3 py-2 text-slate-700">
-              {{ row.facultyName }}
+              {{ row.unitName || "Chưa rõ" }}
             </td>
 
             <td class="px-3 py-2 text-right font-semibold text-slate-900">
-              {{ row.year }}
+              {{ row.year ?? "-" }}
             </td>
 
             <td class="px-3 py-2 text-center">
@@ -102,7 +102,7 @@
                 class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1"
                 :class="statusPillClass(row.statusCode)"
               >
-                {{ statusLabel(row.statusCode) }}
+                {{ row.statusLabel }}
               </span>
             </td>
 
@@ -122,26 +122,25 @@
     </div>
 
     <div
-      v-if="!loading && !error && rows.length > 0"
+      v-if="!loading && !error && rows.length > 0 && pagination"
       class="border-t border-slate-200 px-4 py-3"
     >
       <SharedPaginationControls
-        :total-item-count="rows.length"
-        :current-page-number="currentPageNumber"
-        :page-size="pageSize"
+        :total-item-count="pagination.total"
+        :current-page-number="pagination.page"
+        :page-size="pagination.perPage"
         display-mode="FULL"
         record-summary-mode="PAGE_COUNT"
         record-summary-unit-label="công trình"
         container-class-name="w-full"
-        @update:currentPageNumber="currentPageNumber = $event"
-        @update:pageSize="pageSize = $event"
+        @update:currentPageNumber="emit('update:page', $event)"
+        @update:pageSize="emit('update:pageSize', $event)"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 import {
   BookOpen,
@@ -155,40 +154,30 @@ import type {
   ResearchWorkSummary,
   ResearchWorkTypeKey,
 } from "../contracts/globalResearchWorkSearch.contract";
-import {
-  statusLabel,
-  statusPillClass,
-  typeLabel,
-  typeBadgeClass,
-} from "../contracts/globalResearchWorkSearch.contract";
+import { statusPillClass, typeBadgeClass } from "../contracts/globalResearchWorkSearch.contract";
 
-const props = defineProps<{
+type PaginationMeta = {
+  page: number;
+  perPage: number;
+  total: number;
+  lastPage: number;
+};
+
+defineProps<{
   rows: ResearchWorkSummary[];
   loading: boolean;
   error: string | null;
+  pagination: PaginationMeta | null;
 }>();
 
 const emit = defineEmits<{
   (e: "open-detail", workId: number): void;
+  (e: "update:page", page: number): void;
+  (e: "update:pageSize", pageSize: number): void;
 }>();
 
-const currentPageNumber = ref(1);
-const pageSize = ref(12);
-
-watch(
-  () => [props.rows.length, pageSize.value],
-  () => {
-    currentPageNumber.value = 1;
-  }
-);
-
-const pagedRows = computed(() => {
-  const start = (currentPageNumber.value - 1) * pageSize.value;
-  return props.rows.slice(start, start + pageSize.value);
-});
-
-function typeIcon(typeKey: ResearchWorkTypeKey) {
-  if (typeKey === "article") return FileText;
+function typeIcon(typeKey: ResearchWorkTypeKey | string) {
+  if (typeKey === "paper") return FileText;
   if (typeKey === "project") return FlaskConical;
   if (typeKey === "book") return BookOpen;
   return Presentation;

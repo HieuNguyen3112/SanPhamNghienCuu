@@ -1,8 +1,5 @@
 <template>
   <div>
-    <!-- Controls -->
-
-    <!-- Table -->
     <div class="overflow-hidden rounded-xl border border-slate-200">
       <table class="w-full table-fixed">
         <thead class="bg-slate-50">
@@ -19,7 +16,7 @@
             <th class="w-[10%] px-4 py-3">
               <SortHeader
                 label="Loại"
-                :sort-key="'type'"
+                :sort-key="'category'"
                 :sort="sort"
                 @change="setSort"
               />
@@ -27,12 +24,19 @@
 
             <th class="w-[20%] px-4 py-3">Tạp chí / Hội nghị</th>
 
-            <th class="w-[18%] px-4 py-3">Giảng viên</th>
+            <th class="w-[18%] px-4 py-3">
+              <SortHeader
+                label="Giảng viên"
+                :sort-key="'lecturer'"
+                :sort="sort"
+                @change="setSort"
+              />
+            </th>
 
             <th class="w-[12%] px-4 py-3">
               <SortHeader
                 label="Khoa / Đơn vị"
-                :sort-key="'departmentId'"
+                :sort-key="'department'"
                 :sort="sort"
                 @change="setSort"
               />
@@ -49,44 +53,56 @@
           </tr>
         </thead>
 
-        <tbody>
+        <tbody v-if="loading">
+          <tr>
+            <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">
+              Đang tải dữ liệu...
+            </td>
+          </tr>
+        </tbody>
+
+        <tbody v-else>
           <tr
-            v-for="work in pagedRows"
+            v-for="work in rows"
             :key="work.id"
             class="cursor-pointer border-t border-slate-100 text-sm text-slate-800 hover:bg-slate-50"
-            @click="$emit('row-click', work)"
+            @click="emit('row-click', work)"
           >
             <td class="px-4 py-3">
               <div class="line-clamp-2 font-medium text-slate-900">
                 {{ work.title }}
               </div>
-              <div class="mt-1 text-xs text-slate-500">#{{ work.id }}</div>
-            </td>
-
-            <td class="px-4 py-3 text-slate-700">
-              {{ typeLabel(work.type) }}
-            </td>
-
-            <td class="px-4 py-3">
-              <div class="line-clamp-2 text-slate-700">{{ work.venue }}</div>
-            </td>
-
-            <td class="px-4 py-3">
-              <div class="line-clamp-2 text-slate-700">
-                {{ lecturerNames(work.lecturerIds) }}
+              <div v-if="work.activityCode" class="mt-1 text-xs text-slate-500">
+                #{{ work.activityCode }}
               </div>
             </td>
 
             <td class="px-4 py-3 text-slate-700">
-              {{ deptNameById.get(work.departmentId) }}
+              {{ work.categoryLabel }}
+            </td>
+
+            <td class="px-4 py-3">
+              <div class="line-clamp-2 text-slate-700">
+                {{ work.venueLabel }}
+              </div>
+            </td>
+
+            <td class="px-4 py-3">
+              <div class="line-clamp-2 text-slate-700">
+                {{ work.lecturerNames }}
+              </div>
             </td>
 
             <td class="px-4 py-3 text-slate-700">
-              {{ work.year }}
+              {{ work.departmentName }}
+            </td>
+
+            <td class="px-4 py-3 text-slate-700">
+              {{ work.year ?? "-" }}
             </td>
           </tr>
 
-          <tr v-if="pagedRows.length === 0" class="border-t border-slate-100">
+          <tr v-if="rows.length === 0" class="border-t border-slate-100">
             <td
               class="px-4 py-10 text-center text-sm text-slate-500"
               colspan="6"
@@ -97,144 +113,83 @@
         </tbody>
       </table>
     </div>
+
     <div class="border-t border-slate-200 px-4 py-3">
       <SharedPaginationControls
-        :total-item-count="sortedRows.length"
-        :current-page-number="page"
-        :page-size="pageSize"
+        :total-item-count="pagination.total"
+        :current-page-number="pagination.page"
+        :page-size="pagination.perPage"
         display-mode="FULL"
         :show-record-summary="true"
         record-summary-mode="PAGE_COUNT"
         record-summary-unit-label="công trình"
-        @update:currentPageNumber="(v) => (page = v)"
-        @update:pageSize="(v) => (pageSize = v)"
+        @update:currentPageNumber="(v) => emit('pageChanged', v)"
+        @update:pageSize="(v) => emit('pageSizeChanged', v)"
       />
     </div>
-    <!-- Pagination -->
-    <!-- Pagination (FULL: có summary + page buttons + page size) -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, ref, watch, type PropType } from "vue";
-import type {
-  Department,
-  Lecturer,
-  ResearchType,
-  ResearchWork,
-} from "../useResearchMockData";
+import { computed, defineComponent, h, type PropType } from "vue";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
+import type {
+  ResearchReportPagination,
+  ResearchReportRow,
+  ResearchReportSortCondition,
+  ResearchReportSortField,
+} from "../researchReportTypes";
 
-type SortKey = keyof Pick<
-  ResearchWork,
-  "title" | "type" | "departmentId" | "year"
->;
-type SortState = { key: SortKey; direction: "asc" | "desc" };
+type SortState = ResearchReportSortCondition;
 
 const props = defineProps<{
-  rows: ResearchWork[];
-  departments: Department[];
-  lecturers: Lecturer[];
+  rows: ResearchReportRow[];
+  pagination: ResearchReportPagination;
+  sort: SortState;
+  loading: boolean;
 }>();
 
-defineEmits<{
-  (event: "row-click", work: ResearchWork): void;
+const emit = defineEmits<{
+  (event: "row-click", work: ResearchReportRow): void;
+  (event: "sortChanged", sort: SortState): void;
+  (event: "pageChanged", page: number): void;
+  (event: "pageSizeChanged", pageSize: number): void;
 }>();
 
-const deptNameById = computed(
-  () => new Map(props.departments.map((dept) => [dept.id, dept.name]))
-);
-const lecturerNameById = computed(
-  () => new Map(props.lecturers.map((lec) => [lec.id, lec.name]))
-);
-
-function typeLabel(type: ResearchType) {
-  switch (type) {
-    case "ISI":
-      return "ISI";
-    case "SCOPUS":
-      return "Scopus";
-    case "CONFERENCE":
-      return "Hội nghị";
-    case "PROJECT":
-      return "Đề tài";
-    case "BOOK":
-      return "Sách/GT";
+function setSort(nextKey: ResearchReportSortField) {
+  if (props.sort.sortFieldIdentifier === nextKey) {
+    const nextDirection = props.sort.sortDirection === "asc" ? "desc" : "asc";
+    const nextSort: SortState = {
+      sortFieldIdentifier: nextKey,
+      sortDirection: nextDirection,
+    };
+    return emitSort(nextSort);
   }
-}
-const page = ref(1);
-const pageSize = ref(12);
 
-function lecturerNames(lecturerIds: string[]) {
-  return lecturerIds
-    .map((id) => lecturerNameById.value.get(id) ?? id)
-    .join(", ");
+  emitSort({ sortFieldIdentifier: nextKey, sortDirection: "asc" });
 }
 
-/** Sorting */
-const sort = ref<SortState>({ key: "year", direction: "desc" });
-
-function setSort(nextKey: SortKey) {
-  if (sort.value.key === nextKey) {
-    sort.value.direction = sort.value.direction === "asc" ? "desc" : "asc";
-    return;
-  }
-  sort.value.key = nextKey;
-  sort.value.direction = "asc";
+function emitSort(nextSort: SortState) {
+  emit("sortChanged", nextSort);
 }
 
-const sortedRows = computed(() => {
-  const directionFactor = sort.value.direction === "asc" ? 1 : -1;
-  const key = sort.value.key;
-
-  return [...props.rows].sort((left, right) => {
-    const a = left[key];
-    const b = right[key];
-
-    if (typeof a === "number" && typeof b === "number")
-      return (a - b) * directionFactor;
-    return String(a).localeCompare(String(b), "vi") * directionFactor;
-  });
-});
-
-/** Pagination */
-
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(sortedRows.value.length / pageSize.value))
-);
-
-watch([() => props.rows, pageSize], () => {
-  page.value = 1;
-});
-
-watch(totalPages, () => {
-  if (page.value > totalPages.value) page.value = totalPages.value;
-});
-
-const pagedRows = computed(() => {
-  const start = (page.value - 1) * pageSize.value;
-  const end = start + pageSize.value;
-  return sortedRows.value.slice(start, end);
-});
-
-/** ✅ Sort header (no JSX, render bằng h()) */
 const SortHeader = defineComponent({
   name: "SortHeader",
   props: {
     label: { type: String, required: true },
-    sortKey: { type: String as PropType<SortKey>, required: true },
+    sortKey: { type: String as PropType<ResearchReportSortField>, required: true },
     sort: { type: Object as PropType<SortState>, required: true },
   },
   emits: {
-    change: (_key: SortKey) => true,
+    change: (_key: ResearchReportSortField) => true,
   },
   setup(componentProps, { emit }) {
     const isActive = computed(
-      () => componentProps.sort.key === componentProps.sortKey
+      () => componentProps.sort.sortFieldIdentifier === componentProps.sortKey
     );
     const icon = computed(() => {
       if (!isActive.value) return "↕";
-      return componentProps.sort.direction === "asc" ? "↑" : "↓";
+      return componentProps.sort.sortDirection === "asc" ? "↑" : "↓";
     });
 
     return () =>

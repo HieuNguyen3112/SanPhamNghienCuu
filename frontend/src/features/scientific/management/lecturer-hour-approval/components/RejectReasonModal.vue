@@ -125,7 +125,7 @@
               class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
               @click="emit('close')"
             >
-              Huỷ
+              Hủy
             </button>
 
             <button
@@ -180,8 +180,7 @@ watch(
 
 const validationError = computed(() => {
   if (reasonCode.value !== "other") return null;
-  if (!reasonNote.value.trim())
-    return "Vui lòng nhập nội dung cho lý do khác.";
+  if (!reasonNote.value.trim()) return "Vui lòng nhập nội dung cho lý do khác.";
   return null;
 });
 

@@ -13,6 +13,14 @@
         />
       </div>
 
+      <!-- Notification -->
+      <div
+        v-if="notificationMessage"
+        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+      >
+        {{ notificationMessage }}
+      </div>
+
       <!-- Filters -->
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
@@ -83,24 +91,20 @@
 
       <!-- List -->
       <ParticipationNotificationTable
-        :rows="filteredRows"
+        :rows="rows"
         :loading="loading"
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
-        @update:currentPageNumber="currentPageNumber = $event"
-        @update:pageSize="
-          (s) => {
-            pageSize = s;
-            currentPageNumber = 1;
-          }
-        "
+        :total-item-count="totalItems"
+        :total-pages="totalPages"
+        @update:currentPageNumber="onUpdateCurrentPageNumber"
+        @update:pageSize="onUpdatePageSize"
         @row-click="openDetail"
       />
 
       <!-- Detail panel -->
       <ParticipationNotificationDetailPanel
         :open="detailOpen"
-        :current-user-id="currentUserId"
         :notification="selected"
         @close="closeDetail"
         @accept="acceptSelected"
@@ -126,9 +130,12 @@ const {
 
   currentPageNumber,
   pageSize,
+  totalPages,
+  totalItems,
+  onUpdateCurrentPageNumber,
+  onUpdatePageSize,
 
-  filteredRows,
-  pagedRows,
+  rows,
 
   detailOpen,
   selected,
@@ -138,6 +145,6 @@ const {
   acceptSelected,
   rejectSelected,
 
-  currentUserId,
-} = useParticipationNotifications({ currentUserId: 1 });
+  notificationMessage,
+} = useParticipationNotifications();
 </script>

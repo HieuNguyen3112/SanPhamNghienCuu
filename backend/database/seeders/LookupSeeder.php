@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\AcademicRank;
 use App\Models\Degree;
-use App\Models\Department;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -57,9 +56,9 @@ class LookupSeeder extends Seeder
         }
 
         $departments = [
-            ['faculty_code' => 'FOS', 'code' => 'IT', 'name' => 'Information Technology'],
-            ['faculty_code' => 'FOS', 'code' => 'MATH', 'name' => 'Mathematics'],
-            ['faculty_code' => 'FOE', 'code' => 'EDU', 'name' => 'Education'],
+            ['faculty_code' => 'CNTT', 'code' => 'BM-KTPM', 'name' => 'Bộ môn Kỹ thuật Phần mềm'],
+            ['faculty_code' => 'CNTT', 'code' => 'TT-DL', 'name' => 'Trung tâm Dữ liệu'],
+            ['faculty_code' => 'TOANTIN', 'code' => 'BM-TT', 'name' => 'Bộ môn Toán - Tin'],
         ];
 
         foreach ($departments as $department) {
@@ -68,11 +67,27 @@ class LookupSeeder extends Seeder
                 continue;
             }
 
-            Department::firstOrCreate([
+            $existingId = DB::table('departments')
+                ->where('faculty_id', $facultyId)
+                ->where('code', $department['code'])
+                ->value('id');
+
+            if ($existingId) {
+                DB::table('departments')
+                    ->where('id', $existingId)
+                    ->update([
+                        'name' => $department['name'],
+                        'updated_at' => $now,
+                    ]);
+                continue;
+            }
+
+            DB::table('departments')->insert([
                 'faculty_id' => $facultyId,
                 'code' => $department['code'],
-            ], [
                 'name' => $department['name'],
+                'created_at' => $now,
+                'updated_at' => $now,
             ]);
         }
 

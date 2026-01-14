@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
     <div class="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
       <!-- Năm học -->
@@ -84,7 +84,7 @@
         </div>
       </div>
 
-      <!-- Loại -->
+      <!-- Loại công trình -->
       <div
         :class="isDepartmentFilterVisible ? 'md:col-span-2' : 'md:col-span-2'"
       >
@@ -194,19 +194,19 @@
           type="button"
           class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 md:w-auto"
           @click="componentEvents('resetFilterConditions')"
-          title="Áp dụng / tìm kiếm theo bộ lọc"
-          aria-label="Áp dụng / tìm kiếm theo bộ lọc"
+          title="Xóa lọc"
+          aria-label="Xóa lọc"
         >
           <RotateCcw class="h-6 w-6 text-slate-700" />
         </button>
       </div>
     </div>
 
-    <!-- 
+    <!--
     <p class="mt-3 text-xs leading-relaxed text-slate-500">
-     
       {{ filterPanelHelperText }}
-    </p> -->
+    </p>
+    -->
   </section>
 </template>
 
@@ -263,7 +263,6 @@ function mapResearchWorkTypeToDisplayName(
   return mapping[researchWorkType];
 }
 
-// ✅ thay destructure thường bằng toRefs
 const {
   isDepartmentFilterVisible,
   academicYearOptions,

@@ -12,9 +12,47 @@ import {
   type KpiStatusFilter,
 } from "../services/lecturerHoursService";
 
+interface LecturerHoursServiceLike {
+  loadOverview: (
+    filter: LecturerHoursFilterModel,
+    pagination: { page: number; perPage: number }
+  ) => Promise<{
+    overview: LecturerHoursOverview[];
+    totals: {
+      totalLecturers: number;
+      hitCount: number;
+      missCount: number;
+      hitRate: number;
+    };
+    options: {
+      academicYears: AcademicYearOption[];
+      faculties: FacultyOption[];
+      kpiStatuses: KpiStatusOption[];
+    };
+    meta: {
+      pagination: {
+        currentPage: number;
+        perPage: number;
+        total: number;
+        lastPage: number;
+      } | null;
+      filters: {
+        yearId: number | null;
+        facultyId: number | null;
+        kpiStatus: KpiStatusFilter;
+        keyword: string;
+      };
+    };
+  }>;
+  loadDetail: (lecturerId: number, yearId: number) => Promise<
+    LecturerHoursDetailRow[]
+  >;
+}
+
 export interface UseLecturerHoursManagementOptions {
   initialYearId?: number | null;
   initialFacultyId: number | null; // faculty page: fixed id, university: null
+  service?: LecturerHoursServiceLike;
 }
 
 function clampPercent(value: number) {
@@ -25,6 +63,7 @@ function clampPercent(value: number) {
 export function useLecturerHoursManagement(
   options: UseLecturerHoursManagementOptions
 ) {
+  const service = options.service ?? lecturerHoursService;
   const filter = reactive<LecturerHoursFilterModel>({
     yearId: options.initialYearId ?? null,
     facultyId: options.initialFacultyId,
@@ -74,7 +113,7 @@ export function useLecturerHoursManagement(
     errorOverview.value = null;
 
     try {
-      const payload = await lecturerHoursService.loadOverview(filter, {
+      const payload = await service.loadOverview(filter, {
         page: currentPageNumber.value,
         perPage: pageSize.value,
       });
@@ -107,7 +146,9 @@ export function useLecturerHoursManagement(
         lastPageNumber.value = 1;
       }
     } catch (e) {
-      errorOverview.value = e instanceof Error ? e.message : String(e);
+      // eslint-disable-next-line no-console
+      console.error(e);
+      errorOverview.value = "Không tải được dữ liệu. Vui lòng thử lại.";
       overview.value = [];
       totalLecturers.value = 0;
       hitCount.value = 0;
@@ -129,12 +170,14 @@ export function useLecturerHoursManagement(
         detailRows.value = [];
         return;
       }
-      detailRows.value = await lecturerHoursService.loadDetail(
+      detailRows.value = await service.loadDetail(
         lecturerId,
         filter.yearId
       );
     } catch (e) {
-      errorDetail.value = e instanceof Error ? e.message : String(e);
+      // eslint-disable-next-line no-console
+      console.error(e);
+      errorDetail.value = "Không tải được chi tiết. Vui lòng thử lại.";
       detailRows.value = [];
     } finally {
       loadingDetail.value = false;

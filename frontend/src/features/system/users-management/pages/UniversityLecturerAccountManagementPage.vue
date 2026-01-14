@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <!-- Header -->
@@ -40,9 +40,14 @@
         :rows="rows"
         :loading="loading"
         :error="error"
+        :current-page-number="currentPageNumber"
+        :page-size="pageSize"
+        :total-item-count="totalItems"
         @edit="openEdit"
         @roles="openRoles"
         @toggle-status="openDeactivate"
+        @update:currentPageNumber="updatePage"
+        @update:pageSize="updatePageSize"
       />
 
       <!-- Modals -->
@@ -95,6 +100,9 @@ const {
   loading,
   error,
   resultCount,
+  currentPageNumber,
+  pageSize,
+  totalItems,
 
   toastMessage,
 
@@ -112,6 +120,8 @@ const {
   updateFilter,
   resetFilter,
   search,
+  updatePage,
+  updatePageSize,
 
   openEdit,
   openRoles,
@@ -125,6 +135,6 @@ const {
 
 function onReset() {
   resetFilter();
-  void search();
+  void search({ resetPage: true });
 }
 </script>

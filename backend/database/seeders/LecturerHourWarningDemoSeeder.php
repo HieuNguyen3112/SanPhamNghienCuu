@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class LecturerHourWarningDemoSeeder extends Seeder
 {
@@ -162,6 +163,51 @@ class LecturerHourWarningDemoSeeder extends Seeder
                     'hours_total' => $seed['hours'],
                     'created_at' => $createdAt,
                     'updated_at' => $updatedAt,
+                ]
+            );
+        }
+
+        if (! Schema::hasTable('lecturer_hour_warnings')) {
+            return;
+        }
+
+        $primaryLecturerId = DB::table('lecturers')->where('code', 'GV-001')->value('id');
+        if (! $primaryLecturerId) {
+            return;
+        }
+
+        $warningSeeds = [
+            [
+                'type_key' => 'missing_hours',
+                'status_key' => 'unseen',
+                'seen_at' => null,
+            ],
+            [
+                'type_key' => 'approved_not_submitted',
+                'status_key' => 'seen',
+                'seen_at' => $now->copy()->subDays(1),
+            ],
+            [
+                'type_key' => 'hours_rejected',
+                'status_key' => 'resolved',
+                'seen_at' => $now->copy()->subDays(2),
+                'resolved_at' => $now->copy()->subDays(1),
+            ],
+        ];
+
+        foreach ($warningSeeds as $seed) {
+            DB::table('lecturer_hour_warnings')->updateOrInsert(
+                [
+                    'lecturer_id' => $primaryLecturerId,
+                    'academic_year_id' => $academicYearId,
+                    'type_key' => $seed['type_key'],
+                ],
+                [
+                    'status_key' => $seed['status_key'],
+                    'seen_at' => $seed['seen_at'],
+                    'resolved_at' => $seed['resolved_at'] ?? null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]
             );
         }

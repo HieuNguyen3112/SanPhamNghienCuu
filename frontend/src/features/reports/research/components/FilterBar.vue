@@ -1,13 +1,11 @@
 <template>
   <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-    <!-- ONE LINE -->
     <div class="overflow-x-auto overflow-y-visible">
       <div class="flex flex-nowrap items-end gap-3">
-        <!-- Year -->
         <div class="w-[140px]">
-          <label class="mb-1 block text-xs font-medium text-slate-600"
-            >Năm</label
-          >
+          <label class="mb-1 block text-xs font-medium text-slate-600">
+            Năm
+          </label>
 
           <div class="relative">
             <select
@@ -31,7 +29,6 @@
           </div>
         </div>
 
-        <!-- Department -->
         <div class="w-[260px]">
           <label class="mb-1 block text-xs font-medium text-slate-600">
             Khoa / Đơn vị
@@ -49,7 +46,7 @@
               <option
                 v-for="dept in departments"
                 :key="dept.id"
-                :value="dept.id"
+                :value="String(dept.id)"
               >
                 {{ dept.name }}
               </option>
@@ -61,7 +58,6 @@
           </div>
         </div>
 
-        <!-- Type -->
         <div class="w-60">
           <label class="mb-1 block text-xs font-medium text-slate-600">
             Loại công trình
@@ -89,7 +85,6 @@
           </div>
         </div>
 
-        <!-- Lecturer (Search Select) -->
         <div ref="lecturerBoxRef" class="relative z-50 w-[320px]">
           <label class="mb-1 block text-xs font-medium text-slate-600">
             Giảng viên
@@ -119,8 +114,6 @@
             </button>
           </div>
 
-          <!-- Dropdown -->
-          <!-- Dropdown (teleport ra body để không bị overflow cắt) -->
           <Teleport to="body">
             <div
               v-if="dropdownOpen"
@@ -129,7 +122,6 @@
               :style="dropdownStyle"
             >
               <div class="max-h-72 overflow-auto p-1">
-                <!-- giữ nguyên toàn bộ nội dung dropdown của bạn ở đây -->
                 <button
                   type="button"
                   class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
@@ -152,7 +144,9 @@
                   :key="lecturer.id"
                   type="button"
                   class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50"
-                  :class="lecturer.id === lecturerId ? 'bg-slate-50' : ''"
+                  :class="
+                    lecturer.id === Number(lecturerId) ? 'bg-slate-50' : ''
+                  "
                   @click="selectLecturer(lecturer.id)"
                 >
                   <div class="min-w-0">
@@ -160,11 +154,11 @@
                       {{ lecturer.name }}
                     </div>
                     <div class="truncate text-xs text-slate-500">
-                      {{ deptNameById.get(lecturer.departmentId) }}
+                      {{ lecturer.departmentName ?? "Chưa rõ" }}
                     </div>
                   </div>
                   <span
-                    v-if="lecturer.id === lecturerId"
+                    v-if="lecturer.id === Number(lecturerId)"
                     class="shrink-0 text-slate-400"
                   >
                     ✓
@@ -182,11 +176,9 @@
           </Teleport>
         </div>
 
-        <!-- Reset at the END (rightmost) -->
         <div class="ml-auto w-10">
-          <!-- giữ chiều cao label để canh đáy -->
           <label
-            class="mb-1 block text-xs font-medium text-transparent select-none"
+            class="mb-1 block select-none text-xs font-medium text-transparent"
           >
             Reset
           </label>
@@ -214,17 +206,18 @@ import {
   nextTick,
   watch,
 } from "vue";
-import type { Department, Lecturer } from "../useResearchMockData";
 import { RotateCcw, ChevronDown, Search } from "lucide-vue-next";
-
-type ResearchTypeOption = { value: string; label: string };
+import type {
+  ResearchDepartmentOption,
+  ResearchLecturerOption,
+  ResearchTypeOption,
+} from "../researchReportTypes";
 
 const props = defineProps<{
   years: string[];
-  departments: Department[];
+  departments: ResearchDepartmentOption[];
   researchTypes: ResearchTypeOption[];
-  lecturers: Lecturer[];
-
+  lecturers: ResearchLecturerOption[];
   year: string;
   departmentId: string;
   researchType: string;
@@ -249,26 +242,22 @@ function emitType(value: string) {
   emit("update:researchType", value);
 }
 
-/** Lecturer search select */
 const dropdownOpen = ref(false);
 const lecturerQuery = ref("");
 const lecturerBoxRef = ref<HTMLElement | null>(null);
 const dropdownRef = ref<HTMLElement | null>(null);
 const dropdownStyle = ref<Record<string, string>>({});
 
-const deptNameById = computed(
-  () => new Map(props.departments.map((dept) => [dept.id, dept.name]))
-);
-
 const selectedLecturerName = computed(() => {
   if (props.lecturerId === "all") return "";
-  return props.lecturers.find((lec) => lec.id === props.lecturerId)?.name ?? "";
+  return props.lecturers.find((lec) => lec.id === Number(props.lecturerId))
+    ?.name;
 });
 
 const lecturerInputValue = computed(() => {
   return lecturerQuery.value.length > 0
     ? lecturerQuery.value
-    : selectedLecturerName.value;
+    : selectedLecturerName.value ?? "";
 });
 
 const filteredLecturers = computed(() => {
@@ -286,8 +275,8 @@ function handleLecturerInput(event: Event) {
   dropdownOpen.value = true;
 }
 
-function selectLecturer(nextLecturerId: string) {
-  emit("update:lecturerId", nextLecturerId);
+function selectLecturer(nextLecturerId: number | "all") {
+  emit("update:lecturerId", String(nextLecturerId));
   lecturerQuery.value = "";
   dropdownOpen.value = false;
 }
@@ -313,7 +302,7 @@ function onDocumentMouseDown(event: MouseEvent) {
 onMounted(() => {
   document.addEventListener("mousedown", onDocumentMouseDown);
   window.addEventListener("resize", onWindowReposition);
-  window.addEventListener("scroll", onWindowReposition, true); // bắt cả scroll của div overflow
+  window.addEventListener("scroll", onWindowReposition, true);
 });
 
 onBeforeUnmount(() => {
@@ -328,13 +317,11 @@ function updateDropdownPosition() {
 
   const rect = anchor.getBoundingClientRect();
 
-  // mặc định mở xuống dưới
   let top = rect.bottom + 8;
   let left = rect.left;
   let width = rect.width;
 
-  // nếu gần đáy màn hình quá thì mở lên trên (optional nhưng rất hữu ích)
-  const estimatedHeight = 288; // ~ max-h-72
+  const estimatedHeight = 288;
   if (top + estimatedHeight > window.innerHeight - 8) {
     top = Math.max(8, rect.top - 8 - estimatedHeight);
   }

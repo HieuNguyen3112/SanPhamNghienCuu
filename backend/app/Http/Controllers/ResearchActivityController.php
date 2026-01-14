@@ -6,6 +6,7 @@ use App\Http\Requests\ResearchActivities\ResearchActivityDetailRequest;
 use App\Http\Requests\ResearchActivities\ResearchActivityMembersRequest;
 use App\Http\Requests\ResearchActivities\StoreResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\UpdateResearchActivityRequest;
+use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -279,6 +280,34 @@ class ResearchActivityController extends Controller
             'updated_at' => $now,
         ]);
 
+        $academicYearCode = null;
+        if ($current->academic_year_id) {
+            $academicYearCode = DB::table('academic_years')
+                ->where('id', $current->academic_year_id)
+                ->value('code');
+        }
+
+        $totalHours = (float) DB::table('research_activity_members')
+            ->where('activity_id', $activity)
+            ->sum('hours_assigned');
+
+        AuditLogger::log($request, [
+            'action_group' => 'approval',
+            'action_code' => 'HOURS_SUBMITTED',
+            'action_label' => 'Gửi yêu cầu duyệt giờ NCKH',
+            'severity' => 'important',
+            'result_status' => 'success',
+            'target_type' => 'research_activity',
+            'target_id' => $activity,
+            'target_display' => $current->title ? 'Công trình: ' . $current->title : null,
+            'request_http_status' => Response::HTTP_OK,
+            'changes' => [
+                'academic_year_id' => $current->academic_year_id,
+                'academic_year_code' => $academicYearCode,
+                'total_hours' => $totalHours,
+            ],
+        ], $user);
+
         return response()->json([
             'message' => 'activity submitted',
             'data' => $this->serializeActivity($activity),
@@ -437,11 +466,11 @@ class ResearchActivityController extends Controller
         return [
             'id' => (int) $row->id,
             'activity_code' => $row->activity_code,
-            'owner_lecturer_id' => $row->owner_lecturer_id,
-            'kind_id' => $row->kind_id,
-            'type_id' => $row->type_id,
-            'academic_year_id' => $row->academic_year_id,
-            'status_id' => $row->status_id,
+            'owner_lecturer_id' => $row->owner_lecturer_id !== null ? (int) $row->owner_lecturer_id : null,
+            'kind_id' => $row->kind_id !== null ? (int) $row->kind_id : null,
+            'type_id' => $row->type_id !== null ? (int) $row->type_id : null,
+            'academic_year_id' => $row->academic_year_id !== null ? (int) $row->academic_year_id : null,
+            'status_id' => $row->status_id !== null ? (int) $row->status_id : null,
             'title' => $row->title,
             'abstract' => $row->abstract,
             'start_date' => $row->start_date,

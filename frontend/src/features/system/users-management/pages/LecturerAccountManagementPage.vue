@@ -1,12 +1,12 @@
-<template>
+﻿<template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
-          title="Quản lý tài khoản giảng viên "
-          subtitle="Theo dõi và quản lý các tài khoản của giảng viên "
+          title="Quản lý tài khoản giảng viên"
+          subtitle="Theo dõi và quản lý các tài khoản của giảng viên."
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"
@@ -39,9 +39,14 @@
         :rows="rows"
         :loading="loading"
         :error="error"
+        :current-page-number="currentPageNumber"
+        :page-size="pageSize"
+        :total-item-count="totalItems"
         @edit="openEdit"
         @roles="openRoles"
         @toggle-status="openDeactivate"
+        @update:currentPageNumber="updatePage"
+        @update:pageSize="updatePageSize"
       />
 
       <!-- Modals -->
@@ -78,6 +83,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+import { useUserStore } from "@/app/stores/userStore";
 import LecturerAccountFilterBar from "../components/LecturerAccountFilterBar.vue";
 import LecturerAccountTable from "../components/LecturerAccountTable.vue";
 import EditLecturerModal from "../components/EditLecturerModal.vue";
@@ -85,6 +92,11 @@ import AssignRolesModal from "../components/AssignRolesModal.vue";
 import DeactivateAccountModal from "../components/DeactivateAccountModal.vue";
 import { useLecturerAccountManagement } from "../composables/useLecturerAccountManagement";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
+
+const userStore = useUserStore();
+const scope = computed(() =>
+  userStore.role === "DEPARTMENT_BOARD" ? "FACULTY" : "UNIVERSITY"
+);
 
 const {
   filter,
@@ -95,6 +107,9 @@ const {
   loading,
   error,
   resultCount,
+  currentPageNumber,
+  pageSize,
+  totalItems,
 
   toastMessage,
 
@@ -112,6 +127,8 @@ const {
   updateFilter,
   resetFilter,
   search,
+  updatePage,
+  updatePageSize,
 
   openEdit,
   openRoles,
@@ -121,11 +138,11 @@ const {
   saveEdit,
   saveRoles,
   confirmToggleStatus,
-} = useLecturerAccountManagement();
+} = useLecturerAccountManagement({ scope: scope.value });
 
 function onReset() {
   resetFilter();
   // reset xong thì search luôn cho đúng UX
-  void search();
+  void search({ resetPage: true });
 }
 </script>

@@ -1,8 +1,7 @@
 // File: src/features/master-data/work-catalog-management/composables/useWorkTypeCatalog.ts
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive, ref } from "vue";
 import {
   formatDateTime,
-  toLowerSafe,
   workTypeFromDto,
   type WorkType,
   type WorkTypeDTO,
@@ -15,6 +14,7 @@ type FormErrors<T extends Record<string, unknown>> = Partial<
 
 export function useWorkTypeCatalog() {
   const workTypes = ref<WorkType[]>([]);
+  const workTypeTotal = ref(0);
 
   const qWorkType = ref("");
   const pageWorkType = ref(1);
@@ -43,28 +43,17 @@ export function useWorkTypeCatalog() {
   }
 
   async function load(): Promise<void> {
-    const dtos = await workCatalogService.listWorkTypes();
-    workTypes.value = dtos.map(workTypeFromDto);
+    const response = await workCatalogService.listWorkTypes({
+      keyword: qWorkType.value.trim() || undefined,
+      page: pageWorkType.value,
+      per_page: pageSizeWorkType.value,
+    });
+    workTypes.value = response.items.map(workTypeFromDto);
+    workTypeTotal.value = response.pagination.total;
   }
 
-  function paginate<T>(items: T[], page: number, pageSize: number): T[] {
-    const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }
-
-  const filteredWorkTypes = computed(() => {
-    const q = toLowerSafe(qWorkType.value);
-    return workTypes.value.filter((x) => toLowerSafe(x.name).includes(q));
-  });
-  const pagedWorkTypes = computed(() =>
-    paginate(
-      filteredWorkTypes.value,
-      pageWorkType.value,
-      pageSizeWorkType.value
-    )
-  );
-
-  watch([qWorkType, pageSizeWorkType], () => (pageWorkType.value = 1));
+  const filteredWorkTypes = computed(() => workTypes.value);
+  const pagedWorkTypes = computed(() => workTypes.value);
 
   function openCreateWorkType() {
     modalMode.value = "create";
@@ -119,6 +108,7 @@ export function useWorkTypeCatalog() {
   return {
     // data
     workTypes,
+    workTypeTotal,
 
     // search/paging
     qWorkType,

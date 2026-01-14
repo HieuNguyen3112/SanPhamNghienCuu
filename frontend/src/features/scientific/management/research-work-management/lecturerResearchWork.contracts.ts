@@ -1,9 +1,16 @@
-// DTO (snake_case) + UI Models (camelCase) + Mapper gộp chung
+// DTO (snake_case) + UI models (camelCase) + shared mapper
 
 // =====================
 // DTO (snake_case)
 // =====================
 export type StatusModeDTO = "approved" | "pending" | "rejected" | "all";
+
+export interface PaginationDTO {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
 
 export interface FilterDTO {
   faculty_id: number | null;
@@ -81,10 +88,11 @@ export interface EvidenceDTO {
 
   disk: string;
   path: string;
+  download_url?: string | null;
 
   original_name: string;
   mime_type: string;
-  size_bytes: number;
+  size_bytes: number | null;
 
   uploaded_at: string;
 }
@@ -126,6 +134,18 @@ export interface ApprovedDetailDTO {
 // UI Models (camelCase)
 // =====================
 export type StatusMode = "approved" | "pending" | "rejected" | "all";
+
+export interface Pagination {
+  page: number;
+  perPage: number;
+  total: number;
+  lastPage: number;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  pagination: Pagination;
+}
 
 export interface FilterState {
   facultyId: number | null;
@@ -203,10 +223,11 @@ export interface Evidence {
 
   disk: string;
   path: string;
+  downloadUrl?: string | null;
 
   originalName: string;
   mimeType: string;
-  sizeBytes: number;
+  sizeBytes: number | null;
 
   uploadedAt: string;
 }
@@ -265,6 +286,15 @@ export const mapper = {
 
   academicYearOptionFromDto(dto: AcademicYearOptionDTO): AcademicYearOption {
     return { id: dto.id, code: dto.code, isActive: dto.is_active };
+  },
+
+  paginationFromDto(dto: PaginationDTO): Pagination {
+    return {
+      page: dto.page,
+      perPage: dto.per_page,
+      total: dto.total,
+      lastPage: dto.last_page,
+    };
   },
 
   overviewFromDto(dto: OverviewDTO): OverviewItem {
@@ -333,6 +363,7 @@ export const mapper = {
         fileTypeName: e.file_type_name,
         disk: e.disk,
         path: e.path,
+        downloadUrl: e.download_url ?? null,
         originalName: e.original_name,
         mimeType: e.mime_type,
         sizeBytes: e.size_bytes,

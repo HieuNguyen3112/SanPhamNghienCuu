@@ -5,27 +5,29 @@
         <h3 class="text-sm font-semibold text-slate-900">
           Giảng viên theo khoa
         </h3>
-        <p class="text-xs text-slate-500">Số lượng giảng viên theo từng khoa</p>
+        <p class="text-xs text-slate-500">
+          Số lượng giảng viên theo từng khoa
+        </p>
       </div>
       <div class="h-[300px]">
-        <canvas ref="departmentBarChartCanvasElement" />
+        <canvas ref="facultyBarChartCanvasElement" />
       </div>
     </div>
 
     <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="mb-3">
         <h3 class="text-sm font-semibold text-slate-900">Trình độ học vấn</h3>
-        <p class="text-xs text-slate-500">Phân bổ trình độ đào tạo</p>
+        <p class="text-xs text-slate-500">Phân bố trình độ đào tạo</p>
       </div>
       <div class="h-[300px]">
-        <canvas ref="educationLevelDonutChartCanvasElement" />
+        <canvas ref="degreeDonutChartCanvasElement" />
       </div>
     </div>
 
     <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="mb-3">
         <h3 class="text-sm font-semibold text-slate-900">Học hàm</h3>
-        <p class="text-xs text-slate-500">Tỷ lệ học hàm trong đội ngũ</p>
+        <p class="text-xs text-slate-500">Tỷ lệ học hàm</p>
       </div>
       <div class="h-[300px]">
         <canvas ref="academicRankPieChartCanvasElement" />
@@ -47,166 +49,67 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Chart } from "chart.js/auto";
-import type { LecturerRecord } from "../lecturerStatisticsTypes";
+import type { LecturerReportCharts } from "../lecturerReportTypes";
 
 const componentProperties = defineProps<{
-  filteredLecturerRecords: LecturerRecord[];
+  charts: LecturerReportCharts;
 }>();
 
-const departmentBarChartCanvasElement = ref<HTMLCanvasElement | null>(null);
-const educationLevelDonutChartCanvasElement = ref<HTMLCanvasElement | null>(
-  null
-);
+const facultyBarChartCanvasElement = ref<HTMLCanvasElement | null>(null);
+const degreeDonutChartCanvasElement = ref<HTMLCanvasElement | null>(null);
 const academicRankPieChartCanvasElement = ref<HTMLCanvasElement | null>(null);
 const genderBarChartCanvasElement = ref<HTMLCanvasElement | null>(null);
 
-let departmentBarChartInstance: Chart<"bar"> | null = null;
-let educationLevelDonutChartInstance: Chart<"doughnut"> | null = null;
+let facultyBarChartInstance: Chart<"bar"> | null = null;
+let degreeDonutChartInstance: Chart<"doughnut"> | null = null;
 let academicRankPieChartInstance: Chart<"pie"> | null = null;
 let genderBarChartInstance: Chart<"bar"> | null = null;
 
-/**
- * Giữ reference dataset để cập nhật an toàn, tránh index [0] gây TS2532
- * (TypeScript không đảm bảo mảng datasets luôn có phần tử ở vị trí 0).
- */
-let departmentBarChartDatasetReference: { data: number[] } | null = null;
-
-let educationLevelDonutChartDatasetReference: { data: number[] } | null = null;
-
+let facultyBarChartDatasetReference: { data: number[] } | null = null;
+let degreeDonutChartDatasetReference: { data: number[] } | null = null;
 let academicRankPieChartDatasetReference: { data: number[] } | null = null;
-
 let genderBarChartDatasetReference: { data: number[] } | null = null;
 
-const departmentDistribution = computed(() => {
-  const departmentCountMap = new Map<string, number>();
-
-  for (const lecturerRecord of componentProperties.filteredLecturerRecords) {
-    departmentCountMap.set(
-      lecturerRecord.departmentName,
-      (departmentCountMap.get(lecturerRecord.departmentName) ?? 0) + 1
-    );
-  }
-
-  const sortedEntries = Array.from(departmentCountMap.entries()).sort(
-    (firstEntry, secondEntry) => firstEntry[0].localeCompare(secondEntry[0])
-  );
-
-  return {
-    departmentLabels: sortedEntries.map((entry) => entry[0]),
-    departmentCounts: sortedEntries.map((entry) => entry[1]),
-  };
-});
-
-const educationLevelDistribution = computed(() => {
-  const numberOfDoctorLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) => lecturerRecord.educationLevelCategory === "Doctor"
-    ).length;
-
-  const numberOfMasterLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) => lecturerRecord.educationLevelCategory === "Master"
-    ).length;
-
-  const numberOfBachelorLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) => lecturerRecord.educationLevelCategory === "Bachelor"
-    ).length;
-
-  return {
-    educationLevelLabels: ["Tiến sĩ", "Thạc sĩ", "Đại học"],
-    educationLevelCounts: [
-      numberOfDoctorLecturers,
-      numberOfMasterLecturers,
-      numberOfBachelorLecturers,
-    ],
-  };
-});
-
-const academicRankDistribution = computed(() => {
-  const numberOfProfessorLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) => lecturerRecord.academicRankCategory === "Professor"
-    ).length;
-
-  const numberOfAssociateProfessorLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) =>
-        lecturerRecord.academicRankCategory === "AssociateProfessor"
-    ).length;
-
-  const numberOfNoneAcademicRankLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) => lecturerRecord.academicRankCategory === "None"
-    ).length;
-
-  return {
-    academicRankLabels: ["Giáo sư", "Phó Giáo sư", "Không"],
-    academicRankCounts: [
-      numberOfProfessorLecturers,
-      numberOfAssociateProfessorLecturers,
-      numberOfNoneAcademicRankLecturers,
-    ],
-  };
-});
-
-const genderDistribution = computed(() => {
-  const numberOfMaleLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) => lecturerRecord.genderCategory === "Male"
-    ).length;
-
-  const numberOfFemaleLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) => lecturerRecord.genderCategory === "Female"
-    ).length;
-
-  const numberOfOtherGenderLecturers =
-    componentProperties.filteredLecturerRecords.filter(
-      (lecturerRecord) => lecturerRecord.genderCategory === "Other"
-    ).length;
-
-  return {
-    genderLabels: ["Nam", "Nữ", "Khác"],
-    genderCounts: [
-      numberOfMaleLecturers,
-      numberOfFemaleLecturers,
-      numberOfOtherGenderLecturers,
-    ],
-  };
-});
+const facultyDistribution = computed(() => componentProperties.charts.byFaculty);
+const degreeDistribution = computed(() => componentProperties.charts.byDegree);
+const academicRankDistribution = computed(
+  () => componentProperties.charts.byAcademicRank
+);
+const genderDistribution = computed(() => componentProperties.charts.byGender);
 
 const chartUpdateSignature = computed(() => {
-  // Chữ ký nhẹ để kích hoạt update chart khi dữ liệu thay đổi, tránh watch deep trên danh sách lớn
   return [
-    departmentDistribution.value.departmentLabels.join("|"),
-    departmentDistribution.value.departmentCounts.join("|"),
-    educationLevelDistribution.value.educationLevelCounts.join("|"),
-    academicRankDistribution.value.academicRankCounts.join("|"),
-    genderDistribution.value.genderCounts.join("|"),
+    facultyDistribution.value.labels.join("|"),
+    facultyDistribution.value.values.join("|"),
+    degreeDistribution.value.labels.join("|"),
+    degreeDistribution.value.values.join("|"),
+    academicRankDistribution.value.labels.join("|"),
+    academicRankDistribution.value.values.join("|"),
+    genderDistribution.value.labels.join("|"),
+    genderDistribution.value.values.join("|"),
   ].join("::");
 });
 
-function createOrUpdateDepartmentBarChart() {
-  if (!departmentBarChartCanvasElement.value) return;
+function createOrUpdateFacultyBarChart() {
+  if (!facultyBarChartCanvasElement.value) return;
 
-  if (!departmentBarChartInstance) {
+  if (!facultyBarChartInstance) {
     const createdDataset = {
       label: "Số lượng giảng viên",
-      data: departmentDistribution.value.departmentCounts,
+      data: facultyDistribution.value.values,
       backgroundColor: "rgba(15, 23, 42, 0.20)",
       borderColor: "rgba(15, 23, 42, 0.50)",
       borderWidth: 1,
     };
 
-    departmentBarChartDatasetReference = createdDataset;
+    facultyBarChartDatasetReference = createdDataset;
 
-    departmentBarChartInstance = new Chart(
-      departmentBarChartCanvasElement.value,
+    facultyBarChartInstance = new Chart(
+      facultyBarChartCanvasElement.value,
       {
         type: "bar",
         data: {
-          labels: departmentDistribution.value.departmentLabels,
+          labels: facultyDistribution.value.labels,
           datasets: [createdDataset],
         },
         options: {
@@ -228,43 +131,43 @@ function createOrUpdateDepartmentBarChart() {
     return;
   }
 
-  departmentBarChartInstance.data.labels =
-    departmentDistribution.value.departmentLabels;
-  if (departmentBarChartDatasetReference) {
-    departmentBarChartDatasetReference.data =
-      departmentDistribution.value.departmentCounts;
+  facultyBarChartInstance.data.labels = facultyDistribution.value.labels;
+  if (facultyBarChartDatasetReference) {
+    facultyBarChartDatasetReference.data = facultyDistribution.value.values;
   }
-  departmentBarChartInstance.update("none");
+  facultyBarChartInstance.update("none");
 }
 
-function createOrUpdateEducationLevelDonutChart() {
-  if (!educationLevelDonutChartCanvasElement.value) return;
+function createOrUpdateDegreeDonutChart() {
+  if (!degreeDonutChartCanvasElement.value) return;
 
-  if (!educationLevelDonutChartInstance) {
+  if (!degreeDonutChartInstance) {
     const createdDataset = {
       label: "Số lượng",
-      data: educationLevelDistribution.value.educationLevelCounts,
+      data: degreeDistribution.value.values,
       backgroundColor: [
         "rgba(79, 70, 229, 0.20)",
         "rgba(2, 132, 199, 0.20)",
         "rgba(100, 116, 139, 0.18)",
+        "rgba(234, 179, 8, 0.18)",
       ],
       borderColor: [
         "rgba(79, 70, 229, 0.55)",
         "rgba(2, 132, 199, 0.55)",
         "rgba(100, 116, 139, 0.45)",
+        "rgba(234, 179, 8, 0.45)",
       ],
       borderWidth: 1,
     };
 
-    educationLevelDonutChartDatasetReference = createdDataset;
+    degreeDonutChartDatasetReference = createdDataset;
 
-    educationLevelDonutChartInstance = new Chart(
-      educationLevelDonutChartCanvasElement.value,
+    degreeDonutChartInstance = new Chart(
+      degreeDonutChartCanvasElement.value,
       {
         type: "doughnut",
         data: {
-          labels: educationLevelDistribution.value.educationLevelLabels,
+          labels: degreeDistribution.value.labels,
           datasets: [createdDataset],
         },
         options: {
@@ -283,13 +186,11 @@ function createOrUpdateEducationLevelDonutChart() {
     return;
   }
 
-  educationLevelDonutChartInstance.data.labels =
-    educationLevelDistribution.value.educationLevelLabels;
-  if (educationLevelDonutChartDatasetReference) {
-    educationLevelDonutChartDatasetReference.data =
-      educationLevelDistribution.value.educationLevelCounts;
+  degreeDonutChartInstance.data.labels = degreeDistribution.value.labels;
+  if (degreeDonutChartDatasetReference) {
+    degreeDonutChartDatasetReference.data = degreeDistribution.value.values;
   }
-  educationLevelDonutChartInstance.update("none");
+  degreeDonutChartInstance.update("none");
 }
 
 function createOrUpdateAcademicRankPieChart() {
@@ -298,7 +199,7 @@ function createOrUpdateAcademicRankPieChart() {
   if (!academicRankPieChartInstance) {
     const createdDataset = {
       label: "Số lượng",
-      data: academicRankDistribution.value.academicRankCounts,
+      data: academicRankDistribution.value.values,
       backgroundColor: [
         "rgba(245, 158, 11, 0.22)",
         "rgba(20, 184, 166, 0.20)",
@@ -319,7 +220,7 @@ function createOrUpdateAcademicRankPieChart() {
       {
         type: "pie",
         data: {
-          labels: academicRankDistribution.value.academicRankLabels,
+          labels: academicRankDistribution.value.labels,
           datasets: [createdDataset],
         },
         options: {
@@ -338,10 +239,10 @@ function createOrUpdateAcademicRankPieChart() {
   }
 
   academicRankPieChartInstance.data.labels =
-    academicRankDistribution.value.academicRankLabels;
+    academicRankDistribution.value.labels;
   if (academicRankPieChartDatasetReference) {
     academicRankPieChartDatasetReference.data =
-      academicRankDistribution.value.academicRankCounts;
+      academicRankDistribution.value.values;
   }
   academicRankPieChartInstance.update("none");
 }
@@ -352,7 +253,7 @@ function createOrUpdateGenderBarChart() {
   if (!genderBarChartInstance) {
     const createdDataset = {
       label: "Số lượng giảng viên",
-      data: genderDistribution.value.genderCounts,
+      data: genderDistribution.value.values,
       backgroundColor: [
         "rgba(15, 23, 42, 0.18)",
         "rgba(79, 70, 229, 0.18)",
@@ -371,7 +272,7 @@ function createOrUpdateGenderBarChart() {
     genderBarChartInstance = new Chart(genderBarChartCanvasElement.value, {
       type: "bar",
       data: {
-        labels: genderDistribution.value.genderLabels,
+        labels: genderDistribution.value.labels,
         datasets: [createdDataset],
       },
       options: {
@@ -392,16 +293,16 @@ function createOrUpdateGenderBarChart() {
     return;
   }
 
-  genderBarChartInstance.data.labels = genderDistribution.value.genderLabels;
+  genderBarChartInstance.data.labels = genderDistribution.value.labels;
   if (genderBarChartDatasetReference) {
-    genderBarChartDatasetReference.data = genderDistribution.value.genderCounts;
+    genderBarChartDatasetReference.data = genderDistribution.value.values;
   }
   genderBarChartInstance.update("none");
 }
 
 function createOrUpdateAllCharts() {
-  createOrUpdateDepartmentBarChart();
-  createOrUpdateEducationLevelDonutChart();
+  createOrUpdateFacultyBarChart();
+  createOrUpdateDegreeDonutChart();
   createOrUpdateAcademicRankPieChart();
   createOrUpdateGenderBarChart();
 }
@@ -415,18 +316,18 @@ watch(chartUpdateSignature, () => {
 });
 
 onBeforeUnmount(() => {
-  departmentBarChartInstance?.destroy();
-  educationLevelDonutChartInstance?.destroy();
+  facultyBarChartInstance?.destroy();
+  degreeDonutChartInstance?.destroy();
   academicRankPieChartInstance?.destroy();
   genderBarChartInstance?.destroy();
 
-  departmentBarChartInstance = null;
-  educationLevelDonutChartInstance = null;
+  facultyBarChartInstance = null;
+  degreeDonutChartInstance = null;
   academicRankPieChartInstance = null;
   genderBarChartInstance = null;
 
-  departmentBarChartDatasetReference = null;
-  educationLevelDonutChartDatasetReference = null;
+  facultyBarChartDatasetReference = null;
+  degreeDonutChartDatasetReference = null;
   academicRankPieChartDatasetReference = null;
   genderBarChartDatasetReference = null;
 });

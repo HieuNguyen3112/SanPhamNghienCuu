@@ -1,5 +1,3 @@
-// File:
-src/features/lecturer-hours-overview/components/HoursBatchHistorySection.vue
 <template>
   <section
     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
@@ -15,7 +13,7 @@ src/features/lecturer-hours-overview/components/HoursBatchHistorySection.vue
       v-if="loading"
       class="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"
     >
-      Đang tải lịch sử…
+      Đang tải lịch sử...
     </div>
 
     <div
@@ -27,15 +25,11 @@ src/features/lecturer-hours-overview/components/HoursBatchHistorySection.vue
 
     <div v-else-if="batches.length === 0" class="mt-4 text-sm text-slate-600">
       Chưa có đợt xét duyệt nào.
-      <div class="mt-2 text-xs text-slate-500">
-        TODO(BE): schema hiện chưa có “batch/đợt”. Cần endpoint/DTO derived hoặc
-        thêm bảng hour_approval_batches.
-      </div>
     </div>
 
     <div v-else class="mt-4 overflow-hidden rounded-xl border border-slate-200">
       <div class="max-h-[520px] overflow-auto">
-        <table class="min-w-[980px] w-full text-left text-sm">
+        <table class="w-full min-w-[980px] text-left text-sm">
           <thead
             class="bg-slate-50 text-xs font-semibold uppercase text-slate-600"
           >
@@ -80,7 +74,7 @@ src/features/lecturer-hours-overview/components/HoursBatchHistorySection.vue
                 {{ formatDate(batch.submittedAt) }}
               </td>
               <td class="px-4 py-3 text-slate-700">
-                {{ batch.decidedAt ? formatDate(batch.decidedAt) : "–" }}
+                {{ batch.decidedAt ? formatDate(batch.decidedAt) : "—" }}
               </td>
               <td
                 class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900"

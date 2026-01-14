@@ -1,8 +1,7 @@
 // File: src/features/master-data/work-catalog-management/composables/useJournalCatalog.ts
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive, ref } from "vue";
 import {
   journalFromDto,
-  toLowerSafe,
   type Journal,
   type JournalDTO,
   type JournalRank,
@@ -16,6 +15,7 @@ type FormErrors<T extends Record<string, unknown>> = Partial<
 
 export function useJournalCatalog() {
   const journals = ref<Journal[]>([]);
+  const journalTotal = ref(0);
 
   const qJournal = ref("");
   const pageJournal = ref(1);
@@ -79,29 +79,17 @@ export function useJournalCatalog() {
   }
 
   async function load(): Promise<void> {
-    const dtos = await workCatalogService.listJournals();
-    journals.value = dtos.map(journalFromDto);
-  }
-
-  function paginate<T>(items: T[], page: number, pageSize: number): T[] {
-    const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }
-
-  const filteredJournals = computed(() => {
-    const q = toLowerSafe(qJournal.value);
-    return journals.value.filter((x) => {
-      const byName = toLowerSafe(x.name).includes(q);
-      const byIssn = toLowerSafe(x.issn ?? "").includes(q);
-      return byName || byIssn;
+    const response = await workCatalogService.listJournals({
+      keyword: qJournal.value.trim() || undefined,
+      page: pageJournal.value,
+      per_page: pageSizeJournal.value,
     });
-  });
+    journals.value = response.items.map(journalFromDto);
+    journalTotal.value = response.pagination.total;
+  }
 
-  const pagedJournals = computed(() =>
-    paginate(filteredJournals.value, pageJournal.value, pageSizeJournal.value)
-  );
-
-  watch([qJournal, pageSizeJournal], () => (pageJournal.value = 1));
+  const filteredJournals = computed(() => journals.value);
+  const pagedJournals = computed(() => journals.value);
 
   function openCreateJournal() {
     modalMode.value = "create";
@@ -249,6 +237,7 @@ export function useJournalCatalog() {
 
   return {
     journals,
+    journalTotal,
     qJournal,
     pageJournal,
     pageSizeJournal,

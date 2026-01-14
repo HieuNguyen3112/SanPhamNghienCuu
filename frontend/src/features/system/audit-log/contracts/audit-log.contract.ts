@@ -12,10 +12,7 @@ export type AuditActionGroup =
 export type AuditSeverity = "normal" | "important" | "dangerous";
 export type AuditResultStatus = "success" | "failure";
 
-/** ===== DTO (snake_case) =====
- * NOTE: Backend schema hiện chưa có audit_logs.
- * Đây là DTO đề xuất để BE trả về (hoặc dùng cho mock).
- */
+/** ===== DTO (snake_case) ===== */
 export interface AuditActorDTO {
   user_id: number | null;
   name: string | null;
@@ -57,16 +54,20 @@ export interface AuditLogEntryDTO {
   action_group: AuditActionGroup;
   action_code: string;
   action_label: string;
+  action_label_display?: string | null;
 
   actor: AuditActorDTO;
+  actor_display_name?: string | null;
   target: AuditTargetDTO;
   result: AuditResultDTO;
+  result_label?: string | null;
 
   faculty_id: number | null;
   faculty_name: string | null;
 
   ip: string | null;
   user_agent: string | null;
+  device_label?: string | null;
   request: AuditRequestMetaDTO | null;
 
   changes: AuditChangeDTO[] | null;
@@ -84,18 +85,44 @@ export interface ActorOptionDTO {
   email: string;
 }
 
-/** Query DTO (snake_case) – đề xuất cho API */
+export interface AuditActionCodeOptionDTO {
+  code: string;
+  label: string;
+  group: AuditActionGroup;
+}
+
+export interface AuditLogListResponseDTO {
+  items: AuditLogEntryDTO[];
+  pagination: {
+    page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+  };
+}
+
+export interface AuditLogMetaDTO {
+  actors: ActorOptionDTO[];
+  faculties: FacultyOptionDTO[];
+  action_codes: AuditActionCodeOptionDTO[];
+  faculty_id_scoped: number | null;
+}
+
+/** Query DTO (snake_case) để xuất cho API */
 export interface AuditLogQueryDTO {
   scope: AuditLogScope;
   keyword?: string;
   actor_user_id?: number;
   action_group?: AuditActionGroup;
+  action_code?: string;
   faculty_id?: number;
   date_from?: string; // YYYY-MM-DD
   date_to?: string; // YYYY-MM-DD
   severity?: AuditSeverity;
+  result?: AuditResultStatus;
   page?: number;
   per_page?: number;
+  sort?: string;
 }
 
 /** ===== UI Models (camelCase) ===== */
@@ -167,25 +194,35 @@ export interface ActorOption {
   email: string;
 }
 
+export interface AuditActionCodeOption {
+  code: string;
+  label: string;
+  group: AuditActionGroup;
+}
+
 /** Filters UI (camelCase) */
 export interface AuditLogFilters {
   keyword: string;
   actorUserId: number | "ALL";
   actionGroup: AuditActionGroup | "ALL";
+  actionCode: string | "ALL";
   facultyId: number | "ALL"; // chỉ dùng cho GLOBAL
   dateFrom: string | null; // YYYY-MM-DD
   dateTo: string | null; // YYYY-MM-DD
   severity: AuditSeverity | "ALL";
+  result: AuditResultStatus | "ALL";
 }
 
 export const DEFAULT_AUDIT_LOG_FILTERS: AuditLogFilters = {
   keyword: "",
   actorUserId: "ALL",
   actionGroup: "ALL",
+  actionCode: "ALL",
   facultyId: "ALL",
   dateFrom: null,
   dateTo: null,
   severity: "ALL",
+  result: "ALL",
 };
 
 export const AUDIT_GROUP_LABELS: Record<AuditActionGroup, string> = {
@@ -237,7 +274,7 @@ export function formatDateTimeVi(iso: string) {
 
 export function shortUserAgent(ua: string | null, maxLen = 90) {
   if (!ua) return "-";
-  return ua.length > maxLen ? ua.slice(0, maxLen) + "…" : ua;
+  return ua.length > maxLen ? ua.slice(0, maxLen) + "..." : ua;
 }
 
 /** ===== Mappers (DTO -> UI) ===== */
@@ -274,7 +311,75 @@ export function auditRequestFromDto(
   return { method: dto.method, path: dto.path, httpStatus: dto.http_status };
 }
 
+function normalizeChangeValue(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function coerceAuditChange(item: unknown): AuditChange | null {
+  if (!item || typeof item !== "object") return null;
+  const obj = item as Record<string, unknown>;
+  const field = obj.field;
+  if (typeof field !== "string" || !field.trim()) return null;
+  return {
+    field,
+    before: normalizeChangeValue(obj.before ?? obj.old ?? obj.from ?? null),
+    after: normalizeChangeValue(obj.after ?? obj.new ?? obj.to ?? null),
+  };
+}
+
+export function normalizeAuditChanges(raw: unknown): AuditChange[] {
+  if (!raw) return [];
+
+  if (Array.isArray(raw)) {
+    return raw.map(coerceAuditChange).filter(Boolean) as AuditChange[];
+  }
+
+  if (typeof raw === "string") {
+    try {
+      return normalizeAuditChanges(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  }
+
+  if (typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if ("field" in obj) {
+      const single = coerceAuditChange(obj);
+      return single ? [single] : [];
+    }
+
+    return Object.entries(obj).map(([field, value]) => {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        const inner = value as Record<string, unknown>;
+        return {
+          field,
+          before: normalizeChangeValue(inner.before ?? inner.old ?? inner.from ?? null),
+          after: normalizeChangeValue(inner.after ?? inner.new ?? inner.to ?? null),
+        };
+      }
+
+      return {
+        field,
+        before: null,
+        after: normalizeChangeValue(value),
+      };
+    });
+  }
+
+  return [];
+}
+
 export function auditLogEntryFromDto(dto: AuditLogEntryDTO): AuditLogEntry {
+  const changes = normalizeAuditChanges(dto.changes as unknown);
+
   return {
     id: dto.id,
     occurredAt: dto.occurred_at,
@@ -295,7 +400,7 @@ export function auditLogEntryFromDto(dto: AuditLogEntryDTO): AuditLogEntry {
     userAgent: dto.user_agent,
     request: dto.request ? auditRequestFromDto(dto.request) : null,
 
-    changes: dto.changes ? dto.changes.map(auditChangeFromDto) : null,
+    changes: changes.length ? changes : null,
     note: dto.note,
   };
 }
@@ -306,6 +411,12 @@ export function facultyOptionFromDto(dto: FacultyOptionDTO): FacultyOption {
 
 export function actorOptionFromDto(dto: ActorOptionDTO): ActorOption {
   return { userId: dto.user_id, name: dto.name, email: dto.email };
+}
+
+export function actionCodeOptionFromDto(
+  dto: AuditActionCodeOptionDTO
+): AuditActionCodeOption {
+  return { code: dto.code, label: dto.label, group: dto.group };
 }
 
 /** Mapper filters UI -> query DTO (snake_case) */
@@ -327,7 +438,9 @@ export function auditLogQueryDtoFromFilters(args: {
   if (filters.keyword.trim()) q.keyword = filters.keyword.trim();
   if (filters.actorUserId !== "ALL") q.actor_user_id = filters.actorUserId;
   if (filters.actionGroup !== "ALL") q.action_group = filters.actionGroup;
+  if (filters.actionCode !== "ALL") q.action_code = filters.actionCode;
   if (filters.severity !== "ALL") q.severity = filters.severity;
+  if (filters.result !== "ALL") q.result = filters.result;
   if (filters.dateFrom) q.date_from = filters.dateFrom;
   if (filters.dateTo) q.date_to = filters.dateTo;
 

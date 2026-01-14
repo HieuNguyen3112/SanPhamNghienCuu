@@ -446,7 +446,6 @@ interface ParticipationNotification {
 
 const props = defineProps<{
   open: boolean;
-  currentUserId: number;
   notification: ParticipationNotification | null;
 }>();
 

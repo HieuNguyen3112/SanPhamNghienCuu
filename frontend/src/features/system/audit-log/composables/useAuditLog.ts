@@ -1,6 +1,7 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import type {
   ActorOption,
+  AuditActionCodeOption,
   AuditActionGroup,
   AuditLogEntry,
   AuditLogFilters,
@@ -11,48 +12,36 @@ import {
   DEFAULT_AUDIT_LOG_FILTERS,
   FACULTY_ALLOWED_GROUPS,
   GLOBAL_ALLOWED_GROUPS,
-  auditLogEntryFromDto,
+  actionCodeOptionFromDto,
   actorOptionFromDto,
-  facultyOptionFromDto,
+  auditLogEntryFromDto,
   auditLogQueryDtoFromFilters,
+  facultyOptionFromDto,
   isValidDateRange,
 } from "../contracts/audit-log.contract";
 import {
-  fetchAuditActors,
+  fetchAuditLogDetail,
   fetchAuditLogEntries,
-  fetchFaculties,
-  resolveMyFacultyId,
+  fetchAuditLogMeta,
 } from "../services/auditLogService";
-
-function normalizeText(v: string) {
-  return v.trim().toLowerCase();
-}
-
-function includesKeyword(haystack: string, needle: string) {
-  if (!needle) return true;
-  return normalizeText(haystack).includes(needle);
-}
-
-function dateOnly(iso: string) {
-  const d = new Date(iso);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
 
 export function useAuditLog(scope: AuditLogScope) {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  const detailLoading = ref(false);
+  const detailError = ref<string | null>(null);
+
   const facultyIdScoped = ref<number | null>(null);
 
   const actors = ref<ActorOption[]>([]);
   const faculties = ref<FacultyOption[]>([]);
+  const actionCodes = ref<AuditActionCodeOption[]>([]);
 
-  const allEntries = ref<AuditLogEntry[]>([]);
+  const entries = ref<AuditLogEntry[]>([]);
+  const totalItems = ref(0);
+  const totalPages = ref(1);
 
-  // draft vs applied filters
   const draftFilters = ref<AuditLogFilters>({ ...DEFAULT_AUDIT_LOG_FILTERS });
   const appliedFilters = ref<AuditLogFilters>({ ...DEFAULT_AUDIT_LOG_FILTERS });
 
@@ -65,93 +54,81 @@ export function useAuditLog(scope: AuditLogScope) {
     scope === "FACULTY" ? FACULTY_ALLOWED_GROUPS : GLOBAL_ALLOWED_GROUPS
   );
 
-  const dateRangeInvalid = computed(
-    () =>
-      !isValidDateRange(
-        appliedFilters.value.dateFrom,
-        appliedFilters.value.dateTo
-      )
+  const dateRangeInvalid = computed(() =>
+    !isValidDateRange(draftFilters.value.dateFrom, draftFilters.value.dateTo)
   );
 
-  const visibleEntries = computed(() => {
-    const f = appliedFilters.value;
-
-    // invalid range => show empty (UI will show empty)
-    if (!isValidDateRange(f.dateFrom, f.dateTo)) return [];
-
-    const keyword = normalizeText(f.keyword);
-
-    return allEntries.value.filter((e) => {
-      // group allow list
-      if (!allowedGroups.value.includes(e.actionGroup)) return false;
-
-      // FACULTY enforcement
-      if (scope === "FACULTY") {
-        if (facultyIdScoped.value == null) return false;
-        if (e.facultyId !== facultyIdScoped.value) return false;
-      }
-
-      // GLOBAL faculty filter
-      if (scope === "GLOBAL" && f.facultyId !== "ALL") {
-        if (e.facultyId !== f.facultyId) return false;
-      }
-
-      // actor
-      if (f.actorUserId !== "ALL") {
-        if (e.actor.userId !== f.actorUserId) return false;
-      }
-
-      // group filter
-      if (f.actionGroup !== "ALL") {
-        if (e.actionGroup !== f.actionGroup) return false;
-      }
-
-      // severity
-      if (f.severity !== "ALL") {
-        if (e.severity !== f.severity) return false;
-      }
-
-      // date range
-      const d = dateOnly(e.occurredAt);
-      if (f.dateFrom && d < f.dateFrom) return false;
-      if (f.dateTo && d > f.dateTo) return false;
-
-      // keyword across actor/action/target
-      if (!keyword) return true;
-      const actorText = `${e.actor.name ?? ""} ${e.actor.email ?? ""}`;
-      const actionText = `${e.actionLabel} ${e.actionCode}`;
-      const targetText = `${e.target.display ?? ""} ${
-        e.target.type ?? ""
-      } ${String(e.target.id ?? "")}`;
-
-      return (
-        includesKeyword(actorText, keyword) ||
-        includesKeyword(actionText, keyword) ||
-        includesKeyword(targetText, keyword)
-      );
-    });
+  const actionCodeOptions = computed<AuditActionCodeOption[]>(() => {
+    const group = draftFilters.value.actionGroup;
+    if (group === "ALL") {
+      return actionCodes.value.filter((c) => allowedGroups.value.includes(c.group));
+    }
+    return actionCodes.value.filter((c) => c.group === group);
   });
 
-  const totalItems = computed(() => visibleEntries.value.length);
-  const totalPages = computed(() =>
-    Math.max(1, Math.ceil(totalItems.value / pageSize.value))
-  );
+  const pagedEntries = computed(() => entries.value);
 
-  const pagedEntries = computed(() => {
-    const p = Math.max(1, Math.min(page.value, totalPages.value));
-    const start = (p - 1) * pageSize.value;
-    return visibleEntries.value.slice(start, start + pageSize.value);
-  });
+  async function loadEntries() {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const queryDto = auditLogQueryDtoFromFilters({
+        scope,
+        filters: appliedFilters.value,
+        facultyIdScoped: facultyIdScoped.value,
+        page: page.value,
+        perPage: pageSize.value,
+      });
+
+      queryDto.sort = "occurred_at:desc";
+
+      const res = await fetchAuditLogEntries(queryDto);
+      entries.value = res.items.map(auditLogEntryFromDto);
+      totalItems.value = res.pagination.total;
+      totalPages.value = res.pagination.last_page;
+    } catch (e) {
+      console.error(e);
+      error.value = "Không thể tải nhật ký hệ thống. Vui lòng thử lại.";
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function bootstrap() {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const meta = await fetchAuditLogMeta();
+      actors.value = meta.actors.map(actorOptionFromDto);
+      faculties.value = meta.faculties.map(facultyOptionFromDto);
+      actionCodes.value = meta.action_codes.map(actionCodeOptionFromDto);
+      facultyIdScoped.value = meta.faculty_id_scoped;
+
+      await loadEntries();
+    } catch (e) {
+      console.error(e);
+      error.value = "Không thể tải dữ liệu nhật ký hệ thống. Vui lòng thử lại.";
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   function applyFilters() {
-    appliedFilters.value = { ...draftFilters.value };
+    if (!isValidDateRange(draftFilters.value.dateFrom, draftFilters.value.dateTo)) {
+      error.value =
+        "Khoảng ngày không hợp lệ: Từ ngày phải nhỏ hơn hoặc bằng Đến ngày.";
+      return;
+    }
 
-    // faculty scope doesn't use faculty filter
+    appliedFilters.value = { ...draftFilters.value };
     if (scope === "FACULTY") {
       appliedFilters.value.facultyId = "ALL";
     }
 
     page.value = 1;
+    void loadEntries();
   }
 
   function resetFilters() {
@@ -163,62 +140,54 @@ export function useAuditLog(scope: AuditLogScope) {
     }
 
     page.value = 1;
+    void loadEntries();
   }
 
-  function openDetail(entry: AuditLogEntry) {
+  async function openDetail(entry: AuditLogEntry) {
     selectedEntry.value = entry;
+    detailLoading.value = true;
+    detailError.value = null;
+
+    try {
+      const detailDto = await fetchAuditLogDetail(entry.id);
+      selectedEntry.value = auditLogEntryFromDto(detailDto);
+    } catch (e) {
+      console.error(e);
+      detailError.value = "Không thể tải chi tiết nhật ký. Vui lòng thử lại.";
+    } finally {
+      detailLoading.value = false;
+    }
   }
 
   function closeDetail() {
     selectedEntry.value = null;
+    detailError.value = null;
   }
 
   function setPage(next: number) {
     page.value = Math.max(1, Math.min(totalPages.value, next));
+    void loadEntries();
   }
 
   function setPageSize(next: number) {
     pageSize.value = next;
     page.value = 1;
+    void loadEntries();
   }
 
-  async function bootstrap() {
-    isLoading.value = true;
-    error.value = null;
-
-    try {
-      if (scope === "FACULTY") {
-        facultyIdScoped.value = await resolveMyFacultyId();
+  watch(
+    () => draftFilters.value.actionGroup,
+    () => {
+      if (
+        draftFilters.value.actionCode !== "ALL" &&
+        !actionCodeOptions.value.some(
+          (c) => c.code === draftFilters.value.actionCode
+        )
+      ) {
+        draftFilters.value.actionCode = "ALL";
       }
-
-      const [actorsDto, facultiesDto] = await Promise.all([
-        fetchAuditActors(),
-        fetchFaculties(),
-      ]);
-
-      actors.value = actorsDto.map(actorOptionFromDto);
-      faculties.value = facultiesDto.map(facultyOptionFromDto);
-
-      const queryDto = auditLogQueryDtoFromFilters({
-        scope,
-        filters: appliedFilters.value,
-        facultyIdScoped: facultyIdScoped.value,
-        page: page.value,
-        perPage: pageSize.value,
-      });
-
-      const entriesDto = await fetchAuditLogEntries(queryDto);
-      allEntries.value = entriesDto.map(auditLogEntryFromDto);
-
-      // default show latest
-      applyFilters();
-    } catch (e) {
-      error.value =
-        e instanceof Error ? e.message : "Không thể tải nhật ký hệ thống.";
-    } finally {
-      isLoading.value = false;
     }
-  }
+  );
 
   onMounted(() => {
     void bootstrap();
@@ -230,8 +199,12 @@ export function useAuditLog(scope: AuditLogScope) {
     isLoading,
     error,
 
+    detailLoading,
+    detailError,
+
     actors,
     faculties,
+    actionCodeOptions,
 
     facultyIdScoped,
 

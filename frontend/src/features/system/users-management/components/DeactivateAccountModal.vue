@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-if="open" class="fixed inset-0 z-50">
     <div class="absolute inset-0 bg-slate-900/40" @click="emit('close')" />
 
@@ -84,7 +84,7 @@
 
             <div>
               <label class="mb-1 block text-xs font-medium text-slate-700"
-                >Lý do (optional)</label
+                >Lý do (tuỳ chọn)</label
               >
               <textarea
                 v-model="reason"
@@ -186,10 +186,10 @@ const confirmButtonText = computed(() => {
 function onConfirm() {
   if (!props.account) return;
 
-  const nextStatus = props.account.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+  const isActive = props.account.status !== "ACTIVE";
   emit("confirm", {
     id: props.account.id,
-    next_status: nextStatus,
+    is_active: isActive,
     reason: reason.value.trim() ? reason.value.trim() : null,
   });
 }

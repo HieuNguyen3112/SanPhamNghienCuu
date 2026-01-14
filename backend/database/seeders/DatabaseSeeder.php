@@ -20,9 +20,15 @@ class DatabaseSeeder extends Seeder
         UsersDemoSeeder::class,
         LecturerProfileDemoSeeder::class,
         ResearchLookupSeeder::class,
+        ResearchHoursCatalogSeeder::class,
         ResearchActivityDemoSeeder::class,
+        LecturerPersonalHoursOverviewSeeder::class,
+        ResearchHoursUsageSeeder::class,
         LecturerHourApprovalDemoSeeder::class,
         LecturerHourWarningDemoSeeder::class,
+        WorkCatalogSeeder::class,
+        AuditLogSeeder::class,
+        FacultyHoursApprovalSeeder::class,
     ]);
 }
 

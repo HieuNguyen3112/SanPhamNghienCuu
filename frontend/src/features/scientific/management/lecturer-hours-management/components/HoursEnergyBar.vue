@@ -1,6 +1,5 @@
 <template>
   <div class="min-w-0">
-    <!-- Header -->
     <div class="mb-1 flex items-center justify-between gap-3">
       <div class="min-w-0 text-sm text-slate-600">
         {{ formatInt(hoursTotal) }}/{{ formatInt(requiredHours) }}
@@ -13,7 +12,6 @@
       </div>
     </div>
 
-    <!-- Bar -->
     <div
       class="h-3 w-full overflow-hidden rounded-full bg-slate-100"
       role="progressbar"
@@ -29,7 +27,6 @@
       />
     </div>
 
-    <!-- Footer note (default: còn thiếu / đã đạt) -->
     <div class="mt-1 text-xs" :class="noteClassName">
       <template v-if="noteText">
         {{ noteText }}
@@ -53,11 +50,7 @@ type Tone = "hit" | "good" | "warn" | "risk" | "bad";
 interface Props {
   hoursTotal: number;
   requiredHours: number;
-
-  /** default: "giờ" */
   unitLabel?: string;
-
-  /** nếu muốn override footer (vd: "Chờ duyệt: 10 giờ") */
   noteText?: string | null;
 }
 
@@ -85,16 +78,6 @@ const missingHours = computed(() => {
   return Math.max(0, props.requiredHours - props.hoursTotal);
 });
 
-/**
- * ✅ Màu theo độ thiếu (theo % hoàn thành)
- * - >=100%: hit (xanh đậm)
- * - >=80% : good (xanh)
- * - >=60% : warn (vàng)
- * - >=40% : risk (cam)
- * - <40%  : bad (đỏ)
- *
- * (Bạn muốn ngưỡng khác thì đổi tại đây)
- */
 const tone = computed<Tone>(() => {
   const p = percentRaw.value;
   if (p >= 100) return "hit";
@@ -113,7 +96,6 @@ const fillClassName = computed(() => {
 });
 
 const noteClassName = computed(() => {
-  // nếu bạn truyền noteText kiểu "Chờ duyệt: ..." thì mình dùng màu xanh dương giống screenshot
   if (props.noteText) return "text-sky-600";
 
   if (missingHours.value <= 0) return "text-emerald-700";

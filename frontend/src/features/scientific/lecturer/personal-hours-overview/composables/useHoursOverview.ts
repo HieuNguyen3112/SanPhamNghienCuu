@@ -1,4 +1,3 @@
-// File: src/features/lecturer-hours-overview/composables/useLecturerHoursOverview.ts
 import { computed, ref } from "vue";
 import type {
   HoursApprovalBatchDetail,
@@ -49,7 +48,7 @@ export function useLecturerHoursOverview() {
       distribution.value = await lecturerHoursOverviewService.getDistribution();
     } catch (e) {
       errorDistribution.value =
-        e instanceof Error ? e.message : "Không tải được phân bổ.";
+        e instanceof Error ? e.message : "Không tải được phân bố.";
       distribution.value = [];
     } finally {
       loadingDistribution.value = false;
