@@ -31,10 +31,24 @@ class AdminLecturerHourWarningController extends Controller
             ->value('required_hours') ?? 600);
 
         $facultyId = $this->resolveFacultyId($validated['faculty_identifier'] ?? null);
+        $hoursStageId = $this->resolveHoursStageId();
 
         $rows = DB::table('lecturers as l')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
+            ->leftJoin('research_activity_members as ram', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('research_activities as ra', function ($join) use ($year) {
+                $join->on('ra.id', '=', 'ram.activity_id')
+                    ->where('ra.academic_year_id', '=', $year['id']);
+            })
+            ->leftJoin('activity_approvals as aa', function ($join) use ($hoursStageId) {
+                $join->on('aa.activity_id', '=', 'ra.id');
+                if ($hoursStageId) {
+                    $join->where('aa.stage_id', '=', $hoursStageId);
+                } else {
+                    $join->whereRaw('1 = 0');
+                }
+            })
             ->leftJoin('lecturer_yearly_hours as lyh', function ($join) use ($year) {
                 $join->on('lyh.lecturer_id', '=', 'l.id')
                     ->where('lyh.academic_year_id', '=', $year['id']);
@@ -56,19 +70,31 @@ class AdminLecturerHourWarningController extends Controller
                 'f.id as faculty_id',
                 'f.code as faculty_code',
                 'f.name as faculty_name',
-                'lyh.hours_total',
-                'lyh.created_at as hours_created_at',
-                'lyh.updated_at as hours_updated_at',
+                DB::raw("COALESCE(SUM(CASE WHEN aa.status = 'approved' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as approved_hours"),
+                DB::raw("COALESCE(SUM(CASE WHEN aa.status = 'pending' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as pending_hours"),
+                DB::raw("COALESCE(SUM(CASE WHEN aa.status = 'rejected' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as rejected_hours"),
+                'lyh.created_at as warning_created_at',
+                'lyh.updated_at as warning_updated_at',
             ])
+            ->groupBy(
+                'l.id',
+                'l.code',
+                'l.full_name',
+                'f.id',
+                'f.code',
+                'f.name',
+                'lyh.created_at',
+                'lyh.updated_at'
+            )
             ->get();
 
         $entries = collect($rows)->map(function ($row) use ($requiredHours, $year) {
-            $currentHours = (float) ($row->hours_total ?? 0);
+            $currentHours = (float) ($row->approved_hours ?? 0);
             $remaining = max($requiredHours - $currentHours, 0);
             $severity = $this->resolveSeverity($remaining, $requiredHours);
 
-            $hasRequested = $this->hasRequestedWarning($row->hours_created_at, $row->hours_updated_at);
-            $lastRequestedAt = $hasRequested ? $row->hours_updated_at : null;
+            $hasRequested = $this->hasRequestedWarning($row->warning_created_at, $row->warning_updated_at);
+            $lastRequestedAt = $hasRequested ? $row->warning_updated_at : null;
 
             return [
                 'lecturer_identifier' => (string) $row->lecturer_id,
@@ -196,6 +222,11 @@ class AdminLecturerHourWarningController extends Controller
         }
 
         return DB::table('faculties')->where('code', $identifier)->value('id');
+    }
+
+    private function resolveHoursStageId(): ?int
+    {
+        return DB::table('approval_stages')->where('code', 'hours')->value('id');
     }
 
     private function resolveSeverity(float $remaining, float $required): string

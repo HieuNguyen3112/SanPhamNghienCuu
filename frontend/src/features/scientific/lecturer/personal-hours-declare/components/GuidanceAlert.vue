@@ -34,7 +34,9 @@
       <ul class="space-y-2 text-sm text-slate-700">
         <li class="flex gap-2">
           <Info class="mt-0.5 h-4 w-4 text-slate-600" />
-          <span><b>Bước 1:</b> Chọn các công trình đã được duyệt hợp lệ</span>
+          <span
+            ><b>Bước 1:</b> Chọn các công trình đã được duyệt hợp lệ</span
+          >
         </li>
         <li class="flex gap-2">
           <Info class="mt-0.5 h-4 w-4 text-slate-600" />
@@ -45,7 +47,9 @@
         </li>
         <li class="flex gap-2">
           <Info class="mt-0.5 h-4 w-4 text-slate-600" />
-          <span><b>Bước 3:</b> Gửi yêu cầu xét duyệt giờ NCKH lên Khoa</span>
+          <span
+            ><b>Bước 3:</b> Gửi yêu cầu xét duyệt giờ NCKH lên Khoa</span
+          >
         </li>
         <li class="flex gap-2">
           <Info class="mt-0.5 h-4 w-4 text-slate-600" />

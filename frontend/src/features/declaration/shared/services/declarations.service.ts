@@ -75,6 +75,19 @@ type ConferenceDetailsDto = {
   held_on: string | null;
 };
 
+type UpsertActivityPayload = {
+  id?: number;
+  kind_id: number;
+  type_id?: number | null;
+  academic_year_id?: number | null;
+  title: string;
+  abstract?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  quantity?: number | null;
+  notes?: string | null;
+};
+
 let next_id = 1000;
 const activities = new Map<number, ResearchActivityDto>();
 const paper_details = new Map<number, PaperDetailsDto>();
@@ -89,14 +102,14 @@ function now_iso() {
 }
 
 export async function upsert_activity_base(
-  dto: Omit<ResearchActivityDto, "id" | "activity_code"> & { id?: number }
+  dto: UpsertActivityPayload
 ): Promise<ResearchActivityDto> {
   if (!MOCK) {
     await ensureCsrfCookie();
     const payload = {
       kind_id: dto.kind_id,
       type_id: dto.type_id ?? null,
-      academic_year_id: dto.academic_year_id,
+      academic_year_id: dto.academic_year_id ?? null,
       title: dto.title,
       abstract: dto.abstract ?? null,
       start_date: dto.start_date ?? null,

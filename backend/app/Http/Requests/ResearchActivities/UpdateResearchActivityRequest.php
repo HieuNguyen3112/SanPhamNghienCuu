@@ -46,4 +46,19 @@ class UpdateResearchActivityRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
         ];
     }
+
+    public function attributes(): array
+    {
+        return [
+            'kind_id' => 'loại công trình',
+            'type_id' => 'loại chi tiết',
+            'academic_year_id' => 'niên học',
+            'title' => 'tên công trình',
+            'abstract' => 'tóm tắt',
+            'start_date' => 'ngày bắt đầu',
+            'end_date' => 'ngày kết thúc',
+            'quantity' => 'số lượng',
+            'notes' => 'ghi chú',
+        ];
+    }
 }

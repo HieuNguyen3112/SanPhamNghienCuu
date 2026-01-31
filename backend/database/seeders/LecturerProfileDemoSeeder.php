@@ -329,9 +329,9 @@ class LecturerProfileDemoSeeder extends Seeder
             }
 
             $lecturer = Lecturer::updateOrCreate(
-                ['user_id' => $user->id],
+                ['code' => $seed['code']],
                 [
-                    'code' => $seed['code'],
+                    'user_id' => $user->id,
                     'full_name' => $seed['full_name'],
                     'email' => $user->email,
                     'phone' => $seed['phone'],

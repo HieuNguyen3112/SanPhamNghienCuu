@@ -146,7 +146,7 @@
                   Không có dữ liệu phù hợp
                 </p>
                 <p class="text-xs text-slate-600">
-                  Hãy thử nới điều kiện lọc để xem lại danh sách giảng viên.
+                  Hãy thử đổi điều kiện lọc để xem lại danh sách giảng viên.
                 </p>
               </div>
             </td>

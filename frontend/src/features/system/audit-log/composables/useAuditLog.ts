@@ -100,7 +100,7 @@ export function useAuditLog(scope: AuditLogScope) {
     error.value = null;
 
     try {
-      const meta = await fetchAuditLogMeta();
+      const meta = await fetchAuditLogMeta(scope);
       actors.value = meta.actors.map(actorOptionFromDto);
       faculties.value = meta.faculties.map(facultyOptionFromDto);
       actionCodes.value = meta.action_codes.map(actionCodeOptionFromDto);
@@ -109,7 +109,8 @@ export function useAuditLog(scope: AuditLogScope) {
       await loadEntries();
     } catch (e) {
       console.error(e);
-      error.value = "Không thể tải dữ liệu nhật ký hệ thống. Vui lòng thử lại.";
+      error.value =
+        "Không thể tải dữ liệu nhật ký hệ thống. Vui lòng thử lại.";
     } finally {
       isLoading.value = false;
     }
@@ -149,7 +150,7 @@ export function useAuditLog(scope: AuditLogScope) {
     detailError.value = null;
 
     try {
-      const detailDto = await fetchAuditLogDetail(entry.id);
+      const detailDto = await fetchAuditLogDetail(scope, entry.id);
       selectedEntry.value = auditLogEntryFromDto(detailDto);
     } catch (e) {
       console.error(e);

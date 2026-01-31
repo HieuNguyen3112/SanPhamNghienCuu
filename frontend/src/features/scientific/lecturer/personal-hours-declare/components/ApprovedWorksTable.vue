@@ -16,8 +16,12 @@
     </div>
 
     <div v-else-if="rows.length === 0" class="p-6 text-center">
-      <div class="text-sm font-medium text-slate-900">Không có dữ liệu</div>
-      <div class="mt-1 text-xs text-slate-500">Thử đổi bộ lọc.</div>
+      <div class="text-sm font-medium text-slate-900">
+        Không có công trình đủ điều kiện
+      </div>
+      <div class="mt-1 text-xs text-slate-500">
+        Chỉ hiển thị công trình đã được duyệt nội dung đầy đủ (Khoa + Trường).
+      </div>
     </div>
 
     <div v-else class="max-h-[560px] overflow-auto">

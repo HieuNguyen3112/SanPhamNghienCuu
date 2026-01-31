@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Lecturer\ParticipationNotificationIndexRequest;
 use App\Http\Requests\Lecturer\ParticipationNotificationRejectRequest;
+use App\Models\User;
+use App\Notifications\ParticipationInvitationAcceptedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -112,14 +114,18 @@ class LecturerParticipationNotificationController extends Controller
         }
 
         $now = now();
-        DB::table('research_activity_members')
-            ->where('id', $requestId)
-            ->update([
-                'confirmation_status' => self::STATUS_ACCEPTED,
-                'responded_at' => $now,
-                'confirmation_note' => null,
-                'updated_at' => $now,
-            ]);
+        DB::transaction(function () use ($requestId, $now, $member, $lecturer) {
+            DB::table('research_activity_members')
+                ->where('id', $requestId)
+                ->update([
+                    'confirmation_status' => self::STATUS_ACCEPTED,
+                    'responded_at' => $now,
+                    'confirmation_note' => null,
+                    'updated_at' => $now,
+                ]);
+
+            $this->notifyOwnerOnAccept((int) $member->activity_id, (string) ($lecturer->full_name ?? ''), (int) $requestId);
+        });
 
         return $this->show($request, $requestId);
     }
@@ -325,7 +331,7 @@ class LecturerParticipationNotificationController extends Controller
                 'id' => (int) $item->id,
                 'type' => 'FILE',
                 'label' => $item->file_type_name ?: ($item->original_name ?: 'Evidence file'),
-                'url' => route('admin.works.attachments.download', ['attachment' => $item->id], false),
+                'url' => route('lecturer.works.attachments.download', ['attachment' => $item->id], false),
             ];
         }
 
@@ -348,6 +354,33 @@ class LecturerParticipationNotificationController extends Controller
         }
 
         return $evidences;
+    }
+
+    private function notifyOwnerOnAccept(int $activityId, string $inviteeName, int $memberId): void
+    {
+        $activity = DB::table('research_activities as ra')
+            ->join('lecturers as l', 'ra.owner_lecturer_id', '=', 'l.id')
+            ->leftJoin('users as u', 'l.user_id', '=', 'u.id')
+            ->where('ra.id', $activityId)
+            ->select(['ra.title', 'u.id as owner_user_id'])
+            ->first();
+
+        if (! $activity || ! $activity->owner_user_id) {
+            return;
+        }
+
+        $owner = User::find($activity->owner_user_id);
+        if (! $owner) {
+            return;
+        }
+
+        $owner->notify(new ParticipationInvitationAcceptedNotification([
+            'title' => 'Giảng viên đã xác nhận tham gia',
+            'message' => trim(($inviteeName ?: 'Một giảng viên') . ' đã xác nhận tham gia công trình ' . ($activity->title ?? '') . '.'),
+            'activity_id' => $activityId,
+            'invitation_id' => $memberId,
+            'action_route' => '/declarations/participatier',
+        ]));
     }
 
     private function baseQuery(int $lecturerId)

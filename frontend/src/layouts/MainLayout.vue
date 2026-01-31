@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { RouterView, useRouter } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
 import { useLayoutStore } from "@/app/stores/layoutStore";
@@ -13,6 +13,11 @@ const router = useRouter();
 const layout = useLayoutStore();
 const isSidebarOpen = ref(true);
 const isChangePasswordOpen = ref(false);
+
+const userName = computed(() => userStore.currentUser?.name ?? "");
+const userCode = computed(
+  () => userStore.currentUser?.code ?? userStore.currentUser?.email ?? ""
+);
 
 const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value;
@@ -43,6 +48,8 @@ const handleGoHome = async () => {
         @change-password="isChangePasswordOpen = true"
         @logout="handleLogout"
         @go-home="handleGoHome"
+        :user-name="userName"
+        :user-code="userCode"
       />
 
       <main class="p-6 flex-1 overflow-y-auto bg-slate-50">

@@ -15,6 +15,7 @@ export type ArticleDeclarationFormModel = {
   abstract: string;
   notes: string;
 
+  journalId: number | null;
   journalName: string;
   issn: string;
   doi: string;

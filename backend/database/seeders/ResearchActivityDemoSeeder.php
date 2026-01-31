@@ -588,5 +588,4 @@ class ResearchActivityDemoSeeder extends Seeder
             }
         }
     }
-    }
 }

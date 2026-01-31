@@ -17,3 +17,12 @@ export const logout = async () => {
   await fetchCsrfCookie();
   return http.post("/logout");
 };
+
+export const changePassword = async (payload: {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}) => {
+  await fetchCsrfCookie();
+  return http.put("/profile/password", payload);
+};

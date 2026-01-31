@@ -24,12 +24,13 @@ class LecturerHoursCalculateController extends Controller
         }
 
         $hoursStageId = $this->resolveStageId('hours') ?? 0;
+        $approvedStatusId = $this->resolveStatusId('approved');
 
         $filters = $request->validated();
         $page = max(1, (int) ($filters['page'] ?? 1));
         $perPage = max(1, min(100, (int) ($filters['per_page'] ?? 12)));
 
-        $query = $this->baseQuery($lecturer->id, $assistantStageId, $managerStageId, $hoursStageId);
+        $query = $this->baseQuery($lecturer->id, $assistantStageId, $managerStageId, $hoursStageId, $approvedStatusId);
         $this->applyFilters($query, $filters);
 
         $query->orderByDesc('ra.updated_at');
@@ -52,7 +53,7 @@ class LecturerHoursCalculateController extends Controller
             ];
         })->all();
 
-        $approvedCount = $this->approvedCount($lecturer->id, $assistantStageId, $managerStageId);
+        $approvedCount = $this->approvedCount($lecturer->id, $assistantStageId, $managerStageId, $approvedStatusId);
 
         return response()->json([
             'success' => true,
@@ -86,8 +87,9 @@ class LecturerHoursCalculateController extends Controller
         }
 
         $hoursStageId = $this->resolveStageId('hours') ?? 0;
+        $approvedStatusId = $this->resolveStatusId('approved');
 
-        $row = $this->detailQuery($lecturer->id, $assistantStageId, $managerStageId, $hoursStageId)
+        $row = $this->detailQuery($lecturer->id, $assistantStageId, $managerStageId, $hoursStageId, $approvedStatusId)
             ->where('ra.id', $activityId)
             ->first();
 
@@ -130,13 +132,14 @@ class LecturerHoursCalculateController extends Controller
         $assistantStageId = $this->resolveStageId('assistant');
         $managerStageId = $this->resolveStageId('manager');
         $hoursStageId = $this->resolveStageId('hours');
+        $approvedStatusId = $this->resolveStatusId('approved');
 
         if (! $assistantStageId || ! $managerStageId || ! $hoursStageId) {
             return response()->json(['message' => 'approval stages not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $activityIds = array_values(array_unique($request->validated()['activity_ids']));
-        $eligibleIds = $this->eligibleActivityIds($lecturer->id, $assistantStageId, $managerStageId, $activityIds);
+        $eligibleIds = $this->eligibleActivityIds($lecturer->id, $assistantStageId, $managerStageId, $approvedStatusId, $activityIds);
 
         if (empty($eligibleIds)) {
             return response()->json([
@@ -216,7 +219,19 @@ class LecturerHoursCalculateController extends Controller
         return $id ? (int) $id : null;
     }
 
-    private function baseQuery(int $lecturerId, int $assistantStageId, int $managerStageId, int $hoursStageId)
+    private function resolveStatusId(string $code): ?int
+    {
+        $id = DB::table('activity_statuses')->where('code', $code)->value('id');
+        return $id ? (int) $id : null;
+    }
+
+    private function baseQuery(
+        int $lecturerId,
+        int $assistantStageId,
+        int $managerStageId,
+        int $hoursStageId,
+        ?int $approvedStatusId
+    )
     {
         return DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
@@ -237,8 +252,19 @@ class LecturerHoursCalculateController extends Controller
                     ->where('aa_hours.stage_id', '=', $hoursStageId);
             })
             ->where('ram.lecturer_id', $lecturerId)
-            ->where('aa_assistant.status', 'approved')
-            ->where('aa_manager.status', 'approved')
+            ->where(function ($query) {
+                $query->whereColumn('ra.owner_lecturer_id', 'ram.lecturer_id')
+                    ->orWhere('ram.confirmation_status', 'accepted');
+            })
+            ->where(function ($query) use ($approvedStatusId) {
+                $query->where(function ($sub) {
+                    $sub->where('aa_assistant.status', 'approved')
+                        ->where('aa_manager.status', 'approved');
+                });
+                if ($approvedStatusId) {
+                    $query->orWhere('ra.status_id', $approvedStatusId);
+                }
+            })
             ->select([
                 'ra.id as activity_id',
                 'ra.activity_code',
@@ -258,9 +284,15 @@ class LecturerHoursCalculateController extends Controller
             ]);
     }
 
-    private function detailQuery(int $lecturerId, int $assistantStageId, int $managerStageId, int $hoursStageId)
+    private function detailQuery(
+        int $lecturerId,
+        int $assistantStageId,
+        int $managerStageId,
+        int $hoursStageId,
+        ?int $approvedStatusId
+    )
     {
-        return $this->baseQuery($lecturerId, $assistantStageId, $managerStageId, $hoursStageId)
+        return $this->baseQuery($lecturerId, $assistantStageId, $managerStageId, $hoursStageId, $approvedStatusId)
             ->leftJoin('paper_details as pd', 'ra.id', '=', 'pd.activity_id')
             ->leftJoin('book_details as bd', 'ra.id', '=', 'bd.activity_id')
             ->leftJoin('project_details as prd', 'ra.id', '=', 'prd.activity_id')
@@ -294,7 +326,12 @@ class LecturerHoursCalculateController extends Controller
         }
     }
 
-    private function approvedCount(int $lecturerId, int $assistantStageId, int $managerStageId): int
+    private function approvedCount(
+        int $lecturerId,
+        int $assistantStageId,
+        int $managerStageId,
+        ?int $approvedStatusId
+    ): int
     {
         $query = DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
@@ -307,8 +344,19 @@ class LecturerHoursCalculateController extends Controller
                     ->where('aa_manager.stage_id', '=', $managerStageId);
             })
             ->where('ram.lecturer_id', $lecturerId)
-            ->where('aa_assistant.status', 'approved')
-            ->where('aa_manager.status', 'approved');
+            ->where(function ($query) {
+                $query->whereColumn('ra.owner_lecturer_id', 'ram.lecturer_id')
+                    ->orWhere('ram.confirmation_status', 'accepted');
+            })
+            ->where(function ($query) use ($approvedStatusId) {
+                $query->where(function ($sub) {
+                    $sub->where('aa_assistant.status', 'approved')
+                        ->where('aa_manager.status', 'approved');
+                });
+                if ($approvedStatusId) {
+                    $query->orWhere('ra.status_id', $approvedStatusId);
+                }
+            });
 
         return (int) $query->distinct('ra.id')->count('ra.id');
     }
@@ -326,7 +374,13 @@ class LecturerHoursCalculateController extends Controller
         };
     }
 
-    private function eligibleActivityIds(int $lecturerId, int $assistantStageId, int $managerStageId, array $activityIds): array
+    private function eligibleActivityIds(
+        int $lecturerId,
+        int $assistantStageId,
+        int $managerStageId,
+        ?int $approvedStatusId,
+        array $activityIds
+    ): array
     {
         if (empty($activityIds)) {
             return [];
@@ -343,9 +397,20 @@ class LecturerHoursCalculateController extends Controller
                     ->where('aa_manager.stage_id', '=', $managerStageId);
             })
             ->where('ram.lecturer_id', $lecturerId)
+            ->where(function ($query) {
+                $query->whereColumn('ra.owner_lecturer_id', 'ram.lecturer_id')
+                    ->orWhere('ram.confirmation_status', 'accepted');
+            })
             ->whereIn('ra.id', $activityIds)
-            ->where('aa_assistant.status', 'approved')
-            ->where('aa_manager.status', 'approved')
+            ->where(function ($query) use ($approvedStatusId) {
+                $query->where(function ($sub) {
+                    $sub->where('aa_assistant.status', 'approved')
+                        ->where('aa_manager.status', 'approved');
+                });
+                if ($approvedStatusId) {
+                    $query->orWhere('ra.status_id', $approvedStatusId);
+                }
+            })
             ->distinct()
             ->pluck('ra.id')
             ->map(fn ($id) => (int) $id)

@@ -46,4 +46,31 @@ class StoreResearchActivityRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
         ];
     }
+
+    public function attributes(): array
+    {
+        return [
+            'kind_id' => 'loại công trình',
+            'type_id' => 'loại chi tiết',
+            'academic_year_id' => 'niên học',
+            'title' => 'tên công trình',
+            'abstract' => 'tóm tắt',
+            'start_date' => 'ngày bắt đầu',
+            'end_date' => 'ngày kết thúc',
+            'quantity' => 'số lượng',
+            'notes' => 'ghi chú',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'academic_year_id.required' => 'Vui lòng chọn niên học.',
+            'academic_year_id.exists' => 'Niên học không hợp lệ.',
+            'kind_id.required' => 'Vui lòng chọn loại công trình.',
+            'kind_id.exists' => 'Loại công trình không hợp lệ.',
+            'title.required' => 'Vui lòng nhập tên công trình.',
+            'title.max' => 'Tên công trình tối đa :max ký tự.',
+        ];
+    }
 }

@@ -186,7 +186,7 @@ class FacultyOrgStructureController extends Controller
             $this->countDepartmentLecturers($departmentId) > 0
         ) {
             return response()->json([
-                'message' => 'KhA\'ng thA\u1ec3 s\u1eeda mA\u00e3 khi \u0111\u00e3 c\u00f3 gi\u1ea3ng vi\u00ean.',
+                'message' => 'Không thể sửa mã khi đã có giảng viên.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 

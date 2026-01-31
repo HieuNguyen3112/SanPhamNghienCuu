@@ -59,18 +59,25 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import LecturerResearchHourFilterPanel from "../components/LecturerResearchHourFilterPanel.vue";
 import LecturerResearchHourSummaryCards from "../components/LecturerResearchHourSummaryCards.vue";
 import LecturerResearchHourChartSection from "../components/LecturerResearchHourChartSection.vue";
 import LecturerResearchHourStatisticsTable from "../components/LecturerResearchHourStatisticsTable.vue";
+import { useUserStore } from "@/app/stores/userStore";
 import {
   exportHourResearchReportExcel,
   exportHourResearchReportPdf,
   fetchHourResearchReport,
   fetchHourResearchReportFilters,
 } from "../api/hourResearchReportApi";
+import {
+  exportFacultyHourResearchReportExcel,
+  exportFacultyHourResearchReportPdf,
+  fetchFacultyHourResearchReport,
+  fetchFacultyHourResearchReportFilters,
+} from "@/features/faculty/reports/hour-research/services/facultyHourResearchReportApi";
 import type {
   HourResearchReportCharts,
   HourResearchReportFiltersResponse,
@@ -78,6 +85,10 @@ import type {
   HourResearchReportTable,
   HourResearchStatusCode,
 } from "../hourResearchReportTypes";
+
+const userStore = useUserStore();
+const isFacultyScope = computed(() => userStore.role === "DEPARTMENT_BOARD");
+const scopeFacultyId = ref<number | null>(null);
 
 const selectedFacultyId = ref<number | "ALL">("ALL");
 const selectedAcademicYearId = ref<number | "ALL">("ALL");
@@ -154,6 +165,18 @@ function buildExportParams() {
 
 async function loadFilters() {
   try {
+    if (isFacultyScope.value) {
+      const result = await fetchFacultyHourResearchReportFilters();
+      filterOptions.value = result.filters;
+      scopeFacultyId.value = result.scopeFaculty?.id ?? null;
+      if (scopeFacultyId.value) {
+        selectedFacultyId.value = scopeFacultyId.value;
+      } else if (result.filters.faculties.length === 1) {
+        selectedFacultyId.value = result.filters.faculties[0].id;
+      }
+      return;
+    }
+
     filterOptions.value = await fetchHourResearchReportFilters();
   } catch (error) {
     console.error(error);
@@ -166,7 +189,9 @@ async function loadReport() {
   isLoading.value = true;
   errorMessage.value = "";
   try {
-    const data = await fetchHourResearchReport(buildQueryParams());
+    const data = isFacultyScope.value
+      ? await fetchFacultyHourResearchReport(buildQueryParams())
+      : await fetchHourResearchReport(buildQueryParams());
     kpis.value = data.kpis;
     charts.value = data.charts;
     table.value = data.table;
@@ -182,7 +207,11 @@ async function loadReport() {
 }
 
 function resetFilters() {
-  selectedFacultyId.value = "ALL";
+  if (isFacultyScope.value && scopeFacultyId.value) {
+    selectedFacultyId.value = scopeFacultyId.value;
+  } else {
+    selectedFacultyId.value = "ALL";
+  }
   selectedAcademicYearId.value = "ALL";
   selectedStatus.value = "all";
   page.value = 1;
@@ -217,8 +246,12 @@ async function handleExport(type: "pdf" | "excel") {
     const params = buildExportParams();
     const result =
       type === "excel"
-        ? await exportHourResearchReportExcel(params)
-        : await exportHourResearchReportPdf(params);
+        ? isFacultyScope.value
+          ? await exportFacultyHourResearchReportExcel(params)
+          : await exportHourResearchReportExcel(params)
+        : isFacultyScope.value
+          ? await exportFacultyHourResearchReportPdf(params)
+          : await exportHourResearchReportPdf(params);
     downloadBlob(result.blob, result.filename);
     notificationMessage.value = "Xuất báo cáo thành công.";
   } catch (error) {

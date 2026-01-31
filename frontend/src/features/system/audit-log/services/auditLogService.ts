@@ -3,6 +3,7 @@ import type {
   AuditLogListResponseDTO,
   AuditLogMetaDTO,
   AuditLogQueryDTO,
+  AuditLogScope,
 } from "../contracts/audit-log.contract";
 import {
   getAuditLogDetailApi,
@@ -25,26 +26,35 @@ export async function fetchAuditLogEntries(
   query: AuditLogQueryDTO
 ): Promise<AuditLogListResponseDTO> {
   try {
-    return await listAuditLogsApi(query);
+    return await listAuditLogsApi(query.scope, query);
   } catch (error) {
-    throw new Error(resolveApiErrorMessage(error, "Không tải được danh sách nhật ký."));
+    throw new Error(
+      resolveApiErrorMessage(error, "Không tải được danh sách nhật ký.")
+    );
   }
 }
 
 export async function fetchAuditLogDetail(
+  scope: AuditLogScope,
   id: number
 ): Promise<AuditLogEntryDTO> {
   try {
-    return await getAuditLogDetailApi(id);
+    return await getAuditLogDetailApi(scope, id);
   } catch (error) {
-    throw new Error(resolveApiErrorMessage(error, "Không tải được chi tiết nhật ký."));
+    throw new Error(
+      resolveApiErrorMessage(error, "Không tải được chi tiết nhật ký.")
+    );
   }
 }
 
-export async function fetchAuditLogMeta(): Promise<AuditLogMetaDTO> {
+export async function fetchAuditLogMeta(
+  scope: AuditLogScope
+): Promise<AuditLogMetaDTO> {
   try {
-    return await getAuditLogMetaApi();
+    return await getAuditLogMetaApi(scope);
   } catch (error) {
-    throw new Error(resolveApiErrorMessage(error, "Không tải được dữ liệu lọc."));
+    throw new Error(
+      resolveApiErrorMessage(error, "Không tải được dữ liệu lọc.")
+    );
   }
 }

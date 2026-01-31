@@ -8,11 +8,12 @@
           <label class="text-xs font-medium text-slate-700">Khoa</label>
           <div class="relative mt-1">
             <select
-              class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
+              class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100 disabled:bg-slate-50"
               :value="filters.facultyId"
+              :disabled="isFacultyLocked"
               @change="updateFacultyId(($event.target as HTMLSelectElement).value)"
             >
-              <option value="ALL">Tất cả khoa</option>
+              <option v-if="!isFacultyLocked" value="ALL">Tất cả khoa</option>
               <option
                 v-for="faculty in facultyOptions"
                 :key="faculty.id"
@@ -117,6 +118,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { RotateCcw, ChevronDown } from "lucide-vue-next";
 import type {
   AcademicRankOption,
@@ -132,12 +134,15 @@ const props = defineProps<{
   degreeOptions: DegreeOption[];
   academicRankOptions: AcademicRankOption[];
   genderOptions: GenderOption[];
+  facultyLocked?: boolean;
 }>();
 
 const emitComponentEvent = defineEmits<{
   (eventName: "filtersUpdated", filters: LecturerReportFilters): void;
   (eventName: "resetRequested"): void;
 }>();
+
+const isFacultyLocked = computed(() => props.facultyLocked ?? false);
 
 function updateFacultyId(value: string) {
   emitComponentEvent("filtersUpdated", {

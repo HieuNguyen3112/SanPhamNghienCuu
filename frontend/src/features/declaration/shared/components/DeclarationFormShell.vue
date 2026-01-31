@@ -1,9 +1,7 @@
 <template>
   <div class="space-y-4">
     <!-- Header -->
-    <div
-      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
-    >
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
@@ -43,9 +41,7 @@
     </div>
 
     <!-- Footer actions -->
-    <div
-      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
-    >
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
       <div
         class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
       >

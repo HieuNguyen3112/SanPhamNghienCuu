@@ -40,7 +40,7 @@
           <thead class="sticky top-0 z-10 bg-slate-50">
             <tr class="text-xs font-semibold text-slate-600">
               <th class="w-[72px] px-4 py-3">STT</th>
-              <th class="px-4 py-3">M? khoa</th>
+              <th class="px-4 py-3">Mã khoa</th>
               <th class="px-4 py-3">Tên khoa</th>
               <th class="px-4 py-3">Tên viết tắt</th>
               <th class="px-4 py-3">Trạng thái</th>

@@ -6,6 +6,7 @@ use App\Models\AcademicRank;
 use App\Models\Degree;
 use App\Models\Department;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -153,6 +154,50 @@ class LookupController extends Controller
             ->orderBy('l.full_name')
             ->limit(50)
             ->get();
+
+        return response()->json(['data' => $data], Response::HTTP_OK);
+    }
+
+    public function journals(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $activeOnly = $request->boolean('active', true);
+
+        $today = Carbon::now()->toDateString();
+        $latestRanking = DB::table('journal_rankings')
+            ->select('journal_id', DB::raw('MAX(effective_from) as effective_from'))
+            ->where('effective_from', '<=', $today)
+            ->groupBy('journal_id');
+
+        $query = DB::table('journals as j')
+            ->leftJoinSub($latestRanking, 'lr', 'lr.journal_id', '=', 'j.id')
+            ->leftJoin('journal_rankings as jr', function ($join) {
+                $join->on('jr.journal_id', '=', 'j.id')
+                    ->on('jr.effective_from', '=', 'lr.effective_from');
+            })
+            ->select([
+                'j.id',
+                'j.name',
+                'j.address',
+                'j.issn',
+                'j.is_active',
+                'jr.rank as current_rank',
+                'jr.effective_from as current_rank_effective_from',
+            ])
+            ->when($activeOnly, function ($q) {
+                $q->where('j.is_active', 1);
+            })
+            ->when($search !== '', function ($q) use ($search) {
+                $like = '%' . $search . '%';
+                $q->where(function ($sub) use ($like) {
+                    $sub->where('j.name', 'like', $like)
+                        ->orWhere('j.issn', 'like', $like);
+                });
+            })
+            ->orderBy('j.name')
+            ->limit(50);
+
+        $data = $query->get();
 
         return response()->json(['data' => $data], Response::HTTP_OK);
     }

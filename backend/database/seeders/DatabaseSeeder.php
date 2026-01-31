@@ -25,7 +25,6 @@ class DatabaseSeeder extends Seeder
         LecturerPersonalHoursOverviewSeeder::class,
         ResearchHoursUsageSeeder::class,
         LecturerHourApprovalDemoSeeder::class,
-        LecturerHourWarningDemoSeeder::class,
         WorkCatalogSeeder::class,
         AuditLogSeeder::class,
         FacultyHoursApprovalSeeder::class,

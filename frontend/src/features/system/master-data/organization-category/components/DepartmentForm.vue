@@ -1,4 +1,4 @@
-﻿<!-- src/features/organization-category/components/DepartmentForm.vue -->
+<!-- src/features/organization-category/components/DepartmentForm.vue -->
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50">
@@ -31,9 +31,9 @@
           <form class="space-y-4 p-4 md:p-6" @submit.prevent="onSubmit">
             <div class="grid gap-4 md:grid-cols-2">
               <div class="md:col-span-2">
-                <label class="text-xs font-semibold text-slate-600"
-                  >Khoa quản lý *</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Khoa quản lý *
+                </label>
                 <select
                   v-model="form.facultyId"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
@@ -49,9 +49,9 @@
               </div>
 
               <div>
-                <label class="text-xs font-semibold text-slate-600"
-                  >Mã đơn vị *</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Mã đơn vị *
+                </label>
                 <input
                   v-model="form.code"
                   type="text"
@@ -68,9 +68,9 @@
               </div>
 
               <div>
-                <label class="text-xs font-semibold text-slate-600"
-                  >Tên đơn vị *</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Tên đơn vị *
+                </label>
                 <input
                   v-model="form.name"
                   type="text"
@@ -84,9 +84,9 @@
 
               <!-- Không có trong schema -->
               <div class="md:col-span-1">
-                <label class="text-xs font-semibold text-slate-600"
-                  >Loại đơn vị</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Loại đơn vị
+                </label>
                 <select
                   disabled
                   class="mt-1 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
@@ -100,9 +100,9 @@
 
               <!-- Không có trong schema -->
               <div class="md:col-span-1">
-                <label class="text-xs font-semibold text-slate-600"
-                  >Trạng thái</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Trạng thái
+                </label>
                 <div
                   class="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
                 >
@@ -117,9 +117,9 @@
 
               <!-- Không có trong schema -->
               <div class="md:col-span-2">
-                <label class="text-xs font-semibold text-slate-600"
-                  >Ghi chú</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Ghi chú
+                </label>
                 <textarea
                   disabled
                   rows="3"

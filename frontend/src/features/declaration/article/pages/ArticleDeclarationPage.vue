@@ -2,15 +2,15 @@
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <DeclarationFormShell
-        title="Kê khai Bài báo khoa học"
+        title="Khai báo bài báo khoa học"
         description="Chọn loại bài báo để xác định giờ chuẩn; giờ chia đều cho số tác giả."
         :icon="FileText"
         :status="shell.status.value"
         :canSubmit="canSubmit"
         :pending="shell.pending.value"
         :errorMessage="shell.error_message.value"
-        @save-draft="shell.save_draft"
-        @submit="shell.submit_for_approval"
+        @save-draft="handleSaveDraft"
+        @submit="handleSubmit"
       >
         <template #intro>
           <div
@@ -18,8 +18,8 @@
           >
             <div class="font-semibold text-slate-900">Bảng giờ chuẩn</div>
             <ul class="mt-1 list-disc space-y-1 pl-5 text-slate-600">
-              <li>HDGSNN 1–2 điểm: 900 giờ</li>
-              <li>HDGSNN ≤ 1 điểm: 600 giờ</li>
+              <li>HDGSNN 1-2 điểm: 900 giờ</li>
+              <li>HDGSNN &gt;= 1 điểm: 600 giờ</li>
               <li>Có ISSN/ISBN: 300 giờ</li>
             </ul>
           </div>
@@ -39,30 +39,34 @@
                 <label class="text-xs font-medium text-slate-600"
                   >Niên học</label
                 >
-                <!-- NOTE: bỏ .number vì có option null -->
                 <select
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
                   v-model="form.academicYearId"
                   :disabled="readOnly"
+                  :class="selectClass(formErrors.academicYearId)"
                 >
-                  <option :value="null">— Chọn niên học —</option>
+                  <option :value="null">-- Chọn niên học --</option>
                   <option v-for="y in academicYears" :key="y.id" :value="y.id">
                     {{ y.code }}
                   </option>
                 </select>
+                <p
+                  v-if="formErrors.academicYearId"
+                  class="mt-1 text-xs text-rose-600"
+                >
+                  {{ formErrors.academicYearId }}
+                </p>
               </div>
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
                   >Loại bài báo</label
                 >
-                <!-- NOTE: bỏ .number vì có option null -->
                 <select
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
                   v-model="form.typeId"
                   :disabled="readOnly"
+                  :class="selectClass(formErrors.typeId)"
                 >
-                  <option :value="null">— Chọn loại —</option>
+                  <option :value="null">-- Chọn loại --</option>
                   <option v-for="t in types" :key="t.id" :value="t.id">
                     {{ t.name }}
                   </option>
@@ -74,6 +78,9 @@
                     baseHoursText
                   }}</span>
                 </div>
+                <p v-if="formErrors.typeId" class="mt-1 text-xs text-rose-600">
+                  {{ formErrors.typeId }}
+                </p>
               </div>
             </div>
           </div>
@@ -96,20 +103,24 @@
                   :disabled="readOnly"
                   maxlength="500"
                   placeholder="VD: Ứng dụng AI trong phân tích dữ liệu giáo dục"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  :class="inputClass(formErrors.title)"
                 />
+                <p v-if="formErrors.title" class="mt-1 text-xs text-rose-600">
+                  {{ formErrors.title }}
+                </p>
               </div>
 
               <div class="md:col-span-2">
                 <JournalSelect
-                  v-model="(form as any).journalId"
+                  v-model="form.journalId"
                   v-model:journalName="form.journalName"
                   v-model:issn="form.issn"
                   :disabled="readOnly"
                   label="Tạp chí / Kỷ yếu"
-                  hint="Gõ để tìm và chọn từ danh mục (do QLKH/Hội đồng nhập)."
+                  hint="Gợi ý tìm và chọn từ danh mục (do QLKH/Hội đồng nhập)."
                   :search-fn="searchJournals"
-                  @select="() => {}"
+                  :error="formErrors.journalName"
+                  @select="onJournalSelect"
                 />
               </div>
 
@@ -120,7 +131,7 @@
                   :disabled="readOnly"
                   maxlength="50"
                   placeholder="VD: 1234-5678"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  :class="inputClass()"
                 />
               </div>
 
@@ -131,7 +142,7 @@
                   :disabled="readOnly"
                   maxlength="100"
                   placeholder="VD: 10.1234/abcd.2025.001"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  :class="inputClass()"
                 />
               </div>
 
@@ -144,7 +155,7 @@
                   :disabled="readOnly"
                   maxlength="500"
                   placeholder="VD: https://journal.example.com/article/123"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  :class="inputClass()"
                 />
               </div>
 
@@ -157,7 +168,7 @@
                   :disabled="readOnly"
                   maxlength="50"
                   placeholder="VD: 12"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  :class="inputClass()"
                 />
               </div>
 
@@ -170,7 +181,7 @@
                   :disabled="readOnly"
                   maxlength="50"
                   placeholder="VD: 3"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  :class="inputClass()"
                 />
               </div>
 
@@ -183,8 +194,11 @@
                   max="2100"
                   :disabled="readOnly"
                   placeholder="VD: 2025"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  :class="inputClass(formErrors.year)"
                 />
+                <p v-if="formErrors.year" class="mt-1 text-xs text-rose-600">
+                  {{ formErrors.year }}
+                </p>
               </div>
 
               <div>
@@ -198,7 +212,7 @@
                     min="1"
                     :disabled="readOnly"
                     placeholder="VD: 15"
-                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                    :class="inputClass()"
                   />
                   <input
                     v-model.number="form.pageEnd"
@@ -206,7 +220,7 @@
                     min="1"
                     :disabled="readOnly"
                     placeholder="VD: 27"
-                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                    :class="inputClass()"
                   />
                 </div>
               </div>
@@ -224,15 +238,13 @@
               </div>
 
               <div class="md:col-span-2">
-                <label class="text-xs font-medium text-slate-600"
-                  >Ghi chú</label
-                >
+                <label class="text-xs font-medium text-slate-600">Ghi chú</label>
                 <input
                   v-model.trim="form.notes"
                   :disabled="readOnly"
                   maxlength="500"
                   placeholder="VD: Bài báo thuộc danh mục... / ghi chú thêm (tuỳ chọn)"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  :class="inputClass()"
                 />
               </div>
             </div>
@@ -271,12 +283,63 @@
       </DeclarationFormShell>
     </div>
   </div>
+
+  <div
+    v-if="missingModalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+  >
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div class="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+        <div class="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50 p-3">
+          <div
+            class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600"
+            aria-hidden="true"
+          >
+            <AlertTriangle class="h-4 w-4" />
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-base font-semibold text-rose-700">
+              Thiếu thông tin
+            </h3>
+            <p class="mt-1 text-sm text-rose-700/80">
+              Vui lòng bổ sung các trường bắt buộc sau:
+            </p>
+          </div>
+        </div>
+
+        <ul class="mt-4 space-y-1 text-sm text-rose-700">
+          <li v-for="field in missingFields" :key="field" class="flex items-start gap-2">
+            <span class="mt-1 h-1.5 w-1.5 rounded-full bg-rose-500" aria-hidden="true" />
+            <span>{{ field }}</span>
+          </li>
+        </ul>
+
+        <div class="mt-5 flex justify-end">
+          <button
+            type="button"
+            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            @click="closeMissingModal"
+          >
+            Đã hiểu
+          </button>
+        </div>
+      </div>
+    </Transition>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, type ComputedRef } from "vue";
+import axios from "axios";
+import { computed, onMounted, reactive, ref, watch, type ComputedRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { FileText } from "lucide-vue-next";
+import { AlertTriangle, FileText } from "lucide-vue-next";
 import JournalSelect from "../../shared/components/JournalSelect.vue";
 
 import DeclarationFormShell from "../../shared/components/DeclarationFormShell.vue";
@@ -302,6 +365,7 @@ import {
   fetch_evidence_file_types,
   search_lecturer_options,
   fetch_activity_statuses,
+  search_journals,
 } from "../../shared/services/catalogs.service";
 import {
   fetch_activity,
@@ -322,14 +386,12 @@ import {
 const route = useRoute();
 const router = useRouter();
 
-// const academicYears = ref(await Promise.resolve([] as any[]));
 const academicYears = ref<AcademicYearDto[]>([]);
 const memberRoles = ref<MemberRoleDto[]>([]);
 const evidenceFileTypes = ref<EvidenceFileTypeDto[]>([]);
 const lecturers = ref<LecturerOptionDto[]>([]);
 const types = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
-const submittedStatusId = ref<number>(0);
 
 const currentLecturerId = ref<number>(0);
 
@@ -341,6 +403,7 @@ const form = reactive<ArticleDeclarationFormModel>({
   title: "",
   abstract: "",
   notes: "",
+  journalId: null,
   journalName: "",
   issn: "",
   doi: "",
@@ -352,6 +415,24 @@ const form = reactive<ArticleDeclarationFormModel>({
   pageEnd: null,
   members: [],
 });
+
+const formErrors = reactive<{
+  academicYearId: string | null;
+  typeId: string | null;
+  title: string | null;
+  journalName: string | null;
+  year: string | null;
+}>({
+  academicYearId: null,
+  typeId: null,
+  title: null,
+  journalName: null,
+  year: null,
+});
+
+const missingFields = ref<string[]>([]);
+const missingModalOpen = ref(false);
+
 const filteredMemberRoles = computed(() => {
   const preferredCodes = new Set<string>(
     articleAllowedMemberRoleCodes as readonly string[]
@@ -431,6 +512,57 @@ const canSubmit = computed(() => {
   return true;
 });
 
+function inputClass(error?: string | null) {
+  return [
+    "mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm focus:outline-none disabled:opacity-60",
+    error ? "border-rose-300 focus:border-rose-400" : "border-slate-200 focus:border-slate-300",
+  ];
+}
+
+function selectClass(error?: string | null) {
+  return [
+    "mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm focus:outline-none disabled:opacity-60",
+    error ? "border-rose-300 focus:border-rose-400" : "border-slate-200 focus:border-slate-300",
+  ];
+}
+
+function clearFieldError(field: keyof typeof formErrors) {
+  if (formErrors[field]) formErrors[field] = null;
+}
+
+function resetErrors() {
+  formErrors.academicYearId = null;
+  formErrors.typeId = null;
+  formErrors.title = null;
+  formErrors.journalName = null;
+  formErrors.year = null;
+}
+
+function applyValidationErrors(err: unknown): string | null {
+  if (!axios.isAxiosError(err)) return null;
+  if (err.response?.status !== 422) return null;
+
+  const payload = err.response?.data;
+  const errors = payload?.errors as Record<string, string[]> | undefined;
+  if (!errors) return "Vui lòng kiểm tra các trường bắt buộc.";
+
+  formErrors.academicYearId = errors.academic_year_id?.[0] ?? null;
+  formErrors.typeId = errors.type_id?.[0] ?? null;
+  formErrors.title = errors.title?.[0] ?? null;
+  formErrors.journalName = errors.journal_name?.[0] ?? null;
+  formErrors.year = errors.year?.[0] ?? null;
+
+  return "Vui lòng kiểm tra các trường bắt buộc.";
+}
+
+function normalizeErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const message = err.response?.data?.message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return err instanceof Error ? err.message : fallback;
+}
+
 async function loadCatalogs() {
   currentLecturerId.value = (await fetch_current_lecturer_id()) ?? 0;
   const [years, kinds, roles, fileTypes, statuses] = await Promise.all([
@@ -448,8 +580,6 @@ async function loadCatalogs() {
   form.kindId = kindId.value;
 
   types.value = await fetch_activity_types_by_kind(kindId.value);
-  submittedStatusId.value =
-    statuses.find((s) => s.code === "submitted")?.id ?? 0;
 
   lecturers.value = await search_lecturer_options("");
 
@@ -513,80 +643,173 @@ async function onSearchLecturers(q: string) {
   lecturers.value = await search_lecturer_options(q);
 }
 
+function onJournalSelect(option: { id: number; name: string; issn: string | null }) {
+  form.journalId = option.id;
+  form.journalName = option.name;
+  form.issn = option.issn ?? "";
+  clearFieldError("journalName");
+}
+
 async function onRemoveExistingEvidence(_id: number) {
   existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
+}
+
+function openMissingModal(fields: string[]) {
+  missingFields.value = fields;
+  missingModalOpen.value = true;
+}
+
+function closeMissingModal() {
+  missingModalOpen.value = false;
+}
+
+function collectMissingFields(mode: "draft" | "submit") {
+  const missing: string[] = [];
+
+  if (!form.academicYearId) {
+    missing.push("Niên học");
+    formErrors.academicYearId = "Vui lòng chọn niên học.";
+  }
+
+  if (!form.title.trim()) {
+    missing.push("Tên bài báo");
+    formErrors.title = "Vui lòng nhập tên bài báo.";
+  }
+
+  if (mode === "submit") {
+    if (!form.typeId) {
+      missing.push("Loại bài báo");
+      formErrors.typeId = "Vui lòng chọn loại bài báo.";
+    }
+    if (!form.journalName.trim()) {
+      missing.push("Tạp chí / Kỷ yếu");
+      formErrors.journalName = "Vui lòng chọn tạp chí/kỷ yếu.";
+    }
+    if (!form.year) {
+      missing.push("Năm xuất bản");
+      formErrors.year = "Vui lòng nhập năm xuất bản.";
+    }
+
+    const validMembers = form.members.filter(
+      (m) =>
+        typeof m.lecturer_id === "number" && typeof m.member_role_id === "number"
+    );
+    if (validMembers.length === 0) {
+      missing.push("Danh sách người tham gia");
+    }
+  }
+
+  return missing;
+}
+
+function handleSaveDraft() {
+  resetErrors();
+  const missing = collectMissingFields("draft");
+  if (missing.length > 0) {
+    openMissingModal(missing);
+    return;
+  }
+  shell.save_draft();
+}
+
+function handleSubmit() {
+  resetErrors();
+  const missing = collectMissingFields("submit");
+  if (missing.length > 0) {
+    openMissingModal(missing);
+    return;
+  }
+  shell.submit_for_approval();
 }
 
 const shell = useDeclarationFormShell({
   initial_status: "DRAFT",
   on_save_draft: async () => {
-    const saved = await upsert_activity_base({
-      id: form.activityId ?? undefined,
-      owner_lecturer_id: currentLecturerId.value,
-      kind_id: form.kindId,
-      type_id: form.typeId,
-      academic_year_id: form.academicYearId ?? 0,
-      status_id: 100, // mock draft status id
-      title: form.title,
-      abstract: form.abstract || null,
-      start_date: null,
-      end_date: null,
-      quantity: 1,
-      notes: form.notes || null,
-      submitted_at: null,
-      approved_at: null,
-      total_hours_calc: null,
-    } as any);
-
-    form.activityId = saved.id;
-
-    if (saved.id) {
-      await router.replace({
-        query: { ...route.query, activity_id: String(saved.id) },
+    try {
+      const saved = await upsert_activity_base({
+        id: form.activityId ?? undefined,
+        kind_id: form.kindId,
+        type_id: form.typeId,
+        academic_year_id: form.academicYearId ?? undefined,
+        title: form.title,
+        abstract: form.abstract || null,
+        start_date: null,
+        end_date: null,
+        quantity: 1,
+        notes: form.notes || null,
       });
-    }
 
-    await upsert_paper_details({
-      activity_id: saved.id,
-      journal_name: form.journalName || null,
-      issn: form.issn || null,
-      doi: form.doi || null,
-      article_url: form.articleUrl || null,
-      volume: form.volume || null,
-      issue: form.issue || null,
-      page_start: form.pageStart ?? null,
-      page_end: form.pageEnd ?? null,
-      year: form.year ?? null,
-    });
+      form.activityId = saved.id;
 
-    const upsertList = form.members
-      .filter(
-        (m) =>
-          typeof m.lecturer_id === "number" &&
-          typeof m.member_role_id === "number"
-      )
-      .map((m) => ({
-        lecturer_id: m.lecturer_id as number,
-        member_role_id: m.member_role_id as number,
-        contribution_share: null,
-      }));
-    await upsert_members(saved.id, upsertList);
+      if (saved.id) {
+        await router.replace({
+          query: { ...route.query, activity_id: String(saved.id) },
+        });
+      }
 
-    existingEvidence.value = await list_evidence_files(saved.id);
+      await upsert_paper_details({
+        activity_id: saved.id,
+        journal_name: form.journalName || null,
+        issn: form.issn || null,
+        doi: form.doi || null,
+        article_url: form.articleUrl || null,
+        volume: form.volume || null,
+        issue: form.issue || null,
+        page_start: form.pageStart ?? null,
+        page_end: form.pageEnd ?? null,
+        year: form.year ?? null,
+      });
 
-    if (pendingEvidenceFiles.value.length > 0) {
-      throw new Error("TODO (P0): Upload evidence files endpoint chưa có.");
-    }
-    if (pendingEvidenceLinks.value.length > 0) {
-      throw new Error("TODO (P0): Evidence links chưa có backend support.");
+      const upsertList = form.members
+        .filter(
+          (m) =>
+            typeof m.lecturer_id === "number" &&
+            typeof m.member_role_id === "number"
+        )
+        .map((m) => ({
+          lecturer_id: m.lecturer_id as number,
+          member_role_id: m.member_role_id as number,
+          contribution_share: null,
+        }));
+      await upsert_members(saved.id, upsertList);
+
+      existingEvidence.value = await list_evidence_files(saved.id);
+
+      if (pendingEvidenceFiles.value.length > 0) {
+        throw new Error(
+          "Chưa hỗ trợ tải file minh chứng. Vui lòng thử lại sau."
+        );
+      }
+      if (pendingEvidenceLinks.value.length > 0) {
+        throw new Error("Chưa hỗ trợ link minh chứng. Vui lòng thử lại sau.");
+      }
+    } catch (err) {
+      const validation = applyValidationErrors(err);
+      if (validation) {
+        throw new Error(validation);
+      }
+      throw new Error(
+        normalizeErrorMessage(err, "Không thể lưu bản nháp. Vui lòng thử lại.")
+      );
     }
   },
   on_submit: async () => {
-    if (!form.activityId) {
-      await shell.save_draft();
+    resetErrors();
+    try {
+      if (!form.activityId) {
+        await shell.save_draft();
+      }
+      if (!form.activityId) return;
+      await submit_activity(form.activityId);
+    } catch (err) {
+      const validation = applyValidationErrors(err);
+      if (validation) {
+        throw new Error(validation);
+      }
+      throw new Error(
+        normalizeErrorMessage(err, "Không thể gửi duyệt. Vui lòng thử lại.")
+      );
     }
-    if (!form.activityId) return;
-    await submit_activity(form.activityId);
   },
 });
 const memberRoleNameById: ComputedRef<Record<number, string>> = computed(() => {
@@ -608,50 +831,24 @@ const externalMembers = computed(() => {
       {
         full_name: fullName,
         organization: r.external_department_name ?? null,
-        member_role_name: memberRoleNameById.value[roleId] ?? "—",
+        member_role_name: memberRoleNameById.value[roleId] ?? "-",
       },
     ];
   });
 });
 
+watch(() => form.academicYearId, () => clearFieldError("academicYearId"));
+watch(() => form.typeId, () => clearFieldError("typeId"));
+watch(() => form.title, () => clearFieldError("title"));
+watch(() => form.journalName, () => clearFieldError("journalName"));
+watch(() => form.year, () => clearFieldError("year"));
+
 onMounted(async () => {
   await loadCatalogs();
   await loadDraftFromQuery();
 });
-type JournalRank = "Q1" | "Q2" | "Q3" | "Q4" | "Q5" | "OTHER";
 
 async function searchJournals(q: string) {
-  const list: Array<{
-    id: number;
-    name: string;
-    address: string;
-    issn: string | null;
-    current_rank: JournalRank | null;
-    current_rank_effective_from: string | null;
-    is_active: boolean;
-  }> = [
-    {
-      id: 1,
-      name: "Tạp chí Khoa học Trường X",
-      address: "123 Đường ABC, Q.1, TP.HCM",
-      issn: "1234-5678",
-      current_rank: "Q2",
-      current_rank_effective_from: "2025-01-01",
-      is_active: true,
-    },
-    {
-      id: 2,
-      name: "Proceedings of Education Data Science",
-      address: "Online / International",
-      issn: null,
-      current_rank: "OTHER",
-      current_rank_effective_from: "2024-09-01",
-      is_active: true,
-    },
-  ];
-
-  const qq = (q ?? "").trim().toLowerCase();
-  if (!qq) return list;
-  return list.filter((x) => x.name.toLowerCase().includes(qq));
+  return search_journals(q);
 }
 </script>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\AuthMeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LecturerProfileController;
 use App\Http\Controllers\LecturerParticipationNotificationController;
+use App\Http\Controllers\LecturerDeclarationDraftController;
 use App\Http\Controllers\LecturerPersonalWorkController;
 use App\Http\Controllers\LecturerHoursCalculateController;
 use App\Http\Controllers\LecturerPersonalHoursController;
@@ -23,8 +24,12 @@ use App\Http\Controllers\AdminLecturerAccountController;
 use App\Http\Controllers\FacultyLecturerAccountController;
 use App\Http\Controllers\AdminOrgStructureController;
 use App\Http\Controllers\AdminAuditLogController;
+use App\Http\Controllers\FacultyAuditLogController;
 use App\Http\Controllers\AdminLecturerReportController;
+use App\Http\Controllers\FacultyLecturerReportController;
 use App\Http\Controllers\AdminResearchReportController;
+use App\Http\Controllers\FacultyResearchReportController;
+use App\Http\Controllers\FacultyResearchHoursReportController;
 use App\Http\Controllers\AdminResearchHoursReportController;
 use App\Http\Controllers\AdminWorkCatalogController;
 use App\Http\Controllers\AdminResearchHoursCatalogController;
@@ -72,7 +77,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])->prefix
 });
 
 // RESEARCH ACTIVITIES (declarations)
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])->prefix('research-activities')->group(function () {
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])->prefix('research-activities')->group(function () {
     Route::post('/', [ResearchActivityController::class, 'store']);
     Route::get('/{activity}', [ResearchActivityController::class, 'show']);
     Route::put('/{activity}', [ResearchActivityController::class, 'update']);
@@ -141,6 +146,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])->prefix
     Route::get('/evidence-file-types', [LookupController::class, 'evidenceFileTypes']);
     Route::get('/activity-statuses', [LookupController::class, 'activityStatuses']);
     Route::get('/lecturers', [LookupController::class, 'lecturers']);
+    Route::get('/journals', [LookupController::class, 'journals']);
 });
 
 // ADMIN only demo/ping
@@ -188,6 +194,13 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
             ->name('faculty.works.evidence.download');
     });
 
+// LECTURER DECLARATION DRAFTS (Gateway)
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
+    ->prefix('lecturer/declarations')
+    ->group(function () {
+        Route::get('/drafts', [LecturerDeclarationDraftController::class, 'index']);
+    });
+
 Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
     ->prefix('faculty/hours')
     ->group(function () {
@@ -202,6 +215,24 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::get('/lecturers/summary/export/pdf', [FacultyLecturerHoursController::class, 'exportSummaryPdf']);
         Route::get('/lecturers/summary', [FacultyLecturerHoursController::class, 'index']);
         Route::get('/lecturers/{lecturer}', [FacultyLecturerHoursController::class, 'show']);
+    });
+
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+    ->prefix('faculty/reports/lecturers')
+    ->group(function () {
+        Route::get('/lookups', [FacultyLecturerReportController::class, 'lookups']);
+        Route::get('/', [FacultyLecturerReportController::class, 'index']);
+        Route::get('/export/excel', [FacultyLecturerReportController::class, 'exportExcel']);
+        Route::get('/export/pdf', [FacultyLecturerReportController::class, 'exportPdf']);
+    });
+
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+    ->prefix('faculty/reports/research')
+    ->group(function () {
+        Route::get('/filters', [FacultyResearchReportController::class, 'filters']);
+        Route::get('/', [FacultyResearchReportController::class, 'index']);
+        Route::get('/export/excel', [FacultyResearchReportController::class, 'exportExcel']);
+        Route::get('/export/pdf', [FacultyResearchReportController::class, 'exportPdf']);
     });
 
 Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
@@ -222,6 +253,14 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::put('/{lecturer}', [FacultyLecturerAccountController::class, 'update']);
         Route::put('/{lecturer}/roles', [FacultyLecturerAccountController::class, 'updateRoles']);
         Route::put('/{lecturer}/status', [FacultyLecturerAccountController::class, 'updateStatus']);
+    });
+
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+    ->prefix('faculty/audit-logs')
+    ->group(function () {
+        Route::get('/meta', [FacultyAuditLogController::class, 'meta']);
+        Route::get('/', [FacultyAuditLogController::class, 'index']);
+        Route::get('/{id}', [FacultyAuditLogController::class, 'show']);
     });
 
 Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
@@ -363,6 +402,15 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::get('/', [AdminResearchHoursReportController::class, 'index']);
         Route::get('/export/excel', [AdminResearchHoursReportController::class, 'exportExcel']);
         Route::get('/export/pdf', [AdminResearchHoursReportController::class, 'exportPdf']);
+    });
+
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+    ->prefix('faculty/reports/hour-research')
+    ->group(function () {
+        Route::get('/filters', [FacultyResearchHoursReportController::class, 'filters']);
+        Route::get('/', [FacultyResearchHoursReportController::class, 'index']);
+        Route::get('/export/excel', [FacultyResearchHoursReportController::class, 'exportExcel']);
+        Route::get('/export/pdf', [FacultyResearchHoursReportController::class, 'exportPdf']);
     });
 
 // Placeholder nhóm cho role DL (ban chủ nhiệm/khoa)

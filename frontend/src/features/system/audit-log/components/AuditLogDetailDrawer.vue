@@ -250,7 +250,7 @@ const emit = defineEmits<{
 
 function actorDisplay(e: AuditLogEntry) {
   const name = e.actor.name ?? "Không xác định";
-  const email = e.actor.email ? ` • ${e.actor.email}` : "";
+  const email = e.actor.email ? ` · ${e.actor.email}` : "";
   return `${name}${email}`;
 }
 

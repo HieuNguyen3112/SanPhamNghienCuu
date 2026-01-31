@@ -20,6 +20,7 @@
         :degree-options="filterOptions.degrees"
         :academic-rank-options="filterOptions.academicRanks"
         :gender-options="filterOptions.genders"
+        :faculty-locked="isFacultyScope"
         @filtersUpdated="applyFilters"
         @resetRequested="resetFilters"
       />
@@ -56,18 +57,25 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import LecturerFilterPanel from "../components/LecturerFilterPanel.vue";
 import LecturerSummaryCards from "../components/LecturerSummaryCards.vue";
 import LecturerChartSection from "../components/LecturerChartSection.vue";
 import LecturerStatisticsTable from "../components/LecturerStatisticsTable.vue";
+import { useUserStore } from "@/app/stores/userStore";
 import {
   exportLecturerReportExcel,
   exportLecturerReportPdf,
   fetchLecturerReport,
   fetchLecturerReportFilters,
 } from "../api/lecturerReportApi";
+import {
+  exportFacultyLecturerReportExcel,
+  exportFacultyLecturerReportPdf,
+  fetchFacultyLecturerReport,
+  fetchFacultyLecturerReportFilters,
+} from "@/features/faculty/reports/lecturers/services/facultyLecturerReportService";
 import type {
   LecturerReportCharts,
   LecturerReportFilters,
@@ -76,6 +84,11 @@ import type {
   LecturerReportTable,
   LecturerSortCondition,
 } from "../lecturerReportTypes";
+
+const userStore = useUserStore();
+const isFacultyScope = computed(
+  () => userStore.role === "DEPARTMENT_BOARD"
+);
 
 const defaultFilters: LecturerReportFilters = {
   facultyId: "ALL",
@@ -125,6 +138,8 @@ const table = ref<LecturerReportTable>({
   pagination: { page: 1, perPage: 12, total: 0, lastPage: 1 },
 });
 
+const scopeFacultyId = ref<number | null>(null);
+
 function buildQueryParams() {
   const params: Record<string, string | number> = {
     sort: `${sort.value.sortFieldIdentifier}:${sort.value.sortDirection}`,
@@ -132,9 +147,14 @@ function buildQueryParams() {
     per_page: pageSize.value,
   };
 
-  if (filters.value.facultyId !== "ALL") {
+  if (isFacultyScope.value) {
+    if (scopeFacultyId.value) {
+      params.faculty_id = scopeFacultyId.value;
+    }
+  } else if (filters.value.facultyId !== "ALL") {
     params.faculty_id = filters.value.facultyId;
   }
+
   if (filters.value.degreeId !== "ALL") {
     params.degree_id = filters.value.degreeId;
   }
@@ -153,9 +173,14 @@ function buildExportParams() {
     sort: `${sort.value.sortFieldIdentifier}:${sort.value.sortDirection}`,
   };
 
-  if (filters.value.facultyId !== "ALL") {
+  if (isFacultyScope.value) {
+    if (scopeFacultyId.value) {
+      params.faculty_id = scopeFacultyId.value;
+    }
+  } else if (filters.value.facultyId !== "ALL") {
     params.faculty_id = filters.value.facultyId;
   }
+
   if (filters.value.degreeId !== "ALL") {
     params.degree_id = filters.value.degreeId;
   }
@@ -171,7 +196,17 @@ function buildExportParams() {
 
 async function loadFilters() {
   try {
-    filterOptions.value = await fetchLecturerReportFilters();
+    filterOptions.value = isFacultyScope.value
+      ? await fetchFacultyLecturerReportFilters()
+      : await fetchLecturerReportFilters();
+
+    if (isFacultyScope.value) {
+      const scoped = filterOptions.value.faculties[0]?.id ?? null;
+      scopeFacultyId.value = scoped;
+      if (scoped) {
+        filters.value.facultyId = scoped;
+      }
+    }
   } catch (error) {
     console.error(error);
     errorMessage.value =
@@ -183,7 +218,9 @@ async function loadReport() {
   isLoading.value = true;
   errorMessage.value = "";
   try {
-    const data = await fetchLecturerReport(buildQueryParams());
+    const data = isFacultyScope.value
+      ? await fetchFacultyLecturerReport(buildQueryParams())
+      : await fetchLecturerReport(buildQueryParams());
     summary.value = data.summary;
     charts.value = data.charts;
     table.value = data.table;
@@ -198,12 +235,18 @@ async function loadReport() {
 
 function applyFilters(nextFilters: LecturerReportFilters) {
   filters.value = { ...nextFilters };
+  if (isFacultyScope.value && scopeFacultyId.value) {
+    filters.value.facultyId = scopeFacultyId.value;
+  }
   page.value = 1;
   void loadReport();
 }
 
 function resetFilters() {
   filters.value = { ...defaultFilters };
+  if (isFacultyScope.value && scopeFacultyId.value) {
+    filters.value.facultyId = scopeFacultyId.value;
+  }
   page.value = 1;
   void loadReport();
 }
@@ -242,8 +285,12 @@ async function handleExport(type: "pdf" | "excel") {
     const params = buildExportParams();
     const result =
       type === "excel"
-        ? await exportLecturerReportExcel(params)
-        : await exportLecturerReportPdf(params);
+        ? isFacultyScope.value
+          ? await exportFacultyLecturerReportExcel(params)
+          : await exportLecturerReportExcel(params)
+        : isFacultyScope.value
+          ? await exportFacultyLecturerReportPdf(params)
+          : await exportLecturerReportPdf(params);
     downloadBlob(result.blob, result.filename);
     notificationMessage.value = "Xuất báo cáo thành công.";
   } catch (error) {

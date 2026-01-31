@@ -16,7 +16,9 @@
 
     <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="mb-3">
-        <h3 class="text-sm font-semibold text-slate-900">Trình độ học vấn</h3>
+        <h3 class="text-sm font-semibold text-slate-900">
+          Trình độ học vấn
+        </h3>
         <p class="text-xs text-slate-500">Phân bố trình độ đào tạo</p>
       </div>
       <div class="h-[300px]">
@@ -37,7 +39,9 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="mb-3">
         <h3 class="text-sm font-semibold text-slate-900">Giới tính</h3>
-        <p class="text-xs text-slate-500">Số lượng giảng viên theo giới tính</p>
+        <p class="text-xs text-slate-500">
+          Số lượng giảng viên theo giới tính
+        </p>
       </div>
       <div class="h-[300px]">
         <canvas ref="genderBarChartCanvasElement" />

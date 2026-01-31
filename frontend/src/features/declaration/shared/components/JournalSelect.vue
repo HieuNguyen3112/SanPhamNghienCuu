@@ -9,7 +9,11 @@
       class="mt-1 flex h-10 items-center gap-2 rounded-xl border bg-white px-3 text-sm"
       :class="[
         disabled ? 'opacity-60' : '',
-        open ? 'border-slate-300 ring-2 ring-slate-200' : 'border-slate-200',
+        error
+          ? 'border-rose-300 ring-2 ring-rose-100'
+          : open
+          ? 'border-slate-300 ring-2 ring-slate-200'
+          : 'border-slate-200',
       ]"
       @click="onContainerClick"
       ref="rootEl"

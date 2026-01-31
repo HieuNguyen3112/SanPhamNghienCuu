@@ -300,6 +300,8 @@ class LecturerHoursWarningController extends Controller
             ->where('aa_manager.status', 'approved');
     }
 
+    
+    
     private function buildWarnings(
         string $academicYearCode,
         float $requiredHours,
@@ -410,8 +412,7 @@ class LecturerHoursWarningController extends Controller
 
         return $warnings;
     }
-
-    private function attachStates(int $lecturerId, int $academicYearId, array $warnings): array
+private function attachStates(int $lecturerId, int $academicYearId, array $warnings): array
     {
         if (empty($warnings)) {
             return [];
@@ -584,6 +585,8 @@ class LecturerHoursWarningController extends Controller
         return array_values(array_merge($warnings, $resolvedItems));
     }
 
+    
+    
     private function warningMeta(string $typeKey): array
     {
         return match ($typeKey) {
@@ -650,7 +653,7 @@ class LecturerHoursWarningController extends Controller
             default => [
                 'severity_key' => 'info',
                 'title' => 'Cảnh báo giờ NCKH',
-                'resolved_message' => 'Cảnh báo đã được xử lý.',
+                'resolved_message' => 'Cảnh báo giờ NCKH đã được xử lý.',
                 'action' => [
                     'label' => null,
                     'route_path' => null,

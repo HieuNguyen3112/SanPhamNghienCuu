@@ -5,8 +5,8 @@
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
-          title="Quản lý công trình khoa học cá nhân"
-          subtitle="Theo dõi & kê khai các công trình NCKH của bạn"
+          title="Tính giờ NCKH cá nhân"
+          subtitle="Chọn công trình đã duyệt để tính giờ NCKH và gửi xét duyệt"
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"

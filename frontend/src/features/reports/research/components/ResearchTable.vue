@@ -130,6 +130,7 @@
   </div>
 </template>
 
+
 <script setup lang="ts">
 import { computed, defineComponent, h, type PropType } from "vue";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";

@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ResearchActivitySubmitAuditLogTest extends TestCase
@@ -16,6 +17,8 @@ class ResearchActivitySubmitAuditLogTest extends TestCase
     public function submitting_activity_creates_hours_submitted_audit_log(): void
     {
         $user = User::factory()->create();
+        Role::findOrCreate('GV', 'web');
+        $user->assignRole('GV');
 
         $facultyId = DB::table('faculties')->insertGetId([
             'code' => 'CNTT',
@@ -76,6 +79,14 @@ class ResearchActivitySubmitAuditLogTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $typeId = DB::table('activity_types')->insertGetId([
+            'kind_id' => $kindId,
+            'code' => 'hdgsnn_300',
+            'name' => 'ISSN',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $memberRoleId = DB::table('member_roles')->insertGetId([
             'code' => 'principal',
             'name' => 'Principal',
@@ -87,7 +98,7 @@ class ResearchActivitySubmitAuditLogTest extends TestCase
             'activity_code' => 'ACT-TEST-001',
             'owner_lecturer_id' => $lecturerId,
             'kind_id' => $kindId,
-            'type_id' => null,
+            'type_id' => $typeId,
             'academic_year_id' => $academicYearId,
             'status_id' => $draftStatusId,
             'title' => 'De tai test',
@@ -99,6 +110,21 @@ class ResearchActivitySubmitAuditLogTest extends TestCase
             'approved_at' => null,
             'total_hours_calc' => null,
             'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('paper_details')->insert([
+            'activity_id' => $activityId,
+            'journal_name' => 'Tap chi test',
+            'issn' => '1234-5678',
+            'doi' => null,
+            'article_url' => null,
+            'volume' => null,
+            'issue' => null,
+            'page_start' => null,
+            'page_end' => null,
+            'year' => 2024,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

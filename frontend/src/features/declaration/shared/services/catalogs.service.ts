@@ -17,7 +17,8 @@ import http from "@/lib/http";
  * - GET /api/member-roles
  * - GET /api/evidence-file-types
  * - GET /api/activity-statuses
- * - GET /api/lecturers/options?search=
+ * - GET /api/lecturers?search=
+ * - GET /api/journals?search=
  */
 
 const MOCK = false;
@@ -33,7 +34,7 @@ const ROLE_LABELS_VI: Record<string, string> = {
 
 const PAPER_TYPE_LABELS_VI: Record<string, string> = {
   hdgsnn_900: "HDGSNN 1-2 điểm (900 giờ)",
-  hdgsnn_600: "HDGSNN ≤ 1 điểm (600 giờ)",
+  hdgsnn_600: "HDGSNN >= 1 điểm (600 giờ)",
   hdgsnn_300: "Có ISSN/ISBN (300 giờ)",
 };
 
@@ -86,7 +87,7 @@ const mock_evidence_types: EvidenceFileTypeDto[] = [
   { id: 302, code: "toc", name: "Mục lục" },
   { id: 303, code: "acceptance_decision", name: "Quyết định/Chấp nhận" },
   { id: 304, code: "publication_decision", name: "Quyết định xuất bản" },
-  // P1: có thể cần seed thêm codes theo nghiệp vụ: assignment_decision, nghiệm_thu, ...
+  // P1: cần seed thêm codes theo nghiệp vụ: assignment_decision, nghiệm_thu, ...
 ];
 
 const mock_types: ActivityTypeDto[] = [
@@ -95,13 +96,13 @@ const mock_types: ActivityTypeDto[] = [
     id: 400,
     kind_id: 11,
     code: "hdgsnn_900",
-    name: "HDGSNN 1–2 điểm (900 giờ)",
+    name: "HDGSNN 1-2 điểm (900 giờ)",
   },
   {
     id: 401,
     kind_id: 11,
     code: "hdgsnn_600",
-    name: "HDGSNN ≤ 1 điểm (600 giờ)",
+    name: "HDGSNN >= 1 điểm (600 giờ)",
   },
   { id: 402, kind_id: 11, code: "hdgsnn_300", name: "Có ISSN/ISBN (300 giờ)" },
 
@@ -152,6 +153,37 @@ const mock_lecturer_options: LecturerOptionDto[] = [
     full_name: "Lê Văn C",
     department_id: 11,
     department_name: "Bộ môn Toán",
+  },
+];
+
+export type JournalOptionDto = {
+  id: number;
+  name: string;
+  address: string | null;
+  issn: string | null;
+  current_rank: "Q1" | "Q2" | "Q3" | "Q4" | "Q5" | "OTHER" | null;
+  current_rank_effective_from: string | null;
+  is_active: boolean;
+};
+
+const mock_journals: JournalOptionDto[] = [
+  {
+    id: 1,
+    name: "Tạp chí Khoa học Trường X",
+    address: "123 Đường ABC, Q.1, TP.HCM",
+    issn: "1234-5678",
+    current_rank: "Q2",
+    current_rank_effective_from: "2025-01-01",
+    is_active: true,
+  },
+  {
+    id: 2,
+    name: "Proceedings of Education Data Science",
+    address: "Online / International",
+    issn: null,
+    current_rank: "OTHER",
+    current_rank_effective_from: "2024-09-01",
+    is_active: true,
   },
 ];
 
@@ -277,6 +309,22 @@ export async function search_lecturer_options(
   const { data } = await http.get<{ data: LecturerOptionDto[] }>(
     "/api/lookups/lecturers",
     { params: { search } }
+  );
+  return data.data;
+}
+
+export async function search_journals(
+  search: string
+): Promise<JournalOptionDto[]> {
+  if (MOCK) {
+    const q = search.trim().toLowerCase();
+    if (!q) return mock_journals;
+    return mock_journals.filter((j) => j.name.toLowerCase().includes(q));
+  }
+
+  const { data } = await http.get<{ data: JournalOptionDto[] }>(
+    "/api/lookups/journals",
+    { params: { search, active: 1 } }
   );
   return data.data;
 }

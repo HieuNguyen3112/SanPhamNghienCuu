@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ResearchActivities\ResearchActivityDetailRequest;
 use App\Http\Requests\ResearchActivities\ResearchActivityMembersRequest;
+use App\Http\Requests\ResearchActivities\SubmitResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\StoreResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\UpdateResearchActivityRequest;
 use App\Support\AuditLogger;
+use App\Notifications\ParticipationInvitationNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -183,8 +186,12 @@ class ResearchActivityController extends Controller
 
         $items = $request->validated()['items'] ?? [];
         $now = now();
+        $ownerLecturerId = (int) $current->owner_lecturer_id;
+        $activityTitle = (string) ($current->title ?? '');
+        $ownerName = DB::table('lecturers')->where('id', $ownerLecturerId)->value('full_name') ?? '';
+        $roleNames = DB::table('member_roles')->pluck('name', 'id')->all();
 
-        $synced = DB::transaction(function () use ($activity, $items, $now) {
+        $synced = DB::transaction(function () use ($activity, $items, $now, $ownerLecturerId, $activityTitle, $ownerName, $roleNames) {
             if (count($items) === 0) {
                 DB::table('research_activity_members')
                     ->where('activity_id', $activity)
@@ -194,6 +201,7 @@ class ResearchActivityController extends Controller
 
             $handled = [];
             foreach ($items as $item) {
+                $notifyInvitee = false;
                 $payload = [
                     'activity_id' => $activity,
                     'lecturer_id' => $item['lecturer_id'],
@@ -203,19 +211,82 @@ class ResearchActivityController extends Controller
                     'updated_at' => $now,
                 ];
 
-                $exists = DB::table('research_activity_members')
+                $existing = DB::table('research_activity_members')
                     ->where('activity_id', $activity)
                     ->where('lecturer_id', $item['lecturer_id'])
-                    ->exists();
+                    ->first();
 
-                if (! $exists) {
+                $isOwner = (int) $item['lecturer_id'] === $ownerLecturerId;
+                $statusPayload = [];
+
+                if ($isOwner) {
+                    $statusPayload = [
+                        'confirmation_status' => 'accepted',
+                        'responded_at' => $now,
+                        'confirmation_note' => null,
+                    ];
+                } elseif (! $existing) {
+                    $statusPayload = [
+                        'confirmation_status' => 'pending',
+                        'responded_at' => null,
+                        'confirmation_note' => null,
+                    ];
+                    $notifyInvitee = true;
+                } else {
+                    $changed =
+                        (int) $existing->member_role_id !== (int) $item['member_role_id']
+                        || (string) ($existing->contribution_share ?? '') !== (string) ($item['contribution_share'] ?? '')
+                        || (string) ($existing->hours_assigned ?? '') !== (string) ($item['hours_assigned'] ?? '');
+
+                    if ($changed) {
+                        $statusPayload = [
+                            'confirmation_status' => 'pending',
+                            'responded_at' => null,
+                            'confirmation_note' => null,
+                        ];
+                        $notifyInvitee = true;
+                    } elseif ($existing->confirmation_status === null || $existing->confirmation_status === '') {
+                        $statusPayload = [
+                            'confirmation_status' => 'pending',
+                            'responded_at' => null,
+                            'confirmation_note' => null,
+                        ];
+                        $notifyInvitee = true;
+                    }
+                }
+
+                if (! $existing) {
                     $payload['created_at'] = $now;
-                    DB::table('research_activity_members')->insert($payload);
+                    DB::table('research_activity_members')->insert(array_merge($payload, $statusPayload));
                 } else {
                     DB::table('research_activity_members')
                         ->where('activity_id', $activity)
                         ->where('lecturer_id', $item['lecturer_id'])
-                        ->update($payload);
+                        ->update(array_merge($payload, $statusPayload));
+                }
+
+                if ($notifyInvitee) {
+                    $memberId = DB::table('research_activity_members')
+                        ->where('activity_id', $activity)
+                        ->where('lecturer_id', $item['lecturer_id'])
+                        ->value('id');
+                    $inviteeUserId = DB::table('lecturers')
+                        ->where('id', $item['lecturer_id'])
+                        ->value('user_id');
+                    if ($memberId && $inviteeUserId) {
+                        $invitee = User::find($inviteeUserId);
+                        if ($invitee) {
+                            $roleName = $roleNames[$item['member_role_id']] ?? null;
+                            $invitee->notify(new ParticipationInvitationNotification([
+                                'title' => 'Lời mời tham gia công trình',
+                                'message' => trim('Bạn được mời tham gia công trình ' . $activityTitle . ($ownerName ? (' bởi ' . $ownerName) : '') . '.'),
+                                'activity_id' => (int) $activity,
+                                'invitation_id' => (int) $memberId,
+                                'role_name' => $roleName,
+                                'action_route' => '/declarations/participatier',
+                            ]));
+                        }
+                    }
                 }
 
                 $handled[] = $item['lecturer_id'];
@@ -239,7 +310,7 @@ class ResearchActivityController extends Controller
         ], Response::HTTP_OK);
     }
 
-    public function submit(Request $request, int $activity)
+    public function submit(SubmitResearchActivityRequest $request, int $activity)
     {
         $user = $request->user();
         $lecturer = $user?->lecturer;
@@ -257,28 +328,33 @@ class ResearchActivityController extends Controller
             return response()->json(['message' => 'only draft activities can be submitted'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Allow submit even if detail/member rows are incomplete;
+        // frontend validation should prevent incomplete submissions.
+
         $submittedId = $this->getStatusId('submitted');
         if (! $submittedId) {
             return response()->json(['message' => 'submitted status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $now = now();
-        DB::table('research_activities')->where('id', $activity)->update([
-            'status_id' => $submittedId,
-            'submitted_at' => $now,
-            'updated_at' => $now,
-        ]);
+        DB::transaction(function () use ($activity, $submittedId, $now, $current, $user) {
+            DB::table('research_activities')->where('id', $activity)->update([
+                'status_id' => $submittedId,
+                'submitted_at' => $now,
+                'updated_at' => $now,
+            ]);
 
-        DB::table('activity_status_histories')->insert([
-            'activity_id' => $activity,
-            'from_status_id' => $current->status_id,
-            'to_status_id' => $submittedId,
-            'acted_by_user_id' => $user->id,
-            'acted_at' => $now,
-            'note' => 'submitted',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+            DB::table('activity_status_histories')->insert([
+                'activity_id' => $activity,
+                'from_status_id' => $current->status_id,
+                'to_status_id' => $submittedId,
+                'acted_by_user_id' => $user->id,
+                'acted_at' => $now,
+                'note' => 'submitted',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        });
 
         $academicYearCode = null;
         if ($current->academic_year_id) {

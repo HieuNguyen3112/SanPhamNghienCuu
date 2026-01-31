@@ -48,7 +48,7 @@
         <KpiCard
           title="Hội nghị"
           :value="kpis.conferenceCount"
-          subtitle="Proceedings / Conference papers"
+          subtitle="Kỷ yếu / Hội nghị"
         />
         <KpiCard
           title="Đề tài"
@@ -58,7 +58,7 @@
         <KpiCard
           title="Sách / GT"
           :value="kpis.bookCount"
-          subtitle="Books / Textbooks"
+          subtitle="Sách / Giáo trình"
         />
       </div>
 
@@ -116,8 +116,9 @@
   </div>
 </template>
 
+
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import FilterBar from "../components/FilterBar.vue";
 import KpiCard from "../components/KpiCard.vue";
 import ChartCard from "../components/ChartCard.vue";
@@ -127,12 +128,19 @@ import DepartmentStackedBarChart from "../components/charts/DepartmentStackedBar
 import WorksOverYearsLineChart from "../components/charts/WorksOverYearsLineChart.vue";
 import ResearchTypeDonutChart from "../components/charts/ResearchTypeDonutChart.vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
+import { useUserStore } from "@/app/stores/userStore";
 import {
   exportResearchReportExcel,
   exportResearchReportPdf,
   fetchResearchReport,
   fetchResearchReportFilters,
 } from "../api/researchReportApi";
+import {
+  exportFacultyResearchReportExcel,
+  exportFacultyResearchReportPdf,
+  fetchFacultyResearchReport,
+  fetchFacultyResearchReportFilters,
+} from "@/features/faculty/reports/research/services/facultyResearchReportService";
 import type {
   ResearchReportCharts,
   ResearchReportFilters,
@@ -142,6 +150,9 @@ import type {
   ResearchReportTable,
   ResearchReportSortCondition,
 } from "../researchReportTypes";
+
+const userStore = useUserStore();
+const isFacultyScope = computed(() => userStore.role === "DEPARTMENT_BOARD");
 
 const filters = reactive<ResearchReportFilters>({
   year: "all",
@@ -257,7 +268,9 @@ function buildExportParams() {
 
 async function loadFilters() {
   try {
-    filterOptions.value = await fetchResearchReportFilters();
+    filterOptions.value = isFacultyScope.value
+      ? await fetchFacultyResearchReportFilters()
+      : await fetchResearchReportFilters();
   } catch (error) {
     console.error(error);
     errorMessage.value =
@@ -269,7 +282,9 @@ async function loadReport() {
   isLoading.value = true;
   errorMessage.value = "";
   try {
-    const data = await fetchResearchReport(buildQueryParams());
+    const data = isFacultyScope.value
+      ? await fetchFacultyResearchReport(buildQueryParams())
+      : await fetchResearchReport(buildQueryParams());
     kpis.value = data.kpis;
     charts.value = data.charts;
     table.value = data.table;
@@ -318,13 +333,17 @@ async function handleExport(type: "pdf" | "excel") {
     const params = buildExportParams();
     const result =
       type === "excel"
-        ? await exportResearchReportExcel(params)
-        : await exportResearchReportPdf(params);
+        ? isFacultyScope.value
+          ? await exportFacultyResearchReportExcel(params)
+          : await exportResearchReportExcel(params)
+        : isFacultyScope.value
+          ? await exportFacultyResearchReportPdf(params)
+          : await exportResearchReportPdf(params);
     downloadBlob(result.blob, result.filename);
-    notificationMessage.value = "Export completed.";
+    notificationMessage.value = "Xuất báo cáo thành công.";
   } catch (error) {
     console.error(error);
-    notificationMessage.value = "Export failed. Please try again.";
+    notificationMessage.value = "Không thể xuất báo cáo. Vui lòng thử lại.";
   } finally {
     exporting.value = null;
     window.setTimeout(() => {
@@ -332,7 +351,6 @@ async function handleExport(type: "pdf" | "excel") {
     }, 2500);
   }
 }
-
 
 const detailModal = reactive({
   open: false,

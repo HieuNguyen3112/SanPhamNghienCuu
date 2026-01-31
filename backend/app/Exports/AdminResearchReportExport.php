@@ -31,13 +31,15 @@ class AdminResearchReportExport implements FromArray, WithColumnWidths, WithStyl
 
     public function array(): array
     {
+        $allLabel = 'Tất cả';
+
         $data = [
             ['Báo cáo công trình nghiên cứu khoa học'],
-            ['Năm', $this->filters['year'] ?? 'Tất cả'],
-            ['Khoa / Đơn vị', $this->filters['department'] ?? 'Tất cả'],
-            ['Loại công trình', $this->filters['research_type'] ?? 'Tất cả'],
-            ['Giảng viên', $this->filters['lecturer'] ?? 'Tất cả'],
-            ['Từ khóa', $this->filters['keyword'] ?? 'Tất cả'],
+            ['Năm', $this->filters['year'] ?? $allLabel],
+            ['Khoa / Đơn vị', $this->filters['department'] ?? $allLabel],
+            ['Loại công trình', $this->filters['research_type'] ?? $allLabel],
+            ['Giảng viên', $this->filters['lecturer'] ?? $allLabel],
+            ['Từ khóa', $this->filters['keyword'] ?? $allLabel],
             [],
         ];
 

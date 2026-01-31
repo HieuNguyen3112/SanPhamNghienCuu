@@ -98,7 +98,7 @@
             <input
               class="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-24 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
               :value="lecturerInputValue"
-              placeholder="Tìm giảng viên..."
+              placeholder="Tên giảng viên..."
               @focus="dropdownOpen = true"
               @input="handleLecturerInput"
               @keydown.escape="dropdownOpen = false"
@@ -110,7 +110,7 @@
               class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
               @click="clearLecturer"
             >
-              Clear
+              Xóa
             </button>
           </div>
 
@@ -186,7 +186,7 @@
           <button
             type="button"
             class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
-            title="Đặt lại bộ lọc"
+            title="0ặt lại bộ lọc"
             @click="$emit('reset')"
           >
             <RotateCcw class="h-4 w-4" />
@@ -196,6 +196,7 @@
     </div>
   </div>
 </template>
+
 
 <script setup lang="ts">
 import {

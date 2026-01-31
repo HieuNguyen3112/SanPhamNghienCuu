@@ -21,6 +21,18 @@
 
         <!-- BODY -->
         <form class="px-8 py-6 space-y-5" @submit.prevent="handleSubmit">
+          <div
+            v-if="apiError"
+            class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          >
+            {{ apiError }}
+          </div>
+          <div
+            v-if="apiSuccess"
+            class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+          >
+            {{ apiSuccess }}
+          </div>
           <!-- Mật khẩu cũ -->
           <div>
             <label class="mb-1 block text-sm font-medium text-slate-700">
@@ -157,6 +169,7 @@
             type="button"
             class="mr-3 rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             @click="close"
+            :disabled="isSubmitting"
           >
             Hủy
           </button>
@@ -164,6 +177,7 @@
             type="button"
             class="rounded bg-[rgb(23,43,77)] px-6 py-2 text-sm font-semibold text-white hover:bg-[#475f77]"
             @click="handleSubmit"
+            :disabled="isSubmitting"
           >
             Đổi mật khẩu
           </button>
@@ -175,6 +189,8 @@
 
 <script setup lang="ts">
 import { reactive, ref, computed, watch } from "vue";
+import axios from "axios";
+import { changePassword } from "@/features/auth/api";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -205,6 +221,9 @@ const errors = reactive({
 const showOldPassword = ref(false);
 const showNewPassword = ref(false);
 const showConfirmPassword = ref(false);
+const apiError = ref("");
+const apiSuccess = ref("");
+const isSubmitting = ref(false);
 
 const resetForm = () => {
   form.oldPassword = "";
@@ -213,6 +232,8 @@ const resetForm = () => {
   errors.oldPassword = "";
   errors.newPassword = "";
   errors.confirmPassword = "";
+  apiError.value = "";
+  apiSuccess.value = "";
 };
 
 watch(
@@ -254,11 +275,42 @@ const validate = () => {
 
 const handleSubmit = () => {
   if (!validate()) return;
-
-  emit("submit", {
-    oldPassword: form.oldPassword,
-    newPassword: form.newPassword,
-  });
+  apiError.value = "";
+  apiSuccess.value = "";
+  isSubmitting.value = true;
+  changePassword({
+    current_password: form.oldPassword,
+    password: form.newPassword,
+    password_confirmation: form.confirmPassword,
+  })
+    .then(() => {
+      apiSuccess.value = "Đổi mật khẩu thành công.";
+      resetForm();
+      setTimeout(() => {
+        visible.value = false;
+      }, 600);
+    })
+    .catch((err) => {
+      if (axios.isAxiosError(err) && err.response?.status === 422) {
+        const payload = err.response?.data;
+        const fieldErrors = payload?.errors as Record<string, string[]> | undefined;
+        if (fieldErrors?.current_password?.[0]) {
+          errors.oldPassword = fieldErrors.current_password[0];
+        }
+        if (fieldErrors?.password?.[0]) {
+          errors.newPassword = fieldErrors.password[0];
+        }
+        if (fieldErrors?.password_confirmation?.[0]) {
+          errors.confirmPassword = fieldErrors.password_confirmation[0];
+        }
+        apiError.value = payload?.message || "Dữ liệu không hợp lệ.";
+        return;
+      }
+      apiError.value = "Không thể đổi mật khẩu. Vui lòng thử lại.";
+    })
+    .finally(() => {
+      isSubmitting.value = false;
+    });
 };
 
 const close = () => {

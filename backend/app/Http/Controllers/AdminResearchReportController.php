@@ -17,7 +17,7 @@ class AdminResearchReportController extends Controller
         'ISI' => 'ISI',
         'SCOPUS' => 'Scopus',
         'CONFERENCE' => 'Hội nghị / Hội thảo',
-        'PROJECT' => 'Đề tài',
+        'PROJECT' => 'Đề tài / Dự án',
         'BOOK' => 'Sách / Giáo trình',
     ];
 

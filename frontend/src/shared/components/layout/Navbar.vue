@@ -125,8 +125,9 @@ const props = withDefaults(
   }>(),
   {
     title: "TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH",
-    notificationCount: 8,
-    userName: "Nguyễn Quang Vinh",
+    notificationCount: 0,
+    userName: "",
+    userCode: "",
   }
 );
 

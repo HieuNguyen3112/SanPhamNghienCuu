@@ -4,6 +4,7 @@ import type {
   AuditLogListResponseDTO,
   AuditLogMetaDTO,
   AuditLogQueryDTO,
+  AuditLogScope,
 } from "../contracts/audit-log.contract";
 
 interface ApiResponse<T> {
@@ -12,28 +13,37 @@ interface ApiResponse<T> {
   data: T;
 }
 
+function resolveBasePath(scope: AuditLogScope) {
+  return scope === "FACULTY" ? "/api/faculty/audit-logs" : "/api/admin/audit-logs";
+}
+
 export async function listAuditLogsApi(
+  scope: AuditLogScope,
   params: AuditLogQueryDTO
 ): Promise<AuditLogListResponseDTO> {
+  const { scope: _scope, ...query } = params;
   const { data } = await http.get<ApiResponse<AuditLogListResponseDTO>>(
-    "/api/admin/audit-logs",
-    { params }
+    resolveBasePath(scope),
+    { params: query }
   );
   return data.data;
 }
 
 export async function getAuditLogDetailApi(
+  scope: AuditLogScope,
   id: number
 ): Promise<AuditLogEntryDTO> {
   const { data } = await http.get<ApiResponse<AuditLogEntryDTO>>(
-    `/api/admin/audit-logs/${id}`
+    `${resolveBasePath(scope)}/${id}`
   );
   return data.data;
 }
 
-export async function getAuditLogMetaApi(): Promise<AuditLogMetaDTO> {
+export async function getAuditLogMetaApi(
+  scope: AuditLogScope
+): Promise<AuditLogMetaDTO> {
   const { data } = await http.get<ApiResponse<AuditLogMetaDTO>>(
-    "/api/admin/audit-logs/meta"
+    `${resolveBasePath(scope)}/meta`
   );
   return data.data;
 }

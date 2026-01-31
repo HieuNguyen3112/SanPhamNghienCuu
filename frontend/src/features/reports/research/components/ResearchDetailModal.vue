@@ -21,7 +21,7 @@
           class="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
           @click="$emit('close')"
         >
-          ×
+          Đóng
         </button>
       </div>
 
@@ -79,6 +79,7 @@
     </div>
   </div>
 </template>
+
 
 <script setup lang="ts">
 import type { ResearchReportRow } from "../researchReportTypes";

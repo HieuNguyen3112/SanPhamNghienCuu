@@ -557,11 +557,16 @@ class FacultyResearchWorkApprovalController extends Controller
         }
 
         $rows = DB::table('research_activity_members as ram')
+            ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->whereIn('ram.activity_id', $activityIds)
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
             ->select([
                 'ram.activity_id',
                 'ram.lecturer_id',
@@ -595,11 +600,16 @@ class FacultyResearchWorkApprovalController extends Controller
     private function fetchMembers(int $activityId): array
     {
         return DB::table('research_activity_members as ram')
+            ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activityId)
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
             ->select([
                 'ram.lecturer_id',
                 'l.code as lecturer_code',
@@ -687,6 +697,7 @@ class FacultyResearchWorkApprovalController extends Controller
         return $reasonType . ': ' . $reasonDetail;
     }
 }
+
 
 
 
