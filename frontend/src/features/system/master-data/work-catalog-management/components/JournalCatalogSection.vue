@@ -40,12 +40,13 @@
           <tr>
             <th class="w-16 px-4 py-3">STT</th>
             <th class="px-4 py-3">Tên tạp chí</th>
-            <th class="w-36 px-4 py-3">ISSN</th>
-            <th class="w-[280px] px-4 py-3">Địa chỉ</th>
-            <th class="w-32 px-4 py-3">Hạng hiện tại</th>
-            <th class="w-36 px-4 py-3">Ngày áp dụng</th>
+            <th class="w-36 px-4 py-3">ISSN/ISBN</th>
+            <th class="w-[260px] px-4 py-3">Nguồn uy tín</th>
+            <th class="w-32 px-4 py-3">Điểm</th>
+            <th class="w-40 px-4 py-3">Xếp loại</th>
+            <th class="w-28 px-4 py-3 text-right">Giờ NCKH</th>
             <th class="w-32 px-4 py-3">Trạng thái</th>
-            <th class="w-28 px-4 py-3 text-right">Thao tác</th>
+            <th class="w-24 px-4 py-3 text-right">Thao tác</th>
           </tr>
         </thead>
 
@@ -67,27 +68,27 @@
             <td class="px-4 py-3 text-slate-700">{{ row.issn ?? "—" }}</td>
 
             <td class="px-4 py-3 text-slate-700">
-              <!-- fallback để không vỡ khi backend chưa có address -->
               <div class="line-clamp-2 whitespace-pre-wrap">
-                {{ row.address ?? row.country ?? "—" }}
+                {{ row.sourceName ?? "—" }}
               </div>
             </td>
 
+            <td class="px-4 py-3 text-slate-700">
+              {{ formatPointRange(row.pointMin ?? null, row.pointMax ?? null) }}
+            </td>
+
+            <!-- ✅ refactor: chỉ tính 1 lần -->
             <td class="px-4 py-3">
               <span
                 class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                :class="rankBadgeClass(row.currentRank ?? null)"
+                :class="getCategoryMeta(getDerivedRow(row).category).badgeClass"
               >
-                {{ row.currentRank ?? "—" }}
+                {{ getCategoryMeta(getDerivedRow(row).category).label }}
               </span>
             </td>
 
-            <td class="px-4 py-3 text-slate-600">
-              {{
-                row.currentRankEffectiveFrom
-                  ? formatDate(row.currentRankEffectiveFrom)
-                  : "—"
-              }}
+            <td class="px-4 py-3 text-right font-semibold text-slate-900">
+              {{ getDerivedRow(row).hours }} giờ
             </td>
 
             <td class="px-4 py-3">
@@ -105,16 +106,6 @@
 
             <td class="px-4 py-3">
               <div class="flex items-center justify-end gap-2">
-                <!-- Set Ranking: luôn hiện nút, nhưng modal có thể chưa wiring -->
-                <button
-                  type="button"
-                  class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  title="Thiết lập hạng"
-                  @click="emit('set-ranking', row.id)"
-                >
-                  <TrendingUp class="h-4 w-4" />
-                </button>
-
                 <button
                   type="button"
                   class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -129,7 +120,7 @@
 
           <tr v-if="rows.length === 0">
             <td
-              colspan="8"
+              colspan="9"
               class="px-4 py-10 text-center text-sm text-slate-500"
             >
               Không có dữ liệu phù hợp.
@@ -137,18 +128,6 @@
           </tr>
         </tbody>
       </table>
-    </div>
-
-    <!-- Pagination -->
-    <div class="flex items-center justify-end">
-      <!-- TODO: chỉnh import/path + props theo SharedPaginationControls thật của dự án -->
-      <!-- <SharedPaginationControls
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        @update:page="emit('update:page', $event)"
-        @update:page-size="emit('update:pageSize', $event)"
-      /> -->
     </div>
 
     <!-- Modal: Add/Edit Journal -->
@@ -165,12 +144,9 @@
             >Tên tạp chí *</label
           >
           <input
-            :value="form.name"
+            :value="localForm.name"
             @input="
-              emit('update:form', {
-                ...form,
-                name: ($event.target as HTMLInputElement).value,
-              })
+              patchForm({ name: ($event.target as HTMLInputElement).value })
             "
             type="text"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
@@ -180,39 +156,17 @@
           </p>
         </div>
 
-        <!-- Address: thêm field mới, nhưng vẫn optional để không vỡ form cũ -->
-        <div>
-          <label class="text-xs font-medium text-slate-600">Địa chỉ</label>
-          <input
-            :value="form.address ?? ''"
-            @input="
-              emit('update:form', {
-                ...form,
-                address: ($event.target as HTMLInputElement).value,
-              })
-            "
-            type="text"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-            placeholder="VD: 123 Đường ABC, Quận 1, TP.HCM"
-          />
-          <p v-if="errors.address" class="mt-1 text-xs text-rose-600">
-            {{ errors.address }}
-          </p>
-        </div>
-
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
-            <label class="text-xs font-medium text-slate-600">ISSN</label>
+            <label class="text-xs font-medium text-slate-600">ISSN/ISBN</label>
             <input
-              :value="form.issn"
+              :value="localForm.issn"
               @input="
-                emit('update:form', {
-                  ...form,
-                  issn: ($event.target as HTMLInputElement).value,
-                })
+                patchForm({ issn: ($event.target as HTMLInputElement).value })
               "
               type="text"
               class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+              placeholder="VD: 1234-5678"
             />
             <p v-if="errors.issn" class="mt-1 text-xs text-rose-600">
               {{ errors.issn }}
@@ -227,8 +181,8 @@
               >
                 <input
                   type="radio"
-                  :checked="form.isActive"
-                  @change="emit('update:form', { ...form, isActive: true })"
+                  :checked="localForm.isActive"
+                  @change="patchForm({ isActive: true })"
                 />
                 Đang sử dụng
               </label>
@@ -237,63 +191,145 @@
               >
                 <input
                   type="radio"
-                  :checked="!form.isActive"
-                  @change="emit('update:form', { ...form, isActive: false })"
+                  :checked="!localForm.isActive"
+                  @change="patchForm({ isActive: false })"
                 />
                 Ngừng sử dụng
               </label>
             </div>
           </div>
         </div>
-        <!-- Current ranking (read-only) -->
-        <div
-          class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="font-semibold text-slate-900">Hạng hiện tại</div>
 
-              <div class="mt-1 flex flex-wrap items-center gap-2">
-                <span
-                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                  :class="rankBadgeClass(activeRank ?? null)"
-                >
-                  {{ activeRank ?? "—" }}
-                </span>
+        <div>
+          <label class="text-xs font-medium text-slate-600">
+            Nguồn uy tín (link/ghi chú)
+          </label>
+          <input
+            :value="localForm.sourceName ?? ''"
+            @input="
+              patchForm({
+                sourceName: ($event.target as HTMLInputElement).value,
+              })
+            "
+            type="text"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+            placeholder="VD: HDGSNN 2025 / Scopus / ISI / Link..."
+          />
+          <p v-if="errors.sourceName" class="mt-1 text-xs text-rose-600">
+            {{ errors.sourceName }}
+          </p>
+        </div>
 
-                <span class="text-slate-500">
-                  {{ activeRankEffectiveFromText }}
-                </span>
+        <!-- Điểm công trình -->
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div class="text-xs font-semibold text-slate-900">
+            Điểm công trình (theo nguồn uy tín)
+          </div>
+
+          <div class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label class="text-xs font-medium text-slate-600"
+                >Điểm tối thiểu</label
+              >
+              <input
+                :value="localForm.pointMin ?? ''"
+                @input="
+                  patchForm({
+                    pointMin: toNumberOrNull(
+                      ($event.target as HTMLInputElement).value,
+                    ),
+                  })
+                "
+                type="number"
+                step="0.1"
+                min="0"
+                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+                placeholder="VD: 0"
+              />
+              <p v-if="errors.pointMin" class="mt-1 text-xs text-rose-600">
+                {{ errors.pointMin }}
+              </p>
+            </div>
+
+            <div>
+              <label class="text-xs font-medium text-slate-600"
+                >Điểm tối đa</label
+              >
+              <input
+                :value="localForm.pointMax ?? ''"
+                @input="
+                  patchForm({
+                    pointMax: toNumberOrNull(
+                      ($event.target as HTMLInputElement).value,
+                    ),
+                  })
+                "
+                type="number"
+                step="0.1"
+                min="0"
+                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+                placeholder="VD: 1.5 / 2 / 3"
+              />
+              <p v-if="errors.pointMax" class="mt-1 text-xs text-rose-600">
+                {{ errors.pointMax }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Derived (REACTIVE) -->
+          <div
+            class="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span class="font-semibold text-slate-900">Khoảng điểm:</span>
+                {{ derivedRangeText }}
               </div>
-
-              <div v-if="form.id === 0" class="mt-1 text-slate-500">
-                Cần lưu tạp chí trước khi thiết lập hạng (để ghi lịch sử theo
-                ngày áp dụng).
+              <div class="font-semibold text-slate-900">
+                {{ derivedHours }} giờ NCKH
               </div>
             </div>
 
-            <button
-              type="button"
-              class="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="form.id === 0"
-              @click="form.id !== 0 && emit('set-ranking', form.id)"
-              :title="form.id === 0 ? 'Lưu tạp chí trước' : 'Thiết lập hạng'"
-            >
-              <TrendingUp class="h-4 w-4" />
-              Thiết lập hạng
-            </button>
+            <div class="mt-1">
+              <span class="font-semibold text-slate-900">Xếp loại:</span>
+              <span
+                class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                :class="derivedBadgeClass"
+              >
+                {{ derivedLabel }}
+              </span>
+            </div>
+
+            <div class="mt-2 text-slate-600">
+              Quy tắc: max điểm ≥ 2 → 900h; max điểm ≥ 1 → 600h; nếu &lt; 1 điểm
+              thì xét ISSN/ISBN → 300h.
+            </div>
           </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-slate-600"
+            >Địa chỉ (optional)</label
+          >
+          <input
+            :value="localForm.address ?? ''"
+            @input="
+              patchForm({ address: ($event.target as HTMLInputElement).value })
+            "
+            type="text"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+          />
+          <p v-if="errors.address" class="mt-1 text-xs text-rose-600">
+            {{ errors.address }}
+          </p>
         </div>
 
         <div>
           <label class="text-xs font-medium text-slate-600">Ghi chú</label>
           <textarea
-            :value="form.notes"
+            :value="localForm.notes"
             @input="
-              emit('update:form', {
-                ...form,
-                notes: ($event.target as HTMLTextAreaElement).value,
-              })
+              patchForm({ notes: ($event.target as HTMLTextAreaElement).value })
             "
             rows="3"
             class="mt-1 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
@@ -302,118 +338,21 @@
             {{ errors.notes }}
           </p>
         </div>
-
-        <div
-          class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
-        >
-          Hạng (Q1/Q2/...) được thiết lập ở màn hình
-          <span class="font-semibold">Thiết lập hạng</span> để đảm bảo lưu lịch
-          sử theo ngày áp dụng.
-          <span class="ml-1 text-slate-500"
-            >(Nếu backend chưa có, phần này đang để TODO.)</span
-          >
-        </div>
-      </div>
-    </CatalogUpsertModal>
-
-    <!-- Modal: Set Ranking (optional wiring) -->
-    <CatalogUpsertModal
-      v-if="rankingEnabled"
-      :open="rankingModalOpen"
-      :title="rankingModalTitle"
-      :submitting="submitting"
-      subtitle="Thiết lập hạng mới theo ngày áp dụng. Hệ thống sẽ lưu lịch sử hạng theo thời gian."
-      @close="emit('close-ranking-modal')"
-      @submit="emit('submit-ranking')"
-    >
-      <div class="grid gap-3">
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div>
-            <label class="text-xs font-medium text-slate-600">Hạng *</label>
-            <select
-              :value="rankingForm.rank"
-              @change="
-                emit('update:rankingForm', {
-                  ...rankingForm,
-                  rank: ($event.target as HTMLSelectElement)
-                    .value as JournalRank,
-                })
-              "
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-            >
-              <option value="Q1">Q1</option>
-              <option value="Q2">Q2</option>
-              <option value="Q3">Q3</option>
-              <option value="Q4">Q4</option>
-              <option value="Q5">Q5</option>
-              <option value="OTHER">Khác</option>
-            </select>
-            <p v-if="rankingErrors.rank" class="mt-1 text-xs text-rose-600">
-              {{ rankingErrors.rank }}
-            </p>
-          </div>
-
-          <div>
-            <label class="text-xs font-medium text-slate-600"
-              >Ngày áp dụng *</label
-            >
-            <input
-              :value="rankingForm.effectiveFrom"
-              @input="
-                emit('update:rankingForm', {
-                  ...rankingForm,
-                  effectiveFrom: ($event.target as HTMLInputElement).value,
-                })
-              "
-              type="date"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-            />
-            <p
-              v-if="rankingErrors.effectiveFrom"
-              class="mt-1 text-xs text-rose-600"
-            >
-              {{ rankingErrors.effectiveFrom }}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <label class="text-xs font-medium text-slate-600">Ghi chú</label>
-          <textarea
-            :value="rankingForm.note"
-            @input="
-              emit('update:rankingForm', {
-                ...rankingForm,
-                note: ($event.target as HTMLTextAreaElement).value,
-              })
-            "
-            rows="3"
-            class="mt-1 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-          />
-          <p v-if="rankingErrors.note" class="mt-1 text-xs text-rose-600">
-            {{ rankingErrors.note }}
-          </p>
-        </div>
-
-        <div
-          class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
-        >
-          Lưu ý: Thiết lập hạng mới cần đúng “ngày áp dụng” để map điểm công
-          trình theo thời điểm.
-        </div>
       </div>
     </CatalogUpsertModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { Pencil, Plus, TrendingUp } from "lucide-vue-next";
+import { computed, ref, watch } from "vue";
+import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
 
-// TODO: chỉnh path theo project của bạn
-
-export type JournalRank = "Q1" | "Q2" | "Q3" | "Q4" | "Q5" | "OTHER";
+export type DerivedCategory =
+  | "POINT_GE_2" // maxPoint >= 2 => 900h
+  | "POINT_GE_1" // maxPoint >= 1 => 600h
+  | "ISSN_ISBN" // có ISSN/ISBN => 300h
+  | "UNKNOWN";
 
 export interface JournalRow {
   id: number;
@@ -422,130 +361,215 @@ export interface JournalRow {
   notes: string | null;
   isActive: boolean;
 
-  /** NEW (optional for migration) */
   address?: string | null;
-  currentRank?: JournalRank | null;
-  currentRankEffectiveFrom?: string | null;
-
-  /** Legacy optional: để map tạm từ data cũ nếu cần */
   country?: string | null;
-  updatedAt?: string;
+
+  sourceName?: string | null;
+  pointMin?: number | null;
+  pointMax?: number | null;
 }
 
-type JournalFormModel = {
+export interface JournalFormModel {
   id: number;
   name: string;
   issn: string;
+  address: string;
+  country: string; // <-- thêm dòng này
   notes: string;
   isActive: boolean;
-  /** NEW optional (để không vỡ form cũ) */
-  address?: string;
-};
+  sourceName: string;
+  pointMin: number | null;
+  pointMax: number | null;
+}
 
 type JournalFormErrors = Partial<
-  Record<"name" | "address" | "issn" | "notes", string>
+  Record<
+    | "name"
+    | "address"
+    | "issn"
+    | "notes"
+    | "sourceName"
+    | "pointMin"
+    | "pointMax",
+    string
+  >
 >;
 
-type RankingFormModel = {
-  journalId: number;
-  rank: JournalRank;
-  effectiveFrom: string;
-  note: string;
-};
-type RankingErrors = Partial<Record<"rank" | "effectiveFrom" | "note", string>>;
+const props = defineProps<{
+  rows: JournalRow[];
+  startIndex: number;
+  total: number;
+  search: string;
+  page: number;
+  pageSize: number;
 
-const props = withDefaults(
-  defineProps<{
-    // table
-    rows: JournalRow[];
-    startIndex: number;
-    total: number;
-    search: string;
-    page: number;
-    pageSize: number;
-
-    // journal modal
-    modalOpen: boolean;
-    modalTitle: string;
-    submitting: boolean;
-    form: JournalFormModel;
-    errors: JournalFormErrors;
-
-    // ranking modal (optional wiring)
-    rankingModalOpen?: boolean;
-    rankingModalTitle?: string;
-    rankingForm?: RankingFormModel;
-    rankingErrors?: RankingErrors;
-  }>(),
-  {
-    rankingModalOpen: false,
-    rankingModalTitle: "Thiết lập hạng tạp chí",
-    rankingForm: () => ({
-      journalId: 0,
-      rank: "Q4",
-      effectiveFrom: "",
-      note: "",
-    }),
-    rankingErrors: () => ({}),
-  }
-);
-const activeRow = computed(() =>
-  props.rows.find((x) => x.id === props.form.id)
-);
-
-const activeRank = computed<JournalRank | null>(() => {
-  return activeRow.value?.currentRank ?? null;
-});
-
-const activeRankEffectiveFromText = computed(() => {
-  const from = activeRow.value?.currentRankEffectiveFrom;
-  if (!from) return "";
-  return `Từ ${formatDate(from)}`;
-});
+  modalOpen: boolean;
+  modalTitle: string;
+  submitting: boolean;
+  form: JournalFormModel;
+  errors: JournalFormErrors;
+}>();
 
 const emit = defineEmits<{
-  // list
   (e: "update:search", v: string): void;
   (e: "update:page", v: number): void;
   (e: "update:pageSize", v: number): void;
 
-  // journal actions
   (e: "create"): void;
   (e: "edit", id: number): void;
   (e: "close-modal"): void;
   (e: "submit"): void;
   (e: "update:form", v: JournalFormModel): void;
-
-  // ranking actions (optional)
-  (e: "set-ranking", id: number): void;
-  (e: "close-ranking-modal"): void;
-  (e: "submit-ranking"): void;
-  (e: "update:rankingForm", v: RankingFormModel): void;
 }>();
 
-const rankingEnabled = computed(() => true);
+/**
+ * ✅ Local reactive form:
+ * - nhập liệu update UI ngay
+ * - vẫn emit lên parent để sync
+ */
+const localForm = ref<JournalFormModel>({ ...props.form });
 
-const rankingModalOpen = computed(() => props.rankingModalOpen ?? false);
-const rankingModalTitle = computed(
-  () => props.rankingModalTitle ?? "Thiết lập hạng tạp chí"
+watch(
+  () => props.form,
+  (v) => {
+    localForm.value = { ...v };
+  },
+  { deep: true },
 );
-const rankingForm = computed(() => props.rankingForm!);
-const rankingErrors = computed(() => props.rankingErrors!);
 
-function rankBadgeClass(rank: JournalRank | null): string {
-  if (!rank) return "bg-slate-100 text-slate-700";
-  if (rank === "Q1") return "bg-emerald-50 text-emerald-700";
-  if (rank === "Q2") return "bg-sky-50 text-sky-700";
-  if (rank === "Q3") return "bg-amber-50 text-amber-800";
-  if (rank === "Q4") return "bg-orange-50 text-orange-800";
-  if (rank === "Q5") return "bg-slate-900/5 text-slate-800";
-  return "bg-slate-100 text-slate-700";
+function patchForm(patch: Partial<JournalFormModel>) {
+  localForm.value = { ...localForm.value, ...patch };
+  emit("update:form", localForm.value);
 }
 
-function formatDate(value: string): string {
-  const d = new Date(value.length === 10 ? `${value}T00:00:00` : value);
-  if (Number.isNaN(d.getTime())) return value;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+function toNumberOrNull(raw: string): number | null {
+  if (raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
+
+function formatPointRange(min: number | null, max: number | null): string {
+  if (min === null && max === null) return "—";
+  if (min !== null && max === null) return `≥ ${min}`;
+  if (min === null && max !== null) return `≤ ${max}`;
+  return `${min} – ${max}`;
+}
+
+function hasIssnIsbn(v: string | null): boolean {
+  return !!(v && v.trim().length > 0);
+}
+
+/**
+ * ✅ Normalize điểm:
+ * - chỉ có min hoặc max => coi đó là maxPoint
+ * - có đủ 2 => swap nếu nhập ngược
+ */
+function normalizePoints(pointMin: number | null, pointMax: number | null) {
+  if (pointMin === null && pointMax === null) {
+    return {
+      min: null as number | null,
+      max: null as number | null,
+      maxPoint: null as number | null,
+    };
+  }
+  if (pointMin !== null && pointMax === null) {
+    return { min: pointMin, max: null, maxPoint: pointMin };
+  }
+  if (pointMin === null && pointMax !== null) {
+    return { min: null, max: pointMax, maxPoint: pointMax };
+  }
+  const min = Math.min(pointMin!, pointMax!);
+  const max = Math.max(pointMin!, pointMax!);
+  return { min, max, maxPoint: max };
+}
+
+/**
+ * ✅ Rule mới (chuẩn hơn):
+ * - maxPoint >= 2  => 900h
+ * - maxPoint >= 1  => 600h
+ * - else có ISSN   => 300h
+ * - else           => 0h
+ */
+function deriveCategory(
+  issn: string | null,
+  pointMin: number | null,
+  pointMax: number | null,
+): DerivedCategory {
+  const { maxPoint } = normalizePoints(pointMin, pointMax);
+
+  if (maxPoint !== null && maxPoint >= 2) return "POINT_GE_2";
+  if (maxPoint !== null && maxPoint >= 1) return "POINT_GE_1";
+  if (hasIssnIsbn(issn)) return "ISSN_ISBN";
+  return "UNKNOWN";
+}
+
+/**
+ * ✅ Bảng meta chung: label + giờ + màu badge
+ */
+const CATEGORY_RULES: Record<
+  DerivedCategory,
+  { label: string; hours: number; badgeClass: string }
+> = {
+  POINT_GE_2: {
+    label: "≥ 2 điểm",
+    hours: 900,
+    badgeClass: "bg-emerald-50 text-emerald-700",
+  },
+  POINT_GE_1: {
+    label: "≥ 1 điểm",
+    hours: 600,
+    badgeClass: "bg-sky-50 text-sky-700",
+  },
+  ISSN_ISBN: {
+    label: "ISSN/ISBN",
+    hours: 300,
+    badgeClass: "bg-amber-50 text-amber-800",
+  },
+  UNKNOWN: {
+    label: "Chưa xác định",
+    hours: 0,
+    badgeClass: "bg-slate-100 text-slate-700",
+  },
+};
+
+function getCategoryMeta(c: DerivedCategory) {
+  return CATEGORY_RULES[c];
+}
+
+/**
+ * ✅ Helper tính 1 lần/row để render bảng (tránh gọi derive nhiều lần)
+ */
+function getDerivedRow(row: JournalRow) {
+  const category = deriveCategory(
+    row.issn ?? null,
+    row.pointMin ?? null,
+    row.pointMax ?? null,
+  );
+  return { category, hours: getCategoryMeta(category).hours };
+}
+
+/** ✅ computed cho phần preview trong modal */
+const derivedCategoryValue = computed(() =>
+  deriveCategory(
+    localForm.value.issn ?? null,
+    localForm.value.pointMin ?? null,
+    localForm.value.pointMax ?? null,
+  ),
+);
+
+const derivedHours = computed(
+  () => getCategoryMeta(derivedCategoryValue.value).hours,
+);
+const derivedLabel = computed(
+  () => getCategoryMeta(derivedCategoryValue.value).label,
+);
+const derivedBadgeClass = computed(
+  () => getCategoryMeta(derivedCategoryValue.value).badgeClass,
+);
+const derivedRangeText = computed(() =>
+  formatPointRange(
+    localForm.value.pointMin ?? null,
+    localForm.value.pointMax ?? null,
+  ),
+);
 </script>

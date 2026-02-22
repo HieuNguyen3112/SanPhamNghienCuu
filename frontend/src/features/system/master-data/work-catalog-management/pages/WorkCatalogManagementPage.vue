@@ -7,8 +7,7 @@
       >
         <PageHeader
           title="Danh mục công trình"
-          subtitle="Quản lý các danh mục nền phục vụ kê khai và xét duyệt công trình
-            nghiên cứu khoa học"
+          subtitle="Quản lý các danh mục nền phục vụ kê khai và xét duyệt công trình nghiên cứu khoa học"
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"
@@ -17,7 +16,11 @@
       </div>
 
       <!-- Tabs -->
-      <CatalogTabs v-model="activeTab" :tabs="tabs" />
+      <CatalogTabs
+        :model-value="activeTab"
+        :tabs="tabs"
+        @update:model-value="setActiveTab"
+      />
 
       <!-- Content Card -->
       <div
@@ -107,10 +110,6 @@
             :submitting="loading"
             :form="journalForm"
             :errors="journalErrors"
-            :ranking-modal-open="rankingModalJournalOpen"
-            :ranking-modal-title="'Thiết lập hạng tạp chí'"
-            :ranking-form="rankingForm"
-            :ranking-errors="rankingErrors"
             @update:search="qJournal = $event"
             @update:page="pageJournal = $event"
             @update:pageSize="pageSizeJournal = $event"
@@ -119,10 +118,6 @@
             @close-modal="modalJournalOpen = false"
             @submit="saveJournal"
             @update:form="onUpdateJournalForm"
-            @set-ranking="openJournalRanking"
-            @close-ranking-modal="closeJournalRanking"
-            @submit-ranking="submitJournalRanking"
-            @update:rankingForm="onUpdateRankingForm"
           />
 
           <ConferenceCatalogSection
@@ -187,16 +182,20 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { Layers, Flag, BookOpen, Users, Brain } from "lucide-vue-next";
+
 import CatalogTabs from "../components/CatalogTabs.vue";
 import WorkTypeCatalogSection from "../components/WorkTypeCatalogSection.vue";
 import WorkLevelCatalogSection from "../components/WorkLevelCatalogSection.vue";
 import JournalCatalogSection from "../components/JournalCatalogSection.vue";
 import ConferenceCatalogSection from "../components/ConferenceCatalogSection.vue";
 import ResearchFieldCatalogSection from "../components/ResearchFieldCatalogSection.vue";
-import type { WorkCatalogTabKey } from "../contracts/workCatalog.contract";
+
+import type { WorkCatalogTabKey } from "../contracts/workCatalogTabs.contract";
 import { useWorkCatalogs } from "../composables/useWorkCatalogs";
+
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
+// tabs config
 const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
   { key: "work_type", label: "Loại công trình", icon: Layers },
   { key: "work_level", label: "Cấp công trình", icon: Flag },
@@ -208,22 +207,28 @@ const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
 const wc = useWorkCatalogs();
 
 const {
+  // global
   activeTab,
   loading,
   errorMessage,
+  loadActiveTab,
+  formatDateTime,
 
+  // data stores
   workTypes,
   workLevels,
   journals,
   conferences,
   researchFields,
 
+  // search
   qWorkType,
   qWorkLevel,
   qJournal,
   qConference,
   qResearchField,
 
+  // pagination
   pageWorkType,
   pageWorkLevel,
   pageJournal,
@@ -235,11 +240,7 @@ const {
   pageSizeConference,
   pageSizeResearchField,
 
-  filteredWorkTypes,
-  filteredWorkLevels,
-  filteredJournals,
-  filteredConferences,
-  filteredResearchFields,
+  // computed rows
   pagedWorkTypes,
   pagedWorkLevels,
   pagedJournals,
@@ -251,6 +252,7 @@ const {
   conferenceTotal,
   researchFieldTotal,
 
+  // modal mode + open states
   modalMode,
   modalWorkTypeOpen,
   modalWorkLevelOpen,
@@ -258,6 +260,7 @@ const {
   modalConferenceOpen,
   modalResearchFieldOpen,
 
+  // forms + errors
   workTypeForm,
   workTypeErrors,
   workLevelForm,
@@ -269,128 +272,60 @@ const {
   researchFieldForm,
   researchFieldErrors,
 
-  loadActiveTab,
+  // actions
   openCreateWorkType,
   openEditWorkType,
   saveWorkType,
+  onUpdateWorkTypeForm,
+
   openCreateWorkLevel,
   openEditWorkLevel,
   saveWorkLevel,
+  onUpdateWorkLevelForm,
+
   openCreateJournal,
   openEditJournal,
   saveJournal,
+  onUpdateJournalForm,
+
   openCreateConference,
   openEditConference,
   saveConference,
+  onUpdateConferenceForm,
+
   openCreateResearchField,
   openEditResearchField,
   saveResearchField,
-  // ranking
-  rankingModalJournalOpen,
-  rankingForm,
-  rankingErrors,
-  openJournalRanking,
-  closeJournalRanking,
-  submitJournalRanking,
-  onUpdateRankingForm,
-
-  formatDateTime,
+  onUpdateResearchFieldForm,
 } = wc;
+
+const setActiveTab = (tab: WorkCatalogTabKey) => {
+  activeTab.value = tab;
+  loadActiveTab();
+};
 
 onMounted(async () => {
   await loadActiveTab();
 });
 
 function onEditWorkType(id: number) {
-  const item = workTypes.value.find((x) => x.id === id);
+  const item = workTypes.value.find((x: any) => x.id === id);
   if (item) openEditWorkType(item);
 }
 function onEditWorkLevel(id: number) {
-  const item = workLevels.value.find((x) => x.id === id);
+  const item = workLevels.value.find((x: any) => x.id === id);
   if (item) openEditWorkLevel(item);
 }
 function onEditJournal(id: number) {
-  const item = journals.value.find((x) => x.id === id);
+  const item = journals.value.find((x: any) => x.id === id);
   if (item) openEditJournal(item);
 }
 function onEditConference(id: number) {
-  const item = conferences.value.find((x) => x.id === id);
+  const item = conferences.value.find((x: any) => x.id === id);
   if (item) openEditConference(item);
 }
 function onEditResearchField(id: number) {
-  const item = researchFields.value.find((x) => x.id === id);
+  const item = researchFields.value.find((x: any) => x.id === id);
   if (item) openEditResearchField(item);
-}
-
-function onUpdateWorkTypeForm(v: {
-  id: number;
-  name: string;
-  description: string;
-  isActive: boolean;
-}) {
-  workTypeForm.id = v.id;
-  workTypeForm.name = v.name;
-  workTypeForm.description = v.description;
-  workTypeForm.isActive = v.isActive;
-}
-function onUpdateWorkLevelForm(v: {
-  id: number;
-  name: string;
-  priority: number;
-  notes: string;
-  isActive: boolean;
-}) {
-  workLevelForm.id = v.id;
-  workLevelForm.name = v.name;
-  workLevelForm.priority = v.priority;
-  workLevelForm.notes = v.notes;
-  workLevelForm.isActive = v.isActive;
-}
-function onUpdateJournalForm(v: {
-  id: number;
-  name: string;
-  issn: string;
-  classification?: "ISI" | "SCOPUS" | "OTHER";
-  country?: string;
-  address?: string;
-  notes: string;
-  isActive: boolean;
-}) {
-  journalForm.id = v.id;
-  journalForm.name = v.name;
-  journalForm.issn = v.issn;
-  journalForm.address = v.address ?? journalForm.address ?? "";
-  journalForm.notes = v.notes;
-  journalForm.isActive = v.isActive;
-
-  // TODO: nếu bạn vẫn còn classification/country ở form cũ thì giữ lại trong journalForm riêng,
-  // hoặc migrate dần sang address + ranking.
-}
-
-function onUpdateConferenceForm(v: {
-  id: number;
-  name: string;
-  level: "FACULTY" | "UNIVERSITY" | "NATIONAL" | "INTERNATIONAL";
-  notes: string;
-  isActive: boolean;
-}) {
-  conferenceForm.id = v.id;
-  conferenceForm.name = v.name;
-  conferenceForm.level = v.level;
-  conferenceForm.notes = v.notes;
-  conferenceForm.isActive = v.isActive;
-}
-function onUpdateResearchFieldForm(v: {
-  id: number;
-  code: string;
-  name: string;
-  description: string;
-  isActive: boolean;
-}) {
-  researchFieldForm.id = v.id;
-  researchFieldForm.code = v.code;
-  researchFieldForm.name = v.name;
-  researchFieldForm.description = v.description;
-  researchFieldForm.isActive = v.isActive;
 }
 </script>

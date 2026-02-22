@@ -1,6 +1,5 @@
-// File: src/features/master-data/work-catalog-management/composables/useWorkCatalogs.ts
-import { onBeforeUnmount, ref, watch } from "vue";
-import type { WorkCatalogTabKey } from "../contracts/workCatalog.contract";
+import { computed, ref } from "vue";
+import type { WorkCatalogTabKey } from "../contracts/workCatalogTabs.contract";
 
 import { useWorkTypeCatalog } from "./useWorkTypeCatalog";
 import { useWorkLevelCatalog } from "./useWorkLevelCatalog";
@@ -10,9 +9,8 @@ import { useResearchFieldCatalog } from "./useResearchFieldCatalog";
 
 export function useWorkCatalogs() {
   const activeTab = ref<WorkCatalogTabKey>("work_type");
-
   const loading = ref(false);
-  const errorMessage = ref("");
+  const errorMessage = ref<string | null>(null);
 
   const workType = useWorkTypeCatalog();
   const workLevel = useWorkLevelCatalog();
@@ -20,243 +18,121 @@ export function useWorkCatalogs() {
   const conference = useConferenceCatalog();
   const researchField = useResearchFieldCatalog();
 
-  function clearError() {
-    errorMessage.value = "";
-  }
-
-  function captureError(e: unknown) {
-    errorMessage.value = e instanceof Error ? e.message : "Error occurred.";
-  }
-
   async function loadActiveTab(): Promise<void> {
-    clearError();
     loading.value = true;
+    errorMessage.value = null;
     try {
-      switch (activeTab.value) {
-        case "work_type":
-          await workType.load();
-          break;
-        case "work_level":
-          await workLevel.load();
-          break;
-        case "journal":
-          await journal.load();
-          break;
-        case "conference":
-          await conference.load();
-          break;
-        case "research_field":
-          await researchField.load();
-          break;
-      }
-    } catch (e) {
-      errorMessage.value = e instanceof Error ? e.message : "Có lỗi xảy ra.";
+      if (activeTab.value === "work_type") await workType.load();
+      else if (activeTab.value === "work_level") await workLevel.load();
+      else if (activeTab.value === "journal") await journal.load();
+      else if (activeTab.value === "conference") await conference.load();
+      else await researchField.load();
+    } catch (e: any) {
+      errorMessage.value =
+        e?.response?.data?.message ?? e?.message ?? "Có lỗi xảy ra.";
     } finally {
       loading.value = false;
     }
   }
 
-  watch(activeTab, loadActiveTab);
-
-  let workTypeSearchTimer: number | null = null;
-  watch(workType.qWorkType, () => {
-    if (activeTab.value !== "work_type") return;
-    if (workTypeSearchTimer) window.clearTimeout(workTypeSearchTimer);
-    workTypeSearchTimer = window.setTimeout(() => {
-      workType.pageWorkType.value = 1;
-      void loadActiveTab();
-    }, 300);
-  });
-  watch(workType.pageWorkType, () => {
-    if (activeTab.value !== "work_type") return;
-    void loadActiveTab();
-  });
-  watch(workType.pageSizeWorkType, () => {
-    if (activeTab.value !== "work_type") return;
-    const shouldLoad = workType.pageWorkType.value === 1;
-    workType.pageWorkType.value = 1;
-    if (shouldLoad) void loadActiveTab();
-  });
-
-  let workLevelSearchTimer: number | null = null;
-  watch(workLevel.qWorkLevel, () => {
-    if (activeTab.value !== "work_level") return;
-    if (workLevelSearchTimer) window.clearTimeout(workLevelSearchTimer);
-    workLevelSearchTimer = window.setTimeout(() => {
-      workLevel.pageWorkLevel.value = 1;
-      void loadActiveTab();
-    }, 300);
-  });
-  watch(workLevel.pageWorkLevel, () => {
-    if (activeTab.value !== "work_level") return;
-    void loadActiveTab();
-  });
-  watch(workLevel.pageSizeWorkLevel, () => {
-    if (activeTab.value !== "work_level") return;
-    const shouldLoad = workLevel.pageWorkLevel.value === 1;
-    workLevel.pageWorkLevel.value = 1;
-    if (shouldLoad) void loadActiveTab();
-  });
-
-  let journalSearchTimer: number | null = null;
-  watch(journal.qJournal, () => {
-    if (activeTab.value !== "journal") return;
-    if (journalSearchTimer) window.clearTimeout(journalSearchTimer);
-    journalSearchTimer = window.setTimeout(() => {
-      journal.pageJournal.value = 1;
-      void loadActiveTab();
-    }, 300);
-  });
-  watch(journal.pageJournal, () => {
-    if (activeTab.value !== "journal") return;
-    void loadActiveTab();
-  });
-  watch(journal.pageSizeJournal, () => {
-    if (activeTab.value !== "journal") return;
-    const shouldLoad = journal.pageJournal.value === 1;
-    journal.pageJournal.value = 1;
-    if (shouldLoad) void loadActiveTab();
-  });
-
-  let conferenceSearchTimer: number | null = null;
-  watch(conference.qConference, () => {
-    if (activeTab.value !== "conference") return;
-    if (conferenceSearchTimer) window.clearTimeout(conferenceSearchTimer);
-    conferenceSearchTimer = window.setTimeout(() => {
-      conference.pageConference.value = 1;
-      void loadActiveTab();
-    }, 300);
-  });
-  watch(conference.pageConference, () => {
-    if (activeTab.value !== "conference") return;
-    void loadActiveTab();
-  });
-  watch(conference.pageSizeConference, () => {
-    if (activeTab.value !== "conference") return;
-    const shouldLoad = conference.pageConference.value === 1;
-    conference.pageConference.value = 1;
-    if (shouldLoad) void loadActiveTab();
-  });
-
-  let researchFieldSearchTimer: number | null = null;
-  watch(researchField.qResearchField, () => {
-    if (activeTab.value !== "research_field") return;
-    if (researchFieldSearchTimer) window.clearTimeout(researchFieldSearchTimer);
-    researchFieldSearchTimer = window.setTimeout(() => {
-      researchField.pageResearchField.value = 1;
-      void loadActiveTab();
-    }, 300);
-  });
-  watch(researchField.pageResearchField, () => {
-    if (activeTab.value !== "research_field") return;
-    void loadActiveTab();
-  });
-  watch(researchField.pageSizeResearchField, () => {
-    if (activeTab.value !== "research_field") return;
-    const shouldLoad = researchField.pageResearchField.value === 1;
-    researchField.pageResearchField.value = 1;
-    if (shouldLoad) void loadActiveTab();
-  });
-
-  onBeforeUnmount(() => {
-    if (workTypeSearchTimer) window.clearTimeout(workTypeSearchTimer);
-    if (workLevelSearchTimer) window.clearTimeout(workLevelSearchTimer);
-    if (journalSearchTimer) window.clearTimeout(journalSearchTimer);
-    if (conferenceSearchTimer) window.clearTimeout(conferenceSearchTimer);
-    if (researchFieldSearchTimer) window.clearTimeout(researchFieldSearchTimer);
-  });
-
-  async function saveWorkType() {
-    clearError();
-    loading.value = true;
-    try {
-      await workType.saveWorkType();
-    } catch (e) {
-      captureError(e);
-    } finally {
-      loading.value = false;
-    }
+  function formatDateTime(v: string | null | undefined): string {
+    if (!v) return "";
+    // backend thường trả ISO / datetime string
+    return v.replace("T", " ").replace(".000000Z", "");
   }
 
-  async function saveWorkLevel() {
-    clearError();
-    loading.value = true;
-    try {
-      await workLevel.saveWorkLevel();
-    } catch (e) {
-      captureError(e);
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function saveJournal() {
-    clearError();
-    loading.value = true;
-    try {
-      await journal.saveJournal();
-    } catch (e) {
-      captureError(e);
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function submitJournalRanking() {
-    clearError();
-    loading.value = true;
-    try {
-      await journal.submitJournalRanking();
-    } catch (e) {
-      captureError(e);
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function saveConference() {
-    clearError();
-    loading.value = true;
-    try {
-      await conference.saveConference();
-    } catch (e) {
-      captureError(e);
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function saveResearchField() {
-    clearError();
-    loading.value = true;
-    try {
-      await researchField.saveResearchField();
-    } catch (e) {
-      captureError(e);
-    } finally {
-      loading.value = false;
-    }
-  }
+  const workTypes = computed(() => workType.workTypes.value);
+  const workLevels = computed(() => workLevel.workLevels.value);
+  const journals = computed(() => journal.journals.value);
+  const conferences = computed(() => conference.conferences.value);
+  const researchFields = computed(() => researchField.researchFields.value);
 
   return {
-    // global
     activeTab,
     loading,
     errorMessage,
     loadActiveTab,
+    formatDateTime,
 
-    // expose states (để page không phải sửa nhiều)
-    ...workType,
-    ...workLevel,
-    ...journal,
-    ...conference,
-    ...researchField,
+    // Work Types
+    workTypes,
+    workTypeTotal: workType.workTypeTotal,
+    qWorkType: workType.qWorkType,
+    pageWorkType: workType.pageWorkType,
+    pageSizeWorkType: workType.pageSizeWorkType,
+    filteredWorkTypes: workType.filteredWorkTypes,
+    pagedWorkTypes: workType.pagedWorkTypes,
+    modalWorkTypeOpen: workType.modalWorkTypeOpen,
+    modalMode: workType.modalMode,
+    workTypeForm: workType.workTypeForm,
+    workTypeErrors: workType.workTypeErrors,
+    openCreateWorkType: workType.openCreateWorkType,
+    openEditWorkType: workType.openEditWorkType,
+    saveWorkType: workType.saveWorkType,
+    onUpdateWorkTypeForm: workType.onUpdateWorkTypeForm,
 
-    saveWorkType,
-    saveWorkLevel,
-    saveJournal,
-    submitJournalRanking,
-    saveConference,
-    saveResearchField,
+    // Work Levels
+    workLevels,
+    workLevelTotal: workLevel.workLevelTotal,
+    qWorkLevel: workLevel.qWorkLevel,
+    pageWorkLevel: workLevel.pageWorkLevel,
+    pageSizeWorkLevel: workLevel.pageSizeWorkLevel,
+    filteredWorkLevels: workLevel.filteredWorkLevels,
+    pagedWorkLevels: workLevel.pagedWorkLevels,
+    modalWorkLevelOpen: workLevel.modalWorkLevelOpen,
+    workLevelForm: workLevel.workLevelForm,
+    workLevelErrors: workLevel.workLevelErrors,
+    openCreateWorkLevel: workLevel.openCreateWorkLevel,
+    openEditWorkLevel: workLevel.openEditWorkLevel,
+    saveWorkLevel: workLevel.saveWorkLevel,
+    onUpdateWorkLevelForm: workLevel.onUpdateWorkLevelForm,
+
+    // Journals
+    journals,
+    journalTotal: journal.journalTotal,
+    qJournal: journal.qJournal,
+    pageJournal: journal.pageJournal,
+    pageSizeJournal: journal.pageSizeJournal,
+    filteredJournals: journal.filteredJournals,
+    pagedJournals: journal.pagedJournals,
+    modalJournalOpen: journal.modalJournalOpen,
+    journalForm: journal.journalForm,
+    journalErrors: journal.journalErrors,
+    openCreateJournal: journal.openCreateJournal,
+    openEditJournal: journal.openEditJournal,
+    saveJournal: journal.saveJournal,
+    onUpdateJournalForm: journal.onUpdateJournalForm,
+
+    // Conferences
+    conferences,
+    conferenceTotal: conference.conferenceTotal,
+    qConference: conference.qConference,
+    pageConference: conference.pageConference,
+    pageSizeConference: conference.pageSizeConference,
+    filteredConferences: conference.filteredConferences,
+    pagedConferences: conference.pagedConferences,
+    modalConferenceOpen: conference.modalConferenceOpen,
+    conferenceForm: conference.conferenceForm,
+    conferenceErrors: conference.conferenceErrors,
+    openCreateConference: conference.openCreateConference,
+    openEditConference: conference.openEditConference,
+    saveConference: conference.saveConference,
+    onUpdateConferenceForm: conference.onUpdateConferenceForm,
+
+    // Research fields
+    researchFields,
+    researchFieldTotal: researchField.researchFieldTotal,
+    qResearchField: researchField.qResearchField,
+    pageResearchField: researchField.pageResearchField,
+    pageSizeResearchField: researchField.pageSizeResearchField,
+    filteredResearchFields: researchField.filteredResearchFields,
+    pagedResearchFields: researchField.pagedResearchFields,
+    modalResearchFieldOpen: researchField.modalResearchFieldOpen,
+    researchFieldForm: researchField.researchFieldForm,
+    researchFieldErrors: researchField.researchFieldErrors,
+    openCreateResearchField: researchField.openCreateResearchField,
+    openEditResearchField: researchField.openEditResearchField,
+    saveResearchField: researchField.saveResearchField,
+    onUpdateResearchFieldForm: researchField.onUpdateResearchFieldForm,
   };
 }

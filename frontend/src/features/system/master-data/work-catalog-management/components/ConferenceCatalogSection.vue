@@ -62,10 +62,10 @@
                 row.level === "FACULTY"
                   ? "Khoa"
                   : row.level === "UNIVERSITY"
-                  ? "Trường"
-                  : row.level === "NATIONAL"
-                  ? "Quốc gia"
-                  : "Quốc tế"
+                    ? "Trường"
+                    : row.level === "NATIONAL"
+                      ? "Quốc gia"
+                      : "Quốc tế"
               }}
             </td>
             <td class="px-4 py-3">
@@ -212,8 +212,8 @@
 <script setup lang="ts">
 import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
-import type { Conference } from "../contracts/workCatalog.contract";
-import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
+import type { Conference } from "../contracts/conferences.contract";
+// import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 defineProps<{
   rows: Conference[];
@@ -252,7 +252,7 @@ const emit = defineEmits<{
       level: "FACULTY" | "UNIVERSITY" | "NATIONAL" | "INTERNATIONAL";
       notes: string;
       isActive: boolean;
-    }
+    },
   ): void;
 }>();
 </script>

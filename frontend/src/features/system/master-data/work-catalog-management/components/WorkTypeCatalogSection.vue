@@ -193,8 +193,7 @@
 <script setup lang="ts">
 import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
-import type { WorkType } from "../contracts/workCatalog.contract";
-
+import type { WorkType } from "../contracts/workTypes.contract";
 // TODO: chỉnh path theo project của bạn
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
@@ -224,7 +223,7 @@ const emit = defineEmits<{
   (e: "submit"): void;
   (
     e: "update:form",
-    v: { id: number; name: string; description: string; isActive: boolean }
+    v: { id: number; name: string; description: string; isActive: boolean },
   ): void;
 }>();
 </script>

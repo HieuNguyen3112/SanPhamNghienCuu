@@ -1,11 +1,9 @@
-// File: src/features/master-data/work-catalog-management/composables/useResearchFieldCatalog.ts
 import { computed, reactive, ref } from "vue";
-import {
-  researchFieldFromDto,
-  type ResearchField,
-  type ResearchFieldDTO,
-} from "../contracts/workCatalog.contract";
-import { workCatalogService } from "../services/workCatalogService";
+import { researchFieldService } from "../services/researchFields.service";
+import type {
+  ResearchField,
+  ResearchFieldUpsertDTO,
+} from "../contracts/researchFields.contract";
 
 type FormErrors<T extends Record<string, unknown>> = Partial<
   Record<keyof T, string>
@@ -28,31 +26,40 @@ export function useResearchFieldCatalog() {
     name: string;
     description: string;
     isActive: boolean;
-  }>({
-    id: 0,
-    code: "",
-    name: "",
-    description: "",
-    isActive: true,
-  });
+  }>({ id: 0, code: "", name: "", description: "", isActive: true });
+
   const researchFieldErrors = reactive<FormErrors<typeof researchFieldForm>>(
-    {}
+    {},
   );
 
   function clearErrors() {
     Object.keys(researchFieldErrors).forEach(
-      (k) => delete researchFieldErrors[k as keyof typeof researchFieldErrors]
+      (k) => delete researchFieldErrors[k as keyof typeof researchFieldErrors],
     );
   }
 
+  function validateRequired(value: string, max: number): string | null {
+    if (!value.trim()) return "Trường này là bắt buộc.";
+    if (value.length > max) return `Tối đa ${max} ký tự.`;
+    return null;
+  }
+  function validateOptional(value: string, max: number): string | null {
+    if (value.length > max) return `Tối đa ${max} ký tự.`;
+    return null;
+  }
+
   async function load(): Promise<void> {
-    const response = await workCatalogService.listResearchFields({
+    const res = await researchFieldService.list({
       keyword: qResearchField.value.trim() || undefined,
       page: pageResearchField.value,
       per_page: pageSizeResearchField.value,
     });
-    researchFields.value = response.items.map(researchFieldFromDto);
-    researchFieldTotal.value = response.pagination.total;
+    researchFields.value = res.items.map((item) => ({
+      ...item,
+      isActive: item.is_active ?? true,
+      updatedAt: item.updated_at ?? new Date().toISOString(),
+    }));
+    researchFieldTotal.value = res.pagination.total;
   }
 
   const filteredResearchFields = computed(() => researchFields.value);
@@ -78,33 +85,42 @@ export function useResearchFieldCatalog() {
     modalResearchFieldOpen.value = true;
   }
 
-  function validateRequired(value: string, max: number): string | null {
-    if (!value.trim()) return "Trường này là bắt buộc.";
-    if (value.length > max) return `Tối đa ${max} ký tự.`;
-    return null;
-  }
-  function validateOptional(value: string, max: number): string | null {
-    if (value.length > max) return `Tối đa ${max} ký tự.`;
-    return null;
+  function onUpdateResearchFieldForm(v: {
+    id: number;
+    code: string;
+    name: string;
+    description: string;
+    isActive: boolean;
+  }) {
+    researchFieldForm.id = v.id;
+    researchFieldForm.code = v.code;
+    researchFieldForm.name = v.name;
+    researchFieldForm.description = v.description;
+    researchFieldForm.isActive = v.isActive;
   }
 
   async function saveResearchField(): Promise<void> {
     clearErrors();
 
-    researchFieldErrors.name =
-      validateRequired(researchFieldForm.name, 255) ?? undefined;
     researchFieldErrors.code =
       validateOptional(researchFieldForm.code, 50) ?? undefined;
+    researchFieldErrors.name =
+      validateRequired(researchFieldForm.name, 255) ?? undefined;
     researchFieldErrors.description =
       validateOptional(researchFieldForm.description, 500) ?? undefined;
+    if (
+      researchFieldErrors.code ||
+      researchFieldErrors.name ||
+      researchFieldErrors.description
+    )
+      return;
 
-    if (researchFieldErrors.name || researchFieldErrors.code) return;
+    const code = researchFieldForm.code.trim()
+      ? researchFieldForm.code.trim()
+      : null;
 
-    const payload: Omit<ResearchFieldDTO, "updated_at"> = {
-      id: researchFieldForm.id,
-      code: researchFieldForm.code.trim()
-        ? researchFieldForm.code.trim()
-        : null,
+    const payload: ResearchFieldUpsertDTO = {
+      code,
       name: researchFieldForm.name.trim(),
       description: researchFieldForm.description.trim()
         ? researchFieldForm.description.trim()
@@ -112,7 +128,11 @@ export function useResearchFieldCatalog() {
       is_active: researchFieldForm.isActive,
     };
 
-    await workCatalogService.upsertResearchField(payload);
+    if (researchFieldForm.id === 0) {
+      await researchFieldService.create(payload);
+    } else {
+      await researchFieldService.update(researchFieldForm.id, payload);
+    }
     modalResearchFieldOpen.value = false;
     await load();
   }
@@ -125,15 +145,14 @@ export function useResearchFieldCatalog() {
     pageSizeResearchField,
     filteredResearchFields,
     pagedResearchFields,
-
     modalMode,
     modalResearchFieldOpen,
     researchFieldForm,
     researchFieldErrors,
-
     load,
     openCreateResearchField,
     openEditResearchField,
     saveResearchField,
+    onUpdateResearchFieldForm,
   };
 }

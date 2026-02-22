@@ -1,11 +1,9 @@
-// File: src/features/master-data/work-catalog-management/composables/useWorkLevelCatalog.ts
 import { computed, reactive, ref } from "vue";
-import {
-  workLevelFromDto,
-  type WorkLevel,
-  type WorkLevelDTO,
-} from "../contracts/workCatalog.contract";
-import { workCatalogService } from "../services/workCatalogService";
+import type {
+  WorkLevel,
+  WorkLevelUpsertDTO,
+} from "../contracts/workLevels.contract";
+import { workLevelService } from "../services/workLevels.service";
 
 type FormErrors<T extends Record<string, unknown>> = Partial<
   Record<keyof T, string>
@@ -35,22 +33,35 @@ export function useWorkLevelCatalog() {
     notes: "",
     isActive: true,
   });
-  const workLevelErrors = reactive<FormErrors<typeof workLevelForm>>({});
+
+  const workLevelErrors = reactive<
+    Partial<Record<keyof typeof workLevelForm, string>>
+  >({});
 
   function clearErrors() {
     Object.keys(workLevelErrors).forEach(
-      (k) => delete workLevelErrors[k as keyof typeof workLevelErrors]
+      (k) => delete workLevelErrors[k as keyof typeof workLevelErrors],
     );
   }
 
+  function validateRequired(value: string, max: number): string | null {
+    if (!value.trim()) return "Trường này là bắt buộc.";
+    if (value.length > max) return `Tối đa ${max} ký tự.`;
+    return null;
+  }
+  function validateOptional(value: string, max: number): string | null {
+    if (value.length > max) return `Tối đa ${max} ký tự.`;
+    return null;
+  }
+
   async function load(): Promise<void> {
-    const response = await workCatalogService.listWorkLevels({
+    const res = await workLevelService.list({
       keyword: qWorkLevel.value.trim() || undefined,
       page: pageWorkLevel.value,
       per_page: pageSizeWorkLevel.value,
     });
-    workLevels.value = response.items.map(workLevelFromDto);
-    workLevelTotal.value = response.pagination.total;
+    workLevels.value = res.items;
+    workLevelTotal.value = res.pagination.total;
   }
 
   const filteredWorkLevels = computed(() => workLevels.value);
@@ -76,30 +87,30 @@ export function useWorkLevelCatalog() {
     modalWorkLevelOpen.value = true;
   }
 
-  function validateRequired(value: string, max: number): string | null {
-    if (!value.trim()) return "Trường này là bắt buộc.";
-    if (value.length > max) return `Tối đa ${max} ký tự.`;
-    return null;
-  }
-  function validateOptional(value: string, max: number): string | null {
-    if (value.length > max) return `Tối đa ${max} ký tự.`;
-    return null;
+  function onUpdateWorkLevelForm(v: {
+    id: number;
+    name: string;
+    priority: number;
+    notes: string;
+    isActive: boolean;
+  }) {
+    workLevelForm.id = v.id;
+    workLevelForm.name = v.name;
+    workLevelForm.priority = v.priority;
+    workLevelForm.notes = v.notes;
+    workLevelForm.isActive = v.isActive;
   }
 
   async function saveWorkLevel(): Promise<void> {
     clearErrors();
+
     workLevelErrors.name =
       validateRequired(workLevelForm.name, 255) ?? undefined;
-
-    if (workLevelForm.priority < 1)
-      workLevelErrors.priority = "Ưu tiên phải >= 1.";
-
     workLevelErrors.notes =
       validateOptional(workLevelForm.notes, 255) ?? undefined;
+    if (workLevelErrors.name || workLevelErrors.notes) return;
 
-    if (workLevelErrors.name || workLevelErrors.priority) return;
-
-    const payload: Omit<WorkLevelDTO, "updated_at"> = {
+    const payload: WorkLevelUpsertDTO = {
       id: workLevelForm.id,
       name: workLevelForm.name.trim(),
       priority: workLevelForm.priority,
@@ -107,7 +118,7 @@ export function useWorkLevelCatalog() {
       is_active: workLevelForm.isActive,
     };
 
-    await workCatalogService.upsertWorkLevel(payload);
+    await workLevelService.upsert(payload);
     modalWorkLevelOpen.value = false;
     await load();
   }
@@ -120,15 +131,14 @@ export function useWorkLevelCatalog() {
     pageSizeWorkLevel,
     filteredWorkLevels,
     pagedWorkLevels,
-
     modalMode,
     modalWorkLevelOpen,
     workLevelForm,
     workLevelErrors,
-
     load,
     openCreateWorkLevel,
     openEditWorkLevel,
     saveWorkLevel,
+    onUpdateWorkLevelForm,
   };
 }

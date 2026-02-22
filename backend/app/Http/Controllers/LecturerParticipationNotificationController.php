@@ -16,6 +16,11 @@ class LecturerParticipationNotificationController extends Controller
     private const STATUS_ACCEPTED = 'accepted';
     private const STATUS_REJECTED = 'rejected';
 
+    // Activity statuses (activity_statuses.code)
+    private const ACT_PENDING_MEMBER_CONFIRM = 'pending_member_confirm';
+    private const ACT_MEMBER_REJECTED = 'member_rejected';
+    private const ACT_PENDING_FACULTY_REVIEW = 'pending_faculty_review';
+
     public function index(ParticipationNotificationIndexRequest $request)
     {
         $lecturer = $this->resolveLecturer($request);
@@ -100,21 +105,24 @@ class LecturerParticipationNotificationController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $member = DB::table('research_activity_members')
-            ->where('id', $requestId)
-            ->where('lecturer_id', $lecturer->id)
-            ->first();
-
-        if (! $member) {
-            return response()->json(['message' => 'request not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if ($member->confirmation_status !== self::STATUS_PENDING) {
-            return response()->json(['message' => 'request already handled'], Response::HTTP_CONFLICT);
-        }
-
         $now = now();
-        DB::transaction(function () use ($requestId, $now, $member, $lecturer) {
+
+        $result = DB::transaction(function () use ($requestId, $now, $lecturer) {
+            // lock member row
+            $member = DB::table('research_activity_members')
+                ->where('id', $requestId)
+                ->where('lecturer_id', $lecturer->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $member) {
+                return ['error' => 'request not found', 'status' => Response::HTTP_NOT_FOUND];
+            }
+
+            if ($member->confirmation_status !== self::STATUS_PENDING) {
+                return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
+            }
+
             DB::table('research_activity_members')
                 ->where('id', $requestId)
                 ->update([
@@ -125,7 +133,16 @@ class LecturerParticipationNotificationController extends Controller
                 ]);
 
             $this->notifyOwnerOnAccept((int) $member->activity_id, (string) ($lecturer->full_name ?? ''), (int) $requestId);
+
+            // auto move to faculty if all accepted
+            $this->tryAutoSendToFaculty((int) $member->activity_id, $now);
+
+            return ['ok' => true];
         });
+
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], $result['status']);
+        }
 
         return $this->show($request, $requestId);
     }
@@ -137,30 +154,183 @@ class LecturerParticipationNotificationController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $member = DB::table('research_activity_members')
-            ->where('id', $requestId)
-            ->where('lecturer_id', $lecturer->id)
+        $reason = $request->validated()['reason'];
+        $now = now();
+
+        $result = DB::transaction(function () use ($requestId, $now, $lecturer, $reason) {
+            $member = DB::table('research_activity_members')
+                ->where('id', $requestId)
+                ->where('lecturer_id', $lecturer->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $member) {
+                return ['error' => 'request not found', 'status' => Response::HTTP_NOT_FOUND];
+            }
+
+            if ($member->confirmation_status !== self::STATUS_PENDING) {
+                return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
+            }
+
+            DB::table('research_activity_members')
+                ->where('id', $requestId)
+                ->update([
+                    'confirmation_status' => self::STATUS_REJECTED,
+                    'responded_at' => $now,
+                    'confirmation_note' => $reason,
+                    'updated_at' => $now,
+                ]);
+
+            // activity -> member_rejected
+            $this->markActivityMemberRejected((int) $member->activity_id, $now);
+
+            return ['ok' => true];
+        });
+
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], $result['status']);
+        }
+
+        return $this->show($request, $requestId);
+    }
+
+    private function tryAutoSendToFaculty(int $activityId, $now): void
+    {
+        $pendingFacultyId = $this->getStatusId(self::ACT_PENDING_FACULTY_REVIEW);
+        $pendingMemberId = $this->getStatusId(self::ACT_PENDING_MEMBER_CONFIRM);
+
+        if (! $pendingFacultyId || ! $pendingMemberId) {
+            return; // status chưa seed
+        }
+
+        // lock activity
+        $activity = DB::table('research_activities as ra')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->where('ra.id', $activityId)
+            ->lockForUpdate()
+            ->select(['ra.id', 'ra.status_id', 'ast.code as status_code'])
             ->first();
 
-        if (! $member) {
-            return response()->json(['message' => 'request not found'], Response::HTTP_NOT_FOUND);
+        if (! $activity) {
+            return;
         }
 
-        if ($member->confirmation_status !== self::STATUS_PENDING) {
-            return response()->json(['message' => 'request already handled'], Response::HTTP_CONFLICT);
+        // chỉ auto send khi đang chờ confirm member
+        if ($activity->status_code !== self::ACT_PENDING_MEMBER_CONFIRM) {
+            return;
         }
 
-        $now = now();
-        DB::table('research_activity_members')
-            ->where('id', $requestId)
+        $hasPending = DB::table('research_activity_members as ram')
+            ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
+            ->where('ram.activity_id', $activityId)
+            ->whereColumn('ram.lecturer_id', '<>', 'ra.owner_lecturer_id')
+            ->where('ram.confirmation_status', self::STATUS_PENDING)
+            ->exists();
+
+        $hasRejected = DB::table('research_activity_members as ram')
+            ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
+            ->where('ram.activity_id', $activityId)
+            ->whereColumn('ram.lecturer_id', '<>', 'ra.owner_lecturer_id')
+            ->where('ram.confirmation_status', self::STATUS_REJECTED)
+            ->exists();
+
+        if ($hasRejected) {
+            $this->markActivityMemberRejected($activityId, $now);
+            return;
+        }
+
+        if ($hasPending) {
+            return; // chưa đủ accept
+        }
+
+        // all accepted -> move to faculty
+        DB::table('research_activities')
+            ->where('id', $activityId)
             ->update([
-                'confirmation_status' => self::STATUS_REJECTED,
-                'responded_at' => $now,
-                'confirmation_note' => $request->validated()['reason'],
+                'status_id' => $pendingFacultyId,
+                'submitted_at' => $now,
                 'updated_at' => $now,
             ]);
 
-        return $this->show($request, $requestId);
+        $this->resetFacultyApprovalToPending($activityId, $now);
+
+        DB::table('activity_status_histories')->insert([
+            'activity_id' => $activityId,
+            'from_status_id' => $activity->status_id,
+            'to_status_id' => $pendingFacultyId,
+            'acted_by_user_id' => null, // hệ thống auto
+            'acted_at' => $now,
+            'note' => 'auto_sent_to_faculty_all_members_accepted',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function markActivityMemberRejected(int $activityId, $now): void
+    {
+        $memberRejectedId = $this->getStatusId(self::ACT_MEMBER_REJECTED);
+        if (! $memberRejectedId) {
+            return;
+        }
+
+        $activity = DB::table('research_activities as ra')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->where('ra.id', $activityId)
+            ->lockForUpdate()
+            ->select(['ra.id', 'ra.status_id', 'ast.code as status_code'])
+            ->first();
+
+        if (! $activity) {
+            return;
+        }
+
+        if ($activity->status_code === self::ACT_MEMBER_REJECTED) {
+            return;
+        }
+
+        DB::table('research_activities')
+            ->where('id', $activityId)
+            ->update([
+                'status_id' => $memberRejectedId,
+                'submitted_at' => null,
+                'updated_at' => $now,
+            ]);
+
+        DB::table('activity_status_histories')->insert([
+            'activity_id' => $activityId,
+            'from_status_id' => $activity->status_id,
+            'to_status_id' => $memberRejectedId,
+            'acted_by_user_id' => null, // hệ thống auto
+            'acted_at' => $now,
+            'note' => 'member_rejected',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function resetFacultyApprovalToPending(int $activityId, $now): void
+    {
+        $assistantStageId = DB::table('approval_stages')->where('code', 'assistant')->value('id');
+        if (! $assistantStageId) {
+            return;
+        }
+
+        DB::table('activity_approvals')
+            ->where('activity_id', $activityId)
+            ->where('stage_id', (int) $assistantStageId)
+            ->update([
+                'status' => 'pending',
+                'decided_by_user_id' => null,
+                'decided_at' => null,
+                'note' => null,
+                'updated_at' => $now,
+            ]);
+    }
+
+    private function getStatusId(string $code): ?int
+    {
+        $id = DB::table('activity_statuses')->where('code', $code)->value('id');
+        return $id ? (int) $id : null;
     }
 
     private function resolveLecturer(Request $request)
@@ -443,73 +613,41 @@ class LecturerParticipationNotificationController extends Controller
 
         switch ($row->kind_code) {
             case 'paper':
-                if ($row->journal_name) {
-                    $parts[] = $row->journal_name;
-                }
-                if ($row->doi) {
-                    $parts[] = 'DOI: ' . $row->doi;
-                } elseif ($row->issn) {
-                    $parts[] = 'ISSN: ' . $row->issn;
-                }
+                if ($row->journal_name) $parts[] = $row->journal_name;
+                if ($row->doi) $parts[] = 'DOI: ' . $row->doi;
+                elseif ($row->issn) $parts[] = 'ISSN: ' . $row->issn;
                 break;
             case 'book':
-                if ($row->publisher) {
-                    $parts[] = $row->publisher;
-                }
-                if ($row->isbn) {
-                    $parts[] = 'ISBN: ' . $row->isbn;
-                }
+                if ($row->publisher) $parts[] = $row->publisher;
+                if ($row->isbn) $parts[] = 'ISBN: ' . $row->isbn;
                 break;
             case 'project':
-                if ($row->project_code) {
-                    $parts[] = 'CODE: ' . $row->project_code;
-                } elseif ($row->decision_no) {
-                    $parts[] = 'DECISION: ' . $row->decision_no;
-                }
+                if ($row->project_code) $parts[] = 'CODE: ' . $row->project_code;
+                elseif ($row->decision_no) $parts[] = 'DECISION: ' . $row->decision_no;
                 break;
             case 'conference':
-                if ($row->conference_name) {
-                    $parts[] = $row->conference_name;
-                }
-                if ($row->location) {
-                    $parts[] = $row->location;
-                }
-                break;
-            default:
+                if ($row->conference_name) $parts[] = $row->conference_name;
+                if ($row->location) $parts[] = $row->location;
                 break;
         }
 
-        if (! empty($row->activity_year)) {
-            $parts[] = (string) $row->activity_year;
-        }
+        if (! empty($row->activity_year)) $parts[] = (string) $row->activity_year;
 
         return implode(' - ', array_filter($parts));
     }
 
     private function normalizeDateTime($value): ?string
     {
-        if (! $value) {
-            return null;
-        }
-
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format('Y-m-d H:i:s');
-        }
-
+        if (! $value) return null;
+        if ($value instanceof \DateTimeInterface) return $value->format('Y-m-d H:i:s');
         return (string) $value;
     }
 
     private function normalizeDoiUrl(string $doi): string
     {
         $trimmed = trim($doi);
-        if ($trimmed === '') {
-            return '';
-        }
-
-        if (str_starts_with($trimmed, 'http://') || str_starts_with($trimmed, 'https://')) {
-            return $trimmed;
-        }
-
+        if ($trimmed === '') return '';
+        if (str_starts_with($trimmed, 'http://') || str_starts_with($trimmed, 'https://')) return $trimmed;
         return 'https://doi.org/' . $trimmed;
     }
 }

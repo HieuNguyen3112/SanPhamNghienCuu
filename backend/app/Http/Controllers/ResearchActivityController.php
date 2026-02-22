@@ -7,16 +7,24 @@ use App\Http\Requests\ResearchActivities\ResearchActivityMembersRequest;
 use App\Http\Requests\ResearchActivities\SubmitResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\StoreResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\UpdateResearchActivityRequest;
-use App\Support\AuditLogger;
 use App\Notifications\ParticipationInvitationNotification;
+use App\Support\AuditLogger;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class ResearchActivityController extends Controller
 {
+    // Activity statuses (activity_statuses.code)
+    private const STATUS_DRAFT = 'draft';
+    private const STATUS_PENDING_MEMBER_CONFIRM = 'pending_member_confirm';
+    private const STATUS_MEMBER_REJECTED = 'member_rejected';
+    private const STATUS_PENDING_FACULTY_REVIEW = 'pending_faculty_review';
+    private const STATUS_APPROVED = 'approved';
+    private const STATUS_REJECTED = 'rejected';
+
     public function store(StoreResearchActivityRequest $request)
     {
         $user = $request->user();
@@ -32,7 +40,7 @@ class ResearchActivityController extends Controller
             return response()->json(['message' => 'type_id does not match kind_id'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $draftStatusId = $this->getStatusId('draft');
+        $draftStatusId = $this->getStatusId(self::STATUS_DRAFT);
         if (! $draftStatusId) {
             return response()->json(['message' => 'draft status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -187,11 +195,8 @@ class ResearchActivityController extends Controller
         $items = $request->validated()['items'] ?? [];
         $now = now();
         $ownerLecturerId = (int) $current->owner_lecturer_id;
-        $activityTitle = (string) ($current->title ?? '');
-        $ownerName = DB::table('lecturers')->where('id', $ownerLecturerId)->value('full_name') ?? '';
-        $roleNames = DB::table('member_roles')->pluck('name', 'id')->all();
 
-        $synced = DB::transaction(function () use ($activity, $items, $now, $ownerLecturerId, $activityTitle, $ownerName, $roleNames) {
+        $synced = DB::transaction(function () use ($activity, $items, $now, $ownerLecturerId) {
             if (count($items) === 0) {
                 DB::table('research_activity_members')
                     ->where('activity_id', $activity)
@@ -201,7 +206,6 @@ class ResearchActivityController extends Controller
 
             $handled = [];
             foreach ($items as $item) {
-                $notifyInvitee = false;
                 $payload = [
                     'activity_id' => $activity,
                     'lecturer_id' => $item['lecturer_id'],
@@ -231,7 +235,6 @@ class ResearchActivityController extends Controller
                         'responded_at' => null,
                         'confirmation_note' => null,
                     ];
-                    $notifyInvitee = true;
                 } else {
                     $changed =
                         (int) $existing->member_role_id !== (int) $item['member_role_id']
@@ -244,14 +247,12 @@ class ResearchActivityController extends Controller
                             'responded_at' => null,
                             'confirmation_note' => null,
                         ];
-                        $notifyInvitee = true;
                     } elseif ($existing->confirmation_status === null || $existing->confirmation_status === '') {
                         $statusPayload = [
                             'confirmation_status' => 'pending',
                             'responded_at' => null,
                             'confirmation_note' => null,
                         ];
-                        $notifyInvitee = true;
                     }
                 }
 
@@ -263,30 +264,6 @@ class ResearchActivityController extends Controller
                         ->where('activity_id', $activity)
                         ->where('lecturer_id', $item['lecturer_id'])
                         ->update(array_merge($payload, $statusPayload));
-                }
-
-                if ($notifyInvitee) {
-                    $memberId = DB::table('research_activity_members')
-                        ->where('activity_id', $activity)
-                        ->where('lecturer_id', $item['lecturer_id'])
-                        ->value('id');
-                    $inviteeUserId = DB::table('lecturers')
-                        ->where('id', $item['lecturer_id'])
-                        ->value('user_id');
-                    if ($memberId && $inviteeUserId) {
-                        $invitee = User::find($inviteeUserId);
-                        if ($invitee) {
-                            $roleName = $roleNames[$item['member_role_id']] ?? null;
-                            $invitee->notify(new ParticipationInvitationNotification([
-                                'title' => 'Lời mời tham gia công trình',
-                                'message' => trim('Bạn được mời tham gia công trình ' . $activityTitle . ($ownerName ? (' bởi ' . $ownerName) : '') . '.'),
-                                'activity_id' => (int) $activity,
-                                'invitation_id' => (int) $memberId,
-                                'role_name' => $roleName,
-                                'action_route' => '/declarations/participatier',
-                            ]));
-                        }
-                    }
                 }
 
                 $handled[] = $item['lecturer_id'];
@@ -310,6 +287,14 @@ class ResearchActivityController extends Controller
         ], Response::HTTP_OK);
     }
 
+    /**
+     * FLOW:
+     * - GV bấm "Yêu cầu duyệt"
+     * - Nếu có member (khác owner) pending -> set pending_member_confirm + gửi notify cho pending
+     * - Nếu không có pending (chỉ owner) -> set pending_faculty_review luôn
+     * - Nếu đang member_rejected/rejected -> cho submit lại (sau khi xử lý)
+     * - Nếu có member rejected -> chặn submit, trả list
+     */
     public function submit(SubmitResearchActivityRequest $request, int $activity)
     {
         $user = $request->user();
@@ -324,53 +309,179 @@ class ResearchActivityController extends Controller
             return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($current->status_code !== 'draft') {
-            return response()->json(['message' => 'only draft activities can be submitted'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        // Cho phép resubmit nếu bị member reject hoặc khoa reject
+        if (! in_array($current->status_code, [self::STATUS_DRAFT, self::STATUS_MEMBER_REJECTED, self::STATUS_REJECTED], true)) {
+            return response()->json([
+                'message' => 'only draft/member_rejected/rejected activities can be submitted',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Allow submit even if detail/member rows are incomplete;
-        // frontend validation should prevent incomplete submissions.
+        $pendingMemberConfirmId = $this->getStatusId(self::STATUS_PENDING_MEMBER_CONFIRM);
+        $memberRejectedId = $this->getStatusId(self::STATUS_MEMBER_REJECTED);
+        $pendingFacultyReviewId = $this->getStatusId(self::STATUS_PENDING_FACULTY_REVIEW);
 
-        $submittedId = $this->getStatusId('submitted');
-        if (! $submittedId) {
-            return response()->json(['message' => 'submitted status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if (! $pendingMemberConfirmId || ! $memberRejectedId || ! $pendingFacultyReviewId) {
+            return response()->json([
+                'message' => 'required statuses not configured (pending_member_confirm/member_rejected/pending_faculty_review)',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $now = now();
-        DB::transaction(function () use ($activity, $submittedId, $now, $current, $user) {
+
+        $ownerLecturerId = (int) $current->owner_lecturer_id;
+        $activityTitle = (string) ($current->title ?? '');
+        $ownerName = DB::table('lecturers')->where('id', $ownerLecturerId)->value('full_name') ?? '';
+        $roleNames = DB::table('member_roles')->pluck('name', 'id')->all();
+
+        // Nếu có rejected member -> chặn submit và trả thông tin
+        $rejectedMembers = DB::table('research_activity_members as ram')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->where('ram.activity_id', $activity)
+            ->where('ram.lecturer_id', '!=', $ownerLecturerId)
+            ->where('ram.confirmation_status', 'rejected')
+            ->select([
+                'ram.id',
+                'ram.lecturer_id',
+                'l.full_name as lecturer_full_name',
+                'l.code as lecturer_code',
+                'mr.name as member_role_name',
+                'ram.confirmation_note',
+                'ram.responded_at',
+            ])
+            ->get()
+            ->map(fn($r) => (array) $r)
+            ->all();
+
+        if (count($rejectedMembers) > 0) {
+            // đảm bảo status đang ở member_rejected để UI hiểu
+            DB::transaction(function () use ($activity, $memberRejectedId, $now, $user) {
+                $locked = DB::table('research_activities as ra')
+                    ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+                    ->where('ra.id', $activity)
+                    ->lockForUpdate()
+                    ->select(['ra.status_id', 'ast.code as status_code'])
+                    ->first();
+
+                if (! $locked) {
+                    abort(Response::HTTP_NOT_FOUND, 'activity not found');
+                }
+
+                if ($locked->status_code !== self::STATUS_MEMBER_REJECTED) {
+                    DB::table('research_activities')->where('id', $activity)->update([
+                        'status_id' => $memberRejectedId,
+                        'submitted_at' => null,
+                        'updated_at' => $now,
+                    ]);
+
+                    DB::table('activity_status_histories')->insert([
+                        'activity_id' => $activity,
+                        'from_status_id' => $locked->status_id,
+                        'to_status_id' => $memberRejectedId,
+                        'acted_by_user_id' => $user->id,
+                        'acted_at' => $now,
+                        'note' => 'member_rejected_block_submit',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            });
+
+            return response()->json([
+                'message' => 'Cannot request approval: some members rejected participation. Please remove or re-invite them.',
+                'code' => 'MEMBER_REJECTED',
+                'rejected_members' => $rejectedMembers,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Pending members để gửi notify
+        $pendingRows = DB::table('research_activity_members as ram')
+            ->where('ram.activity_id', $activity)
+            ->where('ram.lecturer_id', '!=', $ownerLecturerId)
+            ->where('ram.confirmation_status', 'pending')
+            ->select(['ram.id', 'ram.lecturer_id', 'ram.member_role_id'])
+            ->get()
+            ->all();
+
+        $hasPending = count($pendingRows) > 0;
+
+        DB::transaction(function () use (
+            $activity,
+            $pendingMemberConfirmId,
+            $pendingFacultyReviewId,
+            $now,
+            $user,
+            $hasPending
+        ) {
+            $locked = DB::table('research_activities as ra')
+                ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+                ->where('ra.id', $activity)
+                ->lockForUpdate()
+                ->select(['ra.status_id', 'ast.code as status_code'])
+                ->first();
+
+            if (! $locked) {
+                abort(Response::HTTP_NOT_FOUND, 'activity not found');
+            }
+
+            if (! in_array($locked->status_code, [self::STATUS_DRAFT, self::STATUS_MEMBER_REJECTED, self::STATUS_REJECTED], true)) {
+                abort(Response::HTTP_UNPROCESSABLE_ENTITY, 'only draft/member_rejected/rejected activities can be submitted');
+            }
+
+            $toStatusId = $hasPending ? $pendingMemberConfirmId : $pendingFacultyReviewId;
+            $note = $hasPending ? 'requested_approval_waiting_members' : 'auto_sent_to_faculty_no_pending';
+
             DB::table('research_activities')->where('id', $activity)->update([
-                'status_id' => $submittedId,
-                'submitted_at' => $now,
+                'status_id' => $toStatusId,
+                'submitted_at' => $hasPending ? null : $now, // lên khoa thì set submitted_at
+                'approved_at' => null,
                 'updated_at' => $now,
             ]);
 
+            // Nếu lên khoa luôn -> reset approval stage khoa = pending
+            if (! $hasPending) {
+                $this->resetFacultyApprovalToPending($activity, $now);
+            }
+
             DB::table('activity_status_histories')->insert([
                 'activity_id' => $activity,
-                'from_status_id' => $current->status_id,
-                'to_status_id' => $submittedId,
+                'from_status_id' => $locked->status_id,
+                'to_status_id' => $toStatusId,
                 'acted_by_user_id' => $user->id,
                 'acted_at' => $now,
-                'note' => 'submitted',
+                'note' => $note,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
         });
 
-        $academicYearCode = null;
-        if ($current->academic_year_id) {
-            $academicYearCode = DB::table('academic_years')
-                ->where('id', $current->academic_year_id)
-                ->value('code');
+        // Gửi notify cho pending members (đúng nghiệp vụ)
+        foreach ($pendingRows as $row) {
+            $inviteeUserId = DB::table('lecturers')->where('id', $row->lecturer_id)->value('user_id');
+            if (! $inviteeUserId) {
+                continue;
+            }
+            $invitee = User::find($inviteeUserId);
+            if (! $invitee) {
+                continue;
+            }
+            $roleName = $roleNames[$row->member_role_id] ?? null;
+
+            $invitee->notify(new ParticipationInvitationNotification([
+                'title' => 'Lời mời tham gia công trình',
+                'message' => trim('Bạn được mời tham gia công trình ' . $activityTitle . ($ownerName ? (' bởi ' . $ownerName) : '') . '.'),
+                'activity_id' => (int) $activity,
+                'invitation_id' => (int) $row->id,
+                'role_name' => $roleName,
+                'action_route' => '/declarations/participatier',
+            ]));
         }
 
-        $totalHours = (float) DB::table('research_activity_members')
-            ->where('activity_id', $activity)
-            ->sum('hours_assigned');
-
+        // Audit log (đúng nghĩa submit công trình)
         AuditLogger::log($request, [
             'action_group' => 'approval',
-            'action_code' => 'HOURS_SUBMITTED',
-            'action_label' => 'Gửi yêu cầu duyệt giờ NCKH',
+            'action_code' => 'WORK_REQUESTED_APPROVAL',
+            'action_label' => 'Giảng viên gửi yêu cầu duyệt công trình',
             'severity' => 'important',
             'result_status' => 'success',
             'target_type' => 'research_activity',
@@ -378,14 +489,14 @@ class ResearchActivityController extends Controller
             'target_display' => $current->title ? 'Công trình: ' . $current->title : null,
             'request_http_status' => Response::HTTP_OK,
             'changes' => [
-                'academic_year_id' => $current->academic_year_id,
-                'academic_year_code' => $academicYearCode,
-                'total_hours' => $totalHours,
+                'activity_status_to' => $hasPending ? self::STATUS_PENDING_MEMBER_CONFIRM : self::STATUS_PENDING_FACULTY_REVIEW,
             ],
         ], $user);
 
         return response()->json([
-            'message' => 'activity submitted',
+            'message' => $hasPending
+                ? 'request recorded; waiting for member confirmations'
+                : 'activity sent to faculty review',
             'data' => $this->serializeActivity($activity),
         ], Response::HTTP_OK);
     }
@@ -417,6 +528,9 @@ class ResearchActivityController extends Controller
                 'ram.member_role_id',
                 'ram.contribution_share',
                 'ram.hours_assigned',
+                'ram.confirmation_status',
+                'ram.confirmation_note',
+                'ram.responded_at',
                 'mr.code as member_role_code',
                 'mr.name as member_role_name',
             ])
@@ -458,14 +572,31 @@ class ResearchActivityController extends Controller
         ], Response::HTTP_OK);
     }
 
+    private function resetFacultyApprovalToPending(int $activityId, $now): void
+    {
+        $assistantStageId = DB::table('approval_stages')->where('code', 'assistant')->value('id');
+        if (! $assistantStageId) {
+            return;
+        }
+
+        DB::table('activity_approvals')
+            ->where('activity_id', $activityId)
+            ->where('stage_id', (int) $assistantStageId)
+            ->update([
+                'status' => 'pending',
+                'decided_by_user_id' => null,
+                'decided_at' => null,
+                'note' => null,
+                'updated_at' => $now,
+            ]);
+    }
+
     private function serializeActivity(int $activityId): array
     {
         $row = DB::table('research_activities')->where('id', $activityId)->first();
-
         if (! $row) {
             return [];
         }
-
         return $this->serializeActivityRow($row);
     }
 
@@ -492,7 +623,8 @@ class ResearchActivityController extends Controller
 
     private function getStatusId(string $code): ?int
     {
-        return DB::table('activity_statuses')->where('code', $code)->value('id');
+        $id = DB::table('activity_statuses')->where('code', $code)->value('id');
+        return $id ? (int) $id : null;
     }
 
     private function generateActivityCode(): string
@@ -514,7 +646,8 @@ class ResearchActivityController extends Controller
 
     private function isEditableStatus(?string $statusCode): bool
     {
-        return in_array($statusCode, ['draft', 'rejected'], true);
+        // Cho phép sửa khi draft / member_rejected / rejected_by_faculty
+        return in_array($statusCode, [self::STATUS_DRAFT, self::STATUS_MEMBER_REJECTED, self::STATUS_REJECTED], true);
     }
 
     private function detailKindMap(): array

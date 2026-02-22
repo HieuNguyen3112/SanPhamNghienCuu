@@ -47,10 +47,10 @@
 
               <button
                 type="button"
-                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                class="h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 @click="emit('close')"
               >
-                Đóng
+                <X class="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -81,7 +81,8 @@
                   Danh sách công trình đã duyệt và quy đổi giờ NCKH
                 </div>
                 <div class="mt-1 text-xs text-slate-500">
-                  Chỉ hiển thị công trình đã duyệt (khoa + trường) và giờ quy đổi.
+                  Chỉ hiển thị công trình đã duyệt (khoa + trường) và giờ quy
+                  đổi.
                 </div>
               </div>
 
@@ -156,8 +157,9 @@
                   Giảng viên đã hoàn thành định mức giờ NCKH.
                 </span>
                 <span v-else>
-                  Giảng viên còn thiếu {{ formatHours(Math.abs(difference)) }} giờ
-                  NCKH so với định mức.
+                  Giảng viên còn thiếu
+                  {{ formatHours(Math.abs(difference)) }} giờ NCKH so với định
+                  mức.
                 </span>
               </div>
             </div>
@@ -175,6 +177,7 @@ import type {
   LecturerHoursDetailRow,
 } from "../lecturerHours.contract";
 import KpiMini from "./internal/KpiMini.vue";
+import { X } from "lucide-vue-next";
 
 type Tone = "hit" | "near" | "miss" | "neutral";
 

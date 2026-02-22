@@ -14,8 +14,8 @@ class ResearchActivityDemoSeeder extends Seeder
     {
         $seedUsers = User::whereIn('email', [
             'gv@local.test',
-            'dl@local.test',
-            'ql@local.test',
+            'khoa@local.test',
+            'truong@local.test',
         ])->get()->keyBy('email');
 
         $lecturerMap = [];

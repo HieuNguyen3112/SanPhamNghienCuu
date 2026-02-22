@@ -34,14 +34,10 @@ type AuthErrorCode =
 
 const mapBackendRole = (role: string): UserRole | null => {
   switch ((role || "").toUpperCase()) {
-    case "GV":
     case "LECTURER":
       return "LECTURER";
-    case "DL":
     case "DEPARTMENT_BOARD":
       return "DEPARTMENT_BOARD";
-    case "QL":
-    case "ADMIN":
     case "SCIENCE_OFFICE":
       return "SCIENCE_OFFICE";
     default:
@@ -49,19 +45,17 @@ const mapBackendRole = (role: string): UserRole | null => {
   }
 };
 
-const mapBackendRoles = (roles: string[] = [], fallback: string[] = []): UserRole[] => {
-  const source = roles.length ? roles : fallback;
-  const mapped = source
+const mapBackendRoles = (roles: string[] = []): UserRole[] => {
+  const mapped = roles
     .map((r) => mapBackendRole(r))
     .filter((r): r is UserRole => Boolean(r));
   return Array.from(new Set(mapped));
 };
 
-
 export const useUserStore = defineStore("user", {
   state: () => ({
     currentUser: null as User | null,
-    currentRole: null as UserRole | null, // role dang chon
+    currentRole: null as UserRole | null, // role đang chọn
     _initPromise: null as Promise<User | null> | null,
     isInitialized: false,
     authErrorCode: null as AuthErrorCode,
@@ -77,6 +71,7 @@ export const useUserStore = defineStore("user", {
     async initAuth() {
       if (this.isInitialized && !this._initPromise) return this.currentUser;
       if (this._initPromise) return this._initPromise;
+
       // reset error state before fetch
       this.authErrorCode = null;
       this.authErrorMessage = null;
@@ -84,17 +79,14 @@ export const useUserStore = defineStore("user", {
       this._initPromise = (async () => {
         try {
           const { data } = await apiFetchCurrentUser();
-          const mappedRoles = mapBackendRoles(
-            data?.roles ?? [],
-            data?.backend_roles ?? []
-          );
+
+          const mappedRoles = mapBackendRoles(data?.roles ?? []);
           if (!mappedRoles.length) {
             this.currentUser = null;
             this.currentRole = null;
             return null;
           }
-          this.authErrorCode = null;
-          this.authErrorMessage = null;
+
           this.currentUser = {
             id: String(data.id ?? ""),
             name: data.name ?? "",
@@ -104,29 +96,34 @@ export const useUserStore = defineStore("user", {
             department: data.department,
             avatar: data.avatar,
           };
+
           if (
             !this.currentRole ||
             !this.currentUser.roles.includes(this.currentRole)
           ) {
             this.currentRole = mappedRoles[0] ?? null;
           }
+
           return this.currentUser;
         } catch (err: any) {
           const status = err?.response?.status;
           const code: AuthErrorCode =
-            err?.response?.data?.code || (status === 401
+            err?.response?.data?.code ||
+            (status === 401
               ? "UNAUTHENTICATED"
               : status === 403
-              ? "FORBIDDEN"
-              : "UNKNOWN");
+                ? "FORBIDDEN"
+                : "UNKNOWN");
+
           this.authErrorCode = code;
           this.authErrorMessage =
             err?.response?.data?.message ||
             (status === 401
               ? "Unauthenticated"
               : status === 403
-              ? "Forbidden"
-              : "Kh�ng th? t?i th�ng tin ngu?i d�ng");
+                ? "Forbidden"
+                : "Không thể tải thông tin người dùng");
+
           this.currentUser = null;
           this.currentRole = null;
           return null;
@@ -157,7 +154,7 @@ export const useUserStore = defineStore("user", {
         throw error;
       }
 
-      // G?i role ? d?ng canonical (LECTURER/DEPARTMENT_BOARD/SCIENCE_OFFICE) d? kh?p v?i backend response
+      // Gửi role ở dạng canonical (LECTURER/DEPARTMENT_BOARD/SCIENCE_OFFICE)
       await apiLogin({
         email: payload.email,
         password: payload.password,
@@ -165,10 +162,7 @@ export const useUserStore = defineStore("user", {
       });
 
       const { data } = await apiFetchCurrentUser();
-      const mappedRoles = mapBackendRoles(
-        data?.roles ?? [],
-        data?.backend_roles ?? []
-      );
+      const mappedRoles = mapBackendRoles(data?.roles ?? []);
 
       this.currentUser = {
         id: String(data.id ?? ""),
@@ -179,6 +173,7 @@ export const useUserStore = defineStore("user", {
         department: data.department,
         avatar: data.avatar,
       };
+
       this.currentRole = mappedRoles[0] ?? null;
       this.isInitialized = true;
       this._initPromise = null;
@@ -188,11 +183,9 @@ export const useUserStore = defineStore("user", {
 
     setRole(role: UserRole) {
       if (!this.currentUser) throw new Error("CHUA_DANG_NHAP");
-
       if (!this.currentUser.roles.includes(role)) {
         throw new Error("ROLE_KHONG_HOP_LE");
       }
-
       this.currentRole = role;
     },
 
@@ -209,5 +202,3 @@ export const useUserStore = defineStore("user", {
     },
   },
 });
-
-

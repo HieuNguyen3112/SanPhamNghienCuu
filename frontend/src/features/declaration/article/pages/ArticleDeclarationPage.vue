@@ -119,9 +119,39 @@
                   label="Tạp chí / Kỷ yếu"
                   hint="Gợi ý tìm và chọn từ danh mục (do QLKH/Hội đồng nhập)."
                   :search-fn="searchJournals"
-                  :error="formErrors.journalName"
+                  :error="formErrors.journalName ?? undefined"
                   @select="onJournalSelect"
                 />
+              </div>
+
+              <!-- Keywords -->
+              <div class="md:col-span-2">
+                <label class="text-xs font-medium text-slate-600"
+                  >Từ khóa (keywords)</label
+                >
+                <input
+                  v-model.trim="keywords"
+                  :disabled="readOnly"
+                  maxlength="300"
+                  placeholder="VD: AI, giáo dục, dữ liệu"
+                  :class="inputClass()"
+                />
+                <p class="mt-1 text-xs text-slate-500">
+                  Nhập các từ khóa, phân tách bằng dấu phẩy.
+                </p>
+
+                <div
+                  v-if="keywordChips.length"
+                  class="mt-2 flex flex-wrap gap-1"
+                >
+                  <span
+                    v-for="k in keywordChips"
+                    :key="k"
+                    class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
+                  >
+                    {{ k }}
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -238,7 +268,9 @@
               </div>
 
               <div class="md:col-span-2">
-                <label class="text-xs font-medium text-slate-600">Ghi chú</label>
+                <label class="text-xs font-medium text-slate-600"
+                  >Ghi chú</label
+                >
                 <input
                   v-model.trim="form.notes"
                   :disabled="readOnly"
@@ -297,7 +329,9 @@
       leave-to-class="opacity-0 scale-95"
     >
       <div class="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-        <div class="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50 p-3">
+        <div
+          class="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50 p-3"
+        >
           <div
             class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600"
             aria-hidden="true"
@@ -315,8 +349,15 @@
         </div>
 
         <ul class="mt-4 space-y-1 text-sm text-rose-700">
-          <li v-for="field in missingFields" :key="field" class="flex items-start gap-2">
-            <span class="mt-1 h-1.5 w-1.5 rounded-full bg-rose-500" aria-hidden="true" />
+          <li
+            v-for="field in missingFields"
+            :key="field"
+            class="flex items-start gap-2"
+          >
+            <span
+              class="mt-1 h-1.5 w-1.5 rounded-full bg-rose-500"
+              aria-hidden="true"
+            />
             <span>{{ field }}</span>
           </li>
         </ul>
@@ -337,7 +378,14 @@
 
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, reactive, ref, watch, type ComputedRef } from "vue";
+import {
+  computed,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+  type ComputedRef,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { AlertTriangle, FileText } from "lucide-vue-next";
 import JournalSelect from "../../shared/components/JournalSelect.vue";
@@ -364,7 +412,6 @@ import {
   fetch_member_roles,
   fetch_evidence_file_types,
   search_lecturer_options,
-  fetch_activity_statuses,
   search_journals,
 } from "../../shared/services/catalogs.service";
 import {
@@ -394,6 +441,15 @@ const types = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
 
 const currentLecturerId = ref<number>(0);
+
+// Keywords (UI + persist)
+const keywords = ref("");
+const keywordChips = computed(() =>
+  keywords.value
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean),
+);
 
 const form = reactive<ArticleDeclarationFormModel>({
   activityId: null,
@@ -435,11 +491,9 @@ const missingModalOpen = ref(false);
 
 const filteredMemberRoles = computed(() => {
   const preferredCodes = new Set<string>(
-    articleAllowedMemberRoleCodes as readonly string[]
+    articleAllowedMemberRoleCodes as readonly string[],
   );
-  const preferred = memberRoles.value.filter((r) =>
-    preferredCodes.has(r.code)
-  );
+  const preferred = memberRoles.value.filter((r) => preferredCodes.has(r.code));
   if (preferred.length > 0) return preferred;
 
   const legacyCodes = new Set(["principal", "member"]);
@@ -455,17 +509,17 @@ const articleMemberRoles = computed(() =>
       return { ...r, name: "Đồng tác giả" };
     }
     return r;
-  })
+  }),
 );
 const existingEvidence = ref<EvidenceFileDto[]>([]);
 const pendingEvidenceFiles = ref<any[]>([]);
 const pendingEvidenceLinks = ref<any[]>([]);
 
 const typeCodeById = computed(() =>
-  Object.fromEntries(types.value.map((t) => [t.id, t.code]))
+  Object.fromEntries(types.value.map((t) => [t.id, t.code])),
 );
 const lecturerNameById = computed(() =>
-  Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name]))
+  Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name])),
 );
 
 const hours = computed(() =>
@@ -474,7 +528,7 @@ const hours = computed(() =>
     lecturerNameById: lecturerNameById.value,
     memberRoleNameById: memberRoleNameById.value,
     currentLecturerId: currentLecturerId.value,
-  })
+  }),
 );
 
 const hoursByLecturerId = computed(() => {
@@ -485,7 +539,7 @@ const hoursByLecturerId = computed(() => {
 
 const baseHoursText = computed(() => {
   const code = form.typeId ? typeCodeById.value[form.typeId] : null;
-  const base = code ? articleBaseHoursByTypeCode[code] ?? 0 : 0;
+  const base = code ? (articleBaseHoursByTypeCode[code] ?? 0) : 0;
   return `${base} giờ`;
 });
 
@@ -500,29 +554,36 @@ const canSubmit = computed(() => {
   if (!form.academicYearId) return false;
   if (!form.typeId) return false;
   if (!form.title.trim()) return false;
+
   const validMembers = form.members.filter(
     (m) =>
-      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number"
+      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number",
   );
   if (validMembers.length === 0) return false;
+
   const invalidPending = pendingEvidenceFiles.value.some(
-    (p: any) => !p.file_type_id
+    (p: any) => !p.file_type_id,
   );
   if (invalidPending) return false;
+
   return true;
 });
 
 function inputClass(error?: string | null) {
   return [
     "mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm focus:outline-none disabled:opacity-60",
-    error ? "border-rose-300 focus:border-rose-400" : "border-slate-200 focus:border-slate-300",
+    error
+      ? "border-rose-300 focus:border-rose-400"
+      : "border-slate-200 focus:border-slate-300",
   ];
 }
 
 function selectClass(error?: string | null) {
   return [
     "mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm focus:outline-none disabled:opacity-60",
-    error ? "border-rose-300 focus:border-rose-400" : "border-slate-200 focus:border-slate-300",
+    error
+      ? "border-rose-300 focus:border-rose-400"
+      : "border-slate-200 focus:border-slate-300",
   ];
 }
 
@@ -565,13 +626,14 @@ function normalizeErrorMessage(err: unknown, fallback: string): string {
 
 async function loadCatalogs() {
   currentLecturerId.value = (await fetch_current_lecturer_id()) ?? 0;
-  const [years, kinds, roles, fileTypes, statuses] = await Promise.all([
+
+  const [years, kinds, roles, fileTypes] = await Promise.all([
     fetch_academic_years(),
     fetch_activity_kinds(),
     fetch_member_roles(),
     fetch_evidence_file_types(),
-    fetch_activity_statuses(),
   ]);
+
   academicYears.value = years;
   memberRoles.value = roles;
   evidenceFileTypes.value = fileTypes;
@@ -625,12 +687,16 @@ async function loadDraftFromQuery() {
     form.year = detail.year ?? null;
     form.pageStart = detail.page_start ?? null;
     form.pageEnd = detail.page_end ?? null;
+    keywords.value = detail.keywords ?? "";
   }
 
   form.members = (data.members ?? []).map((m) => ({
     lecturer_id: m.lecturer_id,
     member_role_id: m.member_role_id,
     member_role_code: m.member_role_code ?? null,
+    // is_external: m.is_external ?? false,
+    // external_full_name: m.external_full_name ?? null,
+    // external_department_name: m.external_department_name ?? null,
   }));
 
   existingEvidence.value = data.evidence_files ?? [];
@@ -643,7 +709,11 @@ async function onSearchLecturers(q: string) {
   lecturers.value = await search_lecturer_options(q);
 }
 
-function onJournalSelect(option: { id: number; name: string; issn: string | null }) {
+function onJournalSelect(option: {
+  id: number;
+  name: string;
+  issn: string | null;
+}) {
   form.journalId = option.id;
   form.journalName = option.name;
   form.issn = option.issn ?? "";
@@ -692,7 +762,8 @@ function collectMissingFields(mode: "draft" | "submit") {
 
     const validMembers = form.members.filter(
       (m) =>
-        typeof m.lecturer_id === "number" && typeof m.member_role_id === "number"
+        typeof m.lecturer_id === "number" &&
+        typeof m.member_role_id === "number",
     );
     if (validMembers.length === 0) {
       missing.push("Danh sách người tham gia");
@@ -758,18 +829,22 @@ const shell = useDeclarationFormShell({
         page_start: form.pageStart ?? null,
         page_end: form.pageEnd ?? null,
         year: form.year ?? null,
-      });
+        keywords: keywords.value.trim() ? keywords.value.trim() : null,
+      } as any);
 
       const upsertList = form.members
         .filter(
           (m) =>
             typeof m.lecturer_id === "number" &&
-            typeof m.member_role_id === "number"
+            typeof m.member_role_id === "number",
         )
         .map((m) => ({
           lecturer_id: m.lecturer_id as number,
           member_role_id: m.member_role_id as number,
           contribution_share: null,
+          is_external: m.is_external ?? false,
+          external_full_name: m.external_full_name ?? null,
+          external_department_name: m.external_department_name ?? null,
         }));
       await upsert_members(saved.id, upsertList);
 
@@ -777,7 +852,7 @@ const shell = useDeclarationFormShell({
 
       if (pendingEvidenceFiles.value.length > 0) {
         throw new Error(
-          "Chưa hỗ trợ tải file minh chứng. Vui lòng thử lại sau."
+          "Chưa hỗ trợ tải file minh chứng. Vui lòng thử lại sau.",
         );
       }
       if (pendingEvidenceLinks.value.length > 0) {
@@ -785,11 +860,10 @@ const shell = useDeclarationFormShell({
       }
     } catch (err) {
       const validation = applyValidationErrors(err);
-      if (validation) {
-        throw new Error(validation);
-      }
+      if (validation) throw new Error(validation);
+
       throw new Error(
-        normalizeErrorMessage(err, "Không thể lưu bản nháp. Vui lòng thử lại.")
+        normalizeErrorMessage(err, "Không thể lưu bản nháp. Vui lòng thử lại."),
       );
     }
   },
@@ -803,20 +877,21 @@ const shell = useDeclarationFormShell({
       await submit_activity(form.activityId);
     } catch (err) {
       const validation = applyValidationErrors(err);
-      if (validation) {
-        throw new Error(validation);
-      }
+      if (validation) throw new Error(validation);
+
       throw new Error(
-        normalizeErrorMessage(err, "Không thể gửi duyệt. Vui lòng thử lại.")
+        normalizeErrorMessage(err, "Không thể gửi duyệt. Vui lòng thử lại."),
       );
     }
   },
 });
+
 const memberRoleNameById: ComputedRef<Record<number, string>> = computed(() => {
   const map: Record<number, string> = {};
   for (const r of memberRoles.value) map[r.id] = r.name;
   return map;
 });
+
 const externalMembers = computed(() => {
   return form.members.flatMap((r) => {
     if (!r.is_external) return [];
@@ -837,18 +912,41 @@ const externalMembers = computed(() => {
   });
 });
 
-watch(() => form.academicYearId, () => clearFieldError("academicYearId"));
-watch(() => form.typeId, () => clearFieldError("typeId"));
-watch(() => form.title, () => clearFieldError("title"));
-watch(() => form.journalName, () => clearFieldError("journalName"));
-watch(() => form.year, () => clearFieldError("year"));
+watch(
+  () => form.academicYearId,
+  () => clearFieldError("academicYearId"),
+);
+watch(
+  () => form.typeId,
+  () => clearFieldError("typeId"),
+);
+watch(
+  () => form.title,
+  () => clearFieldError("title"),
+);
+watch(
+  () => form.journalName,
+  () => clearFieldError("journalName"),
+);
+watch(
+  () => form.year,
+  () => clearFieldError("year"),
+);
 
 onMounted(async () => {
   await loadCatalogs();
   await loadDraftFromQuery();
 });
 
+// Fix TS2322: normalize address null -> ""
 async function searchJournals(q: string) {
-  return search_journals(q);
+  type JournalRow = Awaited<ReturnType<typeof search_journals>>[number];
+  type JournalSelectOptionDto = JournalRow & { address: string };
+
+  const rows = await search_journals(q);
+  return rows.map((r) => ({
+    ...r,
+    address: (r as any).address ?? "",
+  })) as JournalSelectOptionDto[];
 }
 </script>

@@ -3,13 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Support\RoleMapper;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthMeController extends Controller
 {
-    // GET /api/auth/me (sanctum, JSON-only)
     public function show(Request $request)
     {
         $user = $request->user();
@@ -21,14 +19,14 @@ class AuthMeController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        $backendRoles = $user->getRoleNames()->values()->all();
+        $roles = $user->getRoleNames()->values()->all(); // canonical already
 
         return response()->json([
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'roles' => RoleMapper::backendListToCanonical($backendRoles),
-            'backend_roles' => $backendRoles,
+            'roles' => $roles,
+            'backend_roles' => $roles,
         ], Response::HTTP_OK);
     }
 }

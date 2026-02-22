@@ -1,115 +1,209 @@
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50">
-    <div class="absolute inset-0 bg-slate-900/40" @click="emit('close')" />
-
-    <aside
-      class="absolute right-0 top-0 h-full w-full bg-white shadow-2xl ring-1 ring-slate-200/70 sm:w-[440px] lg:w-[560px] xl:w-[640px]"
-      role="dialog"
-      aria-modal="true"
+  <div v-if="isOpen" class="fixed inset-0 z-50" aria-live="polite">
+    <!-- Overlay (fade) -->
+    <Transition
+      enter-active-class="transition-opacity duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
     >
-      <div class="flex h-full flex-col">
-        <!-- Header -->
-        <div class="border-b border-slate-200 px-4 py-4 lg:px-5">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <h3 class="truncate text-sm font-semibold text-slate-900">
-                  {{ drawerTitle }}
-                </h3>
-                <span class="text-xs text-slate-400">•</span>
-                <span class="text-xs font-medium text-slate-600">{{
-                  drawerSubtitle
-                }}</span>
+      <div
+        class="absolute inset-0 bg-slate-900/50 backdrop-blur-[1px]"
+        @click="emit('close')"
+        aria-hidden="true"
+      />
+    </Transition>
+
+    <!-- Drawer (slide) -->
+    <Transition
+      enter-active-class="transition-transform duration-200 ease-out"
+      enter-from-class="translate-x-full"
+      enter-to-class="translate-x-0"
+      leave-active-class="transition-transform duration-150 ease-in"
+      leave-from-class="translate-x-0"
+      leave-to-class="translate-x-full"
+    >
+      <aside
+        class="absolute right-0 top-0 h-full w-[860px] bg-white shadow-2xl ring-1 ring-slate-200/70"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="flex h-full flex-col">
+          <!-- Header -->
+          <div class="border-b border-slate-200 px-4 py-4 lg:px-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <h3 class="truncate text-sm font-semibold text-slate-900">
+                    {{ drawerTitle }}
+                  </h3>
+                  <span class="text-xs text-slate-400">•</span>
+                  <span class="text-xs font-medium text-slate-600">{{
+                    drawerSubtitle
+                  }}</span>
+                </div>
+
+                <p class="mt-1 text-xs text-slate-600">
+                  {{ drawerHelperText }}
+                </p>
               </div>
 
-              <p class="mt-1 text-xs text-slate-600">
-                <!-- WHY -->
-                {{ drawerHelperText }}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              @click="emit('close')"
-            >
-              Đóng
-            </button>
-          </div>
-
-          <div v-if="selectedResearchWorkApprovalEntry" class="mt-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <span
-                :class="
-                  mapApprovalStatusToBadgeClass(
-                    selectedResearchWorkApprovalEntry.approvalStatus
-                  )
-                "
+              <button
+                type="button"
+                class="h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                @click="emit('close')"
               >
-                {{
-                  mapApprovalStatusToDisplayName(
-                    selectedResearchWorkApprovalEntry.approvalStatus
-                  )
-                }}
-              </span>
+                <X class="h-4 w-4" />
+              </button>
+            </div>
 
-              <span class="text-xs text-slate-500">
-                Năm học {{ selectedResearchWorkApprovalEntry.academicYear }}
-              </span>
+            <div v-if="selectedResearchWorkApprovalEntry" class="mt-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  :class="
+                    mapApprovalStatusToBadgeClass(
+                      selectedResearchWorkApprovalEntry.approvalStatus,
+                    )
+                  "
+                >
+                  {{
+                    mapApprovalStatusToDisplayName(
+                      selectedResearchWorkApprovalEntry.approvalStatus,
+                    )
+                  }}
+                </span>
 
-              <span class="text-xs text-slate-500">•</span>
+                <span class="text-xs text-slate-500">
+                  Năm học {{ selectedResearchWorkApprovalEntry.academicYear }}
+                </span>
 
-              <span class="text-xs font-medium text-slate-700">
-                {{
-                  mapResearchWorkTypeToDisplayName(
-                    selectedResearchWorkApprovalEntry.researchWorkType
-                  )
-                }}
-              </span>
+                <span class="text-xs text-slate-500">•</span>
+
+                <span class="text-xs font-medium text-slate-700">
+                  {{
+                    mapResearchWorkTypeToDisplayName(
+                      selectedResearchWorkApprovalEntry.researchWorkType,
+                    )
+                  }}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Body -->
-        <div class="flex-1 overflow-y-auto px-4 py-4 lg:px-5">
-          <div v-if="selectedResearchWorkApprovalEntry" class="space-y-4">
-            <!-- 1. Thông tin chung -->
-            <section
-              class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4"
-            >
-              <div class="text-xs font-semibold text-slate-700">
-                Thông tin chung
-              </div>
-              <div class="mt-1 text-sm font-semibold text-slate-900">
-                {{ selectedResearchWorkApprovalEntry.researchWorkTitle }}
-              </div>
+          <!-- Body -->
+          <div class="flex-1 overflow-y-auto px-4 py-4 lg:px-5">
+            <div v-if="selectedResearchWorkApprovalEntry" class="space-y-4">
+              <!-- 1. Thông tin chung -->
+              <section
+                class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4"
+              >
+                <div class="text-xs font-semibold text-slate-700">
+                  Thông tin chung
+                </div>
+                <div class="mt-1 text-sm font-semibold text-slate-900">
+                  {{ selectedResearchWorkApprovalEntry.researchWorkTitle }}
+                </div>
 
-              <div class="mt-3 grid grid-cols-1 gap-2">
-                <div
-                  class="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2"
-                >
-                  <div class="text-xs font-medium text-slate-600">
-                    Người kê khai
+                <div class="mt-3 grid grid-cols-1 gap-2">
+                  <div
+                    class="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2"
+                  >
+                    <div class="text-xs font-medium text-slate-600">
+                      Người kê khai
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900">
+                      {{
+                        selectedResearchWorkApprovalEntry.submittingLecturerDisplayName
+                      }}
+                    </div>
                   </div>
+
+                  <div
+                    class="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2"
+                  >
+                    <div class="text-xs font-medium text-slate-600">
+                      Khoa / Đơn vị
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900">
+                      {{ selectedResearchWorkApprovalEntry.facultyDisplayName }}
+                    </div>
+                  </div>
+
+                  <p class="mt-1 text-xs text-slate-500">
+                    Thành viên kê khai sẽ được tô nổi bật trong bảng “Thành viên
+                    & số giờ”.
+                  </p>
+                </div>
+              </section>
+
+              <!-- 2. Minh chứng -->
+              <section class="rounded-2xl border border-slate-200 bg-white p-4">
+                <div class="flex items-center justify-between">
                   <div class="text-sm font-semibold text-slate-900">
+                    Minh chứng
+                  </div>
+                  <div class="text-xs text-slate-500">
                     {{
-                      selectedResearchWorkApprovalEntry.submittingLecturerDisplayName
+                      selectedResearchWorkApprovalEntry.evidenceAttachmentList
+                        .length
                     }}
+                    tệp
                   </div>
                 </div>
 
                 <div
-                  class="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2"
+                  v-if="
+                    selectedResearchWorkApprovalEntry.evidenceAttachmentList
+                      .length === 0
+                  "
+                  class="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"
                 >
-                  <div class="text-xs font-medium text-slate-600">
-                    Khoa / Đơn vị
+                  Chưa có minh chứng.
+                </div>
+
+                <div v-else class="mt-3 space-y-2">
+                  <a
+                    v-for="evidenceAttachment in selectedResearchWorkApprovalEntry.evidenceAttachmentList"
+                    :key="evidenceAttachment.evidenceAttachmentIdentifier"
+                    :href="evidenceAttachment.evidenceAttachmentPreviewUrl"
+                    class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2 hover:bg-slate-50"
+                  >
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-medium text-slate-900">
+                        {{ evidenceAttachment.evidenceAttachmentDisplayName }}
+                      </div>
+                      <div class="mt-0.5 text-xs text-slate-600">
+                        Định dạng:
+                        {{ evidenceAttachment.evidenceAttachmentFileType }}
+                      </div>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-600"
+                      >Xem</span
+                    >
+                  </a>
+                </div>
+              </section>
+
+              <!-- 3. 1 BẢNG: Thành viên + Vai trò + Khoa + Số giờ -->
+              <section class="rounded-2xl border border-slate-200 bg-white p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-slate-900">
+                      Thành viên & số giờ
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500">
+                      Số giờ là giờ kê khai theo từng thành viên (đã chia theo
+                      loại sản phẩm NCKH).
+                    </p>
                   </div>
-                  <div class="text-sm font-semibold text-slate-900">
-                    {{ selectedResearchWorkApprovalEntry.facultyDisplayName }}
+
+                  <div class="text-xs text-slate-500">
+                    {{ authorHourRows.length }} thành viên
                   </div>
                 </div>
 
-                <!-- Bảng tác giả -->
                 <div
                   class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white"
                 >
@@ -117,432 +211,248 @@
                     class="flex items-center justify-between border-b border-slate-200 px-3 py-2"
                   >
                     <div class="text-xs font-semibold text-slate-700">
-                      Tác giả
+                      Bảng thành viên
                     </div>
                     <div class="text-xs text-slate-500">
-                      {{ authorRows.length }} thành viên
+                      Tô nổi bật người kê khai
                     </div>
                   </div>
 
                   <div
-                    v-if="authorRows.length === 0"
+                    v-if="authorHourRows.length === 0"
                     class="px-3 py-3 text-sm text-slate-600"
                   >
-                    Không có tác giả.
+                    Chưa có danh sách tác giả.
                   </div>
 
-                  <table v-else class="w-full text-left">
-                    <thead class="bg-slate-50">
-                      <tr class="text-xs font-semibold text-slate-600">
-                        <th class="w-10 px-3 py-2">#</th>
-                        <th class="px-3 py-2">Họ tên</th>
-                        <th class="px-3 py-2">Vai trò</th>
-                        <th class="px-3 py-2">Khoa/Đơn vị</th>
-                      </tr>
-                    </thead>
+                  <div v-else class="overflow-x-auto">
+                    <table class="w-full min-w-[760px] text-left">
+                      <thead class="bg-slate-50">
+                        <tr class="text-xs font-semibold text-slate-600">
+                          <th class="w-10 px-3 py-2">#</th>
+                          <th class="px-3 py-2">Tên thành viên</th>
+                          <th class="px-3 py-2">Vai trò</th>
+                          <th class="px-3 py-2">Khoa/Đơn vị</th>
+                          <th class="px-3 py-2">Số giờ</th>
+                        </tr>
+                      </thead>
 
-                    <tbody class="divide-y divide-slate-200">
-                      <tr
-                        v-for="(a, i) in authorRows"
-                        :key="a.authorIdentifier"
-                        class="text-sm"
-                      >
-                        <td class="px-3 py-2 text-slate-500">{{ i + 1 }}</td>
-
-                        <td class="px-3 py-2 font-semibold text-slate-900">
-                          {{ a.authorDisplayName }}
-
-                          <span
-                            v-if="a.isSubmittingLecturer"
-                            class="ml-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-900"
-                          >
-                            Kê khai
-                          </span>
-                        </td>
-
-                        <td class="px-3 py-2">
-                          <span
-                            v-if="a.isPrimaryAuthor"
-                            class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-900"
-                          >
-                            Tác giả chính
-                          </span>
-                          <span
-                            v-else
-                            class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700"
-                          >
-                            Đồng tác giả
-                          </span>
-                        </td>
-
-                        <td class="px-3 py-2 text-slate-700">
-                          {{ a.authorFacultyDisplayName }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
-
-            <!-- 2. Minh chứng -->
-            <section class="rounded-2xl border border-slate-200 bg-white p-4">
-              <div class="flex items-center justify-between">
-                <div class="text-sm font-semibold text-slate-900">
-                  Minh chứng
-                </div>
-                <div class="text-xs text-slate-500">
-                  {{
-                    selectedResearchWorkApprovalEntry.evidenceAttachmentList
-                      .length
-                  }}
-                  tệp
-                </div>
-              </div>
-
-              <div
-                v-if="
-                  selectedResearchWorkApprovalEntry.evidenceAttachmentList
-                    .length === 0
-                "
-                class="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"
-              >
-                Chưa có minh chứng.
-              </div>
-
-              <div v-else class="mt-3 space-y-2">
-                <a
-                  v-for="evidenceAttachment in selectedResearchWorkApprovalEntry.evidenceAttachmentList"
-                  :key="evidenceAttachment.evidenceAttachmentIdentifier"
-                  :href="evidenceAttachment.evidenceAttachmentPreviewUrl"
-                  class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2 hover:bg-slate-50"
-                >
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-medium text-slate-900">
-                      {{ evidenceAttachment.evidenceAttachmentDisplayName }}
-                    </div>
-                    <div class="mt-0.5 text-xs text-slate-600">
-                      Định dạng:
-                      {{ evidenceAttachment.evidenceAttachmentFileType }}
-                    </div>
-                  </div>
-                  <span class="text-xs font-semibold text-slate-600">Xem</span>
-                </a>
-              </div>
-            </section>
-
-            <!-- 3. Giờ NCKH -->
-            <section
-              :class="
-                canFinalizeHours
-                  ? 'rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4'
-                  : 'rounded-2xl border border-slate-200 bg-white p-4'
-              "
-            >
-              <div class="flex items-center justify-between">
-                <div class="text-sm font-semibold text-slate-900">
-                  Giờ NCKH theo thành viên
-                </div>
-
-                <span
-                  v-if="canFinalizeHours"
-                  class="inline-flex items-center rounded-full border border-indigo-200 bg-white px-2 py-0.5 text-xs font-semibold text-indigo-900"
-                >
-                  Cấp trường chốt giờ
-                </span>
-
-                <span
-                  v-else
-                  class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700"
-                >
-                  Cấp khoa xác minh hồ sơ
-                </span>
-              </div>
-
-              <div
-                class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white"
-              >
-                <div
-                  class="flex items-center justify-between border-b border-slate-200 px-3 py-2"
-                >
-                  <div class="text-xs font-semibold text-slate-700">
-                    Bảng phân bổ giờ
-                  </div>
-                  <div class="text-xs text-slate-500">
-                    {{ authorHourRows.length }} thành viên
-                  </div>
-                </div>
-
-                <div
-                  v-if="authorHourRows.length === 0"
-                  class="px-3 py-3 text-sm text-slate-600"
-                >
-                  Chưa có danh sách tác giả.
-                </div>
-
-                <table v-else class="w-full text-left">
-                  <thead class="bg-slate-50">
-                    <tr class="text-xs font-semibold text-slate-600">
-                      <th class="w-10 px-3 py-2">#</th>
-                      <th class="px-3 py-2">Thành viên</th>
-                      <th class="px-3 py-2">Vai trò</th>
-                      <th class="px-3 py-2">Giờ kê khai</th>
-                      <th class="px-3 py-2">Giờ theo QĐ</th>
-                      <th class="px-3 py-2">Giờ chính thức</th>
-                    </tr>
-                  </thead>
-
-                  <tbody class="divide-y divide-slate-200">
-                    <tr
-                      v-for="(a, i) in authorHourRows"
-                      :key="a.authorIdentifier"
-                      class="text-sm"
-                    >
-                      <td class="px-3 py-2 text-slate-500">{{ i + 1 }}</td>
-
-                      <td class="px-3 py-2">
-                        <div class="font-semibold text-slate-900">
-                          {{ a.authorDisplayName }}
-                          <span
-                            v-if="a.isSubmittingLecturer"
-                            class="ml-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-900"
-                          >
-                            Kê khai
-                          </span>
-                        </div>
-                        <div class="text-xs text-slate-500">
-                          {{ a.authorFacultyDisplayName }}
-                        </div>
-                      </td>
-
-                      <td class="px-3 py-2">
-                        <span
-                          v-if="a.isPrimaryAuthor"
-                          class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-900"
+                      <tbody class="divide-y divide-slate-200">
+                        <tr
+                          v-for="(a, i) in authorHourRows"
+                          :key="a.authorIdentifier"
+                          class="text-sm"
+                          :class="
+                            a.isSubmittingLecturer
+                              ? 'bg-amber-50'
+                              : i % 2 === 0
+                                ? 'bg-white'
+                                : 'bg-slate-50/40'
+                          "
                         >
-                          Tác giả chính
-                        </span>
-                        <span
-                          v-else
-                          class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700"
-                        >
-                          Đồng tác giả
-                        </span>
-                      </td>
+                          <td class="px-3 py-2 text-slate-500">{{ i + 1 }}</td>
 
-                      <td class="px-3 py-2 font-semibold text-slate-900">
-                        {{ formatHourValue(a.declaredHours) }}
-                      </td>
+                          <td class="px-3 py-2">
+                            <div
+                              class="truncate"
+                              :class="
+                                a.isSubmittingLecturer
+                                  ? 'font-extrabold text-slate-900'
+                                  : 'font-semibold text-slate-900'
+                              "
+                            >
+                              {{ a.authorDisplayName }}
+                            </div>
+                          </td>
 
-                      <td class="px-3 py-2 font-semibold text-slate-900">
-                        {{ formatHourValue(a.recommendedHoursByPolicy) }}
-                      </td>
+                          <td class="px-3 py-2">
+                            <span
+                              v-if="a.isPrimaryAuthor"
+                              class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-900"
+                            >
+                              Tác giả chính
+                            </span>
+                            <span
+                              v-else
+                              class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700"
+                            >
+                              Đồng tác giả
+                            </span>
+                          </td>
 
-                      <td class="px-3 py-2">
-                        <template v-if="canFinalizeHours">
-                          <input
-                            v-model.number="
-                              officialHoursDraftByAuthorId[a.authorIdentifier]
-                            "
-                            type="number"
-                            min="0"
-                            step="1"
-                            class="w-28 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-100"
-                          />
-                        </template>
+                          <td class="px-3 py-2 text-slate-700">
+                            {{ a.authorFacultyDisplayName }}
+                          </td>
 
-                        <template v-else>
-                          <div class="font-semibold text-slate-700">
-                            {{
-                              a.officialHours == null
-                                ? "Chờ chốt"
-                                : formatHourValue(a.officialHours)
-                            }}
-                          </div>
-                        </template>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div
-                v-if="canFinalizeHours"
-                class="mt-3 flex items-center justify-between"
-              >
-                <div class="text-xs text-slate-600">Tổng giờ chính thức</div>
-                <div class="text-sm font-semibold text-slate-900">
-                  {{ formatIntegerValue(totalOfficialHours) }}
+                          <td class="px-3 py-2">
+                            <div class="font-semibold text-slate-900">
+                              {{
+                                formatHourValue(
+                                  a.declaredHours ??
+                                    a.recommendedHoursByPolicy ??
+                                    a.officialHours,
+                                )
+                              }}
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              <div
-                v-if="
-                  canFinalizeHours &&
-                  shouldShowOfficialHoursValidationHint &&
-                  !isOfficialHoursValid
-                "
-                class="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800"
-              >
-                Vui lòng nhập giờ chính thức hợp lệ (>= 0) cho tất cả thành
-                viên.
-              </div>
-
-              <p class="mt-2 text-xs text-slate-500">
-                Giờ theo từng thành viên sẽ được hệ thống tính theo quy định
-                (bài báo/đề tài...); hiện UI đã sẵn sàng để đổ dữ liệu.
-              </p>
-            </section>
-
-            <!-- 4. Lịch sử duyệt -->
-            <section class="rounded-2xl border border-slate-200 bg-white p-4">
-              <div class="text-sm font-semibold text-slate-900">
-                Lịch sử duyệt
-              </div>
-              <div class="mt-3 space-y-2">
-                <div
-                  v-for="history in selectedResearchWorkApprovalEntry.approvalHistoryList"
-                  :key="history.historyIdentifier"
-                  class="rounded-xl border border-slate-200 bg-white px-3 py-2"
-                >
+              <!-- 4. Lịch sử duyệt -->
+              <section class="rounded-2xl border border-slate-200 bg-white p-4">
+                <div class="text-sm font-semibold text-slate-900">
+                  Lịch sử duyệt
+                </div>
+                <div class="mt-3 space-y-2">
                   <div
-                    class="flex flex-wrap items-center justify-between gap-2"
+                    v-for="history in selectedResearchWorkApprovalEntry.approvalHistoryList"
+                    :key="history.historyIdentifier"
+                    class="rounded-xl border border-slate-200 bg-white px-3 py-2"
                   >
-                    <div class="text-sm font-semibold text-slate-900">
-                      {{ history.reviewLevelDisplayName }} —
-                      {{ history.reviewActionDisplayName }}
+                    <div
+                      class="flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <div class="text-sm font-semibold text-slate-900">
+                        {{ history.reviewLevelDisplayName }} —
+                        {{ history.reviewActionDisplayName }}
+                      </div>
+                      <div class="text-xs text-slate-500">
+                        {{
+                          formatDateTimeDisplayValue(
+                            history.reviewedAtDateTimeString,
+                          )
+                        }}
+                      </div>
                     </div>
-                    <div class="text-xs text-slate-500">
-                      {{
-                        formatDateTimeDisplayValue(
-                          history.reviewedAtDateTimeString
-                        )
-                      }}
+                    <div class="mt-1 text-sm text-slate-700">
+                      {{ history.reviewNote }}
                     </div>
-                  </div>
-                  <div class="mt-1 text-sm text-slate-700">
-                    {{ history.reviewNote }}
                   </div>
                 </div>
-              </div>
-            </section>
+              </section>
 
-            <!-- Rejection Panel -->
-            <section
-              v-if="isRejectionPanelVisible"
-              ref="rejectionPanelElement"
-              class="rounded-2xl border border-rose-200 bg-rose-50/60 p-4"
+              <!-- Rejection Panel -->
+              <section
+                v-if="isRejectionPanelVisible"
+                ref="rejectionPanelElement"
+                class="rounded-2xl border border-rose-200 bg-rose-50/60 p-4"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-rose-900">
+                      Lý do từ chối (bắt buộc)
+                    </div>
+                    <p class="mt-1 text-sm text-rose-900/90">
+                      Lý do rõ ràng giúp bên dưới điều chỉnh nhanh và đối soát
+                      minh bạch.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-900 hover:bg-rose-50"
+                    @click="cancelRejectionFlow"
+                  >
+                    Hủy
+                  </button>
+                </div>
+
+                <div class="mt-3 space-y-2">
+                  <label
+                    v-for="option in rejectionReasonOptionList"
+                    :key="option.value"
+                    class="flex cursor-pointer items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2"
+                  >
+                    <input
+                      class="h-4 w-4"
+                      type="radio"
+                      name="rejectionReason"
+                      :value="option.value"
+                      v-model="selectedRejectionReasonType"
+                    />
+                    <span class="text-sm font-medium text-slate-800">{{
+                      option.label
+                    }}</span>
+                  </label>
+
+                  <div v-if="isOtherRejectionReasonSelected" class="mt-2">
+                    <label class="text-xs font-semibold text-rose-900"
+                      >Nội dung bổ sung</label
+                    >
+                    <textarea
+                      v-model="rejectionReasonDetail"
+                      rows="3"
+                      class="mt-1 w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-rose-300 focus:ring-0"
+                      placeholder="Nhập lý do cụ thể..."
+                    />
+                  </div>
+
+                  <div
+                    v-if="shouldShowRejectionValidationHint"
+                    class="mt-3 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-rose-900"
+                  >
+                    Vui lòng chọn lý do. Nếu chọn “Khác”, cần nhập nội dung chi
+                    tiết (>= 5 ký tự).
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div
+              v-else
+              class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-700"
             >
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <div class="text-sm font-semibold text-rose-900">
-                    Lý do từ chối (bắt buộc)
-                  </div>
-                  <p class="mt-1 text-sm text-rose-900/90">
-                    Lý do rõ ràng giúp bên dưới điều chỉnh nhanh và đối soát
-                    minh bạch.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-900 hover:bg-rose-50"
-                  @click="cancelRejectionFlow"
-                >
-                  Hủy
-                </button>
-              </div>
-
-              <div class="mt-3 space-y-2">
-                <label
-                  v-for="option in rejectionReasonOptionList"
-                  :key="option.value"
-                  class="flex cursor-pointer items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2"
-                >
-                  <input
-                    class="h-4 w-4"
-                    type="radio"
-                    name="rejectionReason"
-                    :value="option.value"
-                    v-model="selectedRejectionReasonType"
-                  />
-                  <span class="text-sm font-medium text-slate-800">{{
-                    option.label
-                  }}</span>
-                </label>
-
-                <div v-if="isOtherRejectionReasonSelected" class="mt-2">
-                  <label class="text-xs font-semibold text-rose-900"
-                    >Nội dung bổ sung</label
-                  >
-                  <textarea
-                    v-model="rejectionReasonDetail"
-                    rows="3"
-                    class="mt-1 w-full rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-rose-300 focus:ring-0"
-                    placeholder="Nhập lý do cụ thể..."
-                  />
-                </div>
-
-                <div
-                  v-if="shouldShowRejectionValidationHint"
-                  class="mt-3 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-rose-900"
-                >
-                  Vui lòng chọn lý do. Nếu chọn “Khác”, cần nhập nội dung chi
-                  tiết (>= 5 ký tự).
-                </div>
-              </div>
-            </section>
+              Chưa chọn công trình.
+            </div>
           </div>
 
-          <div
-            v-else
-            class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-700"
-          >
-            Chưa chọn công trình.
+          <!-- Footer -->
+          <div class="border-t border-slate-200 px-4 py-3 lg:px-5">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                @click="emit('close')"
+              >
+                Đóng
+              </button>
+
+              <button
+                type="button"
+                class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-60"
+                :disabled="isApproveActionDisabled"
+                @click="approveSelectedResearchWork"
+              >
+                {{ primaryActionButtonLabel }}
+              </button>
+
+              <button
+                type="button"
+                class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-60"
+                :disabled="isRejectActionDisabled"
+                @click="onRejectActionButtonClicked"
+              >
+                {{ rejectActionButtonDisplayName }}
+              </button>
+            </div>
+
+            <p class="mt-2 text-xs text-slate-600">
+              {{ footerHelperText }}
+            </p>
           </div>
         </div>
-
-        <!-- Footer -->
-        <div class="border-t border-slate-200 px-4 py-3 lg:px-5">
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              @click="emit('close')"
-            >
-              Đóng
-            </button>
-
-            <button
-              type="button"
-              class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-60"
-              :disabled="isApproveActionDisabled"
-              @click="approveSelectedResearchWork"
-            >
-              {{ primaryActionButtonLabel }}
-            </button>
-
-            <button
-              type="button"
-              class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-100 disabled:opacity-60"
-              :disabled="isRejectActionDisabled"
-              @click="onRejectActionButtonClicked"
-            >
-              {{ rejectActionButtonDisplayName }}
-            </button>
-          </div>
-
-          <p class="mt-2 text-xs text-slate-600">
-            {{ footerHelperText }}
-          </p>
-        </div>
-      </div>
-    </aside>
+      </aside></Transition
+    >
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, toRefs } from "vue";
+import { X } from "lucide-vue-next";
 import type {
   ResearchWorkApprovalEntry,
   ResearchWorkApprovalScopeIdentifier,
@@ -582,7 +492,7 @@ const emit = defineEmits<{
       officialResearchHours: number | null; // tạm thời giữ API cũ
 
       memberHours?: { authorIdentifier: number; officialHours: number }[];
-    }
+    },
   ): void;
   (
     eventName: "reject",
@@ -590,7 +500,7 @@ const emit = defineEmits<{
       researchWorkIdentifier: number;
       rejectionReasonType: ResearchWorkRejectionReasonType;
       rejectionReasonDetail: string | null;
-    }
+    },
   ): void;
 }>();
 
@@ -636,13 +546,13 @@ const canFinalizeHours = computed(() => {
 const isRejectionPanelVisible = ref(false);
 const rejectionPanelElement = ref<HTMLElement | null>(null);
 const selectedRejectionReasonType = ref<ResearchWorkRejectionReasonType | null>(
-  null
+  null,
 );
 const rejectionReasonDetail = ref("");
 const shouldShowRejectionValidationHint = ref(false);
 
 const isOtherRejectionReasonSelected = computed(
-  () => selectedRejectionReasonType.value === "OTHER"
+  () => selectedRejectionReasonType.value === "OTHER",
 );
 
 const isRejectionFormValid = computed(() => {
@@ -682,7 +592,7 @@ const authorRows = computed<AuthorEntry[]>(() => {
     (a, b) =>
       Number(b.isPrimaryAuthor) - Number(a.isPrimaryAuthor) ||
       Number(b.isSubmittingLecturer) - Number(a.isSubmittingLecturer) ||
-      a.authorDisplayName.localeCompare(b.authorDisplayName)
+      a.authorDisplayName.localeCompare(b.authorDisplayName),
   );
 });
 
@@ -733,7 +643,7 @@ watch(
     resetRejectionFlowState();
     shouldShowOfficialHoursValidationHint.value = false;
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const totalOfficialHours = computed<number>(() => {
@@ -786,7 +696,7 @@ function approveSelectedResearchWork(): void {
   const ok = window.confirm(
     canFinalizeHours.value
       ? "Xác nhận duyệt & chốt giờ?"
-      : "Xác nhận hồ sơ hợp lệ và chuyển lên cấp trường?"
+      : "Xác nhận hồ sơ hợp lệ và chuyển lên cấp trường?",
   );
   if (!ok) return;
 
@@ -799,7 +709,7 @@ function approveSelectedResearchWork(): void {
     memberHours: authorHourRows.value.map((row) => ({
       authorIdentifier: row.authorIdentifier,
       officialHours: Number(
-        officialHoursDraftByAuthorId.value[row.authorIdentifier] ?? 0
+        officialHoursDraftByAuthorId.value[row.authorIdentifier] ?? 0,
       ),
     })),
   });

@@ -1,7 +1,7 @@
 <!-- File: src/features/declaration/conference/pages/ConferenceDeclarationPage.vue -->
 <template>
   <div class="min-h-screen bg-slate-50">
-    <div class="mx-auto max-w-7xl space-y-4 p-4 md:p-6">
+    <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <DeclarationFormShell
         title="Kê khai Hội nghị – Hội thảo"
         description="Mỗi dòng = 1 lần tham gia. Báo cáo: 40 giờ/lần. Tham dự: 4 giờ/lần (tối đa 40 lần)."
@@ -331,13 +331,13 @@ const form = reactive<ConferenceDeclarationFormModel>({
 const openEvidenceRowId = ref<string | null>(null);
 
 const typeCodeById = computed(() =>
-  Object.fromEntries(conferenceTypesAll.value.map((t) => [t.id, t.code]))
+  Object.fromEntries(conferenceTypesAll.value.map((t) => [t.id, t.code])),
 );
 
 const conferenceTypes = computed(() =>
   conferenceTypesAll.value.filter(
-    (t) => t.code === "report" || t.code === "attend"
-  )
+    (t) => t.code === "report" || t.code === "attend",
+  ),
 );
 
 const hours = computed(() =>
@@ -345,7 +345,7 @@ const hours = computed(() =>
     currentLecturerId: currentLecturerId.value,
     currentLecturerName: currentLecturerName.value,
     typeCodeById: typeCodeById.value,
-  })
+  }),
 );
 
 const warnings = computed(() => hours.value.warnings);
@@ -360,7 +360,7 @@ const hoursNote = computed(() => {
 
 function rowNameError(
   row: ConferenceOccurrenceFormItem,
-  readOnly: boolean
+  readOnly: boolean,
 ): string | null {
   if (readOnly) return null;
   if (!row.conferenceName.trim()) return "Tên hội nghị là bắt buộc.";
@@ -413,7 +413,7 @@ function onRemoveRowExistingEvidence(rowId: string, fileId: number) {
   const row = form.items.find((x) => x.rowId === rowId);
   if (!row) return;
   row.existingEvidenceFiles = row.existingEvidenceFiles.filter(
-    (f) => f.id !== fileId
+    (f) => f.id !== fileId,
   );
 }
 
@@ -430,12 +430,12 @@ const canSubmit = computed(() => {
 
     // pending evidence validation (nếu có thì phải chọn loại file_type_id)
     const invalidPendingFiles = (row.pendingEvidenceFiles ?? []).some(
-      (p: any) => !p.file_type_id
+      (p: any) => !p.file_type_id,
     );
     if (invalidPendingFiles) return false;
 
     const invalidPendingLinks = (row.pendingEvidenceLinks ?? []).some(
-      (l: any) => !l.file_type_id || !String(l.url ?? "").trim()
+      (l: any) => !l.file_type_id || !String(l.url ?? "").trim(),
     );
     if (invalidPendingLinks) return false;
 
@@ -473,17 +473,17 @@ const shell = useDeclarationFormShell({
     const hasAnyPendingEvidence = form.items.some(
       (r) =>
         (r.pendingEvidenceFiles?.length ?? 0) > 0 ||
-        (r.pendingEvidenceLinks?.length ?? 0) > 0
+        (r.pendingEvidenceLinks?.length ?? 0) > 0,
     );
 
     if (hasAnyPendingEvidence) {
       throw new Error(
-        "TODO (P0): Upload evidence per-row chưa có backend support."
+        "TODO (P0): Upload evidence per-row chưa có backend support.",
       );
     }
 
     throw new Error(
-      "TODO (P0): Backend cần endpoint POST /api/declarations/conference/batch để lưu danh sách lần tham gia (mỗi dòng 1 activity) + conference_details + evidence_files theo activity."
+      "TODO (P0): Backend cần endpoint POST /api/declarations/conference/batch để lưu danh sách lần tham gia (mỗi dòng 1 activity) + conference_details + evidence_files theo activity.",
     );
   },
   on_submit: async () => {

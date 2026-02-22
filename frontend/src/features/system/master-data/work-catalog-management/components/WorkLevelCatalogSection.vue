@@ -141,7 +141,7 @@
                 emit('update:form', {
                   ...form,
                   priority: Number(
-                    ($event.target as HTMLInputElement).value || 0
+                    ($event.target as HTMLInputElement).value || 0,
                   ),
                 })
               "
@@ -206,7 +206,7 @@
 <script setup lang="ts">
 import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
-import type { WorkLevel } from "../contracts/workCatalog.contract";
+import type { WorkLevel } from "../contracts/workLevels.contract";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 defineProps<{
@@ -246,7 +246,7 @@ const emit = defineEmits<{
       priority: number;
       notes: string;
       isActive: boolean;
-    }
+    },
   ): void;
 }>();
 </script>

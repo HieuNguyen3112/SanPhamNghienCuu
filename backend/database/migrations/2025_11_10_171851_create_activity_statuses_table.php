@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('activity_statuses', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 30)->unique(); // draft, submitted, approved, rejected
+            $table->string('code', 30)->unique(); // draft, pending_member_confirm, member_rejected, pending_faculty_review, approved, rejected
             $table->string('name', 100);
             $table->timestamps();
         });

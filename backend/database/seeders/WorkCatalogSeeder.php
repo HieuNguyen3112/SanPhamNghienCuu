@@ -51,55 +51,74 @@ class WorkCatalogSeeder extends Seeder
                 ]
             );
         }
-
         $journals = [
             [
-                'name' => 'Journal of Advanced Research',
-                'address' => 'Cairo University, Giza, Egypt',
-                'issn' => '2090-1232',
-                'classification' => 'ISI',
-                'country' => 'Egypt',
-                'notes' => null,
-                'is_active' => true,
+                'name'           => 'Journal of Advanced Research',
+                'address'        => 'Cairo University, Giza, Egypt',
+                'issn'           => '2090-1232',
+                'source_name'    => 'ISI',           // Chuyển ISI từ classification sang đây
+                'point_min'      => 1.00,            // Thêm cột mới
+                'point_max'      => 2.00,            // Thêm cột mới
+                'classification' => 'HDGSNN_GE_1',   // Cập nhật lại format theo schema
+                'research_hours' => 600,             // Thêm cột mới
+                'country'        => 'Egypt',
+                'notes'          => null,
+                'is_active'      => true,
             ],
             [
-                'name' => 'Vietnam Journal of Science and Technology',
-                'address' => 'VAST, Hanoi, Vietnam',
-                'issn' => '0866-708X',
-                'classification' => 'SCOPUS',
-                'country' => 'Vietnam',
-                'notes' => 'Scopus indexed',
-                'is_active' => true,
+                'name'           => 'Vietnam Journal of Science and Technology',
+                'address'        => 'VAST, Hanoi, Vietnam',
+                'issn'           => '0866-708X',
+                'source_name'    => 'Scopus',        // Chuyển SCOPUS từ classification sang đây
+                'point_min'      => 0.50,            // Thêm cột mới
+                'point_max'      => 1.00,            // Thêm cột mới
+                'classification' => 'HDGSNN_GE_2',   // Cập nhật lại format theo schema
+                'research_hours' => 300,             // Thêm cột mới
+                'country'        => 'Vietnam',
+                'notes'          => 'Scopus indexed',
+                'is_active'      => true,
             ],
             [
-                'name' => 'International Journal of Computer Science',
-                'address' => 'USA',
-                'issn' => null,
+                'name'           => 'International Journal of Computer Science',
+                'address'        => 'USA',
+                'issn'           => null,
+                'source_name'    => null,
+                'point_min'      => null,
+                'point_max'      => null,
                 'classification' => 'OTHER',
-                'country' => 'USA',
-                'notes' => 'ISSN pending',
-                'is_active' => false,
+                'research_hours' => 0,
+                'country'        => 'USA',
+                'notes'          => 'ISSN pending',
+                'is_active'      => false,
             ],
         ];
 
+        // Chạy seeder cho Journals
         foreach ($journals as $item) {
+            // Nếu có ISSN thì update theo ISSN (vì issn là unique), nếu không thì map theo name
             $key = $item['issn'] ? ['issn' => $item['issn']] : ['name' => $item['name']];
+
             DB::table('journals')->updateOrInsert(
                 $key,
                 [
-                    'name' => $item['name'],
-                    'address' => $item['address'],
-                    'issn' => $item['issn'],
+                    'name'           => $item['name'],
+                    'address'        => $item['address'],
+                    'issn'           => $item['issn'],
+                    'source_name'    => $item['source_name'],
+                    'point_min'      => $item['point_min'],
+                    'point_max'      => $item['point_max'],
                     'classification' => $item['classification'],
-                    'country' => $item['country'],
-                    'notes' => $item['notes'],
-                    'is_active' => $item['is_active'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
+                    'research_hours' => $item['research_hours'],
+                    'country'        => $item['country'],
+                    'notes'          => $item['notes'],
+                    'is_active'      => $item['is_active'],
+                    'created_at'     => $now,
+                    'updated_at'     => $now,
                 ]
             );
         }
 
+        // Lấy danh sách ID đã tạo để map cho Journal Rankings
         $journalIdByIssn = DB::table('journals')
             ->whereNotNull('issn')
             ->pluck('id', 'issn')
@@ -111,6 +130,7 @@ class WorkCatalogSeeder extends Seeder
             ['issn' => '0866-708X', 'rank' => 'Q3', 'effective_from' => now()->subMonths(3)->toDateString()],
         ];
 
+        // Chạy seeder cho Journal Rankings
         foreach ($rankings as $item) {
             $journalId = $journalIdByIssn[$item['issn']] ?? null;
             if (! $journalId) {
@@ -118,16 +138,18 @@ class WorkCatalogSeeder extends Seeder
             }
 
             DB::table('journal_rankings')->updateOrInsert(
-                ['journal_id' => $journalId, 'effective_from' => $item['effective_from']],
                 [
-                    'rank' => $item['rank'],
-                    'note' => null,
+                    'journal_id'     => $journalId,
+                    'effective_from' => $item['effective_from']
+                ],
+                [
+                    'rank'       => $item['rank'],
+                    'note'       => null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]
             );
         }
-
         $conferences = [
             ['name' => 'International Conference on AI', 'level' => 'INTERNATIONAL', 'notes' => null, 'is_active' => true],
             ['name' => 'University Science Conference', 'level' => 'UNIVERSITY', 'notes' => 'Annual', 'is_active' => true],

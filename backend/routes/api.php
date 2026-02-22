@@ -16,7 +16,6 @@ use App\Http\Controllers\LookupController;
 use App\Http\Controllers\ResearchActivityController;
 use App\Http\Controllers\AdminResearchWorkController;
 use App\Http\Controllers\AdminResearchWorkSearchController;
-use App\Http\Controllers\AdminUniversityApprovalController;
 use App\Http\Controllers\AdminLecturerHoursController;
 use App\Http\Controllers\AdminLecturerHourApprovalController;
 use App\Http\Controllers\AdminLecturerHourWarningController;
@@ -42,53 +41,69 @@ use App\Http\Controllers\FacultyOrgStructureController;
 
 // TOKEN-BASED (Sanctum Bearer)
 Route::prefix('auth')->group(function () {
+
+    // ✅ ME: dùng session sanctum, KHÔNG rotate token
+    Route::middleware(['auth:sanctum', 'force.json'])->group(function () {
+        Route::get('/me', [AuthMeController::class, 'show']);
+    });
+
+    // ✅ Token endpoints: chỉ cho SCIENCE_OFFICE + rotate
     Route::middleware(['auth:sanctum', 'auto.rotate.sanctum'])->group(function () {
-        Route::get('/tokens',        [TokenAuthController::class, 'index']);   // list PATs
-        // Chỉ ADMIN/QL được phát hành/luân chuyển PAT để tích hợp
-        Route::post('/token/issue',  [TokenAuthController::class, 'issue'])->middleware('role:ADMIN|QL');   // issue PAT cho user hien tai
-        Route::post('/token/revoke', [TokenAuthController::class, 'revoke']);  // revoke current hoac theo id
-        Route::post('/token/revoke-all', [TokenAuthController::class, 'revokeAll']); // revoke all PATs
-        Route::post('/token/rotate', [TokenAuthController::class, 'rotate'])->middleware('role:ADMIN|QL');  // xoay token khi can
-        Route::get('/token/ttl',     [TokenAuthController::class, 'ttl']);     // xem minutes_left
-        Route::get('/me', [AuthMeController::class, 'show'])->middleware('force.json');
+        Route::get('/tokens', [TokenAuthController::class, 'index']);
+
+        Route::post('/token/issue', [TokenAuthController::class, 'issue'])
+            ->middleware('role:SCIENCE_OFFICE');
+
+        Route::post('/token/revoke', [TokenAuthController::class, 'revoke']);
+        Route::post('/token/revoke-all', [TokenAuthController::class, 'revokeAll']);
+
+        Route::post('/token/rotate', [TokenAuthController::class, 'rotate'])
+            ->middleware('role:SCIENCE_OFFICE');
+
+        Route::get('/token/ttl', [TokenAuthController::class, 'ttl']);
     });
 });
 
-// PROFILE (Sanctum + auto rotate)
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])->prefix('profile')->group(function () {
-    Route::get('/', [LecturerProfileController::class, 'me']);
-    Route::get('/me', [LecturerProfileController::class, 'me']);
-    Route::get('/overview', [LecturerProfileController::class, 'me']);
-    Route::get('/lecturers/{lecturer}', [LecturerProfileController::class, 'showLecturer']);
-    Route::put('/contact', [LecturerProfileController::class, 'updateContact']);
-    Route::put('/academic-titles', [LecturerProfileController::class, 'updateAcademicTitles']);
-    Route::put('/research-areas', [LecturerProfileController::class, 'updateResearchAreas']);
-    Route::put('/languages', [LecturerProfileController::class, 'syncLanguages']);
-    Route::get('/educations', [LecturerProfileController::class, 'trainingHistories']);
-    Route::post('/educations', [LecturerProfileController::class, 'storeTrainingHistory']);
-    Route::put('/educations', [LecturerProfileController::class, 'syncTrainingHistories']);
-    Route::put('/educations/{id}', [LecturerProfileController::class, 'updateTrainingHistory']);
-    Route::delete('/educations/{id}', [LecturerProfileController::class, 'deleteTrainingHistory']);
-    Route::get('/work-histories', [LecturerProfileController::class, 'workHistories']);
-    Route::post('/work-histories', [LecturerProfileController::class, 'storeWorkHistory']);
-    Route::put('/work-histories', [LecturerProfileController::class, 'syncWorkHistories']);
-    Route::put('/work-histories/{id}', [LecturerProfileController::class, 'updateWorkHistory']);
-    Route::delete('/work-histories/{id}', [LecturerProfileController::class, 'deleteWorkHistory']);
-});
 
-// RESEARCH ACTIVITIES (declarations)
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])->prefix('research-activities')->group(function () {
-    Route::post('/', [ResearchActivityController::class, 'store']);
-    Route::get('/{activity}', [ResearchActivityController::class, 'show']);
-    Route::put('/{activity}', [ResearchActivityController::class, 'update']);
-    Route::put('/{activity}/members', [ResearchActivityController::class, 'syncMembers']);
-    Route::post('/{activity}/submit', [ResearchActivityController::class, 'submit']);
-    Route::put('/{activity}/{detail}', [ResearchActivityController::class, 'upsertDetail']);
-    Route::get('/{activity}/evidence-files', [ResearchActivityController::class, 'listEvidenceFiles']);
-});
+// PROFILE (Sanctum + auto rotate)
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])
+    ->prefix('profile')
+    ->group(function () {
+        Route::get('/', [LecturerProfileController::class, 'me']);
+        Route::get('/me', [LecturerProfileController::class, 'me']);
+        Route::get('/overview', [LecturerProfileController::class, 'me']);
+        Route::get('/lecturers/{lecturer}', [LecturerProfileController::class, 'showLecturer']);
+        Route::put('/contact', [LecturerProfileController::class, 'updateContact']);
+        Route::put('/academic-titles', [LecturerProfileController::class, 'updateAcademicTitles']);
+        Route::put('/research-areas', [LecturerProfileController::class, 'updateResearchAreas']);
+        Route::put('/languages', [LecturerProfileController::class, 'syncLanguages']);
+        Route::get('/educations', [LecturerProfileController::class, 'trainingHistories']);
+        Route::post('/educations', [LecturerProfileController::class, 'storeTrainingHistory']);
+        Route::put('/educations', [LecturerProfileController::class, 'syncTrainingHistories']);
+        Route::put('/educations/{id}', [LecturerProfileController::class, 'updateTrainingHistory']);
+        Route::delete('/educations/{id}', [LecturerProfileController::class, 'deleteTrainingHistory']);
+        Route::get('/work-histories', [LecturerProfileController::class, 'workHistories']);
+        Route::post('/work-histories', [LecturerProfileController::class, 'storeWorkHistory']);
+        Route::put('/work-histories', [LecturerProfileController::class, 'syncWorkHistories']);
+        Route::put('/work-histories/{id}', [LecturerProfileController::class, 'updateWorkHistory']);
+        Route::delete('/work-histories/{id}', [LecturerProfileController::class, 'deleteWorkHistory']);
+    });
+
+// RESEARCH ACTIVITIES (declarations) - Lecturer only
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
+    ->prefix('research-activities')
+    ->group(function () {
+        Route::post('/', [ResearchActivityController::class, 'store']);
+        Route::get('/{activity}', [ResearchActivityController::class, 'show']);
+        Route::put('/{activity}', [ResearchActivityController::class, 'update']);
+        Route::put('/{activity}/members', [ResearchActivityController::class, 'syncMembers']);
+        Route::post('/{activity}/submit', [ResearchActivityController::class, 'submit']);
+        Route::put('/{activity}/{detail}', [ResearchActivityController::class, 'upsertDetail']);
+        Route::get('/{activity}/evidence-files', [ResearchActivityController::class, 'listEvidenceFiles']);
+    });
 
 // PARTICIPATION CONFIRMATION (Lecturer)
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
     ->prefix('lecturer/participation-requests')
     ->group(function () {
         Route::get('/', [LecturerParticipationNotificationController::class, 'index']);
@@ -98,7 +113,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV
     });
 
 // LECTURER MY WORKS
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
     ->prefix('lecturer/works/my')
     ->group(function () {
         Route::get('/', [LecturerPersonalWorkController::class, 'index']);
@@ -106,7 +121,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV
     });
 
 // LECTURER HOURS CALCULATE
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
     ->prefix('lecturer/hours/calculate')
     ->group(function () {
         Route::get('/', [LecturerHoursCalculateController::class, 'index']);
@@ -115,7 +130,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV
     });
 
 // LECTURER HOURS PERSONAL
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
     ->prefix('lecturer/hours/personal')
     ->group(function () {
         Route::get('/overview', [LecturerPersonalHoursController::class, 'overview']);
@@ -125,7 +140,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV
     });
 
 // LECTURER HOURS WARNINGS
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
     ->prefix('lecturer/hours/warnings')
     ->group(function () {
         Route::get('/', [LecturerHoursWarningController::class, 'index']);
@@ -134,29 +149,31 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV
     });
 
 // LOOKUPS (read-only)
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])->prefix('lookups')->group(function () {
-    Route::get('/degrees', [LookupController::class, 'degrees']);
-    Route::get('/academic-ranks', [LookupController::class, 'academicRanks']);
-    Route::get('/faculties', [LookupController::class, 'faculties']);
-    Route::get('/departments', [LookupController::class, 'departments']);
-    Route::get('/academic-years', [LookupController::class, 'academicYears']);
-    Route::get('/activity-kinds', [LookupController::class, 'activityKinds']);
-    Route::get('/activity-types', [LookupController::class, 'activityTypes']);
-    Route::get('/member-roles', [LookupController::class, 'memberRoles']);
-    Route::get('/evidence-file-types', [LookupController::class, 'evidenceFileTypes']);
-    Route::get('/activity-statuses', [LookupController::class, 'activityStatuses']);
-    Route::get('/lecturers', [LookupController::class, 'lecturers']);
-    Route::get('/journals', [LookupController::class, 'journals']);
-});
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])
+    ->prefix('lookups')
+    ->group(function () {
+        Route::get('/degrees', [LookupController::class, 'degrees']);
+        Route::get('/academic-ranks', [LookupController::class, 'academicRanks']);
+        Route::get('/faculties', [LookupController::class, 'faculties']);
+        Route::get('/departments', [LookupController::class, 'departments']);
+        Route::get('/academic-years', [LookupController::class, 'academicYears']);
+        Route::get('/activity-kinds', [LookupController::class, 'activityKinds']);
+        Route::get('/activity-types', [LookupController::class, 'activityTypes']);
+        Route::get('/member-roles', [LookupController::class, 'memberRoles']);
+        Route::get('/evidence-file-types', [LookupController::class, 'evidenceFileTypes']);
+        Route::get('/activity-statuses', [LookupController::class, 'activityStatuses']);
+        Route::get('/lecturers', [LookupController::class, 'lecturers']);
+        Route::get('/journals', [LookupController::class, 'journals']);
+    });
 
-// ADMIN only demo/ping
-Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
+// SCIENCE_OFFICE only demo/ping
+Route::middleware(['auth:sanctum', 'role:SCIENCE_OFFICE'])->group(function () {
     Route::get('/admin/ping', fn() => ['ok' => true]);
     // TODO: thêm route quản trị API
 });
 
-// ADMIN/QL research works management
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])
+// SCIENCE_OFFICE research works management
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/works')
     ->group(function () {
         Route::get('/lecturers/summary/export/excel', [AdminResearchWorkController::class, 'exportSummaryExcel']);
@@ -166,7 +183,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::get('/activities/{activity}/approved', [AdminResearchWorkController::class, 'approvedDetail']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL|QL|ADMIN'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE|DEPARTMENT_BOARD'])
     ->prefix('admin/works')
     ->group(function () {
         Route::get('/lookups', [AdminResearchWorkSearchController::class, 'lookups']);
@@ -176,7 +193,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::get('/{activity}', [AdminResearchWorkSearchController::class, 'show']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+// FACULTY (Department Board) works approvals & management
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
     ->prefix('faculty/works')
     ->group(function () {
         Route::get('/approvals/lookups', [FacultyResearchWorkApprovalController::class, 'lookups']);
@@ -184,6 +202,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::get('/approvals/{activity}', [FacultyResearchWorkApprovalController::class, 'show']);
         Route::put('/approvals/{activity}/approve', [FacultyResearchWorkApprovalController::class, 'approve']);
         Route::put('/approvals/{activity}/reject', [FacultyResearchWorkApprovalController::class, 'reject']);
+
         Route::get('/lookups', [FacultyResearchWorkManagementController::class, 'lookups']);
         Route::get('/lecturers/summary', [FacultyResearchWorkManagementController::class, 'lecturerSummary']);
         Route::get('/lecturers/{lecturer}/works', [FacultyResearchWorkManagementController::class, 'lecturerWorks']);
@@ -195,13 +214,14 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
     });
 
 // LECTURER DECLARATION DRAFTS (Gateway)
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
     ->prefix('lecturer/declarations')
     ->group(function () {
         Route::get('/drafts', [LecturerDeclarationDraftController::class, 'index']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+// FACULTY HOURS (Department Board)
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
     ->prefix('faculty/hours')
     ->group(function () {
         Route::get('/warnings', [FacultyLecturerHourWarningController::class, 'index']);
@@ -217,7 +237,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::get('/lecturers/{lecturer}', [FacultyLecturerHoursController::class, 'show']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
     ->prefix('faculty/reports/lecturers')
     ->group(function () {
         Route::get('/lookups', [FacultyLecturerReportController::class, 'lookups']);
@@ -226,7 +246,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::get('/export/pdf', [FacultyLecturerReportController::class, 'exportPdf']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
     ->prefix('faculty/reports/research')
     ->group(function () {
         Route::get('/filters', [FacultyResearchReportController::class, 'filters']);
@@ -235,7 +255,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::get('/export/pdf', [FacultyResearchReportController::class, 'exportPdf']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
     ->prefix('faculty/org-structure')
     ->group(function () {
         Route::get('/lookups', [FacultyOrgStructureController::class, 'lookups']);
@@ -245,7 +265,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::put('/departments/{departmentId}', [FacultyOrgStructureController::class, 'updateDepartment']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
     ->prefix('faculty/users/lecturer-accounts')
     ->group(function () {
         Route::get('/', [FacultyLecturerAccountController::class, 'index']);
@@ -255,7 +275,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::put('/{lecturer}/status', [FacultyLecturerAccountController::class, 'updateStatus']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
     ->prefix('faculty/audit-logs')
     ->group(function () {
         Route::get('/meta', [FacultyAuditLogController::class, 'meta']);
@@ -263,7 +283,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::get('/{id}', [FacultyAuditLogController::class, 'show']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV'])
+// Lecturer search works
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
     ->prefix('lecturer/works')
     ->group(function () {
         Route::get('/lookups', [LecturerResearchWorkSearchController::class, 'lookups']);
@@ -273,7 +294,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:GV
         Route::get('/{activity}', [LecturerResearchWorkSearchController::class, 'show']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])
+// SCIENCE_OFFICE hours
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/hours')
     ->group(function () {
         Route::get('/lecturers/summary/export/excel', [AdminLecturerHoursController::class, 'exportSummaryExcel']);
@@ -288,16 +310,10 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::post('/warnings/{lecturerId}/send', [AdminLecturerHourWarningController::class, 'sendWarning']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])
-    ->prefix('admin/uni-approvals')
-    ->group(function () {
-        Route::get('/', [AdminUniversityApprovalController::class, 'index']);
-        Route::get('/{activity}', [AdminUniversityApprovalController::class, 'show']);
-        Route::put('/{activity}/finalize', [AdminUniversityApprovalController::class, 'finalize']);
-        Route::put('/{activity}/reject', [AdminUniversityApprovalController::class, 'reject']);
-    });
+// ✅ REMOVED: admin/uni-approvals (University approval removed by requirement)
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])
+// SCIENCE_OFFICE lecturer accounts
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/lecturer-accounts')
     ->group(function () {
         Route::get('/', [AdminLecturerAccountController::class, 'index']);
@@ -307,7 +323,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::put('/{lecturer}/status', [AdminLecturerAccountController::class, 'updateStatus']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])
+// SCIENCE_OFFICE org structure
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/org-structure')
     ->group(function () {
         Route::get('/faculties', [AdminOrgStructureController::class, 'listFaculties']);
@@ -319,7 +336,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::put('/departments/{departmentId}', [AdminOrgStructureController::class, 'updateDepartment']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])
+// SCIENCE_OFFICE work catalog
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/work-catalog')
     ->group(function () {
         Route::get('/work-types', [AdminWorkCatalogController::class, 'listWorkTypes']);
@@ -349,7 +367,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::patch('/research-fields/{id}/status', [AdminWorkCatalogController::class, 'updateResearchFieldStatus']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN|QL'])
+// SCIENCE_OFFICE research-hours catalog
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/research-hours')
     ->group(function () {
         Route::get('/meta', [AdminResearchHoursCatalogController::class, 'meta']);
@@ -369,7 +388,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::patch('/academic-years/{id}/apply', [AdminResearchHoursCatalogController::class, 'applyAcademicYear']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN'])
+// SCIENCE_OFFICE audit logs
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/audit-logs')
     ->group(function () {
         Route::get('/meta', [AdminAuditLogController::class, 'meta']);
@@ -377,7 +397,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::get('/{id}', [AdminAuditLogController::class, 'show']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN'])
+// SCIENCE_OFFICE reports
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/reports/lecturers')
     ->group(function () {
         Route::get('/filters', [AdminLecturerReportController::class, 'filters']);
@@ -386,7 +407,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::get('/export/pdf', [AdminLecturerReportController::class, 'exportPdf']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/reports/research')
     ->group(function () {
         Route::get('/filters', [AdminResearchReportController::class, 'filters']);
@@ -395,7 +416,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::get('/export/pdf', [AdminResearchReportController::class, 'exportPdf']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:ADMIN'])
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
     ->prefix('admin/reports/hour-research')
     ->group(function () {
         Route::get('/filters', [AdminResearchHoursReportController::class, 'filters']);
@@ -404,7 +425,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:AD
         Route::get('/export/pdf', [AdminResearchHoursReportController::class, 'exportPdf']);
     });
 
-Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL'])
+// FACULTY reports hour-research (Department Board)
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
     ->prefix('faculty/reports/hour-research')
     ->group(function () {
         Route::get('/filters', [FacultyResearchHoursReportController::class, 'filters']);
@@ -412,13 +434,3 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DL
         Route::get('/export/excel', [FacultyResearchHoursReportController::class, 'exportExcel']);
         Route::get('/export/pdf', [FacultyResearchHoursReportController::class, 'exportPdf']);
     });
-
-// Placeholder nhóm cho role DL (ban chủ nhiệm/khoa)
-Route::middleware(['auth:sanctum', 'role:DL'])->prefix('dl')->group(function () {
-    // TODO: thêm route dành riêng DL
-});
-
-// Placeholder nhóm cho role QL/QLKH (SCIENCE_OFFICE)
-Route::middleware(['auth:sanctum', 'role:QL'])->prefix('ql')->group(function () {
-    // TODO: thêm route dành riêng QL/QLKH
-});

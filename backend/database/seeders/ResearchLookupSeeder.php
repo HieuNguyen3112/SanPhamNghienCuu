@@ -77,15 +77,22 @@ class ResearchLookupSeeder extends Seeder
 
         $statuses = [
             ['code' => 'draft', 'name' => 'Draft'],
-            ['code' => 'submitted', 'name' => 'Submitted'],
-            ['code' => 'approved', 'name' => 'Approved'],
-            ['code' => 'rejected', 'name' => 'Rejected'],
+            ['code' => 'pending_member_confirm', 'name' => 'Chờ thành viên xác nhận'],
+            ['code' => 'member_rejected', 'name' => 'Thành viên từ chối'],
+            ['code' => 'pending_faculty_review', 'name' => 'Chờ Khoa duyệt'],
+            ['code' => 'approved', 'name' => 'Khoa duyệt'],
+            ['code' => 'rejected', 'name' => 'Khoa từ chối'],
         ];
+
 
         foreach ($statuses as $status) {
             DB::table('activity_statuses')->updateOrInsert(
                 ['code' => $status['code']],
-                array_merge($status, ['created_at' => $now, 'updated_at' => $now])
+                [
+                    'name'       => $status['name'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
             );
         }
 

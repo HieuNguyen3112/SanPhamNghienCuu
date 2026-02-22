@@ -6,8 +6,8 @@ interface LoginRequest {
   role: string;
 }
 
-// Session-based SPA: use /me (web guard + cookie/CSRF), not the token-based /api/auth/me
-export const fetchCurrentUser = () => http.get("/me");
+// ✅ Session-based SPA + sanctum-protected API route
+export const fetchCurrentUser = () => http.get("/api/auth/me");
 
 export const getCsrfCookie = () => fetchCsrfCookie();
 

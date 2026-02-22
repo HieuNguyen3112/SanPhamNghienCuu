@@ -205,7 +205,7 @@
 <script setup lang="ts">
 import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
-import type { ResearchField } from "../contracts/workCatalog.contract";
+import type { ResearchField } from "../contracts/researchFields.contract";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 defineProps<{
@@ -245,7 +245,7 @@ const emit = defineEmits<{
       name: string;
       description: string;
       isActive: boolean;
-    }
+    },
   ): void;
 }>();
 </script>

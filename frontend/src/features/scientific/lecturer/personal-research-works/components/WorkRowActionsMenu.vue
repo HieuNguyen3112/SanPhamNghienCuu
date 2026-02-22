@@ -10,7 +10,8 @@
       @keydown.esc.prevent.stop="emit('close')"
       title="Hành động"
     >
-      ⋯
+      <MoreHorizontal class="h-4 w-4" aria-hidden="true" />
+      <span class="sr-only">Hành động</span>
     </button>
 
     <!-- ✅ Teleport ra body để không bị table overflow cắt -->
@@ -39,8 +40,8 @@
               role="menuitem"
               @click="onClickView"
             >
-              <span aria-hidden="true">👁</span>
-              {{ viewLabelResolved }}
+              <Eye class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
+              <span class="min-w-0 truncate">{{ viewLabelResolved }}</span>
             </button>
 
             <!-- Draft -->
@@ -51,8 +52,10 @@
               role="menuitem"
               @click="onClickEditDraft"
             >
-              <span aria-hidden="true">✏️</span>
-              Tiếp tục kê khai
+              <Pencil
+                class="h-4 w-4 text-slate-500 group-hover:text-slate-700"
+              />
+              <span class="min-w-0 truncate">Tiếp tục kê khai</span>
             </button>
 
             <!-- Rejected -->
@@ -63,8 +66,8 @@
               role="menuitem"
               @click="onClickCopyRejected"
             >
-              <span aria-hidden="true">📄</span>
-              Sao chép kê khai lại
+              <Copy class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
+              <span class="min-w-0 truncate">Sao chép kê khai lại</span>
             </button>
           </div>
         </div>
@@ -76,7 +79,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { PersonalWorkStatusCode } from "../contracts/personalResearchWorksContracts";
-
+import { MoreHorizontal, Eye, Pencil, Copy } from "lucide-vue-next";
 const props = withDefaults(
   defineProps<{
     open: boolean;
@@ -89,7 +92,7 @@ const props = withDefaults(
   {
     showView: true,
     viewLabel: null,
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -143,7 +146,7 @@ function updateMenuPosition() {
   const desiredLeft = rect.right - menuWidth;
   const clampedLeft = Math.min(
     Math.max(viewportPadding, desiredLeft),
-    window.innerWidth - viewportPadding - menuWidth
+    window.innerWidth - viewportPadding - menuWidth,
   );
 
   menuLeft.value = clampedLeft;
@@ -187,7 +190,7 @@ watch(
     window.addEventListener("resize", updateMenuPosition);
     // capture scroll ở mọi container (kể cả table scroll)
     window.addEventListener("scroll", updateMenuPosition, true);
-  }
+  },
 );
 
 watch(
@@ -197,7 +200,7 @@ watch(
     document.removeEventListener("pointerdown", onDocPointerDown, true);
     window.removeEventListener("resize", updateMenuPosition);
     window.removeEventListener("scroll", updateMenuPosition, true);
-  }
+  },
 );
 
 onBeforeUnmount(() => {

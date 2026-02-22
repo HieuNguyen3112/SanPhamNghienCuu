@@ -14,29 +14,35 @@ class RoleMapper
 
     /**
      * Map canonical role -> list of backend (Spatie) role codes.
+     * IMPORTANT: Backend now uses canonical role names directly.
      */
     public static function canonicalToBackend(string $role): array
     {
-        return match ($role) {
-            'LECTURER' => ['GV'],
-            'DEPARTMENT_BOARD' => ['DL'],
-            'SCIENCE_OFFICE' => ['QL', 'ADMIN'],
+        $r = strtoupper($role);
+
+        return match ($r) {
+            'LECTURER' => ['LECTURER'],
+            'DEPARTMENT_BOARD' => ['DEPARTMENT_BOARD'],
+            'SCIENCE_OFFICE' => ['SCIENCE_OFFICE'],
             default => [],
         };
     }
 
+
     /**
      * Map backend role -> canonical role (first match); null if unknown.
+     * IMPORTANT: Backend now uses canonical role names directly.
      */
     public static function backendToCanonical(string $role): ?string
     {
-        return match ($role) {
-            'GV' => 'LECTURER',
-            'DL' => 'DEPARTMENT_BOARD',
-            'QL', 'ADMIN' => 'SCIENCE_OFFICE',
+        return match (strtoupper($role)) {
+            'LECTURER' => 'LECTURER',
+            'DEPARTMENT_BOARD' => 'DEPARTMENT_BOARD',
+            'SCIENCE_OFFICE' => 'SCIENCE_OFFICE',
             default => null,
         };
     }
+
 
     public static function backendListToCanonical(array $roles): array
     {
@@ -64,6 +70,6 @@ class RoleMapper
      */
     public static function backendRoleMatchesCanonical(string $backendRole, string $canonicalRole): bool
     {
-        return in_array($backendRole, self::canonicalToBackend($canonicalRole), true);
+        return in_array(strtoupper($backendRole), self::canonicalToBackend(strtoupper($canonicalRole)), true);
     }
 }

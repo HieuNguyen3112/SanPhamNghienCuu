@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import type { Component } from "vue";
-import type { WorkCatalogTabKey } from "../contracts/workCatalog.contract";
+import type { WorkCatalogTabKey } from "../contracts/workCatalogTabs.contract";
 
 defineProps<{
   modelValue: WorkCatalogTabKey;

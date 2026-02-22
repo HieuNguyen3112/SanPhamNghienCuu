@@ -1,12 +1,9 @@
-// File: src/features/master-data/work-catalog-management/composables/useWorkTypeCatalog.ts
 import { computed, reactive, ref } from "vue";
-import {
-  formatDateTime,
-  workTypeFromDto,
-  type WorkType,
-  type WorkTypeDTO,
-} from "../contracts/workCatalog.contract";
-import { workCatalogService } from "../services/workCatalogService";
+import type {
+  WorkType,
+  WorkTypeUpsertDTO,
+} from "../contracts/workTypes.contract";
+import { workTypeService } from "../services/workTypes.service";
 
 type FormErrors<T extends Record<string, unknown>> = Partial<
   Record<keyof T, string>
@@ -34,22 +31,33 @@ export function useWorkTypeCatalog() {
     description: "",
     isActive: true,
   });
+
   const workTypeErrors = reactive<FormErrors<typeof workTypeForm>>({});
 
   function clearErrors() {
     Object.keys(workTypeErrors).forEach(
-      (k) => delete workTypeErrors[k as keyof typeof workTypeErrors]
+      (k) => delete workTypeErrors[k as keyof typeof workTypeErrors],
     );
   }
 
+  function validateRequired(value: string, max: number): string | null {
+    if (!value.trim()) return "Trường này là bắt buộc.";
+    if (value.length > max) return `Tối đa ${max} ký tự.`;
+    return null;
+  }
+  function validateOptional(value: string, max: number): string | null {
+    if (value.length > max) return `Tối đa ${max} ký tự.`;
+    return null;
+  }
+
   async function load(): Promise<void> {
-    const response = await workCatalogService.listWorkTypes({
+    const res = await workTypeService.list({
       keyword: qWorkType.value.trim() || undefined,
       page: pageWorkType.value,
       per_page: pageSizeWorkType.value,
     });
-    workTypes.value = response.items.map(workTypeFromDto);
-    workTypeTotal.value = response.pagination.total;
+    workTypes.value = res.items;
+    workTypeTotal.value = res.pagination.total;
   }
 
   const filteredWorkTypes = computed(() => workTypes.value);
@@ -73,25 +81,27 @@ export function useWorkTypeCatalog() {
     modalWorkTypeOpen.value = true;
   }
 
-  function validateRequired(value: string, max: number): string | null {
-    if (!value.trim()) return "Trường này là bắt buộc.";
-    if (value.length > max) return `Tối đa ${max} ký tự.`;
-    return null;
-  }
-  function validateOptional(value: string, max: number): string | null {
-    if (value.length > max) return `Tối đa ${max} ký tự.`;
-    return null;
+  function onUpdateWorkTypeForm(v: {
+    id: number;
+    name: string;
+    description: string;
+    isActive: boolean;
+  }) {
+    workTypeForm.id = v.id;
+    workTypeForm.name = v.name;
+    workTypeForm.description = v.description;
+    workTypeForm.isActive = v.isActive;
   }
 
   async function saveWorkType(): Promise<void> {
     clearErrors();
+
     workTypeErrors.name = validateRequired(workTypeForm.name, 255) ?? undefined;
     workTypeErrors.description =
       validateOptional(workTypeForm.description, 500) ?? undefined;
+    if (workTypeErrors.name || workTypeErrors.description) return;
 
-    if (workTypeErrors.name) return;
-
-    const payload: Omit<WorkTypeDTO, "updated_at"> = {
+    const payload: WorkTypeUpsertDTO = {
       id: workTypeForm.id,
       name: workTypeForm.name.trim(),
       description: workTypeForm.description.trim()
@@ -100,36 +110,27 @@ export function useWorkTypeCatalog() {
       is_active: workTypeForm.isActive,
     };
 
-    await workCatalogService.upsertWorkType(payload);
+    await workTypeService.upsert(payload);
     modalWorkTypeOpen.value = false;
     await load();
   }
 
   return {
-    // data
     workTypes,
     workTypeTotal,
-
-    // search/paging
     qWorkType,
     pageWorkType,
     pageSizeWorkType,
     filteredWorkTypes,
     pagedWorkTypes,
-
-    // modal/form
     modalMode,
     modalWorkTypeOpen,
     workTypeForm,
     workTypeErrors,
-
-    // actions
     load,
     openCreateWorkType,
     openEditWorkType,
     saveWorkType,
-
-    // helper
-    formatDateTime,
+    onUpdateWorkTypeForm,
   };
 }

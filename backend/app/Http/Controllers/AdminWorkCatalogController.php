@@ -232,8 +232,9 @@ class AdminWorkCatalogController extends Controller
         [$keyword, $page, $perPage] = $this->resolveListParams($request);
 
         $today = Carbon::now()->toDateString();
+
         $latestRanking = DB::table('journal_rankings')
-            ->select('journal_id', DB::raw('MAX(effective_from) as effective_from'))
+            ->select('journal_id', DB::raw('MAX(effective_from) as max_effective_from'))
             ->where('effective_from', '<=', $today)
             ->groupBy('journal_id');
 
@@ -241,18 +242,20 @@ class AdminWorkCatalogController extends Controller
             ->leftJoinSub($latestRanking, 'lr', 'lr.journal_id', '=', 'j.id')
             ->leftJoin('journal_rankings as jr', function ($join) {
                 $join->on('jr.journal_id', '=', 'j.id')
-                    ->on('jr.effective_from', '=', 'lr.effective_from');
+                    ->on('jr.effective_from', '=', 'lr.max_effective_from');
             })
             ->select([
                 'j.*',
                 'jr.rank as current_rank',
                 'jr.effective_from as current_rank_effective_from',
+                // có thể thêm: 'jr.note as current_rank_note' nếu muốn
             ])
             ->when($keyword !== '', function ($q) use ($keyword) {
-                $q->where(function ($sub) use ($keyword) {
-                    $like = '%' . $keyword . '%';
+                $like = '%' . $keyword . '%';
+                $q->where(function ($sub) use ($like) {
                     $sub->where('j.name', 'like', $like)
-                        ->orWhere('j.issn', 'like', $like);
+                        ->orWhere('j.issn', 'like', $like)
+                        ->orWhere('j.source_name', 'like', $like);
                 });
             })
             ->orderByDesc('j.updated_at');
@@ -265,26 +268,35 @@ class AdminWorkCatalogController extends Controller
     public function storeJournal(Request $request)
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'issn' => ['nullable', 'string', 'max:50', 'unique:journals,issn'],
-            'classification' => ['required', 'string', Rule::in(self::JOURNAL_CLASSIFICATIONS)],
-            'country' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:255'],
-            'is_active' => ['required', 'boolean'],
+            'name'              => ['required', 'string', 'max:255'],
+            'issn'              => ['nullable', 'string', 'max:50', 'unique:journals,issn'],
+            'address'           => ['nullable', 'string', 'max:255'],
+            'country'           => ['nullable', 'string', 'max:100'],
+            'notes'             => ['nullable', 'string', 'max:255'],
+            'source_name'       => ['nullable', 'string', 'max:255'],
+            'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2'],
+            'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2', 'gte:point_min'],
+            'classification'    => ['required', 'string', Rule::in(self::JOURNAL_CLASSIFICATIONS)],
+            'research_hours'    => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'is_active'         => ['required', 'boolean'],
         ]);
 
         $now = now();
+
         $id = DB::table('journals')->insertGetId([
-            'name' => $data['name'],
-            'address' => $data['address'] ?? null,
-            'issn' => $data['issn'] ?? null,
+            'name'           => $data['name'],
+            'issn'           => $data['issn'] ?? null,
+            'address'        => $data['address'] ?? null,
+            'country'        => $data['country'] ?? null,
+            'notes'          => $data['notes'] ?? null,
+            'source_name'    => $data['source_name'] ?? null,
+            'point_min'      => $data['point_min'] ?? null,
+            'point_max'      => $data['point_max'] ?? null,
             'classification' => $data['classification'],
-            'country' => $data['country'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'is_active' => (bool) $data['is_active'],
-            'created_at' => $now,
-            'updated_at' => $now,
+            'research_hours' => $data['research_hours'] ?? 0,
+            'is_active'      => (bool) $data['is_active'],
+            'created_at'     => $now,
+            'updated_at'     => $now,
         ]);
 
         $row = $this->journalQuery()->where('j.id', $id)->first();
@@ -292,10 +304,9 @@ class AdminWorkCatalogController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'created',
-            'data' => $this->journalPayload($row),
+            'data'    => $this->journalPayload($row),
         ], Response::HTTP_CREATED);
     }
-
     public function updateJournal(Request $request, int $id)
     {
         $existing = DB::table('journals')->where('id', $id)->first();
@@ -304,26 +315,34 @@ class AdminWorkCatalogController extends Controller
         }
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'issn' => ['nullable', 'string', 'max:50', Rule::unique('journals', 'issn')->ignore($id)],
-            'classification' => ['required', 'string', Rule::in(self::JOURNAL_CLASSIFICATIONS)],
-            'country' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:255'],
-            'is_active' => ['required', 'boolean'],
+            'name'              => ['required', 'string', 'max:255'],
+            'issn'              => ['nullable', 'string', 'max:50', Rule::unique('journals', 'issn')->ignore($id)],
+            'address'           => ['nullable', 'string', 'max:255'],
+            'country'           => ['nullable', 'string', 'max:100'],
+            'notes'             => ['nullable', 'string', 'max:255'],
+            'source_name'       => ['nullable', 'string', 'max:255'],
+            'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2'],
+            'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2', 'gte:point_min'],
+            'classification'    => ['required', 'string', Rule::in(self::JOURNAL_CLASSIFICATIONS)],
+            'research_hours'    => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'is_active'         => ['required', 'boolean'],
         ]);
 
         DB::table('journals')
             ->where('id', $id)
             ->update([
-                'name' => $data['name'],
-                'address' => $data['address'] ?? null,
-                'issn' => $data['issn'] ?? null,
+                'name'           => $data['name'],
+                'issn'           => $data['issn'] ?? null,
+                'address'        => $data['address'] ?? null,
+                'country'        => $data['country'] ?? null,
+                'notes'          => $data['notes'] ?? null,
+                'source_name'    => $data['source_name'] ?? null,
+                'point_min'      => $data['point_min'] ?? null,
+                'point_max'      => $data['point_max'] ?? null,
                 'classification' => $data['classification'],
-                'country' => $data['country'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'is_active' => (bool) $data['is_active'],
-                'updated_at' => now(),
+                'research_hours' => $data['research_hours'] ?? 0,
+                'is_active'      => (bool) $data['is_active'],
+                'updated_at'     => now(),
             ]);
 
         $row = $this->journalQuery()->where('j.id', $id)->first();
@@ -331,7 +350,7 @@ class AdminWorkCatalogController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'updated',
-            'data' => $this->journalPayload($row),
+            'data'    => $this->journalPayload($row),
         ], Response::HTTP_OK);
     }
 
@@ -366,35 +385,41 @@ class AdminWorkCatalogController extends Controller
     {
         $journal = DB::table('journals')->where('id', $journalId)->first();
         if (! $journal) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Journal not found'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
-            'rank' => ['required', 'string', Rule::in(self::JOURNAL_RANKS)],
+            'rank'          => ['required', 'string', Rule::in(self::JOURNAL_RANKS ?? ['Q1', 'Q2', 'Q3', 'Q4', 'A', 'B', 'C'])],
             'effective_from' => ['required', 'date'],
-            'note' => ['nullable', 'string', 'max:255'],
+            'note'          => ['nullable', 'string', 'max:255'],
         ]);
 
         $now = now();
-        $id = DB::table('journal_rankings')->insertGetId([
-            'journal_id' => $journalId,
-            'rank' => $data['rank'],
+
+        DB::table('journal_rankings')->insert([
+            'journal_id'     => $journalId,
+            'rank'           => $data['rank'],
             'effective_from' => $data['effective_from'],
-            'note' => $data['note'] ?? null,
-            'created_at' => $now,
-            'updated_at' => $now,
+            'note'           => $data['note'] ?? null,
+            'created_at'     => $now,
+            'updated_at'     => $now,
         ]);
 
+        // Cập nhật timestamp của journal để dễ sort / nhận biết có thay đổi ranking
         DB::table('journals')
             ->where('id', $journalId)
             ->update(['updated_at' => $now]);
 
-        $row = DB::table('journal_rankings')->where('id', $id)->first();
+        // Trả về ranking vừa tạo + thông tin journal nếu cần
+        $newRanking = DB::table('journal_rankings')
+            ->where('journal_id', $journalId)
+            ->where('effective_from', $data['effective_from'])
+            ->first();
 
         return response()->json([
             'success' => true,
-            'message' => 'created',
-            'data' => $this->journalRankingPayload($row),
+            'message' => 'Ranking created',
+            'data'    => $this->journalRankingPayload($newRanking),
         ], Response::HTTP_CREATED);
     }
 

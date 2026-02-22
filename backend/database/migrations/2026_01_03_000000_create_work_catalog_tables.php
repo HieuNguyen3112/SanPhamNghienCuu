@@ -26,15 +26,38 @@ return new class extends Migration {
 
         Schema::create('journals', function (Blueprint $table) {
             $table->id();
+
+            // Basic info
             $table->string('name', 255);
+            $table->string('issn', 50)->nullable(); // có thể trùng NULL, unique theo non-null ở dưới
             $table->string('address', 255)->nullable();
-            $table->string('issn', 50)->nullable()->unique();
-            $table->string('classification', 20)->default('OTHER');
             $table->string('country', 100)->nullable();
             $table->string('notes', 255)->nullable();
+
+            // Source / credibility
+            // VD: "HDGSNN 2025", "SCI", "SCIE", "Scopus", "ISI", "VAST", link...
+            $table->string('source_name', 255)->nullable();
+
+            // Point range (theo nguồn uy tín)
+            // DECIMAL để tránh lỗi float (0.75, 1.5, 3.0...)
+            $table->decimal('point_min', 4, 2)->nullable();
+            $table->decimal('point_max', 4, 2)->nullable();
+
+            // Classification: nên là enum/tier do hệ thống tự derive, không cho user gõ tự do
+            // VD: OTHER, ISSN_ISBN, HDGSNN_GE_1, HDGSNN_GE_2 ...
+            $table->string('classification', 30)->default('OTHER');
+
+            // Cached hours (optional nhưng rất đáng làm để query/report nhanh)
+            // Nếu bạn muốn luôn derive runtime thì có thể bỏ cột này
+            $table->unsignedSmallInteger('research_hours')->default(0);
+
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            // Unique ISSN nhưng cho phép nhiều NULL
+            $table->unique('issn');
         });
+
 
         Schema::create('journal_rankings', function (Blueprint $table) {
             $table->id();

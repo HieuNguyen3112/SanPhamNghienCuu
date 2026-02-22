@@ -30,7 +30,7 @@ class LecturerProfileDemoSeeder extends Seeder
 
         $seedData = [
             [
-                'role' => 'GV',
+                'role' => 'LECTURER',
                 'email' => 'gv@local.test',
                 'code' => 'GV-001',
                 'full_name' => 'Giang Vien',
@@ -135,7 +135,7 @@ class LecturerProfileDemoSeeder extends Seeder
                 ],
             ],
             [
-                'role' => 'GV',
+                'role' => 'LECTURER',
                 'email' => 'gv2@local.test',
                 'code' => 'GV-002',
                 'full_name' => 'Giang Vien 2',
@@ -145,7 +145,7 @@ class LecturerProfileDemoSeeder extends Seeder
                 'rank_code' => 'LECTURER',
             ],
             [
-                'role' => 'GV',
+                'role' => 'LECTURER',
                 'email' => 'gv3@local.test',
                 'code' => 'GV-003',
                 'full_name' => 'Giang Vien 3',
@@ -155,7 +155,7 @@ class LecturerProfileDemoSeeder extends Seeder
                 'rank_code' => 'LECTURER',
             ],
             [
-                'role' => 'GV',
+                'role' => 'LECTURER',
                 'email' => 'gv4@local.test',
                 'code' => 'GV-004',
                 'full_name' => 'Giang Vien 4',
@@ -165,7 +165,7 @@ class LecturerProfileDemoSeeder extends Seeder
                 'rank_code' => 'LECTURER',
             ],
             [
-                'role' => 'GV',
+                'role' => 'LECTURER',
                 'email' => 'gv5@local.test',
                 'code' => 'GV-005',
                 'full_name' => 'Giang Vien 5',
@@ -175,7 +175,7 @@ class LecturerProfileDemoSeeder extends Seeder
                 'rank_code' => 'LECTURER',
             ],
             [
-                'role' => 'GV',
+                'role' => 'LECTURER',
                 'email' => 'gv6@local.test',
                 'code' => 'GV-006',
                 'full_name' => 'Giang Vien 6',
@@ -185,8 +185,8 @@ class LecturerProfileDemoSeeder extends Seeder
                 'rank_code' => 'LECTURER',
             ],
             [
-                'role' => 'DL',
-                'email' => 'dl@local.test',
+                'role' => 'DEPARTMENT_BOARD',
+                'email' => 'khoa@local.test',
                 'code' => 'DL-001',
                 'full_name' => 'Duyet',
                 'phone' => '0900000002',
@@ -245,8 +245,8 @@ class LecturerProfileDemoSeeder extends Seeder
                 ],
             ],
             [
-                'role' => 'QL',
-                'email' => 'ql@local.test',
+                'role' => 'SCIENCE_OFFICE',
+                'email' => 'truong@local.test',
                 'code' => 'QL-001',
                 'full_name' => 'Quan Ly',
                 'phone' => '0900000003',

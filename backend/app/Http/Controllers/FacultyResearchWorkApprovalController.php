@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 class FacultyResearchWorkApprovalController extends Controller
 {
     private const STATUS_PENDING = 'PENDING_FACULTY_APPROVAL';
-    private const STATUS_APPROVED = 'APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY';
+    private const STATUS_APPROVED = 'APPROVED_BY_FACULTY';
     private const STATUS_REJECTED = 'REJECTED_BY_FACULTY';
 
     public function lookups(Request $request)
@@ -195,27 +195,66 @@ class FacultyResearchWorkApprovalController extends Controller
     }
 
     public function approve(Request $request, int $activity)
-    {
-        $scope = $this->resolveFacultyScope($request);
-        if (! $scope) {
-            return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
-        }
+{
+    $scope = $this->resolveFacultyScope($request);
+    if (! $scope) {
+        return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
+    }
 
-        $stageIds = $this->getStageIds();
-        $current = $this->baseQuery($stageIds, $scope['faculty_id'])
+    $stageIds = $this->getStageIds();
+    $current = $this->baseQuery($stageIds, $scope['faculty_id'])
+        ->where('ra.id', $activity)
+        ->first();
+
+    if (! $current) {
+        return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+    }
+
+    // Chỉ cho duyệt khi công trình đang chờ Khoa duyệt
+    $approvalStatus = $this->resolveFacultyApprovalStatus($current);
+    if ($approvalStatus !== self::STATUS_PENDING) {
+        return response()->json(['message' => 'activity is not pending faculty approval'], Response::HTTP_CONFLICT);
+    }
+
+    $approvedStatusId = $this->getStatusId('approved');
+    if (! $approvedStatusId) {
+        return response()->json(['message' => 'approved status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    $pendingFacultyStatusId = $this->getStatusId('pending_faculty_review');
+    if (! $pendingFacultyStatusId) {
+        return response()->json(['message' => 'pending_faculty_review status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    $now = now();
+    $userId = $request->user()->id;
+
+    DB::transaction(function () use ($activity, $stageIds, $approvedStatusId, $pendingFacultyStatusId, $now, $userId, $request) {
+        // Lock activity để tránh race approve/reject
+        $locked = DB::table('research_activities as ra')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
             ->where('ra.id', $activity)
+            ->lockForUpdate()
+            ->select(['ra.status_id', 'ast.code as status_code'])
             ->first();
 
-        if (! $current) {
-            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+        if (! $locked) {
+            abort(Response::HTTP_NOT_FOUND, 'activity not found');
         }
 
-        $approvalStatus = $this->resolveFacultyApprovalStatus($current);
-        if ($approvalStatus !== self::STATUS_PENDING) {
-            return response()->json(['message' => 'activity is not pending faculty approval'], Response::HTTP_CONFLICT);
+        // Phải đúng trạng thái đang chờ Khoa duyệt
+        if ((int) $locked->status_id !== (int) $pendingFacultyStatusId || $locked->status_code !== 'pending_faculty_review') {
+            abort(Response::HTTP_CONFLICT, 'activity is not pending faculty approval');
         }
 
-        $now = now();
+        // Set final approved (KHÔNG qua Trường)
+        DB::table('research_activities')->where('id', $activity)->update([
+            'status_id' => $approvedStatusId,
+            'approved_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        // Ghi approval stage "assistant" (Khoa) = approved
         DB::table('activity_approvals')->updateOrInsert(
             [
                 'activity_id' => $activity,
@@ -223,7 +262,7 @@ class FacultyResearchWorkApprovalController extends Controller
             ],
             [
                 'status' => 'approved',
-                'decided_by_user_id' => $request->user()->id,
+                'decided_by_user_id' => $userId,
                 'decided_at' => $now,
                 'note' => $request->input('note'),
                 'created_at' => $now,
@@ -231,10 +270,23 @@ class FacultyResearchWorkApprovalController extends Controller
             ]
         );
 
-        return response()->json([
-            'message' => 'faculty approval recorded',
-        ], Response::HTTP_OK);
-    }
+        // Status history
+        DB::table('activity_status_histories')->insert([
+            'activity_id' => $activity,
+            'from_status_id' => $locked->status_id,
+            'to_status_id' => $approvedStatusId,
+            'acted_by_user_id' => $userId,
+            'acted_at' => $now,
+            'note' => $request->input('note'),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    });
+
+    return response()->json([
+        'message' => 'faculty approved (final)',
+    ], Response::HTTP_OK);
+}
 
     public function reject(FacultyWorkApprovalRejectRequest $request, int $activity)
     {
@@ -471,21 +523,25 @@ class FacultyResearchWorkApprovalController extends Controller
     }
 
     private function resolveFacultyApprovalStatus(object $row): ?string
-    {
-        if ($row->assistant_approval_status === 'rejected' || $row->status_code === 'rejected') {
-            return self::STATUS_REJECTED;
-        }
-
-        if ($row->assistant_approval_status === 'approved') {
-            return self::STATUS_APPROVED;
-        }
-
-        if ($row->status_code === 'submitted') {
-            return self::STATUS_PENDING;
-        }
-
-        return null;
+{
+    // Ưu tiên trạng thái reject
+    if ($row->assistant_approval_status === 'rejected' || $row->status_code === 'rejected') {
+        return self::STATUS_REJECTED;
     }
+
+    // Approved là final (không còn bước Trường)
+    if ($row->status_code === 'approved' || $row->assistant_approval_status === 'approved') {
+        return self::STATUS_APPROVED;
+    }
+
+    // Pending khoa duyệt
+    if ($row->status_code === 'pending_faculty_review') {
+        return self::STATUS_PENDING;
+    }
+
+    return null;
+}
+
 
     private function mapListEntry(object $row, array $authorsByActivity): ?array
     {

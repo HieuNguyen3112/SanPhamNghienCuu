@@ -42,7 +42,7 @@ class SessionAuthController extends Controller
                     'roles' => $user->getRoleNames()->values()->all(),
                     'backend_roles' => $user->getRoleNames()->values()->all(),
                 ] : null,
-            ], Response::HTTP_OK); // 200: keep SPA flow happy without creating a new session/token
+            ], Response::HTTP_OK);
         }
 
         $incomingRole = $request->input('role');
@@ -58,10 +58,10 @@ class SessionAuthController extends Controller
         }
 
         $data = $request->validate([
-            'email'             => ['required', 'email'],
-            'password'          => ['required', 'string'],
-            'role'              => ['nullable', 'string', Rule::in($allowedRoles)],
-            'remember'          => ['sometimes', 'boolean'],
+            'email'    => ['required', 'email'],
+            'password' => ['required', 'string'],
+            'role'     => ['nullable', 'string', Rule::in($allowedRoles)],
+            'remember' => ['sometimes', 'boolean'],
         ]);
 
         if (! Auth::guard('web')->attempt(
@@ -80,6 +80,7 @@ class SessionAuthController extends Controller
                 'target_display' => 'Hệ thống SPNC',
                 'request_http_status' => Response::HTTP_UNPROCESSABLE_ENTITY,
             ]);
+
             return response()->json(['message' => 'Invalid credentials'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -87,6 +88,7 @@ class SessionAuthController extends Controller
         $user = Auth::user();
         if (! $user instanceof User) {
             Auth::guard('web')->logout();
+
             AuditLogger::log($request, [
                 'action_group' => 'auth',
                 'action_code' => 'LOGIN_FAILED',
@@ -99,11 +101,13 @@ class SessionAuthController extends Controller
                 'target_display' => 'Hệ thống SPNC',
                 'request_http_status' => Response::HTTP_INTERNAL_SERVER_ERROR,
             ]);
+
             return response()->json(['message' => 'User not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         if ($user instanceof MustVerifyEmailContract && ! $user->hasVerifiedEmail()) {
             Auth::guard('web')->logout();
+
             AuditLogger::log($request, [
                 'action_group' => 'auth',
                 'action_code' => 'LOGIN_FAILED',
@@ -115,34 +119,37 @@ class SessionAuthController extends Controller
                 'target_display' => 'Hệ thống SPNC',
                 'request_http_status' => Response::HTTP_FORBIDDEN,
             ], $user);
-            return response()->json(['message' => 'Email not verified'], Response::HTTP_FORBIDDEN);
+
+            return response()->json([
+                'code' => 'UNVERIFIED_EMAIL',
+                'message' => 'Email not verified',
+            ], Response::HTTP_FORBIDDEN);
         }
 
+        // ✅ Canonical roles are stored in Spatie now -> check canonical directly (web guard)
         $requestedRole = $data['role'] ?? null;
         if ($requestedRole !== null) {
-            $backendRolesForRequest = RoleMapper::canonicalToBackend($requestedRole);
-            $hasAcceptedRole = false;
-            foreach ($backendRolesForRequest as $backendRole) {
-                if ($user->hasRole($backendRole)) {
-                    $hasAcceptedRole = true;
-                    break;
-                }
-            }
+            $hasAcceptedRole = $user->hasRole($requestedRole, 'web');
 
             if (! $hasAcceptedRole) {
                 Auth::guard('web')->logout();
+
                 AuditLogger::log($request, [
                     'action_group' => 'auth',
                     'action_code' => 'LOGIN_FAILED',
                     'action_label' => 'Đăng nhập thất bại',
                     'severity' => 'important',
                     'result_status' => 'failure',
-                    'result_error_message' => 'Role not allowed for this user',
+                    'result_error_message' => 'User does not have the right roles.',
                     'target_type' => 'system',
                     'target_display' => 'Hệ thống SPNC',
                     'request_http_status' => Response::HTTP_FORBIDDEN,
                 ], $user);
-                return response()->json(['message' => 'Role not allowed for this user'], Response::HTTP_FORBIDDEN);
+
+                return response()->json([
+                    'code' => 'FORBIDDEN_MISSING_ROLE',
+                    'message' => 'User does not have the right roles.',
+                ], Response::HTTP_FORBIDDEN);
             }
         }
 
@@ -153,6 +160,7 @@ class SessionAuthController extends Controller
             'ip' => $request->ip(),
             'ua' => $request->userAgent(),
         ]);
+
         AuditLogger::log($request, [
             'action_group' => 'auth',
             'action_code' => 'LOGIN_SUCCESS',
@@ -217,6 +225,7 @@ class SessionAuthController extends Controller
             'ua' => $request->userAgent(),
             'revoked_token_ids' => $tokenIds,
         ]);
+
         AuditLogger::log($request, [
             'action_group' => 'auth',
             'action_code' => 'LOGOUT',

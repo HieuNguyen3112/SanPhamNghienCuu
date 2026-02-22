@@ -231,8 +231,7 @@ class LecturerHoursCalculateController extends Controller
         int $managerStageId,
         int $hoursStageId,
         ?int $approvedStatusId
-    )
-    {
+    ) {
         return DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
@@ -256,15 +255,8 @@ class LecturerHoursCalculateController extends Controller
                 $query->whereColumn('ra.owner_lecturer_id', 'ram.lecturer_id')
                     ->orWhere('ram.confirmation_status', 'accepted');
             })
-            ->where(function ($query) use ($approvedStatusId) {
-                $query->where(function ($sub) {
-                    $sub->where('aa_assistant.status', 'approved')
-                        ->where('aa_manager.status', 'approved');
-                });
-                if ($approvedStatusId) {
-                    $query->orWhere('ra.status_id', $approvedStatusId);
-                }
-            })
+            ->where('ra.status_id', $approvedStatusId)
+
             ->select([
                 'ra.id as activity_id',
                 'ra.activity_code',
@@ -290,8 +282,7 @@ class LecturerHoursCalculateController extends Controller
         int $managerStageId,
         int $hoursStageId,
         ?int $approvedStatusId
-    )
-    {
+    ) {
         return $this->baseQuery($lecturerId, $assistantStageId, $managerStageId, $hoursStageId, $approvedStatusId)
             ->leftJoin('paper_details as pd', 'ra.id', '=', 'pd.activity_id')
             ->leftJoin('book_details as bd', 'ra.id', '=', 'bd.activity_id')
@@ -331,8 +322,7 @@ class LecturerHoursCalculateController extends Controller
         int $assistantStageId,
         int $managerStageId,
         ?int $approvedStatusId
-    ): int
-    {
+    ): int {
         $query = DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->leftJoin('activity_approvals as aa_assistant', function ($join) use ($assistantStageId) {
@@ -380,8 +370,7 @@ class LecturerHoursCalculateController extends Controller
         int $managerStageId,
         ?int $approvedStatusId,
         array $activityIds
-    ): array
-    {
+    ): array {
         if (empty($activityIds)) {
             return [];
         }
@@ -413,7 +402,7 @@ class LecturerHoursCalculateController extends Controller
             })
             ->distinct()
             ->pluck('ra.id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
     }
 

@@ -108,13 +108,13 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     icon: LayoutDashboard,
     roles: ["SCIENCE_OFFICE"],
   },
-  {
-    id: "works-uniapproval",
-    label: "Xét duyệt công trình",
-    routeName: "works.uniapprovals",
-    icon: ShieldCheck,
-    roles: ["SCIENCE_OFFICE"],
-  },
+  // {
+  //   id: "works-uniapproval",
+  //   label: "Xét duyệt công trình",
+  //   routeName: "works.uniapprovals",
+  //   icon: ShieldCheck,
+  //   roles: ["SCIENCE_OFFICE"],
+  // },
   {
     id: "hours-unimanagement",
     label: "Quản lý giờ NCKH",
@@ -122,18 +122,18 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     icon: BarChart3,
     roles: ["SCIENCE_OFFICE"],
   },
-  {
-    id: "hours.uniapprovals",
-    label: "Xét duyệt giờ NCKH",
-    routeName: "hours.uniapprovals",
-    icon: ShieldCheck,
-    roles: ["SCIENCE_OFFICE"],
-  },
-  {
-    id: "hours-uniwarning",
-    label: "Cảnh báo giảng viên",
-    routeName: "hours.uniwarning",
-    icon: AlertTriangle,
-    roles: ["SCIENCE_OFFICE"],
-  },
+  // {
+  //   id: "hours.uniapprovals",
+  //   label: "Xét duyệt giờ NCKH",
+  //   routeName: "hours.uniapprovals",
+  //   icon: ShieldCheck,
+  //   roles: ["SCIENCE_OFFICE"],
+  // },
+  // {
+  //   id: "hours-uniwarning",
+  //   label: "Cảnh báo giảng viên",
+  //   routeName: "hours.uniwarning",
+  //   icon: AlertTriangle,
+  //   roles: ["SCIENCE_OFFICE"],
+  // },
 ];
