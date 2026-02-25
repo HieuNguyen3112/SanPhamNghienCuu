@@ -1,4 +1,5 @@
 import type {
+  ApprovePayloadDTO,
   HourApprovalFilter,
   HourApprovalListResponseDTO,
   HourApprovalRequestDetailDTO,
@@ -18,7 +19,10 @@ export interface HourApprovalService {
     perPage: number
   ): Promise<HourApprovalListResponseDTO>;
   getRequestDetail(requestId: number): Promise<HourApprovalRequestDetailDTO>;
-  approve(requestId: number): Promise<HourApprovalRequestDetailDTO>;
+  approve(
+    requestId: number,
+    payload?: ApprovePayloadDTO
+  ): Promise<HourApprovalRequestDetailDTO>;
   reject(requestId: number, payload: RejectPayloadDTO): Promise<HourApprovalRequestDetailDTO>;
 }
 
@@ -130,7 +134,8 @@ export function createHourApprovalService(
   }
 
   async function approve(
-    requestId: number
+    requestId: number,
+    payload?: ApprovePayloadDTO
   ): Promise<HourApprovalRequestDetailDTO> {
     await delay(randomLatencyMs());
 
@@ -140,8 +145,27 @@ export function createHourApprovalService(
     if (!summary || !detail) throw new Error("Không tìm thấy yêu cầu.");
     if (summary.status !== "pending") return detail;
 
-    summary.status = "approved";
-    detail.status = "approved";
+    const selectedActivityIds = new Set(payload?.activity_ids ?? []);
+    const shouldApplyPartial = selectedActivityIds.size > 0;
+
+    detail.items = detail.items.map((item) => {
+      if (item.approval_status !== "pending") return item;
+      if (shouldApplyPartial && !selectedActivityIds.has(item.activity_id)) return item;
+      return { ...item, approval_status: "approved", rejection_reason: null };
+    });
+
+    const statuses = detail.items.map((item) => item.approval_status ?? "pending");
+    if (statuses.includes("pending")) {
+      summary.status = "pending";
+      detail.status = "pending";
+    } else if (statuses.includes("rejected")) {
+      summary.status = "rejected";
+      detail.status = "rejected";
+    } else {
+      summary.status = "approved";
+      detail.status = "approved";
+    }
+
     return detail;
   }
 
@@ -157,10 +181,27 @@ export function createHourApprovalService(
     if (!summary || !detail) throw new Error("Không tìm thấy yêu cầu.");
     if (summary.status !== "pending") return detail;
 
-    void payload;
+    const selectedActivityIds = new Set(payload.activity_ids ?? []);
+    const shouldApplyPartial = selectedActivityIds.size > 0;
 
-    summary.status = "rejected";
-    detail.status = "rejected";
+    detail.items = detail.items.map((item) => {
+      if (item.approval_status !== "pending") return item;
+      if (shouldApplyPartial && !selectedActivityIds.has(item.activity_id)) return item;
+      return { ...item, approval_status: "rejected", rejection_reason: payload.reason_detail ?? null };
+    });
+
+    const statuses = detail.items.map((item) => item.approval_status ?? "pending");
+    if (statuses.includes("pending")) {
+      summary.status = "pending";
+      detail.status = "pending";
+    } else if (statuses.includes("rejected")) {
+      summary.status = "rejected";
+      detail.status = "rejected";
+    } else {
+      summary.status = "approved";
+      detail.status = "approved";
+    }
+
     return detail;
   }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\AcademicYearResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -238,10 +239,7 @@ class FacultyLecturerHourWarningController extends Controller
             }
         }
 
-        $row = DB::table('academic_years')
-            ->orderByDesc('is_active')
-            ->orderByDesc('id')
-            ->first();
+        $row = AcademicYearResolver::current();
 
         if (! $row) {
             return null;

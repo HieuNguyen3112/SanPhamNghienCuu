@@ -10,7 +10,7 @@ import { researchHoursCatalogService } from "../services/researchHoursCatalogSer
 /**
  * TAB3 NOTE:
  * - academic_years: code,start_date,end_date,is_active
- * - ??t t?nh gi? ch?a c? d? li?u; UI hi?n ch? qu?n l? n?m h?c.
+ * - Đợt tính giờ chưa có dữ liệu; UI hiện chỉ quản lý năm học.
  */
 
 type ModalMode = "create" | "edit";

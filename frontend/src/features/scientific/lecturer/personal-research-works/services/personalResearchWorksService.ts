@@ -1,10 +1,8 @@
 import axios from "axios";
-import http from "@/lib/http";
+import http, { ensureCsrfCookie } from "@/lib/http";
 import type {
   PersonalWorkDetailDTO,
   PersonalWorkIndexResponseDTO,
-  PersonalWorkRowDTO,
-  PersonalStatsDTO,
 } from "../contracts/personalResearchWorksContracts";
 
 export interface PersonalWorksIndexParams {
@@ -56,6 +54,19 @@ export const personalResearchWorksService = {
       return response.data.data;
     } catch (err) {
       throw new Error(extractErrorMessage(err, "Failed to load work detail."));
+    }
+  },
+
+  async reinviteMember(activityId: number, memberId: number): Promise<void> {
+    try {
+      await ensureCsrfCookie();
+      await http.post(
+        `/api/research-activities/${activityId}/members/${memberId}/reinvite`
+      );
+    } catch (err) {
+      throw new Error(
+        extractErrorMessage(err, "Failed to resend participation invitation.")
+      );
     }
   },
 };

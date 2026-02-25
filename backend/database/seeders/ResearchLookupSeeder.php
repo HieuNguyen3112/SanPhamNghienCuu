@@ -28,10 +28,10 @@ class ResearchLookupSeeder extends Seeder
         }
 
         $kinds = [
-            ['code' => 'paper', 'name' => 'Paper'],
-            ['code' => 'book', 'name' => 'Book'],
-            ['code' => 'project', 'name' => 'Project'],
-            ['code' => 'conference', 'name' => 'Conference'],
+            ['code' => 'paper', 'name' => 'Bài báo khoa học'],
+            ['code' => 'book', 'name' => 'Sách, giáo trình'],
+            ['code' => 'project', 'name' => 'Đề tài KH&CN'],
+            ['code' => 'conference', 'name' => 'Hội nghị, hội thảo'],
         ];
 
         foreach ($kinds as $kind) {
@@ -47,15 +47,15 @@ class ResearchLookupSeeder extends Seeder
             ->all();
 
         $types = [
-            ['code' => 'hdgsnn_900', 'name' => 'HDGSNN 900', 'kind_code' => 'paper'],
-            ['code' => 'hdgsnn_600', 'name' => 'HDGSNN 600', 'kind_code' => 'paper'],
-            ['code' => 'hdgsnn_300', 'name' => 'HDGSNN 300', 'kind_code' => 'paper'],
-            ['code' => 'textbook', 'name' => 'Textbook', 'kind_code' => 'book'],
-            ['code' => 'reference', 'name' => 'Reference', 'kind_code' => 'book'],
-            ['code' => 'bo', 'name' => 'Project - Ministry', 'kind_code' => 'project'],
-            ['code' => 'coso', 'name' => 'Project - Institution', 'kind_code' => 'project'],
-            ['code' => 'report', 'name' => 'Conference Report', 'kind_code' => 'conference'],
-            ['code' => 'attend', 'name' => 'Conference Attend', 'kind_code' => 'conference'],
+            ['code' => 'hdgsnn_900', 'name' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)', 'kind_code' => 'paper'],
+            ['code' => 'hdgsnn_600', 'name' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)', 'kind_code' => 'paper'],
+            ['code' => 'hdgsnn_300', 'name' => 'Bài báo có ISSN/ISBN (300 giờ)', 'kind_code' => 'paper'],
+            ['code' => 'textbook', 'name' => 'Giáo trình', 'kind_code' => 'book'],
+            ['code' => 'reference', 'name' => 'Tài liệu tham khảo', 'kind_code' => 'book'],
+            ['code' => 'bo', 'name' => 'Đề tài cấp Bộ', 'kind_code' => 'project'],
+            ['code' => 'coso', 'name' => 'Đề tài cấp Trường', 'kind_code' => 'project'],
+            ['code' => 'report', 'name' => 'Báo cáo hội thảo', 'kind_code' => 'conference'],
+            ['code' => 'attend', 'name' => 'Tham dự hội thảo', 'kind_code' => 'conference'],
         ];
 
         foreach ($types as $type) {
@@ -76,12 +76,12 @@ class ResearchLookupSeeder extends Seeder
         }
 
         $statuses = [
-            ['code' => 'draft', 'name' => 'Draft'],
+            ['code' => 'draft', 'name' => 'Nháp'],
             ['code' => 'pending_member_confirm', 'name' => 'Chờ thành viên xác nhận'],
             ['code' => 'member_rejected', 'name' => 'Thành viên từ chối'],
-            ['code' => 'pending_faculty_review', 'name' => 'Chờ Khoa duyệt'],
-            ['code' => 'approved', 'name' => 'Khoa duyệt'],
-            ['code' => 'rejected', 'name' => 'Khoa từ chối'],
+            ['code' => 'pending_faculty_review', 'name' => 'Chờ khoa duyệt'],
+            ['code' => 'approved', 'name' => 'Đã duyệt'],
+            ['code' => 'rejected', 'name' => 'Từ chối'],
         ];
 
 
@@ -97,12 +97,12 @@ class ResearchLookupSeeder extends Seeder
         }
 
         $memberRoles = [
-            ['code' => 'principal', 'name' => 'Principal'],
-            ['code' => 'member', 'name' => 'Member'],
-            ['code' => 'secretary', 'name' => 'Secretary'],
-            ['code' => 'corresponding_author', 'name' => 'Corresponding Author'],
-            ['code' => 'coauthor', 'name' => 'Co-author'],
-            ['code' => 'chief_editor', 'name' => 'Chief Editor'],
+            ['code' => 'principal', 'name' => 'Chủ nhiệm'],
+            ['code' => 'member', 'name' => 'Thành viên'],
+            ['code' => 'secretary', 'name' => 'Thư ký'],
+            ['code' => 'corresponding_author', 'name' => 'Tác giả chính'],
+            ['code' => 'coauthor', 'name' => 'Đồng tác giả'],
+            ['code' => 'chief_editor', 'name' => 'Chủ biên'],
         ];
 
         foreach ($memberRoles as $role) {
@@ -113,9 +113,9 @@ class ResearchLookupSeeder extends Seeder
         }
 
         $approvalStages = [
-            ['code' => 'assistant', 'name' => 'Assistant', 'order_no' => 1],
-            ['code' => 'manager', 'name' => 'Manager', 'order_no' => 2],
-            ['code' => 'hours', 'name' => 'Hours Approval', 'order_no' => 3],
+            ['code' => 'assistant', 'name' => 'Khoa duyệt nội dung', 'order_no' => 1],
+            ['code' => 'manager', 'name' => 'Trường duyệt nội dung', 'order_no' => 2],
+            ['code' => 'hours', 'name' => 'Khoa duyệt giờ NCKH', 'order_no' => 3],
         ];
 
         foreach ($approvalStages as $stage) {
@@ -126,11 +126,11 @@ class ResearchLookupSeeder extends Seeder
         }
 
         $evidenceTypes = [
-            ['code' => 'content', 'name' => 'Content'],
-            ['code' => 'cover', 'name' => 'Cover'],
-            ['code' => 'toc', 'name' => 'Table of Contents'],
-            ['code' => 'acceptance_decision', 'name' => 'Acceptance Decision'],
-            ['code' => 'publication_decision', 'name' => 'Publication Decision'],
+            ['code' => 'content', 'name' => 'Toàn văn'],
+            ['code' => 'cover', 'name' => 'Trang bìa'],
+            ['code' => 'toc', 'name' => 'Mục lục'],
+            ['code' => 'acceptance_decision', 'name' => 'Quyết định nghiệm thu'],
+            ['code' => 'publication_decision', 'name' => 'Quyết định xuất bản'],
         ];
 
         foreach ($evidenceTypes as $type) {

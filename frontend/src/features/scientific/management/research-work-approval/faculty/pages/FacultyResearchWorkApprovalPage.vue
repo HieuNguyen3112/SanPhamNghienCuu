@@ -72,6 +72,8 @@
         (payload) =>
           facultyResearchWorkApprovalProvider.approve({
             researchWorkIdentifier: payload.researchWorkIdentifier,
+            officialResearchHours: null,
+            memberHours: payload.memberHours,
           })
       "
       @reject="facultyResearchWorkApprovalProvider.reject"

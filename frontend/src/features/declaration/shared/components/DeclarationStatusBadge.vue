@@ -20,6 +20,12 @@ const label = computed(() => {
   switch (props.status) {
     case "DRAFT":
       return "Bản nháp";
+    case "PENDING_MEMBER_CONFIRM":
+      return "Chờ thành viên xác nhận";
+    case "MEMBER_REJECTED":
+      return "Thành viên từ chối";
+    case "PENDING_FACULTY_REVIEW":
+      return "Chờ khoa duyệt";
     case "SUBMITTED":
       return "Đã gửi duyệt";
     case "APPROVED":
@@ -33,6 +39,12 @@ const badgeClass = computed(() => {
   switch (props.status) {
     case "DRAFT":
       return "border border-slate-200 bg-slate-50 text-slate-700";
+    case "PENDING_MEMBER_CONFIRM":
+      return "border border-amber-200 bg-amber-50 text-amber-700";
+    case "MEMBER_REJECTED":
+      return "border border-rose-200 bg-rose-50 text-rose-700";
+    case "PENDING_FACULTY_REVIEW":
+      return "border border-blue-200 bg-blue-50 text-blue-700";
     case "SUBMITTED":
       return "border border-blue-200 bg-blue-50 text-blue-700";
     case "APPROVED":

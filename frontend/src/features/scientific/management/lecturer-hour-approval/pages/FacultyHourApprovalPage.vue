@@ -5,8 +5,8 @@
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
-          title="Xét duyệt giờ nghiên cứu khoa học cho giảng viên"
-          subtitle="Theo dõi tình hình xét duyệt giờ NCKH của giảng viên trong khoa"
+          title="Duyệt giờ NCKH theo khoa"
+          subtitle="Khoa duyệt giờ là bước cuối cùng của quy trình duyệt giờ NCKH"
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"
@@ -17,6 +17,7 @@
       <HourApprovalFilterPanel
         :filter="filter"
         :faculty-options="facultyOptions"
+        :academic-year-options="academicYearOptions"
         :loading="loadingList || loadingLookups"
         :faculty-select-disabled="true"
         @update:filter="applyFilter"
@@ -47,7 +48,7 @@
         :error-approve="errorApprove"
         :error-reject="errorReject"
         @close="closeRequestDetail"
-        @approve="approveRequest"
+        @approve="onApproveSelected"
         @reject="rejectRequest"
       />
     </div>
@@ -62,25 +63,54 @@ import HourApprovalDetailDrawer from "@/features/scientific/management/lecturer-
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import http from "@/lib/http";
 
-import type { FacultyOption } from "@/features/scientific/management/lecturer-hour-approval/contracts/hourApproval.contract";
+import type {
+  AcademicYearOption,
+  FacultyOption,
+} from "@/features/scientific/management/lecturer-hour-approval/contracts/hourApproval.contract";
 import { createFacultyHourApprovalService } from "@/features/scientific/management/lecturer-hour-approval/services/facultyHoursApprovals.service";
 import { useHourApprovalManagement } from "@/features/scientific/management/lecturer-hour-approval/composables/useHourApprovalManagement";
 
 const facultyOptions = ref<FacultyOption[]>([]);
+const academicYearOptions = ref<AcademicYearOption[]>([]);
+const currentAcademicYearId = ref<number | null>(null);
 const loadingLookups = ref(false);
 
 async function loadLookups() {
   loadingLookups.value = true;
   try {
-    const { data } = await http.get<{ data: { faculties: FacultyOption[] } }>(
+    const { data } = await http.get<{
+      data: {
+        faculties: FacultyOption[];
+        academic_years?: Array<{
+          id: number;
+          code: string;
+          start_date: string;
+          end_date: string;
+          is_active?: boolean;
+          is_current?: boolean;
+        }>;
+        current_academic_year_id?: number | null;
+      };
+    }>(
       "/api/faculty/hours/approvals/lookups"
     );
     facultyOptions.value = (data.data?.faculties ?? []).map((item) => ({
       id: item.id,
       name: item.name,
     }));
-  } catch (e) {
+    academicYearOptions.value = (data.data?.academic_years ?? []).map((item) => ({
+      id: item.id,
+      code: item.code,
+      startDate: item.start_date,
+      endDate: item.end_date,
+      isActive: item.is_active ?? false,
+      isCurrent: item.is_current ?? false,
+    }));
+    currentAcademicYearId.value = data.data?.current_academic_year_id ?? null;
+  } catch (_e) {
     facultyOptions.value = [];
+    academicYearOptions.value = [];
+    currentAcademicYearId.value = null;
   } finally {
     loadingLookups.value = false;
   }
@@ -119,6 +149,8 @@ const {
   updatePageSize,
 } = useHourApprovalManagement(service, {
   facultyId: null,
+  academicYearId: null,
+  status: "pending",
 });
 
 onMounted(async () => {
@@ -126,6 +158,20 @@ onMounted(async () => {
   if (!filter.facultyId && facultyOptions.value[0]?.id) {
     filter.facultyId = facultyOptions.value[0].id;
   }
+  if (!filter.academicYearId) {
+    filter.academicYearId =
+      currentAcademicYearId.value ??
+      academicYearOptions.value.find((item) => item.isActive)?.id ??
+      academicYearOptions.value.find((item) => item.isCurrent)?.id ??
+      academicYearOptions.value[0]?.id ??
+      null;
+  }
   await loadRequests();
 });
+
+function onApproveSelected(requestId: number, activityIds: number[]) {
+  void approveRequest(requestId, { activityIds });
+}
 </script>
+
+

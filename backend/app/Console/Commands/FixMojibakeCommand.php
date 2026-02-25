@@ -74,7 +74,17 @@ class FixMojibakeCommand extends Command
     private function mojibakeScore(string $value): int
     {
         $score = 0;
-        foreach (['Ã', 'Â', 'Ä', 'áº', 'â€“', 'â€œ', 'â€'] as $needle) {
+        $needles = [
+            chr(0xC3),
+            chr(0xC2),
+            chr(0xC4),
+            "\u{00E1}\u{00BA}",
+            "\u{00E2}\u{20AC}\u{201C}",
+            "\u{00E2}\u{20AC}\u{201D}",
+            "\u{00E2}\u{20AC}",
+        ];
+
+        foreach ($needles as $needle) {
             $score += substr_count($value, $needle);
         }
 

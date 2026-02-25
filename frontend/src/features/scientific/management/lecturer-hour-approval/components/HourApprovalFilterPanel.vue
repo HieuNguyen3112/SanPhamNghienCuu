@@ -1,9 +1,26 @@
 <template>
   <div class="rounded-2xl border border-slate-200 bg-white p-4">
-    <div
-      class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
-    >
-      <div class="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <div class="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <div>
+          <label class="text-xs text-slate-600">Năm học</label>
+          <select
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0 disabled:bg-slate-50"
+            :disabled="loading"
+            :value="filter.academicYearId ?? ''"
+            @change="onChangeAcademicYear"
+          >
+            <option value="">Tất cả</option>
+            <option
+              v-for="year in academicYearOptions"
+              :key="year.id"
+              :value="year.id"
+            >
+              {{ year.code }}
+            </option>
+          </select>
+        </div>
+
         <div>
           <label class="text-xs text-slate-600">Khoa</label>
           <select
@@ -28,9 +45,9 @@
             @change="onChangeStatus"
           >
             <option value="all">Tất cả</option>
-            <option value="pending">Chờ duyệt</option>
-            <option value="approved">Đã duyệt</option>
-            <option value="rejected">Từ chối</option>
+            <option value="pending">Chờ khoa duyệt giờ</option>
+            <option value="approved">Đã duyệt giờ</option>
+            <option value="rejected">Khoa từ chối giờ</option>
           </select>
         </div>
 
@@ -101,6 +118,7 @@
 
 <script setup lang="ts">
 import type {
+  AcademicYearOption,
   FacultyOption,
   HourApprovalFilter,
 } from "../contracts/hourApproval.contract";
@@ -111,6 +129,7 @@ const Filter = FilterIcon;
 interface Props {
   filter: HourApprovalFilter;
   facultyOptions: FacultyOption[];
+  academicYearOptions: AcademicYearOption[];
   loading: boolean;
   facultySelectDisabled: boolean;
 }
@@ -129,20 +148,29 @@ function onChangeFaculty(event: Event) {
   const value = (event.target as HTMLSelectElement).value;
   patch({ facultyId: value ? Number(value) : null });
 }
+
+function onChangeAcademicYear(event: Event) {
+  const raw = (event.target as HTMLSelectElement).value;
+  patch({ academicYearId: raw ? Number(raw) : null });
+}
+
 function onChangeStatus(event: Event) {
   patch({
     status: (event.target as HTMLSelectElement)
       .value as HourApprovalFilter["status"],
   });
 }
+
 function onChangeFrom(event: Event) {
   const v = (event.target as HTMLInputElement).value;
   patch({ submittedFrom: v ? v : null });
 }
+
 function onChangeTo(event: Event) {
   const v = (event.target as HTMLInputElement).value;
   patch({ submittedTo: v ? v : null });
 }
+
 function onChangeSearch(event: Event) {
   patch({ searchText: (event.target as HTMLInputElement).value });
 }

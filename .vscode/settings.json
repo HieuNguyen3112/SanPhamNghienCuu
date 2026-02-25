@@ -2,5 +2,8 @@
   "intelephense.environment.documentRoot": "backend",
   "intelephense.environment.includePaths": [
     "backend/vendor"
-  ]
+  ],
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false,
+  "files.eol": "\n"
 }

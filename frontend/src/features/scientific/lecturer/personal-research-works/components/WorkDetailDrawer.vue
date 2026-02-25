@@ -1,6 +1,5 @@
 <template>
   <Teleport to="body">
-    <!-- Overlay -->
     <Transition
       enter-active-class="transition-opacity duration-200"
       enter-from-class="opacity-0"
@@ -17,7 +16,6 @@
       />
     </Transition>
 
-    <!-- Drawer -->
     <Transition
       enter-active-class="transition-transform duration-250 ease-out"
       enter-from-class="translate-x-full"
@@ -33,7 +31,6 @@
         aria-modal="true"
       >
         <div class="flex h-full flex-col">
-          <!-- Header -->
           <div class="border-b border-slate-200 px-4 py-4">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -61,18 +58,17 @@
                 class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 @click="emit('close')"
               >
-                ✕
+                ×
               </button>
             </div>
           </div>
 
-          <!-- Body -->
           <div class="flex-1 overflow-auto p-4">
             <div
               v-if="loading"
               class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"
             >
-              Đang tải chi tiết…
+              Đang tải chi tiết...
             </div>
 
             <div
@@ -87,34 +83,22 @@
             </div>
 
             <div v-else class="space-y-5">
-              <!-- General -->
               <section class="rounded-xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold text-slate-700">
-                  Thông tin chung
-                </div>
+                <div class="text-xs font-semibold text-slate-700">Thông tin chung</div>
 
                 <div class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                   <InfoRow label="Loại công trình" :value="work.kindName" />
                   <InfoRow label="Phân loại" :value="work.typeName ?? '—'" />
                   <InfoRow label="Vai trò" :value="work.roleName ?? '—'" />
-                  <InfoRow
-                    label="Năm"
-                    :value="work.workYear ? String(work.workYear) : '—'"
-                  />
+                  <InfoRow label="Năm" :value="work.workYear ? String(work.workYear) : '—'" />
                   <InfoRow
                     wrapper-class="md:col-span-2"
                     label="Nơi công bố/đơn vị"
                     :value="work.venueName ?? '—'"
                   />
 
-                  <InfoRow
-                    label="Ngày gửi"
-                    :value="formatDateTime(work.submittedAt)"
-                  />
-                  <InfoRow
-                    label="Ngày duyệt"
-                    :value="formatDateTime(work.approvedAt)"
-                  />
+                  <InfoRow label="Ngày gửi" :value="formatDateTime(work.submittedAt)" />
+                  <InfoRow label="Ngày duyệt" :value="formatDateTime(work.approvedAt)" />
 
                   <InfoRow
                     v-if="work.statusCode === 'approved'"
@@ -130,29 +114,71 @@
                   <div class="text-xs font-semibold">Lý do từ chối</div>
                   <div class="mt-1">{{ work.rejectionNote }}</div>
                 </div>
+
+                <div
+                  v-if="work.statusCode === 'member_rejected'"
+                  class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+                >
+                  <div class="text-xs font-semibold text-amber-900">Thành viên đã từ chối tham gia</div>
+                  <p class="mt-1">
+                    Bạn cần xóa/thay thế thành viên bị từ chối hoặc gửi lại yêu cầu xác nhận trước khi gửi lên khoa.
+                  </p>
+                </div>
               </section>
 
-              <!-- Authors -->
+              <section
+                v-if="work.statusCode === 'member_rejected'"
+                class="rounded-xl border border-rose-200 bg-rose-50 p-4"
+              >
+                <div class="text-xs font-semibold text-rose-700">Danh sách thành viên từ chối</div>
+
+                <div v-if="work.rejectedMembers.length === 0" class="mt-3 text-sm text-rose-700">
+                  Chưa có chi tiết thành viên từ chối.
+                </div>
+
+                <div v-else class="mt-3 space-y-2">
+                  <div
+                    v-for="member in work.rejectedMembers"
+                    :key="member.memberId"
+                    class="rounded-lg border border-rose-200 bg-white p-3"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="font-semibold text-slate-900">
+                          {{ member.lecturerFullName }}
+                          <span class="text-slate-500">({{ member.lecturerCode ?? 'N/A' }})</span>
+                        </div>
+                        <div class="mt-0.5 text-xs text-slate-600">
+                          Vai trò: {{ member.memberRoleName ?? '—' }}
+                        </div>
+                        <div class="mt-1 text-xs text-rose-700">
+                          Lý do: {{ member.confirmationNote || 'Không có ghi chú' }}
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500">
+                          Thời điểm phản hồi: {{ formatDateTime(member.respondedAt) }}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        @click="emit('reinvite-member', member.memberId)"
+                      >
+                        Gửi lại yêu cầu
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
               <section class="rounded-xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold text-slate-700">
-                  Danh sách tác giả
-                </div>
+                <div class="text-xs font-semibold text-slate-700">Danh sách tác giả</div>
 
-                <div
-                  v-if="work.authors.length === 0"
-                  class="mt-3 text-sm text-slate-600"
-                >
-                  Chưa có tác giả.
-                </div>
+                <div v-if="work.authors.length === 0" class="mt-3 text-sm text-slate-600">Chưa có tác giả.</div>
 
-                <div
-                  v-else
-                  class="mt-3 overflow-hidden rounded-lg border border-slate-200"
-                >
+                <div v-else class="mt-3 overflow-hidden rounded-lg border border-slate-200">
                   <table class="w-full text-left text-sm">
-                    <thead
-                      class="bg-slate-50 text-xs font-semibold text-slate-600"
-                    >
+                    <thead class="bg-slate-50 text-xs font-semibold text-slate-600">
                       <tr>
                         <th class="px-3 py-2">Tác giả</th>
                         <th class="px-3 py-2">Vai trò</th>
@@ -161,37 +187,20 @@
                     </thead>
 
                     <tbody class="divide-y divide-slate-100">
-                      <tr
-                        v-for="author in work.authors"
-                        :key="author.lecturerId"
-                      >
-                        <td class="px-3 py-2 font-medium text-slate-900">
-                          {{ author.lecturerFullName }}
-                        </td>
-                        <td class="px-3 py-2 text-slate-700">
-                          {{ author.memberRoleName }}
-                        </td>
-                        <td class="px-3 py-2 text-slate-700">
-                          {{ author.departmentName ?? "—" }}
-                        </td>
+                      <tr v-for="author in work.authors" :key="author.lecturerId">
+                        <td class="px-3 py-2 font-medium text-slate-900">{{ author.lecturerFullName }}</td>
+                        <td class="px-3 py-2 text-slate-700">{{ author.memberRoleName }}</td>
+                        <td class="px-3 py-2 text-slate-700">{{ author.departmentName ?? '—' }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </section>
 
-              <!-- Evidence -->
               <section class="rounded-xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold text-slate-700">
-                  Minh chứng
-                </div>
+                <div class="text-xs font-semibold text-slate-700">Minh chứng</div>
 
-                <div
-                  v-if="work.evidenceItems.length === 0"
-                  class="mt-3 text-sm text-slate-600"
-                >
-                  Chưa có minh chứng.
-                </div>
+                <div v-if="work.evidenceItems.length === 0" class="mt-3 text-sm text-slate-600">Chưa có minh chứng.</div>
 
                 <div v-else class="mt-3 space-y-2">
                   <div
@@ -200,11 +209,7 @@
                     class="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50"
                   >
                     <div class="min-w-0">
-                      <div
-                        class="truncate text-sm font-semibold text-slate-900"
-                      >
-                        {{ item.originalName }}
-                      </div>
+                      <div class="truncate text-sm font-semibold text-slate-900">{{ item.originalName }}</div>
                       <div class="mt-1 text-xs text-slate-500">
                         {{ item.fileTypeName }}
                         <span class="px-1 text-slate-300">•</span>
@@ -212,9 +217,7 @@
                         <span class="px-1 text-slate-300">•</span>
                         {{ formatBytes(item.sizeBytes) }}
                       </div>
-                      <div class="mt-1 text-xs text-slate-400">
-                        Uploaded: {{ formatDateTime(item.uploadedAt) }}
-                      </div>
+                      <div class="mt-1 text-xs text-slate-400">Uploaded: {{ formatDateTime(item.uploadedAt) }}</div>
                     </div>
 
                     <a
@@ -222,7 +225,6 @@
                       :href="buildEvidenceUrl(item.disk, item.path)"
                       target="_blank"
                       rel="noreferrer"
-                      title="TODO(BE): signed url / download_url"
                     >
                       Mở
                     </a>
@@ -230,11 +232,8 @@
                 </div>
               </section>
 
-              <!-- Timeline -->
               <section class="rounded-xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold text-slate-700">
-                  Trạng thái & lịch sử
-                </div>
+                <div class="text-xs font-semibold text-slate-700">Trạng thái và lịch sử</div>
 
                 <div class="mt-3 space-y-3">
                   <TimelineItem
@@ -248,11 +247,7 @@
                     v-for="approval in work.approvals"
                     :key="approval.stageCode"
                     :label="`Xét duyệt ${approval.stageName}`"
-                    :value="
-                      approval.decidedAt
-                        ? formatDateTime(approval.decidedAt)
-                        : '—'
-                    "
+                    :value="approval.decidedAt ? formatDateTime(approval.decidedAt) : '—'"
                     :note="approval.note"
                     :status="approval.status"
                   />
@@ -277,7 +272,6 @@
             </div>
           </div>
 
-          <!-- Footer -->
           <div class="border-t border-slate-200 px-4 py-3">
             <div class="flex items-center justify-between gap-2">
               <button
@@ -289,12 +283,12 @@
               </button>
 
               <button
-                v-if="work?.statusCode === 'draft'"
+                v-if="work && ['draft', 'member_rejected'].includes(work.statusCode)"
                 type="button"
                 class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
                 @click="emit('edit-draft', work.activityId)"
               >
-                Tiếp tục kê khai
+                Chỉnh sửa công trình
               </button>
             </div>
           </div>
@@ -323,6 +317,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "edit-draft", workId: number): void;
+  (e: "reinvite-member", memberId: number): void;
 }>();
 
 const rejectedActedAt = computed<string | null>(() => {
@@ -342,8 +337,11 @@ function badgeClass(statusCode: PersonalWorkStatusCode): string {
   switch (statusCode) {
     case "approved":
       return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+    case "pending_member_confirm":
+    case "pending_faculty_review":
     case "submitted":
       return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+    case "member_rejected":
     case "rejected":
       return "bg-rose-50 text-rose-700 ring-1 ring-rose-200";
     case "draft":
@@ -372,7 +370,6 @@ function formatBytes(bytes: number): string {
   return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-// TODO(BE): evidence_files.path cần signed URL (download_url) thay vì tự ghép
 function buildEvidenceUrl(disk: string, path: string): string {
   void disk;
   return path.startsWith("http") ? path : `/${path.replace(/^\/+/, "")}`;

@@ -57,7 +57,8 @@ class LecturerProfileController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if (! $user->hasRole('GV')) {
+        $canonicalRoles = RoleMapper::backendListToCanonical($user->getRoleNames()->values()->all());
+        if (! in_array('LECTURER', $canonicalRoles, true)) {
             return response()->json(['message' => 'forbidden'], Response::HTTP_FORBIDDEN);
         }
 

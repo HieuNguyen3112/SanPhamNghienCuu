@@ -17,6 +17,7 @@
       <HourApprovalFilterPanel
         :filter="filter"
         :faculty-options="facultyOptions"
+        :academic-year-options="academicYearOptions"
         :loading="loadingList || loadingFaculties"
         :faculty-select-disabled="false"
         @update:filter="applyFilter"
@@ -47,7 +48,7 @@
         :error-approve="errorApprove"
         :error-reject="errorReject"
         @close="closeRequestDetail"
-        @approve="approveRequest"
+        @approve="onApproveSelected"
         @reject="rejectRequest"
       />
     </div>
@@ -62,11 +63,15 @@ import HourApprovalDetailDrawer from "@/features/scientific/management/lecturer-
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import http from "@/lib/http";
 
-import type { FacultyOption } from "@/features/scientific/management/lecturer-hour-approval/contracts/hourApproval.contract";
+import type {
+  AcademicYearOption,
+  FacultyOption,
+} from "@/features/scientific/management/lecturer-hour-approval/contracts/hourApproval.contract";
 import { createUniversityHourApprovalService } from "@/features/scientific/management/lecturer-hour-approval/services/uniHoursApprovals.service";
 import { useHourApprovalManagement } from "@/features/scientific/management/lecturer-hour-approval/composables/useHourApprovalManagement";
 
 const facultyOptions = ref<FacultyOption[]>([]);
+const academicYearOptions = ref<AcademicYearOption[]>([]);
 const loadingFaculties = ref(false);
 
 async function loadFacultyOptions() {
@@ -83,6 +88,32 @@ async function loadFacultyOptions() {
     facultyOptions.value = [];
   } finally {
     loadingFaculties.value = false;
+  }
+}
+
+async function loadAcademicYearOptions() {
+  try {
+    const { data } = await http.get<{
+      data: Array<{
+        id: number;
+        code: string;
+        start_date: string;
+        end_date: string;
+        is_active?: boolean;
+        is_current?: boolean;
+      }>;
+    }>("/api/lookups/academic-years");
+
+    academicYearOptions.value = (data.data ?? []).map((item) => ({
+      id: item.id,
+      code: item.code,
+      startDate: item.start_date,
+      endDate: item.end_date,
+      isActive: item.is_active ?? false,
+      isCurrent: item.is_current ?? false,
+    }));
+  } catch (_e) {
+    academicYearOptions.value = [];
   }
 }
 
@@ -120,7 +151,17 @@ const {
 } = useHourApprovalManagement(service);
 
 onMounted(async () => {
-  await loadFacultyOptions();
+  await Promise.all([loadFacultyOptions(), loadAcademicYearOptions()]);
+  filter.academicYearId =
+    academicYearOptions.value.find((item) => item.isCurrent)?.id ??
+    academicYearOptions.value.find((item) => item.isActive)?.id ??
+    academicYearOptions.value[0]?.id ??
+    null;
   await loadRequests();
 });
+
+function onApproveSelected(requestId: number, activityIds: number[]) {
+  void approveRequest(requestId, { activityIds });
+}
 </script>
+

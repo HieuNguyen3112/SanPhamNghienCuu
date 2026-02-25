@@ -3,18 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Lecturer\LecturerPersonalWorkIndexRequest;
+use App\Services\Hours\HoursRecomputeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class LecturerPersonalWorkController extends Controller
 {
+    private HoursRecomputeService $hoursRecomputeService;
+
+    public function __construct(HoursRecomputeService $hoursRecomputeService)
+    {
+        $this->hoursRecomputeService = $hoursRecomputeService;
+    }
+
     public function index(LecturerPersonalWorkIndexRequest $request)
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
+
+        $this->backfillApprovedHours((int) $lecturer->id);
 
         $filters = $this->normalizeFilters($request->validated());
         $page = max(1, (int) ($filters['page'] ?? 1));
@@ -57,6 +67,8 @@ class LecturerPersonalWorkController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
+        $this->backfillApprovedHours((int) $lecturer->id);
+
         $row = $this->baseQuery($lecturer->id)
             ->where('ra.id', $activity)
             ->first();
@@ -78,6 +90,23 @@ class LecturerPersonalWorkController extends Controller
     {
         $user = $request->user();
         return $user?->lecturer;
+    }
+
+    private function backfillApprovedHours(int $lecturerId): void
+    {
+        $approvedStatusId = (int) (DB::table('activity_statuses')
+            ->where('code', 'approved')
+            ->value('id') ?? 0);
+
+        if ($approvedStatusId <= 0) {
+            return;
+        }
+
+        $this->hoursRecomputeService->recomputeApprovedActivitiesForLecturer(
+            $lecturerId,
+            $approvedStatusId,
+            null
+        );
     }
 
     private function normalizeFilters(array $validated): array
@@ -160,7 +189,13 @@ class LecturerPersonalWorkController extends Controller
     private function applyFilters($query, array $filters): void
     {
         if (! empty($filters['status']) && $filters['status'] !== 'all') {
-            $query->where('ast.code', $filters['status']);
+            if ($filters['status'] === 'pending') {
+                $query->whereIn('ast.code', ['pending_member_confirm', 'pending_faculty_review', 'submitted']);
+            } elseif ($filters['status'] === 'rejected') {
+                $query->whereIn('ast.code', ['member_rejected', 'rejected']);
+            } else {
+                $query->where('ast.code', $filters['status']);
+            }
         }
 
         if (! empty($filters['q'])) {
@@ -260,11 +295,14 @@ class LecturerPersonalWorkController extends Controller
                 case 'approved':
                     $counts['approved_count'] = $count;
                     break;
+                case 'pending_member_confirm':
+                case 'pending_faculty_review':
                 case 'submitted':
-                    $counts['pending_count'] = $count;
+                    $counts['pending_count'] += $count;
                     break;
+                case 'member_rejected':
                 case 'rejected':
-                    $counts['rejected_count'] = $count;
+                    $counts['rejected_count'] += $count;
                     break;
                 case 'draft':
                     $counts['draft_count'] = $count;
@@ -285,6 +323,7 @@ class LecturerPersonalWorkController extends Controller
             'activity_code' => $row->activity_code,
             'title' => $row->title,
             'kind_id' => (int) $row->kind_id,
+            'kind_code' => $row->kind_code,
             'kind_name' => $this->mapKindName($row->kind_code, $row->kind_name),
             'type_id' => $row->type_id ? (int) $row->type_id : null,
             'type_name' => $this->mapTypeName($row->type_code, $row->type_name),
@@ -302,9 +341,9 @@ class LecturerPersonalWorkController extends Controller
             'approved_at' => $this->normalizeDateTime($row->approved_at),
             'updated_at' => $this->normalizeDateTime($row->updated_at) ?? $row->updated_at,
             'actions' => [
-                'can_edit' => $isOwner && in_array($statusCode, ['draft', 'rejected'], true),
-                'can_submit' => $isOwner && $statusCode === 'draft',
-                'can_delete' => $isOwner && $statusCode === 'draft',
+                'can_edit' => $isOwner && in_array($statusCode, ['draft', 'member_rejected', 'rejected'], true),
+                'can_submit' => $isOwner && in_array($statusCode, ['draft', 'member_rejected', 'rejected'], true),
+                'can_delete' => $isOwner && in_array($statusCode, ['draft', 'member_rejected'], true),
                 'can_view' => true,
             ],
         ];
@@ -318,6 +357,7 @@ class LecturerPersonalWorkController extends Controller
             'title' => $row->title,
             'abstract' => $row->abstract ?? null,
             'kind_id' => (int) $row->kind_id,
+            'kind_code' => $row->kind_code,
             'kind_name' => $this->mapKindName($row->kind_code, $row->kind_name),
             'type_id' => $row->type_id ? (int) $row->type_id : null,
             'type_name' => $this->mapTypeName($row->type_code, $row->type_name),
@@ -336,6 +376,8 @@ class LecturerPersonalWorkController extends Controller
             'total_hours_calc' => $row->total_hours_calc !== null ? (string) $row->total_hours_calc : null,
             'rejection_note' => $this->resolveRejectionNote((int) $row->activity_id),
             'authors' => $this->buildAuthors((int) $row->activity_id),
+            'member_confirmations' => $this->buildMemberConfirmations((int) $row->activity_id),
+            'rejected_members' => $this->buildRejectedMembers((int) $row->activity_id),
             'evidence_items' => $this->buildEvidenceItems((int) $row->activity_id),
             'approvals' => $this->buildApprovals((int) $row->activity_id),
             'status_histories' => $this->buildStatusHistories((int) $row->activity_id),
@@ -360,6 +402,9 @@ class LecturerPersonalWorkController extends Controller
                 'mr.name as member_role_name',
                 'd.name as department_name',
                 'ram.contribution_share',
+                'ram.confirmation_status',
+                'ram.confirmation_note',
+                'ram.responded_at',
             ])
             ->get()
             ->map(function ($row) {
@@ -370,8 +415,54 @@ class LecturerPersonalWorkController extends Controller
                     'member_role_name' => $this->mapRoleName($row->member_role_code, $row->member_role_name),
                     'department_name' => $row->department_name,
                     'contribution_share' => $row->contribution_share !== null ? (string) $row->contribution_share : null,
+                    'confirmation_status' => $row->confirmation_status,
+                    'confirmation_note' => $row->confirmation_note,
+                    'responded_at' => $this->normalizeDateTime($row->responded_at),
                 ];
             })
+            ->all();
+    }
+
+    private function buildMemberConfirmations(int $activityId): array
+    {
+        return DB::table('research_activity_members as ram')
+            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->where('ram.activity_id', $activityId)
+            ->orderBy('ram.id')
+            ->select([
+                'ram.id as member_id',
+                'ram.lecturer_id',
+                'l.code as lecturer_code',
+                'l.full_name as lecturer_full_name',
+                'mr.code as member_role_code',
+                'mr.name as member_role_name',
+                'ram.confirmation_status',
+                'ram.confirmation_note',
+                'ram.responded_at',
+            ])
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'member_id' => (int) $row->member_id,
+                    'lecturer_id' => (int) $row->lecturer_id,
+                    'lecturer_code' => $row->lecturer_code,
+                    'lecturer_full_name' => $row->lecturer_full_name,
+                    'member_role_code' => $row->member_role_code,
+                    'member_role_name' => $this->mapRoleName($row->member_role_code, $row->member_role_name),
+                    'confirmation_status' => $row->confirmation_status,
+                    'confirmation_note' => $row->confirmation_note,
+                    'responded_at' => $this->normalizeDateTime($row->responded_at),
+                ];
+            })
+            ->all();
+    }
+
+    private function buildRejectedMembers(int $activityId): array
+    {
+        return collect($this->buildMemberConfirmations($activityId))
+            ->filter(fn ($row) => ($row['confirmation_status'] ?? null) === 'rejected')
+            ->values()
             ->all();
     }
 
@@ -480,7 +571,19 @@ class LecturerPersonalWorkController extends Controller
             ->select(['ash.note'])
             ->first();
 
-        return $row?->note ?: null;
+        if ($row?->note) {
+            return $row->note;
+        }
+
+        $memberRejected = DB::table('research_activity_members')
+            ->where('activity_id', $activityId)
+            ->where('confirmation_status', 'rejected')
+            ->whereNotNull('confirmation_note')
+            ->orderByDesc('responded_at')
+            ->orderByDesc('id')
+            ->value('confirmation_note');
+
+        return $memberRejected ?: null;
     }
 
     private function activityYearExpression(): string
@@ -507,6 +610,9 @@ class LecturerPersonalWorkController extends Controller
 
         return match ($code) {
             'draft' => 'Draft',
+            'pending_member_confirm' => 'Chờ thành viên xác nhận',
+            'member_rejected' => 'Thành viên từ chối',
+            'pending_faculty_review' => 'Chờ khoa duyệt',
             'submitted' => 'Submitted',
             'approved' => 'Approved',
             'rejected' => 'Rejected',

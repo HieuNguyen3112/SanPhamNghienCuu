@@ -228,6 +228,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from "axios";
 import { computed, onMounted, reactive, ref, type ComputedRef } from "vue";
 import { BookOpen } from "lucide-vue-next";
 
@@ -244,6 +245,7 @@ import type {
   EvidenceFileTypeDto,
   EvidenceFileDto,
 } from "../../shared/contracts/declarationSharedContract";
+import { mapStatusCodeToUi } from "../../shared/contracts/declarationSharedContract";
 import { useDeclarationFormShell } from "../../shared/composables/useDeclarationFormShell";
 import {
   fetch_academic_years,
@@ -252,7 +254,6 @@ import {
   fetch_member_roles,
   fetch_evidence_file_types,
   search_lecturer_options,
-  fetch_activity_statuses,
 } from "../../shared/services/catalogs.service";
 import {
   fetch_current_lecturer_id,
@@ -276,7 +277,6 @@ const evidenceFileTypes = ref<EvidenceFileTypeDto[]>([]);
 const lecturers = ref<LecturerOptionDto[]>([]);
 const types = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
-const submittedStatusId = ref<number>(0);
 
 const currentLecturerId = ref<number>(0);
 
@@ -396,12 +396,11 @@ const canSubmit = computed(() => {
 
 async function loadCatalogs() {
   currentLecturerId.value = (await fetch_current_lecturer_id()) ?? 0;
-  const [years, kinds, roles, fileTypes, statuses] = await Promise.all([
+  const [years, kinds, roles, fileTypes] = await Promise.all([
     fetch_academic_years(),
     fetch_activity_kinds(),
     fetch_member_roles(),
     fetch_evidence_file_types(),
-    fetch_activity_statuses(),
   ]);
   academicYears.value = years;
   memberRoles.value = roles;
@@ -411,9 +410,6 @@ async function loadCatalogs() {
   form.kindId = kindId.value;
 
   types.value = await fetch_activity_types_by_kind(kindId.value);
-  submittedStatusId.value =
-    statuses.find((s) => s.code === "submitted")?.id ?? 0;
-
   lecturers.value = await search_lecturer_options("");
 
   if (form.members.length === 0 && currentLecturerId.value) {
@@ -482,18 +478,32 @@ const shell = useDeclarationFormShell({
 
     existingEvidence.value = await list_evidence_files(saved.id);
 
-    if (pendingEvidenceFiles.value.length > 0)
-      throw new Error("TODO (P0): Upload evidence files endpoint chưa có.");
-    if (pendingEvidenceLinks.value.length > 0)
-      throw new Error("TODO (P0): Evidence links chưa có backend support.");
+    // Minh chứng chính thức được nộp ở bước duyệt giờ NCKH.
+    // Không chặn lưu nháp kê khai nếu người dùng đã chọn file/link tại màn này.
+    pendingEvidenceFiles.value = [];
+    pendingEvidenceLinks.value = [];
   },
   on_submit: async () => {
-    if (!form.activityId) {
-      await shell.save_draft();
+    try {
+      if (!form.activityId) {
+        await shell.save_draft();
+      }
+      if (!form.activityId) return;
+      const submitResult = await submit_activity(form.activityId);
+      const nextStatusCode =
+        submitResult?.workflow?.status_code ??
+        submitResult?.data?.status_code ??
+        "pending_faculty_review";
+      return mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW";
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const code = error.response?.data?.code;
+        if (code === "MEMBERS_REJECTED") {
+          return "MEMBER_REJECTED";
+        }
+      }
+      throw error;
     }
-    if (!form.activityId) return;
-    if (!submittedStatusId.value) throw new Error("Thiếu submitted status_id");
-    await submit_activity(form.activityId, submittedStatusId.value);
   },
 });
 

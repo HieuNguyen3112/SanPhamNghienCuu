@@ -287,6 +287,196 @@ class ResearchActivityController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function reinviteMember(Request $request, int $activity, int $member)
+    {
+        $user = $request->user();
+        $lecturer = $user?->lecturer;
+
+        if (! $lecturer) {
+            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $current = $this->getActivityWithMeta($activity, $lecturer->id);
+        if (! $current) {
+            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (! $this->isEditableStatus($current->status_code)) {
+            return response()->json([
+                'message' => 'activity is not in a reinvitable state',
+                'code' => 'ACTIVITY_NOT_REINVITABLE',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $pendingMemberConfirmId = $this->getStatusId(self::STATUS_PENDING_MEMBER_CONFIRM);
+        if (! $pendingMemberConfirmId) {
+            return response()->json([
+                'message' => 'pending_member_confirm status not configured',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $now = now();
+        $payload = DB::transaction(function () use ($activity, $member, $current, $pendingMemberConfirmId, $now, $user) {
+            $lockedActivity = DB::table('research_activities as ra')
+                ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+                ->where('ra.id', $activity)
+                ->lockForUpdate()
+                ->select([
+                    'ra.id',
+                    'ra.status_id',
+                    'ra.title',
+                    'ra.owner_lecturer_id',
+                    'ast.code as status_code',
+                ])
+                ->first();
+
+            if (! $lockedActivity || (int) $lockedActivity->owner_lecturer_id !== (int) $current->owner_lecturer_id) {
+                return [
+                    'error' => 'activity not found',
+                    'code' => 'ACTIVITY_NOT_FOUND',
+                    'status' => Response::HTTP_NOT_FOUND,
+                ];
+            }
+
+            if (! $this->isEditableStatus($lockedActivity->status_code)) {
+                return [
+                    'error' => 'activity is not in a reinvitable state',
+                    'code' => 'ACTIVITY_NOT_REINVITABLE',
+                    'status' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                ];
+            }
+
+            $memberRow = DB::table('research_activity_members as ram')
+                ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+                ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+                ->where('ram.id', $member)
+                ->where('ram.activity_id', $activity)
+                ->lockForUpdate()
+                ->select([
+                    'ram.id',
+                    'ram.activity_id',
+                    'ram.lecturer_id',
+                    'ram.member_role_id',
+                    'ram.confirmation_status',
+                    'ram.confirmation_note',
+                    'ram.responded_at',
+                    'l.code as lecturer_code',
+                    'l.full_name as lecturer_full_name',
+                    'l.user_id as lecturer_user_id',
+                    'mr.code as member_role_code',
+                    'mr.name as member_role_name',
+                ])
+                ->first();
+
+            if (! $memberRow) {
+                return [
+                    'error' => 'member not found in activity',
+                    'code' => 'MEMBER_NOT_FOUND',
+                    'status' => Response::HTTP_NOT_FOUND,
+                ];
+            }
+
+            if ((int) $memberRow->lecturer_id === (int) $lockedActivity->owner_lecturer_id) {
+                return [
+                    'error' => 'owner participation cannot be reinvited',
+                    'code' => 'OWNER_MEMBER_CANNOT_REINVITE',
+                    'status' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                ];
+            }
+
+            if ($memberRow->confirmation_status !== 'rejected') {
+                return [
+                    'error' => 'only rejected member can be reinvited',
+                    'code' => 'MEMBER_NOT_REJECTED',
+                    'status' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                ];
+            }
+
+            DB::table('research_activity_members')
+                ->where('id', $memberRow->id)
+                ->update([
+                    'confirmation_status' => 'pending',
+                    'responded_at' => null,
+                    'confirmation_note' => null,
+                    'updated_at' => $now,
+                ]);
+
+            if ($lockedActivity->status_code !== self::STATUS_PENDING_MEMBER_CONFIRM) {
+                DB::table('research_activities')
+                    ->where('id', $activity)
+                    ->update([
+                        'status_id' => $pendingMemberConfirmId,
+                        'submitted_at' => null,
+                        'approved_at' => null,
+                        'updated_at' => $now,
+                    ]);
+
+                DB::table('activity_status_histories')->insert([
+                    'activity_id' => $activity,
+                    'from_status_id' => $lockedActivity->status_id,
+                    'to_status_id' => $pendingMemberConfirmId,
+                    'acted_by_user_id' => $user->id,
+                    'acted_at' => $now,
+                    'note' => 'member_reinvited:' . $memberRow->id,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            return [
+                'activity' => $lockedActivity,
+                'member' => (array) $memberRow,
+            ];
+        });
+
+        if (isset($payload['error'])) {
+            return response()->json([
+                'message' => $payload['error'],
+                'code' => $payload['code'] ?? 'REINVITE_FAILED',
+            ], (int) ($payload['status'] ?? Response::HTTP_UNPROCESSABLE_ENTITY));
+        }
+
+        $this->sendParticipationInvitationNotification(
+            (int) $activity,
+            $payload['member']
+        );
+
+        AuditLogger::log($request, [
+            'action_group' => 'approval',
+            'action_code' => 'WORK_MEMBER_REINVITED',
+            'action_label' => 'Giang vien gui lai yeu cau xac nhan thanh vien',
+            'severity' => 'normal',
+            'result_status' => 'success',
+            'target_type' => 'research_activity_member',
+            'target_id' => (int) $member,
+            'request_http_status' => Response::HTTP_OK,
+            'changes' => [
+                'activity_id' => (int) $activity,
+                'confirmation_status_from' => 'rejected',
+                'confirmation_status_to' => 'pending',
+            ],
+        ], $user);
+
+        return response()->json([
+            'message' => 'member invitation resent',
+            'data' => array_merge($this->serializeActivity($activity), [
+                'status_code' => self::STATUS_PENDING_MEMBER_CONFIRM,
+            ]),
+            'member' => [
+                'id' => (int) $payload['member']['id'],
+                'lecturer_id' => (int) $payload['member']['lecturer_id'],
+                'lecturer_code' => $payload['member']['lecturer_code'],
+                'lecturer_full_name' => $payload['member']['lecturer_full_name'],
+                'member_role_code' => $payload['member']['member_role_code'],
+                'member_role_name' => $payload['member']['member_role_name'],
+                'confirmation_status' => 'pending',
+            ],
+            'workflow' => [
+                'status_code' => self::STATUS_PENDING_MEMBER_CONFIRM,
+            ],
+        ], Response::HTTP_OK);
+    }
+
     /**
      * FLOW:
      * - GV bấm "Yêu cầu duyệt"
@@ -389,17 +579,27 @@ class ResearchActivityController extends Controller
 
             return response()->json([
                 'message' => 'Cannot request approval: some members rejected participation. Please remove or re-invite them.',
-                'code' => 'MEMBER_REJECTED',
+                'code' => 'MEMBERS_REJECTED',
                 'rejected_members' => $rejectedMembers,
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         // Pending members để gửi notify
         $pendingRows = DB::table('research_activity_members as ram')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activity)
             ->where('ram.lecturer_id', '!=', $ownerLecturerId)
             ->where('ram.confirmation_status', 'pending')
-            ->select(['ram.id', 'ram.lecturer_id', 'ram.member_role_id'])
+            ->select([
+                'ram.id',
+                'ram.lecturer_id',
+                'ram.member_role_id',
+                'l.code as lecturer_code',
+                'l.full_name as lecturer_full_name',
+                'mr.code as member_role_code',
+                'mr.name as member_role_name',
+            ])
             ->get()
             ->all();
 
@@ -493,11 +693,33 @@ class ResearchActivityController extends Controller
             ],
         ], $user);
 
+        $statusCode = $hasPending
+            ? self::STATUS_PENDING_MEMBER_CONFIRM
+            : self::STATUS_PENDING_FACULTY_REVIEW;
+
+        $pendingMembers = collect($pendingRows)->map(function ($row) {
+            return [
+                'invitation_id' => (int) $row->id,
+                'lecturer_id' => (int) $row->lecturer_id,
+                'lecturer_code' => $row->lecturer_code,
+                'lecturer_full_name' => $row->lecturer_full_name,
+                'member_role_code' => $row->member_role_code,
+                'member_role_name' => $row->member_role_name,
+            ];
+        })->values()->all();
+
         return response()->json([
             'message' => $hasPending
                 ? 'request recorded; waiting for member confirmations'
                 : 'activity sent to faculty review',
-            'data' => $this->serializeActivity($activity),
+            'data' => array_merge($this->serializeActivity($activity), [
+                'status_code' => $statusCode,
+            ]),
+            'workflow' => [
+                'status_code' => $statusCode,
+                'pending_members' => $pendingMembers,
+                'can_faculty_review' => ! $hasPending,
+            ],
         ], Response::HTTP_OK);
     }
 
@@ -572,6 +794,41 @@ class ResearchActivityController extends Controller
         ], Response::HTTP_OK);
     }
 
+    private function sendParticipationInvitationNotification(int $activityId, array $member): void
+    {
+        $inviteeUserId = isset($member['lecturer_user_id']) ? (int) $member['lecturer_user_id'] : 0;
+        if ($inviteeUserId <= 0) {
+            return;
+        }
+
+        $invitee = User::find($inviteeUserId);
+        if (! $invitee) {
+            return;
+        }
+
+        $activity = DB::table('research_activities as ra')
+            ->leftJoin('lecturers as l', 'ra.owner_lecturer_id', '=', 'l.id')
+            ->where('ra.id', $activityId)
+            ->select([
+                'ra.title',
+                'l.full_name as owner_name',
+            ])
+            ->first();
+
+        if (! $activity) {
+            return;
+        }
+
+        $invitee->notify(new ParticipationInvitationNotification([
+            'title' => 'Loi moi tham gia cong trinh',
+            'message' => trim('Ban duoc moi tham gia cong trinh ' . ($activity->title ?? '') . (($activity->owner_name ?? '') ? (' boi ' . $activity->owner_name) : '') . '.'),
+            'activity_id' => $activityId,
+            'invitation_id' => isset($member['id']) ? (int) $member['id'] : null,
+            'role_name' => $member['member_role_name'] ?? null,
+            'action_route' => '/declarations/participatier',
+        ]));
+    }
+
     private function resetFacultyApprovalToPending(int $activityId, $now): void
     {
         $assistantStageId = DB::table('approval_stages')->where('code', 'assistant')->value('id');
@@ -579,16 +836,36 @@ class ResearchActivityController extends Controller
             return;
         }
 
-        DB::table('activity_approvals')
+        $assistantStageId = (int) $assistantStageId;
+        $exists = DB::table('activity_approvals')
             ->where('activity_id', $activityId)
-            ->where('stage_id', (int) $assistantStageId)
-            ->update([
-                'status' => 'pending',
-                'decided_by_user_id' => null,
-                'decided_at' => null,
-                'note' => null,
-                'updated_at' => $now,
-            ]);
+            ->where('stage_id', $assistantStageId)
+            ->exists();
+
+        if ($exists) {
+            DB::table('activity_approvals')
+                ->where('activity_id', $activityId)
+                ->where('stage_id', $assistantStageId)
+                ->update([
+                    'status' => 'pending',
+                    'decided_by_user_id' => null,
+                    'decided_at' => null,
+                    'note' => null,
+                    'updated_at' => $now,
+                ]);
+            return;
+        }
+
+        DB::table('activity_approvals')->insert([
+            'activity_id' => $activityId,
+            'stage_id' => $assistantStageId,
+            'status' => 'pending',
+            'decided_by_user_id' => null,
+            'decided_at' => null,
+            'note' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     private function serializeActivity(int $activityId): array

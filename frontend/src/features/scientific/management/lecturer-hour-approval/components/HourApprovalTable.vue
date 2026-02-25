@@ -1,14 +1,10 @@
 <template>
   <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-    <div v-if="loading" class="p-4 text-sm text-slate-700">
-      Đang tải danh sách...
-    </div>
+    <div v-if="loading" class="p-4 text-sm text-slate-700">Đang tải danh sách...</div>
 
     <div v-else-if="error" class="p-4">
       <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
-        <div class="text-sm font-medium text-rose-700">
-          Không tải được dữ liệu
-        </div>
+        <div class="text-sm font-medium text-rose-700">Không tải được dữ liệu</div>
         <div class="mt-1 whitespace-pre-wrap text-xs text-rose-700">
           {{ error }}
         </div>
@@ -17,9 +13,7 @@
 
     <div v-else-if="rows.length === 0" class="p-6 text-center">
       <div class="text-sm font-medium text-slate-900">Không có yêu cầu</div>
-      <div class="mt-1 text-xs text-slate-500">
-        Thử đổi bộ lọc hoặc khoảng thời gian.
-      </div>
+      <div class="mt-1 text-xs text-slate-500">Thử đổi bộ lọc hoặc khoảng thời gian.</div>
     </div>
 
     <div v-else class="max-h-[560px] overflow-auto">
@@ -43,29 +37,21 @@
             @click="emit('row-click', row.requestId)"
           >
             <td class="px-3 py-2">
-              <div class="font-medium text-slate-900">
-                {{ row.lecturerFullName }}
-              </div>
-              <div class="mt-0.5 text-xs text-slate-500">
-                {{ row.lecturerCode }}
-              </div>
+              <div class="font-medium text-slate-900">{{ row.lecturerFullName }}</div>
+              <div class="mt-0.5 text-xs text-slate-500">{{ row.lecturerCode }}</div>
             </td>
 
-            <td class="px-3 py-2 text-slate-700">
-              {{ row.facultyName }}
-            </td>
+            <td class="px-3 py-2 text-slate-700">{{ row.facultyName }}</td>
 
             <td class="px-3 py-2 text-right font-semibold text-slate-900">
               {{ row.activityCount }}
             </td>
 
             <td class="px-3 py-2 text-right font-semibold text-slate-900">
-              {{ formatHours(row.totalHours) }}h
+              {{ formatHours(row.totalHours) }} giờ
             </td>
 
-            <td class="px-3 py-2 text-slate-700">
-              {{ formatDate(row.submittedAt) }}
-            </td>
+            <td class="px-3 py-2 text-slate-700">{{ formatDate(row.submittedAt) }}</td>
 
             <td class="px-3 py-2 text-center">
               <span
@@ -139,9 +125,9 @@ function formatDate(iso: string) {
 }
 
 function statusLabel(status: HourApprovalRequestStatus) {
-  if (status === "pending") return "Chờ duyệt";
-  if (status === "approved") return "Đã duyệt";
-  return "Từ chối";
+  if (status === "pending") return "Chờ khoa duyệt giờ";
+  if (status === "approved") return "Đã duyệt giờ";
+  return "Khoa từ chối giờ";
 }
 
 function statusIcon(status: HourApprovalRequestStatus) {

@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class AdminResearchHoursCatalogController extends Controller
@@ -747,7 +749,7 @@ class AdminResearchHoursCatalogController extends Controller
 
     private function validateAcademicYear(Request $request, ?int $ignoreId): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'code' => [
                 'required',
                 'string',
@@ -758,6 +760,40 @@ class AdminResearchHoursCatalogController extends Controller
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'is_active' => ['required', 'boolean'],
         ]);
+
+        $start = Carbon::parse($data['start_date']);
+        $end = Carbon::parse($data['end_date']);
+
+        $errors = [];
+        if ($start->month !== 9 || $start->day !== 1) {
+            $errors['start_date'] = ['Năm học phải bắt đầu từ ngày 01/09.'];
+        }
+        if ($end->month !== 8 || $end->day !== 31) {
+            $errors['end_date'] = ['Năm học phải kết thúc vào ngày 31/08 năm sau.'];
+        }
+
+        if ($end->year !== ($start->year + 1)) {
+            $errors['end_date'][] = 'Năm học phải kéo dài từ tháng 09 năm nay đến tháng 08 năm sau.';
+        }
+
+        if (! preg_match('/^\d{4}-\d{4}$/', (string) $data['code'])) {
+            $errors['code'] = ['Mã năm học phải có định dạng YYYY-YYYY.'];
+        } else {
+            [$startYearFromCode, $endYearFromCode] = array_map('intval', explode('-', (string) $data['code']));
+            if ($endYearFromCode !== ($startYearFromCode + 1)) {
+                $errors['code'][] = 'Mã năm học phải theo cặp năm liên tiếp, ví dụ 2025-2026.';
+            }
+
+            if ($start->year !== $startYearFromCode || $end->year !== $endYearFromCode) {
+                $errors['code'][] = 'Mã năm học phải khớp với khoảng ngày bắt đầu/kết thúc.';
+            }
+        }
+
+        if (! empty($errors)) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $data;
     }
 
     private function isHourRuleLocked(int $id): bool

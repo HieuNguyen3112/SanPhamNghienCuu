@@ -1,5 +1,4 @@
 <template>
-  <!-- ✅ sticky để không lệch khi sidebar co giãn -->
   <div
     class="sticky bottom-0 z-30 -mx-4 border-t border-slate-200 bg-white/90 px-4 py-3 backdrop-blur md:-mx-6 md:px-6"
   >

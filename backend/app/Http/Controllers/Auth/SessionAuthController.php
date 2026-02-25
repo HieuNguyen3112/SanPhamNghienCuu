@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
@@ -13,6 +14,7 @@ use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Validation\Rule;
 use App\Support\RoleMapper;
 use App\Support\AuditLogger;
+use Spatie\Permission\Models\Role;
 
 class SessionAuthController extends Controller
 {
@@ -129,7 +131,8 @@ class SessionAuthController extends Controller
         // ✅ Canonical roles are stored in Spatie now -> check canonical directly (web guard)
         $requestedRole = $data['role'] ?? null;
         if ($requestedRole !== null) {
-            $hasAcceptedRole = $user->hasRole($requestedRole, 'web');
+            $acceptedRoles = RoleMapper::canonicalToBackend($requestedRole);
+            $hasAcceptedRole = $this->userHasAnyAcceptedRole($user, $acceptedRoles);
 
             if (! $hasAcceptedRole) {
                 Auth::guard('web')->logout();
@@ -150,6 +153,13 @@ class SessionAuthController extends Controller
                     'code' => 'FORBIDDEN_MISSING_ROLE',
                     'message' => 'User does not have the right roles.',
                 ], Response::HTTP_FORBIDDEN);
+            }
+
+            // Backward-compatibility: user DB cũ chỉ có role legacy (GV/DL/QL/ADMIN)
+            // -> tự gán thêm canonical role để qua middleware role:LECTURER|... ở API mới.
+            if (! $user->hasRole($requestedRole, 'web')) {
+                Role::findOrCreate($requestedRole, 'web');
+                $user->assignRole($requestedRole);
             }
         }
 
@@ -238,5 +248,27 @@ class SessionAuthController extends Controller
         ], $user);
 
         return response()->json(['message' => 'ok'], Response::HTTP_OK);
+    }
+
+    /**
+     * Accept both canonical + legacy role rows, regardless of old guard mismatch.
+     * Once accepted, caller will attach canonical web role.
+     */
+    private function userHasAnyAcceptedRole(User $user, array $acceptedRoles): bool
+    {
+        if (count($acceptedRoles) === 0) {
+            return false;
+        }
+
+        if (collect($acceptedRoles)->contains(fn (string $roleName) => $user->hasRole($roleName, 'web'))) {
+            return true;
+        }
+
+        return DB::table('model_has_roles as mhr')
+            ->join('roles as r', 'r.id', '=', 'mhr.role_id')
+            ->where('mhr.model_type', User::class)
+            ->where('mhr.model_id', $user->id)
+            ->whereIn('r.name', $acceptedRoles)
+            ->exists();
     }
 }

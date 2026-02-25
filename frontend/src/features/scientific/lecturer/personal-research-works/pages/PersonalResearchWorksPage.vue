@@ -19,6 +19,20 @@
       @select="selectCard"
     />
 
+    <div
+      v-if="noticeMessage"
+      :class="[
+        'rounded-2xl border px-4 py-3 text-sm',
+        noticeTone === 'success'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          : noticeTone === 'error'
+          ? 'border-rose-200 bg-rose-50 text-rose-700'
+          : 'border-blue-200 bg-blue-50 text-blue-700',
+      ]"
+    >
+      {{ noticeMessage }}
+    </div>
+
     <PersonalResearchWorksTable
       :rows="rows"
       :total-item-count="totalItemCount"
@@ -35,6 +49,7 @@
       @open-detail="openDetail"
       @edit-draft="goToEditDraft"
       @copy-rejected="copyFromRejected"
+      @reinvite="reinviteFromRow"
     />
 
     <WorkDetailDrawer
@@ -44,6 +59,7 @@
       :work="selectedWorkDetail"
       @close="closeDetail"
       @edit-draft="goToEditDraft"
+      @reinvite-member="reinviteMember"
     />
   </div>
 </template>
@@ -69,6 +85,8 @@ const {
   errorList,
   loadingDetail,
   errorDetail,
+  noticeMessage,
+  noticeTone,
 
   loadWorks,
 
@@ -78,6 +96,8 @@ const {
 
   goToEditDraft,
   copyFromRejected,
+  reinviteFromRow,
+  reinviteMember,
 
   currentPageNumber,
   pageSize,

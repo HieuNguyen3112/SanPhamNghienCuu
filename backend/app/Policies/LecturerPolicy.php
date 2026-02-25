@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Lecturer;
 use App\Models\User;
+use App\Support\RoleMapper;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class LecturerPolicy
@@ -16,7 +17,8 @@ class LecturerPolicy
             return true;
         }
 
-        if ($this->hasBackendRole($user, ['DL', 'QL', 'ADMIN'])) {
+        $canonicalRoles = RoleMapper::backendListToCanonical($user->getRoleNames()->values()->all());
+        if (in_array('DEPARTMENT_BOARD', $canonicalRoles, true) || in_array('SCIENCE_OFFICE', $canonicalRoles, true)) {
             return true;
         }
 
@@ -31,12 +33,5 @@ class LecturerPolicy
     private function isOwner(User $user, Lecturer $lecturer): bool
     {
         return $user->lecturer?->id === $lecturer->id;
-    }
-
-    private function hasBackendRole(User $user, array $roles): bool
-    {
-        $backendRoles = $user->getRoleNames()->values()->all();
-
-        return (bool) array_intersect($backendRoles, $roles);
     }
 }

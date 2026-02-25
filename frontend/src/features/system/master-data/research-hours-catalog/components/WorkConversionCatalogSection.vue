@@ -291,10 +291,10 @@
             v-model.trim="vm.draft.notes"
             rows="3"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-            placeholder="Nh?p ghi ch? (kh?ng l?u v?o h? th?ng)"
+            placeholder="Nhập ghi chú (không lưu vào hệ thống)"
           ></textarea>
           <p class="mt-1 text-xs text-slate-500">
-            Ghi ch? ch? hi?n th? t?i UI, kh?ng l?u v?o CSDL.
+            Ghi chú chỉ hiển thị tại UI, không lưu vào CSDL.
           </p>
           <p v-if="vm.draftErrors.notes" class="mt-1 text-xs text-rose-600">
             {{ vm.draftErrors.notes }}

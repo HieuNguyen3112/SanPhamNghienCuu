@@ -1,5 +1,6 @@
 import PersonalResearchWorksPage from "@/features/scientific/lecturer/personal-research-works/pages/PersonalResearchWorksPage.vue";
 import LecturerSelectApprovedWorksForHoursPage from "@/features/scientific/lecturer/personal-hours-declare/pages/LecturerSelectApprovedWorksForHoursPage.vue";
+import LecturerEvidenceMissingHoursPage from "@/features/scientific/lecturer/personal-hours-declare/pages/LecturerEvidenceMissingHoursPage.vue";
 import LecturerHoursWarningPage from "@/features/scientific/lecturer/personal-hours-warning/pages/LecturerHoursWarningPage.vue";
 import PersonalHoursOverviewPage from "@/features/scientific/lecturer/personal-hours-overview/pages/PersonalHoursOverviewPage.vue";
 
@@ -40,6 +41,11 @@ export const researchWorksRoutes: RouteRecordRaw[] = [
     path: "hours/calculate",
     name: "hours.calculate",
     component: LecturerSelectApprovedWorksForHoursPage,
+  },
+  {
+    path: "hours/calculate/evidence-missing",
+    name: "hours.calculate.evidence_missing",
+    component: LecturerEvidenceMissingHoursPage,
   },
 
   // 2) BCN KHOA (Faculty)

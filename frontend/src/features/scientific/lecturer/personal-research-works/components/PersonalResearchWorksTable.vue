@@ -1,9 +1,6 @@
 <template>
   <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-    <!-- States -->
-    <div v-if="loading" class="p-6 text-sm text-slate-600">
-      Đang tải danh sách…
-    </div>
+    <div v-if="loading" class="p-6 text-sm text-slate-600">Đang tải danh sách...</div>
 
     <div v-else-if="error" class="p-6 text-sm text-rose-700">
       <div class="font-semibold">Không tải được danh sách</div>
@@ -14,14 +11,10 @@
       Không có công trình nào trong trạng thái này.
     </div>
 
-    <!-- Table -->
     <div v-else class="max-h-[560px] overflow-auto">
       <table class="w-full min-w-[980px] text-left text-sm">
-        <thead
-          class="bg-slate-50 text-xs font-semibold uppercase text-slate-600"
-        >
+        <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-600">
           <tr>
-            <!-- ✅ Sort: title -->
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
               <button
                 type="button"
@@ -31,17 +24,12 @@
                 title="Sắp xếp theo tên"
               >
                 Tên công trình
-                <span class="text-xs text-slate-400">{{
-                  sortIcon("title")
-                }}</span>
+                <span class="text-xs text-slate-400">{{ sortIcon("title") }}</span>
               </button>
             </th>
 
-            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
-              Loại công trình
-            </th>
+            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">Loại công trình</th>
 
-            <!-- ✅ Sort: roleName -->
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
               <button
                 type="button"
@@ -51,13 +39,10 @@
                 title="Sắp xếp theo vai trò"
               >
                 Vai trò
-                <span class="text-xs text-slate-400">{{
-                  sortIcon("roleName")
-                }}</span>
+                <span class="text-xs text-slate-400">{{ sortIcon("roleName") }}</span>
               </button>
             </th>
 
-            <!-- ✅ Sort: workYear -->
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
               <button
                 type="button"
@@ -67,39 +52,21 @@
                 title="Sắp xếp theo năm"
               >
                 Năm
-                <span class="text-xs text-slate-400">{{
-                  sortIcon("workYear")
-                }}</span>
+                <span class="text-xs text-slate-400">{{ sortIcon("workYear") }}</span>
               </button>
             </th>
 
-            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">
-              Giờ quy đổi
-            </th>
-
+            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">Giờ quy đổi</th>
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">Trạng thái</th>
-
-            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">
-              Hành động
-            </th>
+            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">Hành động</th>
           </tr>
         </thead>
 
         <tbody class="divide-y divide-slate-100">
-          <tr
-            v-for="row in rows"
-            :key="row.activityId"
-            class="hover:bg-slate-50"
-          >
+          <tr v-for="row in rows" :key="row.activityId" class="hover:bg-slate-50">
             <td class="px-4 py-3">
-              <button
-                type="button"
-                class="text-left"
-                @click="emit('open-detail', row.activityId)"
-              >
-                <div
-                  class="max-w-[420px] truncate font-semibold text-slate-900 hover:underline"
-                >
+              <button type="button" class="text-left" @click="emit('open-detail', row.activityId)">
+                <div class="max-w-[420px] truncate font-semibold text-slate-900 hover:underline">
                   {{ row.title }}
                 </div>
                 <div class="mt-1 text-xs text-slate-500">
@@ -112,23 +79,14 @@
 
             <td class="px-4 py-3 text-slate-700">
               <div class="font-medium">{{ row.kindName }}</div>
-              <div v-if="row.typeName" class="mt-0.5 text-xs text-slate-500">
-                {{ row.typeName }}
-              </div>
+              <div v-if="row.typeName" class="mt-0.5 text-xs text-slate-500">{{ row.typeName }}</div>
             </td>
 
-            <td class="px-4 py-3 text-slate-700">
-              {{ row.roleName ?? "—" }}
-            </td>
-
-            <td class="px-4 py-3 text-slate-700">
-              {{ row.workYear ?? "—" }}
-            </td>
+            <td class="px-4 py-3 text-slate-700">{{ row.roleName ?? "—" }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ row.workYear ?? "—" }}</td>
 
             <td class="px-4 py-3 text-right tabular-nums text-slate-900">
-              <span v-if="row.statusCode === 'approved'">
-                {{ row.lecturerHours ?? "—" }}
-              </span>
+              <span v-if="row.statusCode === 'approved'">{{ row.lecturerHours ?? "—" }}</span>
               <span v-else class="text-slate-400">—</span>
             </td>
 
@@ -141,7 +99,6 @@
               </span>
             </td>
 
-            <!-- Actions Dropdown -->
             <td class="px-4 py-3">
               <div class="flex justify-end">
                 <WorkRowActionsMenu
@@ -153,6 +110,7 @@
                   @view="(id) => emit('open-detail', id)"
                   @edit-draft="(id) => emit('edit-draft', id)"
                   @copy-rejected="(id) => emit('copy-rejected', id)"
+                  @reinvite="(id) => emit('reinvite', id)"
                 />
               </div>
             </td>
@@ -161,7 +119,6 @@
       </table>
     </div>
 
-    <!-- Pagination (UI only, state nằm ở parent qua v-model) -->
     <div class="border-t border-slate-200 px-4 py-3">
       <PaginationControl
         :total-item-count="totalItemCount"
@@ -192,15 +149,11 @@ type AriaSort = "none" | "ascending" | "descending";
 const props = defineProps<{
   rows: PersonalWorkRow[];
   totalItemCount: number;
-
-  currentPageNumber: number; // 1-based
+  currentPageNumber: number;
   pageSize: number;
-
   loading: boolean;
   error: string | null;
   activeTab: string;
-
-  /** ✅ Sort state comes from parent */
   sortKey?: SortKey;
   sortOrder?: SortOrder;
 }>();
@@ -209,12 +162,9 @@ const emit = defineEmits<{
   (e: "open-detail", workId: number): void;
   (e: "edit-draft", workId: number): void;
   (e: "copy-rejected", workId: number): void;
-
-  // pass-through v-model
+  (e: "reinvite", workId: number): void;
   (e: "update:currentPageNumber", value: number): void;
   (e: "update:pageSize", value: number): void;
-
-  // ✅ sort
   (e: "sort-change", sortKey: SortKey, sortOrder: SortOrder): void;
 }>();
 
@@ -223,11 +173,11 @@ const openMenuWorkId = ref<number | null>(null);
 function setMenuOpen(workId: number, nextOpen: boolean) {
   openMenuWorkId.value = nextOpen ? workId : null;
 }
+
 function closeMenu() {
   openMenuWorkId.value = null;
 }
 
-// đổi tab / đổi trang / đổi page size / list thay đổi -> đóng menu
 watch(
   () => [
     props.activeTab,
@@ -251,7 +201,6 @@ function requestSort(key: SortKey) {
     return;
   }
 
-  // default order theo cột
   const defaultOrderByKey: Record<SortKey, SortOrder> = {
     updatedAt: "desc",
     title: "asc",
@@ -279,8 +228,11 @@ function statusBadgeClass(statusCode: PersonalWorkStatusCode): string {
   switch (statusCode) {
     case "approved":
       return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+    case "pending_member_confirm":
+    case "pending_faculty_review":
     case "submitted":
       return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+    case "member_rejected":
     case "rejected":
       return "bg-rose-50 text-rose-700 ring-1 ring-rose-200";
     case "draft":

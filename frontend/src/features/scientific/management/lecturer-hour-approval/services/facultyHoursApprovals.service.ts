@@ -1,5 +1,6 @@
 import http from "@/lib/http";
 import type {
+  ApprovePayloadDTO,
   HourApprovalFilter,
   HourApprovalListResponseDTO,
   HourApprovalRequestDetailDTO,
@@ -22,7 +23,9 @@ export function createFacultyHourApprovalService(): HourApprovalService {
     async getRequests(filter: HourApprovalFilter, page: number, perPage: number) {
       const params = normalizeParams({
         faculty_id: filter.facultyId,
-        status: filter.status,
+        academic_year_id: filter.academicYearId,
+        include_all_years: filter.academicYearId === null ? 1 : null,
+        status: filter.status === "all" ? null : filter.status,
         from_date: filter.submittedFrom,
         to_date: filter.submittedTo,
         keyword: filter.searchText,
@@ -44,9 +47,10 @@ export function createFacultyHourApprovalService(): HourApprovalService {
       return data.data;
     },
 
-    async approve(requestId: number) {
+    async approve(requestId: number, payload?: ApprovePayloadDTO) {
       const { data } = await http.put<{ data: HourApprovalRequestDetailDTO }>(
-        `/api/faculty/hours/approvals/${requestId}/approve`
+        `/api/faculty/hours/approvals/${requestId}/approve`,
+        payload ?? {}
       );
       return data.data;
     },

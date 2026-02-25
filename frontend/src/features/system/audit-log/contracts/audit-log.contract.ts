@@ -226,12 +226,12 @@ export const DEFAULT_AUDIT_LOG_FILTERS: AuditLogFilters = {
 };
 
 export const AUDIT_GROUP_LABELS: Record<AuditActionGroup, string> = {
-  auth: "T?i kho?n",
-  lecturer: "Gi?ng vi?n",
-  research: "C?ng tr?nh",
-  approval: "Duy?t",
-  config: "C?u h?nh",
-  security: "B?o m?t / nh?y c?m",
+  auth: "Tài khoản",
+  lecturer: "Giảng viên",
+  research: "Công trình",
+  approval: "Duyệt",
+  config: "Cấu hình",
+  security: "Bảo mật / nhạy cảm",
 };
 
 export const GLOBAL_ALLOWED_GROUPS: readonly AuditActionGroup[] = [

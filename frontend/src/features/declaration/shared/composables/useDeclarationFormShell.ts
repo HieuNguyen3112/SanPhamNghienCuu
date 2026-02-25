@@ -4,7 +4,7 @@ import type { DeclarationStatusUi } from "../contracts/declarationSharedContract
 type UseDeclarationShellOptions = {
   initial_status: DeclarationStatusUi;
   on_save_draft: () => Promise<void>;
-  on_submit: () => Promise<void>;
+  on_submit: () => Promise<DeclarationStatusUi | void>;
 };
 
 export function useDeclarationFormShell(opts: UseDeclarationShellOptions) {
@@ -14,7 +14,9 @@ export function useDeclarationFormShell(opts: UseDeclarationShellOptions) {
   const error_message = ref<string | null>(null);
 
   const pending = computed(() => is_saving.value || is_submitting.value);
-  const is_read_only = computed(() => status.value !== "DRAFT");
+  const is_read_only = computed(
+    () => !["DRAFT", "MEMBER_REJECTED", "REJECTED"].includes(status.value)
+  );
 
   async function save_draft() {
     error_message.value = null;
@@ -34,8 +36,8 @@ export function useDeclarationFormShell(opts: UseDeclarationShellOptions) {
     error_message.value = null;
     is_submitting.value = true;
     try {
-      await opts.on_submit();
-      status.value = "SUBMITTED";
+      const nextStatus = await opts.on_submit();
+      status.value = nextStatus ?? "PENDING_FACULTY_REVIEW";
     } catch (e) {
       error_message.value = e instanceof Error ? e.message : "Submit failed";
     } finally {

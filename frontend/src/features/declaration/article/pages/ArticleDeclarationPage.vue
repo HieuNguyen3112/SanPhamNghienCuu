@@ -1,6 +1,18 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
+      <div
+        v-if="submitNotice"
+        :class="[
+          'rounded-2xl border p-3 text-sm',
+          submitNoticeTone === 'success'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-blue-200 bg-blue-50 text-blue-700',
+        ]"
+      >
+        {{ submitNotice }}
+      </div>
+
       <DeclarationFormShell
         title="Khai báo bài báo khoa học"
         description="Chọn loại bài báo để xác định giờ chuẩn; giờ chia đều cho số tác giả."
@@ -488,6 +500,8 @@ const formErrors = reactive<{
 
 const missingFields = ref<string[]>([]);
 const missingModalOpen = ref(false);
+const submitNotice = ref<string | null>(null);
+const submitNoticeTone = ref<"info" | "success">("info");
 
 const filteredMemberRoles = computed(() => {
   const preferredCodes = new Set<string>(
@@ -775,6 +789,7 @@ function collectMissingFields(mode: "draft" | "submit") {
 
 function handleSaveDraft() {
   resetErrors();
+  submitNotice.value = null;
   const missing = collectMissingFields("draft");
   if (missing.length > 0) {
     openMissingModal(missing);
@@ -785,6 +800,7 @@ function handleSaveDraft() {
 
 function handleSubmit() {
   resetErrors();
+  submitNotice.value = null;
   const missing = collectMissingFields("submit");
   if (missing.length > 0) {
     openMissingModal(missing);
@@ -850,14 +866,10 @@ const shell = useDeclarationFormShell({
 
       existingEvidence.value = await list_evidence_files(saved.id);
 
-      if (pendingEvidenceFiles.value.length > 0) {
-        throw new Error(
-          "Chưa hỗ trợ tải file minh chứng. Vui lòng thử lại sau.",
-        );
-      }
-      if (pendingEvidenceLinks.value.length > 0) {
-        throw new Error("Chưa hỗ trợ link minh chứng. Vui lòng thử lại sau.");
-      }
+      // Minh chứng chính thức được nộp ở bước duyệt giờ NCKH.
+      // Không chặn lưu nháp kê khai nếu người dùng đã chọn file/link tại màn này.
+      pendingEvidenceFiles.value = [];
+      pendingEvidenceLinks.value = [];
     } catch (err) {
       const validation = applyValidationErrors(err);
       if (validation) throw new Error(validation);
@@ -874,7 +886,24 @@ const shell = useDeclarationFormShell({
         await shell.save_draft();
       }
       if (!form.activityId) return;
-      await submit_activity(form.activityId);
+      const submitResponse = await submit_activity(form.activityId);
+      const nextStatusCode =
+        submitResponse?.workflow?.status_code ??
+        submitResponse?.data?.status_code ??
+        "pending_faculty_review";
+
+      if (nextStatusCode === "pending_member_confirm") {
+        submitNoticeTone.value = "info";
+        submitNotice.value =
+          "Đã gửi lời mời tới thành viên, hệ thống đang chờ xác nhận trước khi chuyển Khoa duyệt.";
+      } else if (nextStatusCode === "pending_faculty_review") {
+        submitNoticeTone.value = "success";
+        submitNotice.value = "Đã gửi công trình lên Khoa duyệt.";
+      } else {
+        submitNotice.value = null;
+      }
+
+      return mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW";
     } catch (err) {
       const validation = applyValidationErrors(err);
       if (validation) throw new Error(validation);
@@ -950,3 +979,4 @@ async function searchJournals(q: string) {
   })) as JournalSelectOptionDto[];
 }
 </script>
+

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Faculty\FacultyWorkApprovalListRequest;
 use App\Http\Requests\Faculty\FacultyWorkApprovalRejectRequest;
+use App\Services\Hours\HoursRecomputeService;
+use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,8 +13,15 @@ use Symfony\Component\HttpFoundation\Response;
 class FacultyResearchWorkApprovalController extends Controller
 {
     private const STATUS_PENDING = 'PENDING_FACULTY_APPROVAL';
-    private const STATUS_APPROVED = 'APPROVED_BY_FACULTY';
+    private const STATUS_APPROVED = 'APPROVED_BY_FACULTY_FINAL';
     private const STATUS_REJECTED = 'REJECTED_BY_FACULTY';
+    private HoursRecomputeService $hoursRecomputeService;
+
+    public function __construct(
+        HoursRecomputeService $hoursRecomputeService
+    ) {
+        $this->hoursRecomputeService = $hoursRecomputeService;
+    }
 
     public function lookups(Request $request)
     {
@@ -44,18 +53,16 @@ class FacultyResearchWorkApprovalController extends Controller
             ])
             ->all();
 
-        $statuses = [
-            ['code' => 'all', 'name' => 'Tất cả'],
-            ['code' => self::STATUS_PENDING, 'name' => 'Chờ khoa duyệt'],
-            ['code' => self::STATUS_APPROVED, 'name' => 'Đã chuyển lên cấp trường'],
-            ['code' => self::STATUS_REJECTED, 'name' => 'Bị từ chối ở cấp khoa'],
-        ];
-
         return response()->json([
             'data' => [
                 'academic_years' => $academicYears,
                 'work_kinds' => $kinds,
-                'statuses' => $statuses,
+                'statuses' => [
+                    ['code' => 'all', 'name' => 'Tất cả'],
+                    ['code' => self::STATUS_PENDING, 'name' => 'Chờ khoa duyệt'],
+                    ['code' => self::STATUS_APPROVED, 'name' => 'Đã duyệt cuối cùng tại khoa'],
+                    ['code' => self::STATUS_REJECTED, 'name' => 'Bị từ chối ở khoa'],
+                ],
                 'faculty' => [
                     'id' => $scope['faculty_id'],
                     'name' => $scope['faculty_name'],
@@ -92,7 +99,6 @@ class FacultyResearchWorkApprovalController extends Controller
             ->map(function ($row) use ($authorsByActivity) {
                 return $this->mapListEntry($row, $authorsByActivity);
             })
-            ->filter()
             ->values()
             ->all();
 
@@ -139,24 +145,41 @@ class FacultyResearchWorkApprovalController extends Controller
             return response()->json(['message' => 'activity not available for faculty approval'], Response::HTTP_NOT_FOUND);
         }
 
+        // Đồng bộ trước khi hiển thị để bảng "Thành viên & số giờ" luôn có dữ liệu dự kiến mới nhất.
+        $calculation = $this->hoursRecomputeService->recomputeActivity((int) $activity, now(), true);
         $members = $this->fetchMembers($activity);
-        $memberCount = count($members);
-        $recommendedPerMember = null;
-        if ($row->total_hours_calc !== null && $memberCount > 0) {
-            $recommendedPerMember = (float) $row->total_hours_calc / $memberCount;
+        $computedHoursByLecturer = [];
+        foreach (($calculation['members'] ?? []) as $memberHours) {
+            $computedHoursByLecturer[(int) $memberHours['lecturer_id']] = $memberHours;
         }
 
-        $membersPayload = array_map(function ($member) use ($recommendedPerMember) {
+        $computedTotalHours = $calculation['total_hours_activity'] !== null
+            ? (float) $calculation['total_hours_activity']
+            : ($row->total_hours_calc !== null ? (float) $row->total_hours_calc : null);
+
+        $memberCount = count($members);
+        $recommendedPerMember = null;
+        if ($computedTotalHours !== null && $memberCount > 0) {
+            $recommendedPerMember = (float) $computedTotalHours / $memberCount;
+        }
+
+        $membersPayload = array_map(function ($member) use ($recommendedPerMember, $computedHoursByLecturer) {
             $payload = (array) $member;
-            $payload['declared_hours'] = $member->hours_assigned !== null
+            $computed = $computedHoursByLecturer[(int) $member->lecturer_id]['hours_assigned'] ?? null;
+            $declared = $member->hours_assigned !== null
                 ? (float) $member->hours_assigned
-                : null;
+                : ($computed !== null ? (float) $computed : null);
+
+            $payload['declared_hours'] = $declared;
+            $payload['computed_member_hours'] = $computed !== null ? (float) $computed : $declared;
             $payload['recommended_hours'] = $recommendedPerMember !== null
                 ? (float) $recommendedPerMember
                 : null;
             $payload['official_hours'] = null;
             return $payload;
         }, $members);
+
+        $hoursSummary = $this->resolveHoursApprovalSummary((int) $activity);
 
         return response()->json([
             'data' => [
@@ -175,6 +198,11 @@ class FacultyResearchWorkApprovalController extends Controller
                     'submitted_at' => $row->submitted_at,
                     'approved_at' => $row->approved_at,
                     'declared_hours' => (float) ($row->declared_hours ?? 0),
+                    'computed_total_hours' => $computedTotalHours,
+                    'member_count' => $memberCount,
+                    'hours_value_label' => 'Giờ quy đổi (dự kiến)',
+                    'hours_request_state' => $hoursSummary['state'],
+                    'hours_request_status_raw' => $hoursSummary['raw_status'],
                     'official_hours' => null,
                     'evidence_count' => (int) ($row->evidence_count ?? 0),
                     'lecturer' => [
@@ -195,98 +223,108 @@ class FacultyResearchWorkApprovalController extends Controller
     }
 
     public function approve(Request $request, int $activity)
-{
-    $scope = $this->resolveFacultyScope($request);
-    if (! $scope) {
-        return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
-    }
+    {
+        $scope = $this->resolveFacultyScope($request);
+        if (! $scope) {
+            return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
+        }
 
-    $stageIds = $this->getStageIds();
-    $current = $this->baseQuery($stageIds, $scope['faculty_id'])
-        ->where('ra.id', $activity)
-        ->first();
-
-    if (! $current) {
-        return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
-    }
-
-    // Chỉ cho duyệt khi công trình đang chờ Khoa duyệt
-    $approvalStatus = $this->resolveFacultyApprovalStatus($current);
-    if ($approvalStatus !== self::STATUS_PENDING) {
-        return response()->json(['message' => 'activity is not pending faculty approval'], Response::HTTP_CONFLICT);
-    }
-
-    $approvedStatusId = $this->getStatusId('approved');
-    if (! $approvedStatusId) {
-        return response()->json(['message' => 'approved status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
-    }
-
-    $pendingFacultyStatusId = $this->getStatusId('pending_faculty_review');
-    if (! $pendingFacultyStatusId) {
-        return response()->json(['message' => 'pending_faculty_review status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
-    }
-
-    $now = now();
-    $userId = $request->user()->id;
-
-    DB::transaction(function () use ($activity, $stageIds, $approvedStatusId, $pendingFacultyStatusId, $now, $userId, $request) {
-        // Lock activity để tránh race approve/reject
-        $locked = DB::table('research_activities as ra')
-            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+        $stageIds = $this->getStageIds();
+        $current = $this->baseQuery($stageIds, $scope['faculty_id'])
             ->where('ra.id', $activity)
-            ->lockForUpdate()
-            ->select(['ra.status_id', 'ast.code as status_code'])
             ->first();
 
-        if (! $locked) {
-            abort(Response::HTTP_NOT_FOUND, 'activity not found');
+        if (! $current) {
+            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Phải đúng trạng thái đang chờ Khoa duyệt
-        if ((int) $locked->status_id !== (int) $pendingFacultyStatusId || $locked->status_code !== 'pending_faculty_review') {
-            abort(Response::HTTP_CONFLICT, 'activity is not pending faculty approval');
+        if ($this->resolveFacultyApprovalStatus($current) !== self::STATUS_PENDING) {
+            return response()->json(['message' => 'activity is not pending faculty approval'], Response::HTTP_CONFLICT);
         }
 
-        // Set final approved (KHÔNG qua Trường)
-        DB::table('research_activities')->where('id', $activity)->update([
-            'status_id' => $approvedStatusId,
-            'approved_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $approvedStatusId = $this->getStatusId('approved');
+        if (! $approvedStatusId) {
+            return response()->json(['message' => 'approved status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
-        // Ghi approval stage "assistant" (Khoa) = approved
-        DB::table('activity_approvals')->updateOrInsert(
-            [
+        $now = now();
+        $user = $request->user();
+
+        DB::transaction(function () use ($activity, $stageIds, $approvedStatusId, $now, $request, $user) {
+            $locked = DB::table('research_activities as ra')
+                ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+                ->where('ra.id', $activity)
+                ->lockForUpdate()
+                ->select(['ra.status_id', 'ast.code as status_code'])
+                ->first();
+
+            if (! $locked) {
+                abort(Response::HTTP_NOT_FOUND, 'activity not found');
+            }
+
+            if (! in_array($locked->status_code, ['pending_faculty_review', 'submitted'], true)) {
+                abort(Response::HTTP_CONFLICT, 'activity is not pending faculty approval');
+            }
+
+            $calculation = $this->calculateAndPersistHoursDistribution($activity, $now);
+
+            $activityUpdate = [
+                'status_id' => $approvedStatusId,
+                'approved_at' => $now,
+                'updated_at' => $now,
+            ];
+            if ($calculation['total_hours_activity'] !== null) {
+                $activityUpdate['total_hours_calc'] = $calculation['total_hours_activity'];
+            }
+
+            DB::table('research_activities')->where('id', $activity)->update($activityUpdate);
+
+            DB::table('activity_approvals')->updateOrInsert(
+                [
+                    'activity_id' => $activity,
+                    'stage_id' => $stageIds['assistant'],
+                ],
+                [
+                    'status' => 'approved',
+                    'decided_by_user_id' => $user->id,
+                    'decided_at' => $now,
+                    'note' => $request->input('note'),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+
+            DB::table('activity_status_histories')->insert([
                 'activity_id' => $activity,
-                'stage_id' => $stageIds['assistant'],
-            ],
-            [
-                'status' => 'approved',
-                'decided_by_user_id' => $userId,
-                'decided_at' => $now,
+                'from_status_id' => $locked->status_id,
+                'to_status_id' => $approvedStatusId,
+                'acted_by_user_id' => $user->id,
+                'acted_at' => $now,
                 'note' => $request->input('note'),
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]
-        );
+            ]);
 
-        // Status history
-        DB::table('activity_status_histories')->insert([
-            'activity_id' => $activity,
-            'from_status_id' => $locked->status_id,
-            'to_status_id' => $approvedStatusId,
-            'acted_by_user_id' => $userId,
-            'acted_at' => $now,
-            'note' => $request->input('note'),
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-    });
+            AuditLogger::log($request, [
+                'action_group' => 'approval',
+                'action_code' => 'FACULTY_WORK_APPROVED',
+                'action_label' => 'Khoa duyet cong trinh',
+                'severity' => 'important',
+                'result_status' => 'success',
+                'target_type' => 'research_activity',
+                'target_id' => $activity,
+                'request_http_status' => Response::HTTP_OK,
+                'changes' => [
+                    'from_status' => $locked->status_code,
+                    'to_status' => 'approved',
+                ],
+            ], $user);
+        });
 
-    return response()->json([
-        'message' => 'faculty approved (final)',
-    ], Response::HTTP_OK);
-}
+        return response()->json([
+            'message' => 'faculty approved (final)',
+        ], Response::HTTP_OK);
+    }
 
     public function reject(FacultyWorkApprovalRejectRequest $request, int $activity)
     {
@@ -304,8 +342,7 @@ class FacultyResearchWorkApprovalController extends Controller
             return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $approvalStatus = $this->resolveFacultyApprovalStatus($current);
-        if ($approvalStatus !== self::STATUS_PENDING) {
+        if ($this->resolveFacultyApprovalStatus($current) !== self::STATUS_PENDING) {
             return response()->json(['message' => 'activity is not pending faculty approval'], Response::HTTP_CONFLICT);
         }
 
@@ -316,8 +353,24 @@ class FacultyResearchWorkApprovalController extends Controller
 
         $note = $this->buildRejectNote($request);
         $now = now();
+        $user = $request->user();
 
-        DB::transaction(function () use ($activity, $rejectedStatusId, $stageIds, $now, $current, $request, $note) {
+        DB::transaction(function () use ($activity, $rejectedStatusId, $stageIds, $now, $request, $note, $user) {
+            $locked = DB::table('research_activities as ra')
+                ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+                ->where('ra.id', $activity)
+                ->lockForUpdate()
+                ->select(['ra.status_id', 'ast.code as status_code'])
+                ->first();
+
+            if (! $locked) {
+                abort(Response::HTTP_NOT_FOUND, 'activity not found');
+            }
+
+            if (! in_array($locked->status_code, ['pending_faculty_review', 'submitted'], true)) {
+                abort(Response::HTTP_CONFLICT, 'activity is not pending faculty approval');
+            }
+
             DB::table('research_activities')->where('id', $activity)->update([
                 'status_id' => $rejectedStatusId,
                 'approved_at' => null,
@@ -331,7 +384,7 @@ class FacultyResearchWorkApprovalController extends Controller
                 ],
                 [
                     'status' => 'rejected',
-                    'decided_by_user_id' => $request->user()->id,
+                    'decided_by_user_id' => $user->id,
                     'decided_at' => $now,
                     'note' => $note,
                     'created_at' => $now,
@@ -341,14 +394,30 @@ class FacultyResearchWorkApprovalController extends Controller
 
             DB::table('activity_status_histories')->insert([
                 'activity_id' => $activity,
-                'from_status_id' => $current->status_id,
+                'from_status_id' => $locked->status_id,
                 'to_status_id' => $rejectedStatusId,
-                'acted_by_user_id' => $request->user()->id,
+                'acted_by_user_id' => $user->id,
                 'acted_at' => $now,
                 'note' => $note,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+
+            AuditLogger::log($request, [
+                'action_group' => 'approval',
+                'action_code' => 'FACULTY_WORK_REJECTED',
+                'action_label' => 'Khoa tu choi cong trinh',
+                'severity' => 'important',
+                'result_status' => 'success',
+                'target_type' => 'research_activity',
+                'target_id' => $activity,
+                'request_http_status' => Response::HTTP_OK,
+                'changes' => [
+                    'from_status' => $locked->status_code,
+                    'to_status' => 'rejected',
+                    'reason' => $note,
+                ],
+            ], $user);
         });
 
         return response()->json([
@@ -417,7 +486,7 @@ class FacultyResearchWorkApprovalController extends Controller
                     ->where('aa_manager.stage_id', $stageIds['manager']);
             })
             ->where('f.id', $facultyId)
-            ->where('ast.code', '!=', 'draft')
+            ->whereIn('ast.code', ['pending_faculty_review', 'submitted', 'approved', 'rejected'])
             ->select([
                 'ra.id as activity_id',
                 'ra.activity_code',
@@ -451,6 +520,7 @@ class FacultyResearchWorkApprovalController extends Controller
                 'aa_manager.decided_at as manager_decided_at',
             ]);
     }
+
     private function baseCounterQuery(array $stageIds, int $facultyId)
     {
         return DB::table('research_activities as ra')
@@ -469,10 +539,8 @@ class FacultyResearchWorkApprovalController extends Controller
                     ->where('aa_manager.stage_id', $stageIds['manager']);
             })
             ->where('f.id', $facultyId)
-            ->where('ast.code', '!=', 'draft');
+            ->whereIn('ast.code', ['pending_faculty_review', 'submitted', 'approved', 'rejected']);
     }
-
-
 
     private function applyFilters($query, array $filters): void
     {
@@ -501,56 +569,42 @@ class FacultyResearchWorkApprovalController extends Controller
         }
 
         if ($status === 'pending') {
-            $query->where('ast.code', 'submitted')
-                ->where(function ($q) {
-                    $q->whereNull('aa_assistant.status')
-                        ->orWhere('aa_assistant.status', 'pending');
-                });
+            $query->whereIn('ast.code', ['pending_faculty_review', 'submitted']);
             return;
         }
 
         if ($status === 'approved') {
-            $query->where('aa_assistant.status', 'approved');
+            $query->where('ast.code', 'approved');
             return;
         }
 
         if ($status === 'rejected') {
-            $query->where(function ($q) {
-                $q->where('aa_assistant.status', 'rejected')
-                    ->orWhere('ast.code', 'rejected');
-            });
+            $query->where('ast.code', 'rejected');
         }
     }
 
     private function resolveFacultyApprovalStatus(object $row): ?string
-{
-    // Ưu tiên trạng thái reject
-    if ($row->assistant_approval_status === 'rejected' || $row->status_code === 'rejected') {
-        return self::STATUS_REJECTED;
-    }
-
-    // Approved là final (không còn bước Trường)
-    if ($row->status_code === 'approved' || $row->assistant_approval_status === 'approved') {
-        return self::STATUS_APPROVED;
-    }
-
-    // Pending khoa duyệt
-    if ($row->status_code === 'pending_faculty_review') {
-        return self::STATUS_PENDING;
-    }
-
-    return null;
-}
-
-
-    private function mapListEntry(object $row, array $authorsByActivity): ?array
     {
-        $approvalStatus = $this->resolveFacultyApprovalStatus($row);
-        if (! $approvalStatus) {
-            return null;
+        if ($row->status_code === 'rejected') {
+            return self::STATUS_REJECTED;
         }
 
+        if ($row->status_code === 'approved') {
+            return self::STATUS_APPROVED;
+        }
+
+        if (in_array($row->status_code, ['pending_faculty_review', 'submitted'], true)) {
+            return self::STATUS_PENDING;
+        }
+
+        return null;
+    }
+
+    private function mapListEntry(object $row, array $authorsByActivity): array
+    {
         $activityId = (int) $row->activity_id;
+        $approvalStatus = $this->resolveFacultyApprovalStatus($row) ?? self::STATUS_PENDING;
+
         return [
             'activity_id' => $activityId,
             'activity_code' => $row->activity_code,
@@ -588,9 +642,9 @@ class FacultyResearchWorkApprovalController extends Controller
 
         $row = $query
             ->selectRaw("
-                SUM(CASE WHEN aa_assistant.status = 'rejected' OR ast.code = 'rejected' THEN 1 ELSE 0 END) as rejected_count,
-                SUM(CASE WHEN aa_assistant.status = 'approved' THEN 1 ELSE 0 END) as approved_count,
-                SUM(CASE WHEN ast.code = 'submitted' AND (aa_assistant.status IS NULL OR aa_assistant.status = 'pending') THEN 1 ELSE 0 END) as pending_count
+                SUM(CASE WHEN ast.code = 'rejected' THEN 1 ELSE 0 END) as rejected_count,
+                SUM(CASE WHEN ast.code = 'approved' THEN 1 ELSE 0 END) as approved_count,
+                SUM(CASE WHEN ast.code IN ('pending_faculty_review', 'submitted') THEN 1 ELSE 0 END) as pending_count
             ")
             ->first();
 
@@ -732,6 +786,57 @@ class FacultyResearchWorkApprovalController extends Controller
             ->all();
     }
 
+    private function resolveHoursApprovalSummary(int $activityId): array
+    {
+        $hoursStageId = (int) (DB::table('approval_stages')
+            ->where('code', 'hours')
+            ->value('id') ?? 0);
+
+        if ($hoursStageId <= 0) {
+            return [
+                'state' => 'hours_not_submitted',
+                'raw_status' => null,
+            ];
+        }
+
+        $status = DB::table('activity_approvals')
+            ->where('activity_id', $activityId)
+            ->where('stage_id', $hoursStageId)
+            ->value('status');
+
+        $normalized = $status ? strtolower((string) $status) : null;
+        if (! $normalized) {
+            return [
+                'state' => 'hours_not_submitted',
+                'raw_status' => null,
+            ];
+        }
+
+        if ($normalized === 'approved') {
+            return [
+                'state' => 'hours_approved',
+                'raw_status' => 'approved',
+            ];
+        }
+
+        if ($normalized === 'rejected') {
+            return [
+                'state' => 'hours_rejected',
+                'raw_status' => 'rejected',
+            ];
+        }
+
+        return [
+            'state' => 'hours_pending_faculty',
+            'raw_status' => $normalized,
+        ];
+    }
+
+    private function calculateAndPersistHoursDistribution(int $activityId, $executedAt): array
+    {
+        return $this->hoursRecomputeService->recomputeActivity($activityId, $executedAt, true);
+    }
+
     private function getStatusId(string $code): ?int
     {
         $id = DB::table('activity_statuses')->where('code', $code)->value('id');
@@ -753,7 +858,3 @@ class FacultyResearchWorkApprovalController extends Controller
         return $reasonType . ': ' . $reasonDetail;
     }
 }
-
-
-
-

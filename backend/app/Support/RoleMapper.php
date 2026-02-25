@@ -21,9 +21,9 @@ class RoleMapper
         $r = strtoupper($role);
 
         return match ($r) {
-            'LECTURER' => ['LECTURER'],
-            'DEPARTMENT_BOARD' => ['DEPARTMENT_BOARD'],
-            'SCIENCE_OFFICE' => ['SCIENCE_OFFICE'],
+            'LECTURER' => ['LECTURER', 'GV'],
+            'DEPARTMENT_BOARD' => ['DEPARTMENT_BOARD', 'DL'],
+            'SCIENCE_OFFICE' => ['SCIENCE_OFFICE', 'QL', 'ADMIN'],
             default => [],
         };
     }
@@ -36,9 +36,9 @@ class RoleMapper
     public static function backendToCanonical(string $role): ?string
     {
         return match (strtoupper($role)) {
-            'LECTURER' => 'LECTURER',
-            'DEPARTMENT_BOARD' => 'DEPARTMENT_BOARD',
-            'SCIENCE_OFFICE' => 'SCIENCE_OFFICE',
+            'LECTURER', 'GV' => 'LECTURER',
+            'DEPARTMENT_BOARD', 'DL' => 'DEPARTMENT_BOARD',
+            'SCIENCE_OFFICE', 'QL', 'ADMIN' => 'SCIENCE_OFFICE',
             default => null,
         };
     }

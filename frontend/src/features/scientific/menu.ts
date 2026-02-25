@@ -6,7 +6,6 @@ import {
   User,
   LayoutDashboard,
   ClipboardCheck,
-  ShieldCheck,
   AlertTriangle,
   BarChart3,
   Calculator,
@@ -14,7 +13,7 @@ import {
   Bell,
 } from "lucide-vue-next";
 
-// Nếu MenuItem CHƯA có field icon thì bạn thêm:
+// Nếu MenuItem chưa có field icon thì bạn thêm:
 // icon?: Component
 
 export const researchWorksMenuGroup: MenuItem & { icon?: Component } = {
@@ -74,7 +73,6 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     icon: ClipboardCheck,
     roles: ["DEPARTMENT_BOARD"],
   },
-
   {
     id: "hours-facwarning",
     label: "Cảnh báo giảng viên",
@@ -82,7 +80,6 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     icon: AlertTriangle,
     roles: ["DEPARTMENT_BOARD"],
   },
-
   {
     id: "hours-facmanagement",
     label: "Quản lý giờ NCKH",
@@ -108,13 +105,6 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     icon: LayoutDashboard,
     roles: ["SCIENCE_OFFICE"],
   },
-  // {
-  //   id: "works-uniapproval",
-  //   label: "Xét duyệt công trình",
-  //   routeName: "works.uniapprovals",
-  //   icon: ShieldCheck,
-  //   roles: ["SCIENCE_OFFICE"],
-  // },
   {
     id: "hours-unimanagement",
     label: "Quản lý giờ NCKH",
@@ -122,18 +112,4 @@ export const researchWorksMenuItems: (MenuItem & { icon?: Component })[] = [
     icon: BarChart3,
     roles: ["SCIENCE_OFFICE"],
   },
-  // {
-  //   id: "hours.uniapprovals",
-  //   label: "Xét duyệt giờ NCKH",
-  //   routeName: "hours.uniapprovals",
-  //   icon: ShieldCheck,
-  //   roles: ["SCIENCE_OFFICE"],
-  // },
-  // {
-  //   id: "hours-uniwarning",
-  //   label: "Cảnh báo giảng viên",
-  //   routeName: "hours.uniwarning",
-  //   icon: AlertTriangle,
-  //   roles: ["SCIENCE_OFFICE"],
-  // },
 ];

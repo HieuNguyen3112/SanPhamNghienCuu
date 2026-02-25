@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Admin\WorkSearchRequest;
+use App\Support\RoleMapper;
 use App\Support\StorageDownload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -397,7 +398,8 @@ class AdminResearchWorkSearchController extends Controller
             return;
         }
 
-        if ($user->hasRole('ADMIN') || $user->hasRole('QL')) {
+        $canonicalRoles = RoleMapper::backendListToCanonical($user->getRoleNames()->values()->all());
+        if (in_array('SCIENCE_OFFICE', $canonicalRoles, true)) {
             return;
         }
 
@@ -407,7 +409,7 @@ class AdminResearchWorkSearchController extends Controller
             return;
         }
 
-        if ($user->hasRole('DL')) {
+        if (in_array('DEPARTMENT_BOARD', $canonicalRoles, true)) {
             $departmentId = $lecturer->department_id;
             if (! $departmentId) {
                 $query->whereRaw('1 = 0');

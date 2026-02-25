@@ -1,5 +1,8 @@
 export type DeclarationStatusUi =
   | "DRAFT"
+  | "PENDING_MEMBER_CONFIRM"
+  | "MEMBER_REJECTED"
+  | "PENDING_FACULTY_REVIEW"
   | "SUBMITTED"
   | "APPROVED"
   | "REJECTED";
@@ -29,7 +32,14 @@ export type ActivityTypeDto = {
 
 export type ActivityStatusDto = {
   id: number;
-  code: "draft" | "submitted" | "approved" | "rejected";
+  code:
+    | "draft"
+    | "pending_member_confirm"
+    | "member_rejected"
+    | "pending_faculty_review"
+    | "submitted"
+    | "approved"
+    | "rejected";
   name: string;
 };
 
@@ -101,8 +111,14 @@ export function mapStatusCodeToUi(
   switch (code) {
     case "draft":
       return "DRAFT";
+    case "pending_member_confirm":
+      return "PENDING_MEMBER_CONFIRM";
+    case "member_rejected":
+      return "MEMBER_REJECTED";
+    case "pending_faculty_review":
+      return "PENDING_FACULTY_REVIEW";
     case "submitted":
-      return "SUBMITTED";
+      return "PENDING_FACULTY_REVIEW";
     case "approved":
       return "APPROVED";
     case "rejected":
@@ -116,8 +132,14 @@ export function mapUiToStatusCode(
   switch (ui) {
     case "DRAFT":
       return "draft";
+    case "PENDING_MEMBER_CONFIRM":
+      return "pending_member_confirm";
+    case "MEMBER_REJECTED":
+      return "member_rejected";
+    case "PENDING_FACULTY_REVIEW":
+      return "pending_faculty_review";
     case "SUBMITTED":
-      return "submitted";
+      return "pending_faculty_review";
     case "APPROVED":
       return "approved";
     case "REJECTED":

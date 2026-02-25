@@ -67,9 +67,11 @@ const mock_kinds: ActivityKindDto[] = [
 
 const mock_statuses: ActivityStatusDto[] = [
   { id: 100, code: "draft", name: "Bản nháp" },
-  { id: 101, code: "submitted", name: "Đã gửi duyệt" },
-  { id: 102, code: "approved", name: "Được duyệt" },
-  { id: 103, code: "rejected", name: "Bị từ chối" },
+  { id: 101, code: "pending_member_confirm", name: "Chờ thành viên xác nhận" },
+  { id: 102, code: "member_rejected", name: "Thành viên từ chối" },
+  { id: 103, code: "pending_faculty_review", name: "Chờ khoa duyệt" },
+  { id: 104, code: "approved", name: "Được duyệt" },
+  { id: 105, code: "rejected", name: "Bị từ chối" },
 ];
 
 const mock_roles: MemberRoleDto[] = [

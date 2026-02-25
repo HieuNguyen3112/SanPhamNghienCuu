@@ -1,6 +1,5 @@
 <template>
   <div class="space-y-4">
-    <!-- Header -->
     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
@@ -19,7 +18,6 @@
       </div>
     </div>
 
-    <!-- Intro / guidance -->
     <div
       v-if="$slots.intro"
       class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
@@ -27,12 +25,10 @@
       <slot name="intro" :read-only="readOnly" />
     </div>
 
-    <!-- Main content -->
     <div class="space-y-4">
       <slot :read-only="readOnly" />
     </div>
 
-    <!-- Error state -->
     <div
       v-if="errorMessage"
       class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
@@ -40,7 +36,13 @@
       {{ errorMessage }}
     </div>
 
-    <!-- Footer actions -->
+    <div
+      v-if="status === 'MEMBER_REJECTED'"
+      class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+    >
+      Có thành viên đã từ chối. Bạn cần xóa/thay thế hoặc gửi lại yêu cầu xác nhận trước khi gửi lên khoa.
+    </div>
+
     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
       <div
         class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
@@ -60,7 +62,7 @@
           <button
             type="button"
             class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-            :disabled="pending"
+            :disabled="pending || readOnly"
             @click="$emit('save-draft')"
           >
             <Save class="h-4 w-4" />
@@ -70,7 +72,7 @@
           <button
             type="button"
             class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
-            :disabled="pending || !canSubmit || status !== 'DRAFT'"
+            :disabled="pending || !canSubmitNow"
             @click="$emit('submit')"
           >
             <Send class="h-4 w-4" />
@@ -80,12 +82,12 @@
       </div>
 
       <div
-        v-if="status !== 'DRAFT'"
+        v-if="readOnly"
         class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600"
       >
         Bản kê khai đang ở trạng thái
-        <span class="font-semibold">{{ statusText }}</span> nên được chuyển sang
-        chế độ chỉ xem.
+        <span class="font-semibold">{{ statusText }}</span>
+        nên đang ở chế độ chỉ xem.
       </div>
     </div>
   </div>
@@ -114,12 +116,24 @@ defineEmits<{
   (e: "submit"): void;
 }>();
 
-const readOnly = computed(() => props.status !== "DRAFT");
+function isEditableStatus(status: DeclarationStatusUi): boolean {
+  return status === "DRAFT" || status === "MEMBER_REJECTED" || status === "REJECTED";
+}
+
+const readOnly = computed(() => !isEditableStatus(props.status));
+
+const canSubmitNow = computed(() => !readOnly.value && props.canSubmit);
 
 const statusText = computed(() => {
   switch (props.status) {
     case "DRAFT":
       return "Bản nháp";
+    case "PENDING_MEMBER_CONFIRM":
+      return "Chờ thành viên xác nhận";
+    case "MEMBER_REJECTED":
+      return "Thành viên từ chối";
+    case "PENDING_FACULTY_REVIEW":
+      return "Chờ khoa duyệt";
     case "SUBMITTED":
       return "Đã gửi duyệt";
     case "APPROVED":

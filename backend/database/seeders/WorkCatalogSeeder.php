@@ -12,11 +12,11 @@ class WorkCatalogSeeder extends Seeder
         $now = now();
 
         $workTypes = [
-            ['name' => 'Paper', 'description' => 'Journal or conference paper', 'is_active' => true],
-            ['name' => 'Book', 'description' => 'Book or textbook', 'is_active' => true],
-            ['name' => 'Project', 'description' => 'Research project', 'is_active' => true],
-            ['name' => 'Conference', 'description' => 'Conference participation', 'is_active' => false],
-            ['name' => 'Other', 'description' => null, 'is_active' => true],
+            ['name' => 'Bài báo', 'description' => 'Bài báo tạp chí hoặc kỷ yếu', 'is_active' => true],
+            ['name' => 'Sách', 'description' => 'Sách hoặc giáo trình', 'is_active' => true],
+            ['name' => 'Đề tài', 'description' => 'Đề tài nghiên cứu khoa học', 'is_active' => true],
+            ['name' => 'Hội nghị', 'description' => 'Tham gia hội nghị, hội thảo', 'is_active' => false],
+            ['name' => 'Khác', 'description' => null, 'is_active' => true],
         ];
 
         foreach ($workTypes as $item) {
@@ -32,11 +32,11 @@ class WorkCatalogSeeder extends Seeder
         }
 
         $workLevels = [
-            ['name' => 'International', 'priority' => 1, 'notes' => 'Top priority', 'is_active' => true],
-            ['name' => 'National', 'priority' => 2, 'notes' => null, 'is_active' => true],
-            ['name' => 'University', 'priority' => 3, 'notes' => null, 'is_active' => true],
-            ['name' => 'Faculty', 'priority' => 4, 'notes' => null, 'is_active' => true],
-            ['name' => 'Other', 'priority' => 5, 'notes' => null, 'is_active' => false],
+            ['name' => 'Quốc tế', 'priority' => 1, 'notes' => 'Ưu tiên cao nhất', 'is_active' => true],
+            ['name' => 'Quốc gia', 'priority' => 2, 'notes' => null, 'is_active' => true],
+            ['name' => 'Cấp trường', 'priority' => 3, 'notes' => null, 'is_active' => true],
+            ['name' => 'Cấp khoa', 'priority' => 4, 'notes' => null, 'is_active' => true],
+            ['name' => 'Khác', 'priority' => 5, 'notes' => null, 'is_active' => false],
         ];
 
         foreach ($workLevels as $item) {
@@ -151,10 +151,10 @@ class WorkCatalogSeeder extends Seeder
             );
         }
         $conferences = [
-            ['name' => 'International Conference on AI', 'level' => 'INTERNATIONAL', 'notes' => null, 'is_active' => true],
-            ['name' => 'University Science Conference', 'level' => 'UNIVERSITY', 'notes' => 'Annual', 'is_active' => true],
-            ['name' => 'Faculty Seminar', 'level' => 'FACULTY', 'notes' => null, 'is_active' => true],
-            ['name' => 'National Symposium on Education', 'level' => 'NATIONAL', 'notes' => null, 'is_active' => false],
+            ['name' => 'Hội nghị quốc tế về AI', 'level' => 'INTERNATIONAL', 'notes' => null, 'is_active' => true],
+            ['name' => 'Hội nghị khoa học cấp trường', 'level' => 'UNIVERSITY', 'notes' => 'Tổ chức hằng năm', 'is_active' => true],
+            ['name' => 'Hội thảo cấp khoa', 'level' => 'FACULTY', 'notes' => null, 'is_active' => true],
+            ['name' => 'Hội thảo quốc gia về giáo dục', 'level' => 'NATIONAL', 'notes' => null, 'is_active' => false],
         ];
 
         foreach ($conferences as $item) {
@@ -171,10 +171,10 @@ class WorkCatalogSeeder extends Seeder
         }
 
         $researchFields = [
-            ['code' => 'AI', 'name' => 'Artificial Intelligence', 'description' => 'Machine learning, NLP', 'is_active' => true],
-            ['code' => 'EDU', 'name' => 'Education Science', 'description' => null, 'is_active' => true],
-            ['code' => 'SE', 'name' => 'Software Engineering', 'description' => null, 'is_active' => true],
-            ['code' => null, 'name' => 'Economics', 'description' => null, 'is_active' => false],
+            ['code' => 'AI', 'name' => 'Trí tuệ nhân tạo', 'description' => 'Máy học, xử lý ngôn ngữ tự nhiên', 'is_active' => true],
+            ['code' => 'EDU', 'name' => 'Khoa học giáo dục', 'description' => null, 'is_active' => true],
+            ['code' => 'SE', 'name' => 'Kỹ thuật phần mềm', 'description' => null, 'is_active' => true],
+            ['code' => null, 'name' => 'Kinh tế học', 'description' => null, 'is_active' => false],
         ];
 
         foreach ($researchFields as $item) {

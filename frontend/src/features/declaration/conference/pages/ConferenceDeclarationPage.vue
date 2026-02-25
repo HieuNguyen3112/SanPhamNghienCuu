@@ -24,8 +24,8 @@
               <li>Tham dự: 4 giờ/lần, tối đa 40 lần (160 giờ).</li>
               <li>Minh chứng: upload/link <b>theo từng dòng</b>.</li>
               <li class="text-amber-700">
-                TODO (P0): Persist nhiều lần tham gia + evidence theo dòng =>
-                backend cần batch create (mỗi dòng 1 activity) hoặc bảng con.
+                Mỗi dòng sẽ được lưu thành một công trình hội thảo riêng để
+                gửi duyệt theo đúng quy trình hiện tại.
               </li>
             </ul>
           </div>
@@ -298,13 +298,23 @@ import type {
   EvidenceFileDto,
   ActivityTypeDto,
 } from "../../shared/contracts/declarationSharedContract";
+import { mapStatusCodeToUi } from "../../shared/contracts/declarationSharedContract";
 import { useDeclarationFormShell } from "../../shared/composables/useDeclarationFormShell";
 import {
   fetch_academic_years,
   fetch_activity_kinds,
   fetch_activity_types_by_kind,
   fetch_evidence_file_types,
+  fetch_member_roles,
 } from "../../shared/services/catalogs.service";
+import {
+  fetch_current_lecturer_id,
+  list_evidence_files,
+  submit_activity,
+  upsert_activity_base,
+  upsert_conference_details,
+  upsert_members,
+} from "../../shared/services/declarations.service";
 
 import {
   computeConferenceHours,
@@ -317,9 +327,10 @@ const academicYears = ref<AcademicYearDto[]>([]);
 const evidenceFileTypes = ref<EvidenceFileTypeDto[]>([]);
 const conferenceTypesAll = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
+const memberRoles = ref<{ id: number; code: string; name: string }[]>([]);
 
 const currentLecturerId = ref<number>(0);
-const currentLecturerName = ref<string>("Nguyễn Văn A"); // TODO: from /api/profile/me
+const currentLecturerName = ref<string>("Giảng viên");
 
 const form = reactive<ConferenceDeclarationFormModel>({
   activityIds: [],
@@ -446,14 +457,18 @@ const canSubmit = computed(() => {
 });
 
 async function loadCatalogs() {
-  const [years, kinds, fileTypes] = await Promise.all([
+  const [years, kinds, fileTypes, roles, lecturerId] = await Promise.all([
     fetch_academic_years(),
     fetch_activity_kinds(),
     fetch_evidence_file_types(),
+    fetch_member_roles(),
+    fetch_current_lecturer_id(),
   ]);
 
   academicYears.value = years;
   evidenceFileTypes.value = fileTypes;
+  memberRoles.value = roles;
+  currentLecturerId.value = lecturerId ?? 0;
 
   kindId.value = kinds.find((k) => k.code === "conference")?.id ?? 0;
   form.kindId = kindId.value;
@@ -465,11 +480,22 @@ async function loadCatalogs() {
   if (form.items.length === 0) addRow();
 }
 
+function resolveDefaultMemberRoleId(): number {
+  const preferred =
+    memberRoles.value.find((role) => role.code === "member") ??
+    memberRoles.value.find((role) => role.code === "principal") ??
+    memberRoles.value[0];
+
+  if (!preferred) {
+    throw new Error("Không tìm thấy vai trò thành viên để lưu kê khai.");
+  }
+
+  return preferred.id;
+}
+
 const shell = useDeclarationFormShell({
   initial_status: "DRAFT",
   on_save_draft: async () => {
-    // Persist đúng nghĩa: mỗi dòng = 1 research_activities (kind=conference, type=report/attend, quantity=1)
-    // Evidence_files sẽ attach theo activity_id của từng dòng
     const hasAnyPendingEvidence = form.items.some(
       (r) =>
         (r.pendingEvidenceFiles?.length ?? 0) > 0 ||
@@ -478,16 +504,81 @@ const shell = useDeclarationFormShell({
 
     if (hasAnyPendingEvidence) {
       throw new Error(
-        "TODO (P0): Upload evidence per-row chưa có backend support.",
+        "Hiện chưa hỗ trợ tải minh chứng ngay ở màn kê khai hội thảo. Vui lòng gửi minh chứng tại bước duyệt giờ NCKH.",
       );
     }
 
-    throw new Error(
-      "TODO (P0): Backend cần endpoint POST /api/declarations/conference/batch để lưu danh sách lần tham gia (mỗi dòng 1 activity) + conference_details + evidence_files theo activity.",
-    );
+    if (!form.academicYearId) {
+      throw new Error("Vui lòng chọn niên học trước khi lưu.");
+    }
+    if (kindId.value <= 0) {
+      throw new Error("Không tìm thấy loại công trình hội nghị/hội thảo.");
+    }
+    if (!currentLecturerId.value) {
+      throw new Error("Không xác định được giảng viên hiện tại.");
+    }
+
+    const memberRoleId = resolveDefaultMemberRoleId();
+    const createdIds: number[] = [];
+
+    for (const row of form.items) {
+      if (!row.typeId || !row.conferenceName.trim()) {
+        continue;
+      }
+
+      const activity = await upsert_activity_base({
+        kind_id: kindId.value,
+        type_id: row.typeId,
+        academic_year_id: form.academicYearId,
+        title: row.conferenceName.trim(),
+        abstract: null,
+        start_date: row.heldOn ?? null,
+        end_date: row.heldOn ?? null,
+        quantity: 1,
+        notes: row.notes?.trim() ? row.notes.trim() : null,
+      });
+
+      await upsert_conference_details({
+        activity_id: activity.id,
+        conference_name: row.conferenceName.trim(),
+        location: row.location?.trim() ? row.location.trim() : null,
+        held_on: row.heldOn ?? null,
+      });
+
+      await upsert_members(activity.id, [
+        {
+          lecturer_id: currentLecturerId.value,
+          member_role_id: memberRoleId,
+          contribution_share: null,
+        },
+      ]);
+
+      row.existingEvidenceFiles = await list_evidence_files(activity.id);
+      createdIds.push(activity.id);
+    }
+
+    form.activityIds = createdIds;
   },
   on_submit: async () => {
     await shell.save_draft();
+    if (form.activityIds.length === 0) {
+      throw new Error("Không có dòng hội thảo hợp lệ để gửi duyệt.");
+    }
+
+    let nextStatusCode = "pending_faculty_review";
+    for (const activityId of form.activityIds) {
+      const submitResult = await submit_activity(activityId);
+      const activityStatusCode =
+        submitResult?.workflow?.status_code ??
+        submitResult?.data?.status_code ??
+        "pending_faculty_review";
+
+      if (activityStatusCode === "pending_member_confirm") {
+        nextStatusCode = "pending_member_confirm";
+      }
+    }
+
+    return mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW";
   },
 });
 

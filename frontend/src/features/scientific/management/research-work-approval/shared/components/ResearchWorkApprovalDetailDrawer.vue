@@ -194,8 +194,8 @@
                       Thành viên & số giờ
                     </div>
                     <p class="mt-1 text-xs text-slate-500">
-                      Số giờ là giờ kê khai theo từng thành viên (đã chia theo
-                      loại sản phẩm NCKH).
+                      Hiển thị giờ quy đổi dự kiến theo quy tắc tính giờ hiện tại của công trình.
+                      Giờ chính thức chỉ được ghi nhận sau bước duyệt giờ NCKH.
                     </p>
                   </div>
 
@@ -214,7 +214,7 @@
                       Bảng thành viên
                     </div>
                     <div class="text-xs text-slate-500">
-                      Tô nổi bật người kê khai
+                      Giờ quy đổi theo quy tắc
                     </div>
                   </div>
 
@@ -233,7 +233,7 @@
                           <th class="px-3 py-2">Tên thành viên</th>
                           <th class="px-3 py-2">Vai trò</th>
                           <th class="px-3 py-2">Khoa/Đơn vị</th>
-                          <th class="px-3 py-2">Số giờ</th>
+                          <th class="px-3 py-2">Giờ quy đổi (dự kiến)</th>
                         </tr>
                       </thead>
 
@@ -270,13 +270,13 @@
                               v-if="a.isPrimaryAuthor"
                               class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-900"
                             >
-                              Tác giả chính
+                              {{ a.authorRoleDisplayName ?? "Tác giả chính" }}
                             </span>
                             <span
                               v-else
                               class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700"
                             >
-                              Đồng tác giả
+                              {{ a.authorRoleDisplayName ?? "Đồng tác giả" }}
                             </span>
                           </td>
 
@@ -287,11 +287,7 @@
                           <td class="px-3 py-2">
                             <div class="font-semibold text-slate-900">
                               {{
-                                formatHourValue(
-                                  a.declaredHours ??
-                                    a.recommendedHoursByPolicy ??
-                                    a.officialHours,
-                                )
+                                formatHourValue(a.computedMemberHours ?? a.declaredHours ?? a.recommendedHoursByPolicy ?? a.officialHours)
                               }}
                             </div>
                           </td>
@@ -696,7 +692,7 @@ function approveSelectedResearchWork(): void {
   const ok = window.confirm(
     canFinalizeHours.value
       ? "Xác nhận duyệt & chốt giờ?"
-      : "Xác nhận hồ sơ hợp lệ và chuyển lên cấp trường?",
+      : "Xác nhận hồ sơ hợp lệ và duyệt công trình?",
   );
   if (!ok) return;
 

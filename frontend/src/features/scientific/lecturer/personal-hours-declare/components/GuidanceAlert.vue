@@ -7,11 +7,9 @@
         </div>
 
         <div class="min-w-0">
-          <div class="text-sm font-semibold text-slate-900">
-            Hướng dẫn kê khai & gửi xét duyệt giờ NCKH
-          </div>
+          <div class="text-sm font-semibold text-slate-900">Hướng dẫn duyệt giờ NCKH</div>
           <div class="mt-0.5 text-xs text-slate-600">
-            Chỉ công trình đã được duyệt nội dung mới được tính giờ.
+            Hệ thống tự tính giờ theo quy tắc. Chỉ công trình đã được khoa duyệt nội dung mới đủ điều kiện gửi duyệt giờ.
           </div>
         </div>
       </div>
@@ -27,36 +25,23 @@
       </button>
     </div>
 
-    <div
-      v-if="expanded"
-      class="mt-4 rounded-xl bg-white p-4 ring-1 ring-slate-200"
-    >
+    <div v-if="expanded" class="mt-4 rounded-xl bg-white p-4 ring-1 ring-slate-200">
       <ul class="space-y-2 text-sm text-slate-700">
         <li class="flex gap-2">
           <Info class="mt-0.5 h-4 w-4 text-slate-600" />
-          <span
-            ><b>Bước 1:</b> Chọn các công trình đã được duyệt hợp lệ</span
-          >
+          <span><b>Bước 1:</b> Mở chi tiết công trình để kiểm tra giờ quy đổi tự động.</span>
         </li>
         <li class="flex gap-2">
           <Info class="mt-0.5 h-4 w-4 text-slate-600" />
-          <span
-            ><b>Bước 2:</b> Kiểm tra số giờ NCKH tương ứng của từng công
-            trình</span
-          >
+          <span><b>Bước 2:</b> Kiểm tra mục <b>Công thức tính giờ</b> để biết tổng giờ công trình và giờ của bạn.</span>
         </li>
         <li class="flex gap-2">
           <Info class="mt-0.5 h-4 w-4 text-slate-600" />
-          <span
-            ><b>Bước 3:</b> Gửi yêu cầu xét duyệt giờ NCKH lên Khoa</span
-          >
+          <span><b>Bước 3:</b> Tải tối thiểu 1 minh chứng PDF cho từng công trình.</span>
         </li>
         <li class="flex gap-2">
           <Info class="mt-0.5 h-4 w-4 text-slate-600" />
-          <span
-            ><b>Lưu ý:</b> Chỉ công trình đã duyệt nội dung mới được tính giờ
-            NCKH</span
-          >
+          <span><b>Bước 4:</b> Chọn công trình hợp lệ và bấm <b>Gửi duyệt giờ</b>.</span>
         </li>
       </ul>
     </div>

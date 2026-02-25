@@ -3,4 +3,13 @@
 /* optional: custom theme */
 @theme {
   --color-brand: #4f46e5;
+  --font-sans: "Inter", "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue",
+    Arial, sans-serif;
+}
+
+@layer base {
+  html,
+  body {
+    font-family: var(--font-sans);
+  }
 }

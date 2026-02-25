@@ -17,11 +17,11 @@ const MOCK = false;
 type ResearchActivityDto = {
   id: number;
   activity_code: string;
-  owner_lecturer_id: number;
+  owner_lecturer_id: number | null;
   kind_id: number;
   type_id: number | null;
-  academic_year_id: number;
-  status_id: number;
+  academic_year_id: number | null;
+  status_id: number | null;
   title: string;
   abstract: string | null;
   start_date: string | null;
@@ -77,15 +77,20 @@ type ConferenceDetailsDto = {
 
 type UpsertActivityPayload = {
   id?: number;
+  owner_lecturer_id?: number | null;
   kind_id: number;
   type_id?: number | null;
   academic_year_id?: number | null;
+  status_id?: number | null;
   title: string;
   abstract?: string | null;
   start_date?: string | null;
   end_date?: string | null;
   quantity?: number | null;
   notes?: string | null;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  total_hours_calc?: number | null;
 };
 
 let next_id = 1000;
@@ -139,7 +144,17 @@ export async function upsert_activity_base(
     const created: ResearchActivityDto = {
       id,
       activity_code: `ACT-${id}`,
-      ...dto,
+      kind_id: dto.kind_id,
+      type_id: dto.type_id ?? null,
+      academic_year_id: dto.academic_year_id ?? null,
+      title: dto.title,
+      abstract: dto.abstract ?? null,
+      start_date: dto.start_date ?? null,
+      end_date: dto.end_date ?? null,
+      quantity: dto.quantity ?? 1,
+      notes: dto.notes ?? null,
+      owner_lecturer_id: dto.owner_lecturer_id ?? null,
+      status_id: dto.status_id ?? null,
       submitted_at: dto.submitted_at ?? null,
       approved_at: dto.approved_at ?? null,
       total_hours_calc: dto.total_hours_calc ?? null,
@@ -157,6 +172,10 @@ export async function upsert_activity_base(
   const updated: ResearchActivityDto = {
     ...prev,
     ...dto,
+    type_id: dto.type_id ?? prev.type_id ?? null,
+    academic_year_id: dto.academic_year_id ?? prev.academic_year_id ?? null,
+    quantity: dto.quantity ?? prev.quantity ?? 1,
+    status_id: dto.status_id ?? prev.status_id ?? null,
     updated_at: now_iso(),
   };
 
@@ -235,18 +254,61 @@ export async function upsert_members(
 export async function submit_activity(
   activity_id: number,
   _submitted_status_id?: number
-) {
+): Promise<{
+  message: string;
+  data: ResearchActivityDto & { status_code?: string };
+  workflow?: {
+    status_code?: string;
+    pending_members?: Array<{
+      invitation_id: number;
+      lecturer_id: number;
+      lecturer_code: string | null;
+      lecturer_full_name: string | null;
+      member_role_code: string | null;
+      member_role_name: string | null;
+    }>;
+    can_faculty_review?: boolean;
+  };
+}> {
   if (!MOCK) {
     await ensureCsrfCookie();
-    await http.post(`/api/research-activities/${activity_id}/submit`);
-    return;
+    const { data } = await http.post<{
+      message: string;
+      data: ResearchActivityDto & { status_code?: string };
+      workflow?: {
+        status_code?: string;
+        pending_members?: Array<{
+          invitation_id: number;
+          lecturer_id: number;
+          lecturer_code: string | null;
+          lecturer_full_name: string | null;
+          member_role_code: string | null;
+          member_role_name: string | null;
+        }>;
+        can_faculty_review?: boolean;
+      };
+    }>(`/api/research-activities/${activity_id}/submit`);
+    return data;
   }
   const prev = activities.get(activity_id);
   if (!prev) throw new Error("Activity not found");
-  activities.set(activity_id, {
+  const next = {
     ...prev,
     submitted_at: now_iso(),
-  });
+  };
+  activities.set(activity_id, next);
+  return {
+    message: "submitted",
+    data: {
+      ...next,
+      status_code: "pending_faculty_review",
+    },
+    workflow: {
+      status_code: "pending_faculty_review",
+      pending_members: [],
+      can_faculty_review: true,
+    },
+  };
 }
 
 export async function list_evidence_files(

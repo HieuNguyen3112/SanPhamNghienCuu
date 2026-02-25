@@ -56,7 +56,13 @@ export type FacultyApprovalListItem = {
 };
 
 export type FacultyApprovalDetailResponse = {
-  activity: FacultyApprovalListItem;
+  activity: FacultyApprovalListItem & {
+    computed_total_hours?: number | null;
+    member_count?: number | null;
+    hours_value_label?: string | null;
+    hours_request_state?: string | null;
+    hours_request_status_raw?: string | null;
+  };
   members: {
     lecturer_id: number;
     lecturer_code: string;
@@ -67,6 +73,7 @@ export type FacultyApprovalDetailResponse = {
     contribution_share: number | null;
     hours_assigned: number | null;
     declared_hours: number | null;
+    computed_member_hours?: number | null;
     recommended_hours: number | null;
     official_hours: number | null;
     department_name: string | null;

@@ -11,6 +11,7 @@ export type ResearchWorkType =
 
 export type ResearchWorkApprovalStatus =
   | "PENDING_FACULTY_APPROVAL"
+  | "APPROVED_BY_FACULTY_FINAL"
   | "APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY"
   | "REJECTED_BY_FACULTY"
   | "PENDING_UNIVERSITY_APPROVAL"
@@ -43,6 +44,11 @@ export interface ResearchWorkAuthor {
   authorFacultyDisplayName: string;
   isPrimaryAuthor: boolean;
   isSubmittingLecturer: boolean;
+  authorRoleDisplayName?: string;
+  declaredHours?: number | null;
+  computedMemberHours?: number | null;
+  recommendedHoursByPolicy?: number | null;
+  officialHours?: number | null;
 }
 export type ResearchWorkCoAuthor = {
   lecturerIdentifier: number;

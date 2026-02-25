@@ -28,8 +28,8 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
         { value: "ALL_APPROVAL_STATUSES", label: "Tất cả trạng thái" },
         { value: "PENDING_FACULTY_APPROVAL", label: "Chờ khoa duyệt" },
         {
-          value: "APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY",
-          label: "Đã chuyển lên cấp trường",
+          value: "APPROVED_BY_FACULTY_FINAL",
+          label: "Đã duyệt (cuối cùng tại khoa)",
         },
         { value: "REJECTED_BY_FACULTY", label: "Bị từ chối ở cấp khoa" },
       ];
@@ -60,8 +60,9 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
   ): string {
     const mapping: Record<ResearchWorkApprovalStatus, string> = {
       PENDING_FACULTY_APPROVAL: "Chờ khoa duyệt",
+      APPROVED_BY_FACULTY_FINAL: "Đã duyệt (cuối cùng tại khoa)",
       APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY:
-        "Đã chuyển lên cấp trường",
+        "Đã duyệt (cuối cùng tại khoa)",
       REJECTED_BY_FACULTY: "Bị từ chối ở cấp khoa",
 
       PENDING_UNIVERSITY_APPROVAL: "Chờ duyệt cấp trường",
@@ -77,6 +78,8 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
     const mapping: Record<ResearchWorkApprovalStatus, string> = {
       PENDING_FACULTY_APPROVAL:
         "inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900",
+      APPROVED_BY_FACULTY_FINAL:
+        "inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-900",
       APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY:
         "inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-900",
       REJECTED_BY_FACULTY:

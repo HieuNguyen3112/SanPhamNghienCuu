@@ -1,5 +1,6 @@
 import { reactive, ref } from "vue";
 import type {
+  ApprovePayload,
   HourApprovalFilter,
   HourApprovalRequestDetail,
   HourApprovalRequestSummary,
@@ -11,7 +12,8 @@ import type { HourApprovalService } from "../services/hourApprovalService";
 export function createDefaultHourApprovalFilter(): HourApprovalFilter {
   return {
     facultyId: null,
-    status: "all",
+    academicYearId: null,
+    status: "pending",
     submittedFrom: null,
     submittedTo: null,
     searchText: "",
@@ -108,11 +110,14 @@ export function useHourApprovalManagement(
     errorDetail.value = null;
   }
 
-  async function approveRequest(requestId: number) {
+  async function approveRequest(requestId: number, payload?: ApprovePayload) {
     loadingApprove.value = true;
     errorApprove.value = null;
     try {
-      await service.approve(requestId);
+      await service.approve(
+        requestId,
+        payload ? hourApprovalMappers.approvePayloadToDto(payload) : undefined
+      );
       await loadRequests();
       if (selectedRequestId.value === requestId) {
         await openRequestDetail(requestId);

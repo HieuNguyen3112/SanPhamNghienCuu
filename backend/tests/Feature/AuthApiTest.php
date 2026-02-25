@@ -76,6 +76,28 @@ class AuthApiTest extends TestCase
     }
 
     /** @test */
+    public function login_with_canonical_role_accepts_legacy_backend_role_and_upgrades_user_role()
+    {
+        $user = User::factory()->create([
+            'email' => 'gv-role-map@example.com',
+            'password' => bcrypt('secret123'),
+            'email_verified_at' => now(),
+        ]);
+        $user->assignRole('GV');
+
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+
+        $this->postJson('/login', [
+            'email' => 'gv-role-map@example.com',
+            'password' => 'secret123',
+            'role' => 'LECTURER',
+        ])->assertStatus(200);
+
+        $user->refresh();
+        $this->assertTrue($user->hasRole('LECTURER', 'web'));
+    }
+
+    /** @test */
     public function logout_creates_audit_log()
     {
         $user = User::factory()->create();

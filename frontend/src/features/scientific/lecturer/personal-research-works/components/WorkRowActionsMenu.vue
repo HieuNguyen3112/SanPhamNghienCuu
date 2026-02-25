@@ -14,7 +14,6 @@
       <span class="sr-only">Hành động</span>
     </button>
 
-    <!-- ✅ Teleport ra body để không bị table overflow cắt -->
     <Teleport to="body">
       <Transition
         enter-active-class="transition duration-150 ease-out"
@@ -32,7 +31,6 @@
           :style="menuStyle"
         >
           <div class="p-1">
-            <!-- View -->
             <button
               v-if="showView"
               type="button"
@@ -44,21 +42,39 @@
               <span class="min-w-0 truncate">{{ viewLabelResolved }}</span>
             </button>
 
-            <!-- Draft -->
             <button
               v-if="statusCode === 'draft'"
               type="button"
               class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
               role="menuitem"
-              @click="onClickEditDraft"
+              @click="onClickEdit"
             >
-              <Pencil
-                class="h-4 w-4 text-slate-500 group-hover:text-slate-700"
-              />
+              <Pencil class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
               <span class="min-w-0 truncate">Tiếp tục kê khai</span>
             </button>
 
-            <!-- Rejected -->
+            <button
+              v-if="statusCode === 'member_rejected'"
+              type="button"
+              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              role="menuitem"
+              @click="onClickEdit"
+            >
+              <Pencil class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
+              <span class="min-w-0 truncate">Chỉnh sửa thành viên</span>
+            </button>
+
+            <button
+              v-if="statusCode === 'member_rejected'"
+              type="button"
+              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              role="menuitem"
+              @click="onClickReinvite"
+            >
+              <Send class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
+              <span class="min-w-0 truncate">Gửi lại yêu cầu xác nhận</span>
+            </button>
+
             <button
               v-if="statusCode === 'rejected'"
               type="button"
@@ -79,20 +95,20 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { PersonalWorkStatusCode } from "../contracts/personalResearchWorksContracts";
-import { MoreHorizontal, Eye, Pencil, Copy } from "lucide-vue-next";
+import { MoreHorizontal, Eye, Pencil, Copy, Send } from "lucide-vue-next";
+
 const props = withDefaults(
   defineProps<{
     open: boolean;
     activityId: number;
     statusCode: PersonalWorkStatusCode;
-
     showView?: boolean;
     viewLabel?: string | null;
   }>(),
   {
     showView: true,
     viewLabel: null,
-  },
+  }
 );
 
 const emit = defineEmits<{
@@ -101,6 +117,7 @@ const emit = defineEmits<{
   (e: "view", activityId: number): void;
   (e: "edit-draft", activityId: number): void;
   (e: "copy-rejected", activityId: number): void;
+  (e: "reinvite", activityId: number): void;
 }>();
 
 const triggerEl = ref<HTMLButtonElement | null>(null);
@@ -111,7 +128,9 @@ const menuLeft = ref(0);
 
 const viewLabelResolved = computed(() => {
   if (props.viewLabel?.trim()) return props.viewLabel.trim();
-  return props.statusCode === "rejected" ? "Xem lý do" : "Xem chi tiết";
+  return ["rejected", "member_rejected"].includes(props.statusCode)
+    ? "Xem lý do"
+    : "Xem chi tiết";
 });
 
 const menuStyle = computed(() => ({
@@ -123,12 +142,19 @@ function onClickView() {
   emit("view", props.activityId);
   emit("close");
 }
-function onClickEditDraft() {
+
+function onClickEdit() {
   emit("edit-draft", props.activityId);
   emit("close");
 }
+
 function onClickCopyRejected() {
   emit("copy-rejected", props.activityId);
+  emit("close");
+}
+
+function onClickReinvite() {
+  emit("reinvite", props.activityId);
   emit("close");
 }
 
@@ -137,24 +163,18 @@ function updateMenuPosition() {
   if (!trigger) return;
 
   const rect = trigger.getBoundingClientRect();
-
-  // menu width = w-56 = 14rem = 224px
   const menuWidth = 224;
   const viewportPadding = 8;
 
-  // left: canh phải theo button, nhưng clamp trong viewport
   const desiredLeft = rect.right - menuWidth;
   const clampedLeft = Math.min(
     Math.max(viewportPadding, desiredLeft),
-    window.innerWidth - viewportPadding - menuWidth,
+    window.innerWidth - viewportPadding - menuWidth
   );
 
   menuLeft.value = clampedLeft;
 
-  // top: default mở xuống
   const defaultTop = rect.bottom + 8;
-
-  // nếu gần đáy -> flip lên
   const menuHeight = menuEl.value?.getBoundingClientRect().height ?? 220;
   const wouldOverflowBottom =
     defaultTop + menuHeight > window.innerHeight - viewportPadding;
@@ -171,7 +191,6 @@ function onDocPointerDown(event: Event) {
   const menu = menuEl.value;
   if (!target) return;
 
-  // click trong trigger hoặc trong menu => không đóng
   if (trigger?.contains(target)) return;
   if (menu?.contains(target)) return;
 
@@ -188,9 +207,8 @@ watch(
 
     document.addEventListener("pointerdown", onDocPointerDown, true);
     window.addEventListener("resize", updateMenuPosition);
-    // capture scroll ở mọi container (kể cả table scroll)
     window.addEventListener("scroll", updateMenuPosition, true);
-  },
+  }
 );
 
 watch(
@@ -200,7 +218,7 @@ watch(
     document.removeEventListener("pointerdown", onDocPointerDown, true);
     window.removeEventListener("resize", updateMenuPosition);
     window.removeEventListener("scroll", updateMenuPosition, true);
-  },
+  }
 );
 
 onBeforeUnmount(() => {

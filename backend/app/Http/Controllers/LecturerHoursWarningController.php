@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Lecturer\LecturerHoursWarningIndexRequest;
 use App\Http\Requests\Lecturer\LecturerHoursWarningSeenRequest;
+use App\Support\AcademicYearResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -182,24 +183,7 @@ class LecturerHoursWarningController extends Controller
 
     private function resolveAcademicYear(?int $academicYearId)
     {
-        if ($academicYearId) {
-            return DB::table('academic_years')
-                ->where('id', $academicYearId)
-                ->first();
-        }
-
-        $active = DB::table('academic_years')
-            ->where('is_active', 1)
-            ->orderByDesc('start_date')
-            ->first();
-
-        if ($active) {
-            return $active;
-        }
-
-        return DB::table('academic_years')
-            ->orderByDesc('start_date')
-            ->first();
+        return AcademicYearResolver::resolve($academicYearId);
     }
 
     private function requiredHours(int $academicYearId): float

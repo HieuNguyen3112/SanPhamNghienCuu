@@ -4,12 +4,31 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Lecturer\LecturerHoursCalculateIndexRequest;
 use App\Http\Requests\Lecturer\LecturerHoursCalculateSubmitRequest;
+use App\Services\Hours\HoursRecomputeService;
+use App\Services\Hours\HoursRuleResolver;
+use App\Support\StorageDownload;
+use App\Support\AcademicYearResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class LecturerHoursCalculateController extends Controller
 {
+    private const EVIDENCE_REQUIRED = true;
+    private HoursRuleResolver $hoursRuleResolver;
+    private HoursRecomputeService $hoursRecomputeService;
+
+    public function __construct(
+        HoursRuleResolver $hoursRuleResolver,
+        HoursRecomputeService $hoursRecomputeService
+    ) {
+        $this->hoursRuleResolver = $hoursRuleResolver;
+        $this->hoursRecomputeService = $hoursRecomputeService;
+    }
+
     public function index(LecturerHoursCalculateIndexRequest $request)
     {
         $lecturer = $this->resolveLecturer($request);
@@ -17,43 +36,52 @@ class LecturerHoursCalculateController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $assistantStageId = $this->resolveStageId('assistant');
-        $managerStageId = $this->resolveStageId('manager');
-        if (! $assistantStageId || ! $managerStageId) {
-            return response()->json(['message' => 'approval stages not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        $hoursStageId = $this->resolveStageId('hours');
+        $approvedStatusId = $this->resolveStatusId('approved');
+        if (! $hoursStageId || ! $approvedStatusId) {
+            return response()->json([
+                'message' => 'hours stage or approved status not configured',
+                'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $hoursStageId = $this->resolveStageId('hours') ?? 0;
-        $approvedStatusId = $this->resolveStatusId('approved');
-
         $filters = $request->validated();
+        $includeAllAcademicYears = (bool) ($filters['include_all_years'] ?? false);
+
+        $selectedAcademicYear = null;
+        if (! $includeAllAcademicYears) {
+            $selectedAcademicYear = $this->resolveAcademicYearForCalculate(
+                (int) $lecturer->id,
+                $approvedStatusId,
+                $filters['academic_year_id'] ?? null
+            );
+            if (! $selectedAcademicYear) {
+                return response()->json(['message' => 'academic year not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+
+        $selectedAcademicYearId = $selectedAcademicYear ? (int) $selectedAcademicYear->id : null;
+        $filters['academic_year_id'] = $selectedAcademicYearId;
+
+        // Đồng bộ lại giờ cho các công trình đã khoa duyệt để tránh dữ liệu cũ bị lệch quy tắc.
+        $this->hoursRecomputeService->recomputeApprovedActivitiesForLecturer(
+            (int) $lecturer->id,
+            $approvedStatusId,
+            $selectedAcademicYearId
+        );
+
         $page = max(1, (int) ($filters['page'] ?? 1));
         $perPage = max(1, min(100, (int) ($filters['per_page'] ?? 12)));
 
-        $query = $this->baseQuery($lecturer->id, $assistantStageId, $managerStageId, $hoursStageId, $approvedStatusId);
+        $query = $this->baseQuery($lecturer->id, $hoursStageId, $approvedStatusId);
         $this->applyFilters($query, $filters);
 
         $query->orderByDesc('ra.updated_at');
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
-        $items = collect($paginator->items())->map(function ($row) {
-            $hoursState = $this->resolveHoursRequestState($row->hours_approval_status ?? null);
-            return [
-                'activity_id' => (int) $row->activity_id,
-                'activity_code' => $row->activity_code,
-                'academic_year_code' => $row->academic_year_code,
-                'title' => $row->title,
-                'kind_name' => $row->kind_name,
-                'member_role_name' => $row->member_role_name,
-                'hours_assigned' => $row->hours_assigned !== null ? (float) $row->hours_assigned : null,
-                'activity_status_code' => $row->activity_status_code,
-                'assistant_approval_status' => $row->assistant_approval_status,
-                'manager_approval_status' => $row->manager_approval_status,
-                'hours_request_state' => $hoursState,
-            ];
-        })->all();
-
-        $approvedCount = $this->approvedCount($lecturer->id, $assistantStageId, $managerStageId, $approvedStatusId);
+        $items = collect($paginator->items())->map(fn ($row) => $this->mapListItem($row))->all();
+        $approvedCount = $this->approvedCount((int) $lecturer->id, $approvedStatusId, $selectedAcademicYearId);
+        $responseAcademicYear = $selectedAcademicYear ?: AcademicYearResolver::current();
 
         return response()->json([
             'success' => true,
@@ -69,6 +97,16 @@ class LecturerHoursCalculateController extends Controller
                 'summary' => [
                     'approved_count' => $approvedCount,
                 ],
+                'academic_year' => $responseAcademicYear
+                    ? [
+                        'id' => (int) $responseAcademicYear->id,
+                        'code' => (string) $responseAcademicYear->code,
+                        'start_date' => (string) $responseAcademicYear->start_date,
+                        'end_date' => (string) $responseAcademicYear->end_date,
+                        'is_filter_applied' => $selectedAcademicYear !== null,
+                        'include_all_years' => $includeAllAcademicYears,
+                    ]
+                    : null,
             ],
         ], Response::HTTP_OK);
     }
@@ -80,16 +118,18 @@ class LecturerHoursCalculateController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $assistantStageId = $this->resolveStageId('assistant');
-        $managerStageId = $this->resolveStageId('manager');
-        if (! $assistantStageId || ! $managerStageId) {
-            return response()->json(['message' => 'approval stages not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        $hoursStageId = $this->resolveStageId('hours');
+        $approvedStatusId = $this->resolveStatusId('approved');
+        if (! $hoursStageId || ! $approvedStatusId) {
+            return response()->json([
+                'message' => 'hours stage or approved status not configured',
+                'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $hoursStageId = $this->resolveStageId('hours') ?? 0;
-        $approvedStatusId = $this->resolveStatusId('approved');
+        $this->hoursRecomputeService->recomputeActivity((int) $activityId, now(), true);
 
-        $row = $this->detailQuery($lecturer->id, $assistantStageId, $managerStageId, $hoursStageId, $approvedStatusId)
+        $row = $this->detailQuery($lecturer->id, $hoursStageId, $approvedStatusId)
             ->where('ra.id', $activityId)
             ->first();
 
@@ -97,28 +137,56 @@ class LecturerHoursCalculateController extends Controller
             return response()->json(['message' => 'work not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $ruleSummary = $this->buildRuleSummary((int) $row->kind_id, $row->type_id ? (int) $row->type_id : null);
-
-        $payload = [
-            'activity_id' => (int) $row->activity_id,
-            'title' => $row->title,
-            'kind_name' => $row->kind_name,
-            'academic_year_code' => $row->academic_year_code,
-            'publication_or_unit' => $this->resolvePublicationOrUnit($row),
-            'member_role_name' => $row->member_role_name,
-            'contribution_share' => $row->contribution_share !== null ? (float) $row->contribution_share : null,
-            'rule_summary' => $ruleSummary,
-            'hours_for_lecturer' => $row->hours_assigned !== null ? (float) $row->hours_assigned : null,
-            'activity_status_code' => $row->activity_status_code,
-            'assistant_approval_status' => $row->assistant_approval_status,
-            'manager_approval_status' => $row->manager_approval_status,
-            'hours_request_state' => $this->resolveHoursRequestState($row->hours_approval_status ?? null),
-        ];
+        $hoursMeta = $this->resolveHoursMeta(
+            $row->hours_approval_status ?? null,
+            $row->hours_approval_note ?? null
+        );
+        $hoursValues = $this->resolveHoursValues(
+            (int) $row->kind_id,
+            $row->type_id ? (int) $row->type_id : null,
+            $row->academic_year_id ? (int) $row->academic_year_id : null,
+            $row->hours_assigned !== null ? (float) $row->hours_assigned : null,
+            $row->total_hours_calc !== null ? (float) $row->total_hours_calc : null,
+            $row->quantity !== null ? (int) $row->quantity : null,
+            $row->contribution_share !== null ? (float) $row->contribution_share : null,
+            $row->member_role_code ? (string) $row->member_role_code : null,
+            $row->member_count !== null ? (int) $row->member_count : 1,
+            $row->principal_count !== null ? (int) $row->principal_count : 0
+        );
 
         return response()->json([
             'success' => true,
             'message' => 'ok',
-            'data' => $payload,
+            'data' => [
+                'activity_id' => (int) $row->activity_id,
+                'title' => $row->title,
+                'kind_name' => $row->kind_name,
+                'academic_year_code' => $row->academic_year_code,
+                'publication_or_unit' => $this->resolvePublicationOrUnit($row),
+                'member_role_name' => $row->member_role_name,
+                'contribution_share' => $row->contribution_share !== null ? (float) $row->contribution_share : null,
+                'rule_summary' => $hoursValues['rule_summary'],
+                'conversion_rule_present' => $hoursValues['conversion_rule_present'],
+                'calculated_hours' => $hoursValues['calculated_hours'],
+                'proposed_hours' => $hoursValues['proposed_hours'],
+                'effective_hours_display' => $hoursValues['effective_hours_display'],
+                'hours_for_lecturer' => $hoursValues['effective_hours_display'],
+                'total_hours_activity' => $hoursValues['total_hours_activity'],
+                'member_hours' => $hoursValues['member_hours'],
+                'formula_explanation' => $hoursValues['formula_explanation'],
+                'can_edit_proposed_hours' => $hoursValues['can_edit_proposed_hours'],
+                'evidence_required' => self::EVIDENCE_REQUIRED,
+                'deadline_flags' => [
+                    'submission_deadline_enforced' => false,
+                    'approval_deadline_enforced' => false,
+                ],
+                'activity_status_code' => $row->activity_status_code,
+                'hours_request_state' => $hoursMeta['state'],
+                'hours_rejection_reason' => $hoursMeta['rejection_reason'],
+                'next_action_code' => $hoursMeta['next_action_code'],
+                'next_action_text' => $hoursMeta['next_action_text'],
+                'evidence_files' => $this->fetchEvidenceFiles((int) $row->activity_id),
+            ],
         ], Response::HTTP_OK);
     }
 
@@ -129,21 +197,31 @@ class LecturerHoursCalculateController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $assistantStageId = $this->resolveStageId('assistant');
-        $managerStageId = $this->resolveStageId('manager');
         $hoursStageId = $this->resolveStageId('hours');
         $approvedStatusId = $this->resolveStatusId('approved');
-
-        if (! $assistantStageId || ! $managerStageId || ! $hoursStageId) {
-            return response()->json(['message' => 'approval stages not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if (! $hoursStageId || ! $approvedStatusId) {
+            return response()->json([
+                'message' => 'hours stage or approved status not configured',
+                'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $activityIds = array_values(array_unique($request->validated()['activity_ids']));
-        $eligibleIds = $this->eligibleActivityIds($lecturer->id, $assistantStageId, $managerStageId, $approvedStatusId, $activityIds);
+        $eligibleIds = $this->eligibleActivityIds($lecturer->id, $approvedStatusId, $activityIds);
+        $ineligibleIds = array_values(array_diff($activityIds, $eligibleIds));
+
+        if (! empty($ineligibleIds)) {
+            return response()->json([
+                'message' => 'Some works are not eligible. Only faculty-approved works can be submitted for hours review.',
+                'code' => 'WORK_NOT_FACULTY_APPROVED',
+                'invalid_activity_ids' => $ineligibleIds,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         if (empty($eligibleIds)) {
             return response()->json([
                 'message' => 'no eligible works found',
+                'code' => 'NO_ELIGIBLE_WORKS',
                 'data' => [
                     'submitted_count' => 0,
                     'skipped_count' => count($activityIds),
@@ -151,11 +229,81 @@ class LecturerHoursCalculateController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $now = now();
-        $submittedCount = 0;
-        $skippedCount = 0;
+        $this->hoursRecomputeService->recomputeActivities($eligibleIds, now());
 
-        DB::transaction(function () use ($eligibleIds, $hoursStageId, $now, &$submittedCount, &$skippedCount, $lecturer) {
+        $rows = $this->baseQuery((int) $lecturer->id, $hoursStageId, $approvedStatusId)
+            ->whereIn('ra.id', $eligibleIds)
+            ->get()
+            ->keyBy('activity_id');
+
+        $evidenceCountByActivity = DB::table('evidence_files')
+            ->selectRaw('activity_id, COUNT(*) as total')
+            ->whereIn('activity_id', $eligibleIds)
+            ->groupBy('activity_id')
+            ->pluck('total', 'activity_id');
+
+        $missingHours = [];
+        $missingEvidence = [];
+
+        foreach ($eligibleIds as $activityId) {
+            $row = $rows->get($activityId);
+            if (! $row) {
+                $missingHours[] = [
+                    'activity_id' => (int) $activityId,
+                    'reason' => 'ACTIVITY_CONTEXT_NOT_FOUND',
+                ];
+                continue;
+            }
+
+            $hoursValues = $this->resolveHoursValues(
+                (int) $row->kind_id,
+                $row->type_id ? (int) $row->type_id : null,
+                $row->academic_year_id ? (int) $row->academic_year_id : null,
+                $row->hours_assigned !== null ? (float) $row->hours_assigned : null,
+                $row->total_hours_calc !== null ? (float) $row->total_hours_calc : null,
+                $row->quantity !== null ? (int) $row->quantity : null,
+                $row->contribution_share !== null ? (float) $row->contribution_share : null,
+                $row->member_role_code ? (string) $row->member_role_code : null,
+                $row->member_count !== null ? (int) $row->member_count : 1,
+                $row->principal_count !== null ? (int) $row->principal_count : 0
+            );
+
+            if ($hoursValues['effective_hours_display'] === null) {
+                $missingHours[] = [
+                    'activity_id' => (int) $activityId,
+                    'conversion_rule_present' => (bool) $hoursValues['conversion_rule_present'],
+                    'rule_summary' => (string) $hoursValues['rule_summary'],
+                ];
+                continue;
+            }
+
+            $evidenceCount = (int) ($evidenceCountByActivity[$activityId] ?? 0);
+            if ($evidenceCount === 0) {
+                $missingEvidence[] = (int) $activityId;
+            }
+        }
+
+        if (! empty($missingHours)) {
+            return response()->json([
+                'message' => 'Một số công trình chưa có dữ liệu tính giờ tự động theo quy tắc.',
+                'code' => 'HOURS_VALUE_REQUIRED',
+                'invalid_items' => $missingHours,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! empty($missingEvidence)) {
+            return response()->json([
+                'message' => 'Mỗi công trình phải có ít nhất một minh chứng PDF trước khi gửi duyệt giờ.',
+                'code' => 'EVIDENCE_REQUIRED',
+                'invalid_activity_ids' => $missingEvidence,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $now = now();
+        $submittedIds = [];
+        $skipped = [];
+
+        DB::transaction(function () use ($eligibleIds, $hoursStageId, $now, &$submittedIds, &$skipped) {
             $existing = DB::table('activity_approvals')
                 ->where('stage_id', $hoursStageId)
                 ->whereIn('activity_id', $eligibleIds)
@@ -175,7 +323,7 @@ class LecturerHoursCalculateController extends Controller
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);
-                    $submittedCount++;
+                    $submittedIds[] = $activityId;
                     continue;
                 }
 
@@ -189,11 +337,14 @@ class LecturerHoursCalculateController extends Controller
                             'note' => null,
                             'updated_at' => $now,
                         ]);
-                    $submittedCount++;
+                    $submittedIds[] = $activityId;
                     continue;
                 }
 
-                $skippedCount++;
+                $skipped[] = [
+                    'activity_id' => (int) $activityId,
+                    'status' => (string) $row->status,
+                ];
             }
         });
 
@@ -201,16 +352,305 @@ class LecturerHoursCalculateController extends Controller
             'success' => true,
             'message' => 'submitted',
             'data' => [
-                'submitted_count' => $submittedCount,
-                'skipped_count' => $skippedCount,
+                'submitted_count' => count($submittedIds),
+                'skipped_count' => count($skipped),
+                'submitted_activity_ids' => array_values($submittedIds),
+                'skipped' => $skipped,
             ],
         ], Response::HTTP_OK);
     }
 
+    public function updateProposedHours(Request $request, int $activityId)
+    {
+        return response()->json([
+            'message' => 'Hệ thống chỉ hỗ trợ tính giờ tự động theo quy tắc đã cấu hình.',
+            'code' => 'AUTO_CALC_ONLY',
+        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    public function listEvidence(Request $request, int $activityId)
+    {
+        $lecturer = $this->resolveLecturer($request);
+        if (! $lecturer) {
+            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $approvedStatusId = $this->resolveStatusId('approved');
+        if (! $approvedStatusId) {
+            return response()->json([
+                'message' => 'approved status not configured',
+                'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $activity = $this->resolveAccessibleApprovedActivity((int) $lecturer->id, $activityId, $approvedStatusId);
+        if (! $activity) {
+            return response()->json([
+                'message' => 'work not found',
+                'code' => 'WORK_NOT_FOUND',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'ok',
+            'data' => $this->fetchEvidenceFiles($activityId),
+        ], Response::HTTP_OK);
+    }
+
+    public function uploadEvidence(Request $request, int $activityId)
+    {
+        $lecturer = $this->resolveLecturer($request);
+        if (! $lecturer) {
+            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $hoursStageId = $this->resolveStageId('hours');
+        $approvedStatusId = $this->resolveStatusId('approved');
+        if (! $hoursStageId || ! $approvedStatusId) {
+            return response()->json([
+                'message' => 'hours stage or approved status not configured',
+                'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $activity = $this->resolveAccessibleApprovedActivity((int) $lecturer->id, $activityId, $approvedStatusId);
+        if (! $activity) {
+            return response()->json([
+                'message' => 'work not found',
+                'code' => 'WORK_NOT_FOUND',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $hoursStatus = $this->resolveHoursApprovalStatus($activityId, $hoursStageId);
+        if ($hoursStatus === 'approved') {
+            return response()->json([
+                'message' => 'evidence is locked because hours were already approved',
+                'code' => 'EVIDENCE_LOCKED_BY_APPROVED_HOURS',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'file' => ['required', 'file', 'max:10240', 'mimes:pdf'],
+                'file_type_id' => ['required', 'integer', 'exists:evidence_file_types,id'],
+            ],
+            [
+                'file.required' => 'Vui lòng chọn tệp minh chứng.',
+                'file.file' => 'Tệp minh chứng không hợp lệ.',
+                'file.max' => 'Dung lượng tệp minh chứng không được vượt quá 10MB.',
+                'file.mimes' => 'Minh chứng phải là tệp PDF.',
+                'file_type_id.required' => 'Vui lòng chọn loại minh chứng.',
+                'file_type_id.integer' => 'Loại minh chứng không hợp lệ.',
+                'file_type_id.exists' => 'Loại minh chứng không tồn tại.',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Dữ liệu không hợp lệ.',
+                'code' => 'VALIDATION_FAILED',
+                'errors' => $validator->errors(),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        /** @var \Illuminate\Http\UploadedFile $file */
+        $file = $request->file('file');
+        $contentSha256 = hash_file('sha256', $file->getRealPath());
+        // Giữ chống trùng trong cùng công trình, nhưng cho phép cùng một PDF dùng cho công trình khác.
+        $scopedSha256 = hash('sha256', $activityId . '|' . $contentSha256);
+
+        $existingByHash = DB::table('evidence_files')
+            ->where('activity_id', $activityId)
+            ->whereIn('sha256', [$contentSha256, $scopedSha256])
+            ->first();
+        if ($existingByHash) {
+            return response()->json([
+                'success' => true,
+                'message' => 'already uploaded',
+                'data' => $this->mapEvidenceRow($existingByHash),
+            ], Response::HTTP_OK);
+        }
+
+        $disk = (string) config('filesystems.default', 'local');
+        if (! config("filesystems.disks.{$disk}")) {
+            $disk = 'local';
+        }
+
+        $originalName = $file->getClientOriginalName() ?: ('evidence-' . Str::uuid() . '.bin');
+        $nameWithoutExt = pathinfo($originalName, PATHINFO_FILENAME);
+        $ext = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
+        $safeName = Str::slug($nameWithoutExt);
+        if ($safeName === '') {
+            $safeName = 'evidence';
+        }
+
+        $filename = Str::uuid()->toString() . '-' . $safeName . ($ext !== '' ? '.' . $ext : '');
+        $directory = 'evidence/hours/' . now()->format('Y/m') . '/activity-' . $activityId;
+        $storedPath = $file->storeAs($directory, $filename, $disk);
+
+        if (! $storedPath) {
+            return response()->json([
+                'message' => 'failed to store evidence file',
+                'code' => 'EVIDENCE_STORE_FAILED',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $now = now();
+        $id = DB::table('evidence_files')->insertGetId([
+            'activity_id' => $activityId,
+            'file_type_id' => (int) $request->input('file_type_id'),
+            'disk' => $disk,
+            'path' => $storedPath,
+            'original_name' => $originalName,
+            'mime_type' => (string) ($file->getClientMimeType() ?: 'application/octet-stream'),
+            'size_bytes' => (int) $file->getSize(),
+            'sha256' => $scopedSha256,
+            'uploaded_by_user_id' => (int) $request->user()->id,
+            'uploaded_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $saved = DB::table('evidence_files as ef')
+            ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
+            ->where('ef.id', $id)
+            ->select([
+                'ef.id',
+                'ef.activity_id',
+                'ef.file_type_id',
+                'ef.disk',
+                'ef.path',
+                'ef.original_name',
+                'ef.mime_type',
+                'ef.size_bytes',
+                'ef.sha256',
+                'ef.uploaded_by_user_id',
+                'ef.uploaded_at',
+                'ef.created_at',
+                'ef.updated_at',
+                'eft.name as file_type_name',
+            ])
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'uploaded',
+            'data' => $saved ? $this->mapEvidenceRow($saved) : null,
+        ], Response::HTTP_CREATED);
+    }
+
+    public function deleteEvidence(Request $request, int $evidenceId)
+    {
+        $lecturer = $this->resolveLecturer($request);
+        if (! $lecturer) {
+            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $hoursStageId = $this->resolveStageId('hours');
+        if (! $hoursStageId) {
+            return response()->json([
+                'message' => 'hours stage not configured',
+                'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $evidence = DB::table('evidence_files as ef')
+            ->join('research_activities as ra', 'ef.activity_id', '=', 'ra.id')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturer) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', (int) $lecturer->id);
+            })
+            ->where('ef.id', $evidenceId)
+            ->where(function ($query) use ($lecturer) {
+                $query->where('ra.owner_lecturer_id', (int) $lecturer->id)
+                    ->orWhere('ram.confirmation_status', 'accepted');
+            })
+            ->select([
+                'ef.id',
+                'ef.activity_id',
+                'ef.disk',
+                'ef.path',
+                'ef.original_name',
+            ])
+            ->first();
+
+        if (! $evidence) {
+            return response()->json([
+                'message' => 'evidence not found',
+                'code' => 'EVIDENCE_NOT_FOUND',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $hoursStatus = $this->resolveHoursApprovalStatus((int) $evidence->activity_id, $hoursStageId);
+        if ($hoursStatus === 'approved') {
+            return response()->json([
+                'message' => 'evidence is locked because hours were already approved',
+                'code' => 'EVIDENCE_LOCKED_BY_APPROVED_HOURS',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        DB::table('evidence_files')->where('id', $evidenceId)->delete();
+
+        $disk = $evidence->disk ?: 'local';
+        if (config("filesystems.disks.{$disk}") && Storage::disk($disk)->exists($evidence->path)) {
+            Storage::disk($disk)->delete($evidence->path);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'deleted',
+            'data' => [
+                'evidence_id' => (int) $evidenceId,
+                'activity_id' => (int) $evidence->activity_id,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function downloadEvidence(Request $request, int $evidenceId)
+    {
+        $lecturer = $this->resolveLecturer($request);
+        if (! $lecturer) {
+            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $file = DB::table('evidence_files as ef')
+            ->join('research_activities as ra', 'ef.activity_id', '=', 'ra.id')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturer) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', (int) $lecturer->id);
+            })
+            ->where('ef.id', $evidenceId)
+            ->where(function ($query) use ($lecturer) {
+                $query->where('ra.owner_lecturer_id', (int) $lecturer->id)
+                    ->orWhere('ram.confirmation_status', 'accepted');
+            })
+            ->select([
+                'ef.id',
+                'ef.disk',
+                'ef.path',
+                'ef.original_name',
+                'ef.mime_type',
+            ])
+            ->first();
+
+        if (! $file) {
+            return response()->json(['message' => 'evidence not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $disk = $file->disk ?: 'local';
+        $path = $file->path;
+        $filename = $file->original_name ?: ('evidence-' . $file->id);
+
+        return StorageDownload::stream($disk, $path, $filename, [
+            'Content-Type' => $file->mime_type ?: 'application/octet-stream',
+        ]);
+    }
+
     private function resolveLecturer(Request $request)
     {
-        $user = $request->user();
-        return $user?->lecturer;
+        return $request->user()?->lecturer;
     }
 
     private function resolveStageId(string $code): ?int
@@ -225,65 +665,84 @@ class LecturerHoursCalculateController extends Controller
         return $id ? (int) $id : null;
     }
 
-    private function baseQuery(
-        int $lecturerId,
-        int $assistantStageId,
-        int $managerStageId,
-        int $hoursStageId,
-        ?int $approvedStatusId
-    ) {
-        return DB::table('research_activity_members as ram')
-            ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
+    private function baseQuery(int $lecturerId, int $hoursStageId, int $approvedStatusId)
+    {
+        $evidenceCountSubQuery = DB::table('evidence_files')
+            ->selectRaw('activity_id, COUNT(*) as evidence_count')
+            ->groupBy('activity_id');
+
+        $memberStatsSubQuery = DB::table('research_activity_members as ram_stats')
+            ->join('research_activities as ra_stats', 'ram_stats.activity_id', '=', 'ra_stats.id')
+            ->leftJoin('member_roles as mr_stats', 'ram_stats.member_role_id', '=', 'mr_stats.id')
+            ->selectRaw("
+                ram_stats.activity_id,
+                SUM(CASE
+                    WHEN ram_stats.confirmation_status = 'accepted'
+                        OR ram_stats.lecturer_id = ra_stats.owner_lecturer_id
+                    THEN 1 ELSE 0
+                END) as member_count,
+                SUM(CASE
+                    WHEN (
+                        ram_stats.confirmation_status = 'accepted'
+                        OR ram_stats.lecturer_id = ra_stats.owner_lecturer_id
+                    ) AND mr_stats.code IN ('principal', 'chief_editor')
+                    THEN 1 ELSE 0
+                END) as principal_count
+            ")
+            ->groupBy('ram_stats.activity_id');
+
+        return DB::table('research_activities as ra')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturerId);
+            })
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
             ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
-            ->leftJoin('activity_approvals as aa_assistant', function ($join) use ($assistantStageId) {
-                $join->on('aa_assistant.activity_id', '=', 'ra.id')
-                    ->where('aa_assistant.stage_id', '=', $assistantStageId);
+            ->leftJoinSub($evidenceCountSubQuery, 'efc', function ($join) {
+                $join->on('efc.activity_id', '=', 'ra.id');
             })
-            ->leftJoin('activity_approvals as aa_manager', function ($join) use ($managerStageId) {
-                $join->on('aa_manager.activity_id', '=', 'ra.id')
-                    ->where('aa_manager.stage_id', '=', $managerStageId);
+            ->leftJoinSub($memberStatsSubQuery, 'rms', function ($join) {
+                $join->on('rms.activity_id', '=', 'ra.id');
             })
             ->leftJoin('activity_approvals as aa_hours', function ($join) use ($hoursStageId) {
                 $join->on('aa_hours.activity_id', '=', 'ra.id')
                     ->where('aa_hours.stage_id', '=', $hoursStageId);
             })
-            ->where('ram.lecturer_id', $lecturerId)
-            ->where(function ($query) {
-                $query->whereColumn('ra.owner_lecturer_id', 'ram.lecturer_id')
+            ->where(function ($query) use ($lecturerId) {
+                $query->where('ra.owner_lecturer_id', $lecturerId)
                     ->orWhere('ram.confirmation_status', 'accepted');
             })
             ->where('ra.status_id', $approvedStatusId)
-
             ->select([
                 'ra.id as activity_id',
                 'ra.activity_code',
                 'ra.title',
+                'ra.total_hours_calc',
+                'ra.quantity',
                 'ra.kind_id',
                 'ra.type_id',
                 'ak.name as kind_name',
                 'mr.name as member_role_name',
+                'mr.code as member_role_code',
                 'ram.hours_assigned',
                 'ram.contribution_share',
                 'ast.code as activity_status_code',
-                'aa_assistant.status as assistant_approval_status',
-                'aa_manager.status as manager_approval_status',
                 'aa_hours.status as hours_approval_status',
+                'aa_hours.note as hours_approval_note',
+                DB::raw('COALESCE(efc.evidence_count, 0) as evidence_count'),
+                DB::raw('COALESCE(rms.member_count, 1) as member_count'),
+                DB::raw('COALESCE(rms.principal_count, 0) as principal_count'),
+                'ay.id as academic_year_id',
                 'ay.code as academic_year_code',
                 'ra.updated_at',
             ]);
     }
 
-    private function detailQuery(
-        int $lecturerId,
-        int $assistantStageId,
-        int $managerStageId,
-        int $hoursStageId,
-        ?int $approvedStatusId
-    ) {
-        return $this->baseQuery($lecturerId, $assistantStageId, $managerStageId, $hoursStageId, $approvedStatusId)
+    private function detailQuery(int $lecturerId, int $hoursStageId, int $approvedStatusId)
+    {
+        return $this->baseQuery($lecturerId, $hoursStageId, $approvedStatusId)
             ->leftJoin('paper_details as pd', 'ra.id', '=', 'pd.activity_id')
             ->leftJoin('book_details as bd', 'ra.id', '=', 'bd.activity_id')
             ->leftJoin('project_details as prd', 'ra.id', '=', 'prd.activity_id')
@@ -299,12 +758,21 @@ class LecturerHoursCalculateController extends Controller
 
     private function applyFilters($query, array $filters): void
     {
+        if (! empty($filters['academic_year_id'])) {
+            $query->where('ra.academic_year_id', (int) $filters['academic_year_id']);
+        }
+
         $status = $filters['status'] ?? null;
         if ($status && $status !== 'all') {
-            if ($status === 'not_submitted') {
+            $normalized = strtolower(trim((string) $status));
+            if (in_array($normalized, ['not_submitted', 'hours_not_submitted'], true)) {
                 $query->whereNull('aa_hours.status');
-            } else {
-                $query->where('aa_hours.status', $status);
+            } elseif (in_array($normalized, ['pending', 'hours_pending_faculty'], true)) {
+                $query->where('aa_hours.status', 'pending');
+            } elseif (in_array($normalized, ['approved', 'hours_approved'], true)) {
+                $query->where('aa_hours.status', 'approved');
+            } elseif (in_array($normalized, ['rejected', 'hours_rejected'], true)) {
+                $query->where('aa_hours.status', 'rejected');
             }
         }
 
@@ -317,93 +785,217 @@ class LecturerHoursCalculateController extends Controller
         }
     }
 
-    private function approvedCount(
-        int $lecturerId,
-        int $assistantStageId,
-        int $managerStageId,
-        ?int $approvedStatusId
-    ): int {
-        $query = DB::table('research_activity_members as ram')
-            ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
-            ->leftJoin('activity_approvals as aa_assistant', function ($join) use ($assistantStageId) {
-                $join->on('aa_assistant.activity_id', '=', 'ra.id')
-                    ->where('aa_assistant.stage_id', '=', $assistantStageId);
+    private function approvedCount(int $lecturerId, int $approvedStatusId, ?int $academicYearId = null): int
+    {
+        $query = DB::table('research_activities as ra')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturerId);
             })
-            ->leftJoin('activity_approvals as aa_manager', function ($join) use ($managerStageId) {
-                $join->on('aa_manager.activity_id', '=', 'ra.id')
-                    ->where('aa_manager.stage_id', '=', $managerStageId);
-            })
-            ->where('ram.lecturer_id', $lecturerId)
-            ->where(function ($query) {
-                $query->whereColumn('ra.owner_lecturer_id', 'ram.lecturer_id')
+            ->where(function ($query) use ($lecturerId) {
+                $query->where('ra.owner_lecturer_id', $lecturerId)
                     ->orWhere('ram.confirmation_status', 'accepted');
             })
-            ->where(function ($query) use ($approvedStatusId) {
-                $query->where(function ($sub) {
-                    $sub->where('aa_assistant.status', 'approved')
-                        ->where('aa_manager.status', 'approved');
-                });
-                if ($approvedStatusId) {
-                    $query->orWhere('ra.status_id', $approvedStatusId);
-                }
-            });
+            ->where('ra.status_id', $approvedStatusId)
+            ->distinct('ra.id');
 
-        return (int) $query->distinct('ra.id')->count('ra.id');
-    }
-
-    private function resolveHoursRequestState(?string $hoursStatus): string
-    {
-        if (! $hoursStatus) {
-            return 'eligible';
+        if ($academicYearId) {
+            $query->where('ra.academic_year_id', $academicYearId);
         }
 
-        return match ($hoursStatus) {
-            'approved' => 'hours_approved',
-            'rejected' => 'rejected',
-            default => 'submitted',
-        };
+        return (int) $query->count('ra.id');
     }
 
-    private function eligibleActivityIds(
-        int $lecturerId,
-        int $assistantStageId,
-        int $managerStageId,
-        ?int $approvedStatusId,
-        array $activityIds
-    ): array {
+    private function eligibleActivityIds(int $lecturerId, int $approvedStatusId, array $activityIds): array
+    {
         if (empty($activityIds)) {
             return [];
         }
 
-        return DB::table('research_activity_members as ram')
-            ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
-            ->leftJoin('activity_approvals as aa_assistant', function ($join) use ($assistantStageId) {
-                $join->on('aa_assistant.activity_id', '=', 'ra.id')
-                    ->where('aa_assistant.stage_id', '=', $assistantStageId);
+        return DB::table('research_activities as ra')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturerId);
             })
-            ->leftJoin('activity_approvals as aa_manager', function ($join) use ($managerStageId) {
-                $join->on('aa_manager.activity_id', '=', 'ra.id')
-                    ->where('aa_manager.stage_id', '=', $managerStageId);
-            })
-            ->where('ram.lecturer_id', $lecturerId)
-            ->where(function ($query) {
-                $query->whereColumn('ra.owner_lecturer_id', 'ram.lecturer_id')
+            ->where(function ($query) use ($lecturerId) {
+                $query->where('ra.owner_lecturer_id', $lecturerId)
                     ->orWhere('ram.confirmation_status', 'accepted');
             })
+            ->where('ra.status_id', $approvedStatusId)
             ->whereIn('ra.id', $activityIds)
-            ->where(function ($query) use ($approvedStatusId) {
-                $query->where(function ($sub) {
-                    $sub->where('aa_assistant.status', 'approved')
-                        ->where('aa_manager.status', 'approved');
-                });
-                if ($approvedStatusId) {
-                    $query->orWhere('ra.status_id', $approvedStatusId);
-                }
-            })
             ->distinct()
             ->pluck('ra.id')
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->all();
+    }
+
+    private function resolveAcademicYearForCalculate(
+        int $lecturerId,
+        int $approvedStatusId,
+        ?int $requestedAcademicYearId
+    ): ?object {
+        if ($requestedAcademicYearId) {
+            return AcademicYearResolver::resolve($requestedAcademicYearId);
+        }
+
+        $currentAcademicYear = AcademicYearResolver::current();
+        if ($currentAcademicYear) {
+            $hasCurrentYearData = DB::table('research_activities as ra')
+                ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                    $join->on('ram.activity_id', '=', 'ra.id')
+                        ->where('ram.lecturer_id', '=', $lecturerId);
+                })
+                ->where('ra.status_id', $approvedStatusId)
+                ->where('ra.academic_year_id', (int) $currentAcademicYear->id)
+                ->where(function ($query) use ($lecturerId) {
+                    $query->where('ra.owner_lecturer_id', $lecturerId)
+                        ->orWhere('ram.confirmation_status', 'accepted');
+                })
+                ->exists();
+
+            if ($hasCurrentYearData) {
+                return $currentAcademicYear;
+            }
+        }
+
+        $yearIdWithData = DB::table('research_activities as ra')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturerId);
+            })
+            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+            ->where('ra.status_id', $approvedStatusId)
+            ->where(function ($query) use ($lecturerId) {
+                $query->where('ra.owner_lecturer_id', $lecturerId)
+                    ->orWhere('ram.confirmation_status', 'accepted');
+            })
+            ->orderByDesc('ay.is_active')
+            ->orderByDesc('ay.start_date')
+            ->value('ra.academic_year_id');
+
+        if ($yearIdWithData) {
+            $resolved = AcademicYearResolver::resolve((int) $yearIdWithData);
+            if ($resolved) {
+                return $resolved;
+            }
+        }
+
+        return AcademicYearResolver::current();
+    }
+
+    private function mapListItem(object $row): array
+    {
+        $hoursMeta = $this->resolveHoursMeta(
+            $row->hours_approval_status ?? null,
+            $row->hours_approval_note ?? null
+        );
+        $hoursValues = $this->resolveHoursValues(
+            (int) $row->kind_id,
+            $row->type_id ? (int) $row->type_id : null,
+            $row->academic_year_id ? (int) $row->academic_year_id : null,
+            $row->hours_assigned !== null ? (float) $row->hours_assigned : null,
+            $row->total_hours_calc !== null ? (float) $row->total_hours_calc : null,
+            $row->quantity !== null ? (int) $row->quantity : null,
+            $row->contribution_share !== null ? (float) $row->contribution_share : null,
+            $row->member_role_code ? (string) $row->member_role_code : null,
+            $row->member_count !== null ? (int) $row->member_count : 1,
+            $row->principal_count !== null ? (int) $row->principal_count : 0
+        );
+
+        return [
+            'activity_id' => (int) $row->activity_id,
+            'activity_code' => $row->activity_code,
+            'academic_year_code' => $row->academic_year_code,
+            'title' => $row->title,
+            'kind_name' => $row->kind_name,
+            'member_role_name' => $row->member_role_name,
+            'hours_assigned' => $row->hours_assigned !== null ? (float) $row->hours_assigned : null,
+            'rule_summary' => $hoursValues['rule_summary'],
+            'conversion_rule_present' => $hoursValues['conversion_rule_present'],
+            'calculated_hours' => $hoursValues['calculated_hours'],
+            'proposed_hours' => $hoursValues['proposed_hours'],
+            'effective_hours_display' => $hoursValues['effective_hours_display'],
+            'total_hours_activity' => $hoursValues['total_hours_activity'],
+            'member_hours' => $hoursValues['member_hours'],
+            'formula_explanation' => $hoursValues['formula_explanation'],
+            'can_edit_proposed_hours' => $hoursValues['can_edit_proposed_hours'],
+            'evidence_required' => self::EVIDENCE_REQUIRED,
+            'deadline_flags' => [
+                'submission_deadline_enforced' => false,
+                'approval_deadline_enforced' => false,
+            ],
+            'activity_status_code' => $row->activity_status_code,
+            'hours_request_state' => $hoursMeta['state'],
+            'hours_rejection_reason' => $hoursMeta['rejection_reason'],
+            'next_action_code' => $hoursMeta['next_action_code'],
+            'next_action_text' => $hoursMeta['next_action_text'],
+            'evidence_count' => (int) ($row->evidence_count ?? 0),
+        ];
+    }
+
+    private function resolveHoursMeta(?string $hoursStatus, ?string $note): array
+    {
+        $normalized = $hoursStatus ? strtolower(trim($hoursStatus)) : null;
+
+        if (! $normalized) {
+            return [
+                'state' => 'hours_not_submitted',
+                'rejection_reason' => null,
+                'next_action_code' => 'submit_hours',
+                'next_action_text' => 'Tải tối thiểu 1 minh chứng PDF và bấm Gửi duyệt giờ',
+            ];
+        }
+
+        if ($normalized === 'approved') {
+            return [
+                'state' => 'hours_approved',
+                'rejection_reason' => null,
+                'next_action_code' => 'none',
+                'next_action_text' => 'Đã duyệt giờ',
+            ];
+        }
+
+        if ($normalized === 'rejected') {
+            return [
+                'state' => 'hours_rejected',
+                'rejection_reason' => $this->resolveRejectionReason($note),
+                'next_action_code' => 'resubmit_hours',
+                'next_action_text' => 'Khoa từ chối giờ',
+            ];
+        }
+
+        return [
+            'state' => 'hours_pending_faculty',
+            'rejection_reason' => null,
+            'next_action_code' => 'wait_faculty',
+            'next_action_text' => 'Chờ khoa duyệt giờ',
+        ];
+    }
+
+    private function resolveRejectionReason(?string $note): ?string
+    {
+        if (! $note || trim($note) === '') {
+            return null;
+        }
+
+        $decoded = json_decode($note, true);
+        if (is_array($decoded)) {
+            $reasonDetail = isset($decoded['reason_detail']) ? trim((string) $decoded['reason_detail']) : '';
+            if ($reasonDetail !== '') {
+                return $reasonDetail;
+            }
+
+            $reasonCode = isset($decoded['reason_code']) ? trim((string) $decoded['reason_code']) : '';
+            return match ($reasonCode) {
+                'hours_not_reasonable' => 'Giờ quy đổi chưa hợp lý',
+                'work_not_eligible' => 'Công trình chưa đủ điều kiện',
+                'missing_evidence' => 'Thiếu minh chứng',
+                'other' => 'Lý do khác',
+                default => $reasonCode !== '' ? $reasonCode : null,
+            };
+        }
+
+        return trim($note);
     }
 
     private function resolvePublicationOrUnit(object $row): string
@@ -425,51 +1017,296 @@ class LecturerHoursCalculateController extends Controller
         return '-';
     }
 
-    private function buildRuleSummary(int $kindId, ?int $typeId): string
+    private function resolveHoursValues(
+        int $kindId,
+        ?int $typeId,
+        ?int $academicYearId,
+        ?float $hoursAssigned,
+        ?float $totalHoursCalc = null,
+        ?int $quantity = null,
+        ?float $contributionShare = null,
+        ?string $memberRoleCode = null,
+        ?int $memberCount = null,
+        ?int $principalCount = null
+    ): array
     {
-        $ruleQuery = DB::table('hour_rules')
-            ->where('kind_id', $kindId)
-            ->where('is_active', 1)
-            ->where(function ($query) use ($typeId) {
-                if ($typeId === null) {
-                    $query->whereNull('type_id');
-                } else {
-                    $query->where('type_id', $typeId);
-                }
-            })
-            ->where('effective_from', '<=', now()->toDateString())
-            ->where(function ($query) {
-                $query->whereNull('effective_to')
-                    ->orWhere('effective_to', '>=', now()->toDateString());
-            })
-            ->orderByDesc('effective_from')
-            ->orderByDesc('version');
+        $rule = $this->hoursRuleResolver->resolveForActivity($kindId, $typeId, $academicYearId);
+        $rulePresent = $rule !== null;
+        $ruleSnapshot = $this->calculateRuleSnapshot(
+            $rule,
+            $quantity,
+            $memberCount,
+            $principalCount,
+            $memberRoleCode
+        );
 
-        $rule = $ruleQuery->first();
-        if (! $rule) {
-            return 'Rule not configured.';
+        $totalHoursActivity = $totalHoursCalc ?? $ruleSnapshot['total_hours_activity'];
+        $memberHours = $hoursAssigned;
+
+        if ($memberHours === null && $totalHoursActivity !== null && $contributionShare !== null) {
+            $memberHours = round($totalHoursActivity * $contributionShare, 2);
+        }
+        if ($memberHours === null) {
+            $memberHours = $ruleSnapshot['member_hours'];
         }
 
-        $parts = [
-            'distribution=' . $rule->distribution_strategy,
+        $memberSharePercent = null;
+        if ($totalHoursActivity !== null && $totalHoursActivity > 0 && $memberHours !== null) {
+            $memberSharePercent = round(($memberHours / $totalHoursActivity) * 100, 2);
+        } elseif ($contributionShare !== null) {
+            $memberSharePercent = round($contributionShare * 100, 2);
+        }
+
+        $formulaExplanation = [
+            'rule_name' => $ruleSnapshot['rule_name'],
+            'distribution_strategy' => $ruleSnapshot['distribution_strategy'],
+            'base_hours' => $ruleSnapshot['base_hours'],
+            'modifiers' => $ruleSnapshot['modifiers'],
+            'total_hours_activity' => $totalHoursActivity,
+            'member_hours' => $memberHours,
+            'member_share_percent' => $memberSharePercent,
+            'member_role_code' => $memberRoleCode,
+            'contribution_share' => $contributionShare,
         ];
 
-        if ($rule->hours_total_per_activity !== null) {
-            $parts[] = 'total=' . $rule->hours_total_per_activity;
-        }
-        if ($rule->hours_per_occurrence !== null) {
-            $parts[] = 'per_occurrence=' . $rule->hours_per_occurrence;
-        }
-        if ($rule->principal_fraction !== null) {
-            $parts[] = 'principal_fraction=' . $rule->principal_fraction;
-        }
-        if ($rule->others_fraction_total !== null) {
-            $parts[] = 'others_fraction_total=' . $rule->others_fraction_total;
-        }
-        if ($rule->max_occurrences_per_year !== null) {
-            $parts[] = 'max_occurrences=' . $rule->max_occurrences_per_year;
+        $calculatedHours = $rulePresent ? $memberHours : null;
+        $proposedHours = null;
+        $effectiveHours = $calculatedHours;
+
+        return [
+            'rule_summary' => $this->hoursRuleResolver->formatRuleSummary($rule),
+            'conversion_rule_present' => $rulePresent,
+            'calculated_hours' => $calculatedHours,
+            'proposed_hours' => $proposedHours,
+            'effective_hours_display' => $effectiveHours,
+            'total_hours_activity' => $totalHoursActivity,
+            'member_hours' => $memberHours,
+            'formula_explanation' => $formulaExplanation,
+            'can_edit_proposed_hours' => false,
+        ];
+    }
+
+    private function calculateRuleSnapshot(
+        ?object $rule,
+        ?int $quantity,
+        ?int $memberCount,
+        ?int $principalCount,
+        ?string $memberRoleCode
+    ): array {
+        $normalizedQuantity = max(1, (int) ($quantity ?? 1));
+        $normalizedMemberCount = max(1, (int) ($memberCount ?? 1));
+        $normalizedPrincipalCount = max(0, (int) ($principalCount ?? 0));
+        $baseHours = null;
+        $modifiers = [];
+        $memberHours = null;
+        $calculatedTotalByRule = null;
+
+        if (! $rule) {
+            return [
+                'rule_name' => 'Chưa có quy tắc quy đổi',
+                'distribution_strategy' => null,
+                'base_hours' => null,
+                'modifiers' => [],
+                'total_hours_activity' => null,
+                'member_hours' => null,
+            ];
         }
 
-        return 'Rule: ' . implode(', ', $parts);
+        $strategy = (string) $rule->distribution_strategy;
+        if ($strategy === 'per_lecturer_fixed') {
+            $baseHours = $rule->hours_per_occurrence !== null ? (float) $rule->hours_per_occurrence : null;
+            $effectiveOccurrences = $normalizedQuantity;
+            if ($rule->max_occurrences_per_year !== null) {
+                $effectiveOccurrences = min($effectiveOccurrences, (int) $rule->max_occurrences_per_year);
+                $modifiers[] = [
+                    'name' => 'Giới hạn số lần trong năm',
+                    'value' => (int) $rule->max_occurrences_per_year,
+                ];
+            }
+            $modifiers[] = ['name' => 'Số lần được tính', 'value' => $effectiveOccurrences];
+            $memberHours = $baseHours !== null ? round($baseHours * $effectiveOccurrences, 2) : null;
+            $calculatedTotalByRule = $memberHours !== null
+                ? round($memberHours * $normalizedMemberCount, 2)
+                : null;
+        } elseif ($this->hoursRuleResolver->isProjectPoolRule($rule)) {
+            $baseHours = $rule->hours_total_per_activity !== null
+                ? (float) $rule->hours_total_per_activity
+                : null;
+            $leaderHoursTotal = round((float) $rule->hours_total_per_activity * $normalizedQuantity, 2);
+            $memberPoolTotal = round((float) $rule->hours_per_occurrence * $normalizedQuantity, 2);
+            $calculatedTotalByRule = round($leaderHoursTotal + $memberPoolTotal, 2);
+
+            $nonPrincipalCount = max(0, $normalizedMemberCount - $normalizedPrincipalCount);
+            $modifiers[] = ['name' => 'Giờ chủ nhiệm', 'value' => $leaderHoursTotal];
+            $modifiers[] = ['name' => 'Quỹ giờ thành viên', 'value' => $memberPoolTotal];
+            $modifiers[] = ['name' => 'Số chủ nhiệm/chủ biên', 'value' => $normalizedPrincipalCount];
+            $modifiers[] = ['name' => 'Số thành viên', 'value' => $nonPrincipalCount];
+
+            if ($normalizedPrincipalCount === 0) {
+                $memberHours = round($calculatedTotalByRule / $normalizedMemberCount, 2);
+            } elseif ($this->isPrincipalRole($memberRoleCode)) {
+                $memberHours = round($leaderHoursTotal / $normalizedPrincipalCount, 2);
+                if ($nonPrincipalCount === 0) {
+                    $memberHours = round(
+                        $memberHours + ($memberPoolTotal / $normalizedPrincipalCount),
+                        2
+                    );
+                }
+            } else {
+                $memberHours = $nonPrincipalCount > 0
+                    ? round($memberPoolTotal / $nonPrincipalCount, 2)
+                    : 0.0;
+            }
+        } elseif ($strategy === 'principal_fraction_others_equal') {
+            $baseHours = $rule->hours_total_per_activity !== null ? (float) $rule->hours_total_per_activity : null;
+            if ($normalizedQuantity > 1) {
+                $modifiers[] = ['name' => 'Số lượng công trình', 'value' => $normalizedQuantity];
+            }
+            $calculatedTotalByRule = $baseHours !== null ? round($baseHours * $normalizedQuantity, 2) : null;
+            $principalFraction = $rule->principal_fraction !== null ? (float) $rule->principal_fraction : 0.2;
+            $othersFractionTotal = $rule->others_fraction_total !== null
+                ? (float) $rule->others_fraction_total
+                : max(0.0, 1 - $principalFraction);
+
+            $modifiers[] = ['name' => 'Tỷ lệ chủ biên', 'value' => $principalFraction];
+            $modifiers[] = ['name' => 'Tỷ lệ chia nhóm tác giả', 'value' => $othersFractionTotal];
+
+            $memberHours = null;
+            if ($calculatedTotalByRule !== null) {
+                $sharedPerMember = round(($calculatedTotalByRule * $othersFractionTotal) / $normalizedMemberCount, 2);
+                $principalBonusPool = $calculatedTotalByRule * $principalFraction;
+                $principalBonus = $normalizedPrincipalCount > 0
+                    ? round($principalBonusPool / $normalizedPrincipalCount, 2)
+                    : 0.0;
+
+                $memberHours = $sharedPerMember;
+                if ($this->isPrincipalRole($memberRoleCode)) {
+                    $memberHours = round($sharedPerMember + $principalBonus, 2);
+                }
+            }
+        } else {
+            $baseHours = $rule->hours_total_per_activity !== null ? (float) $rule->hours_total_per_activity : null;
+            if ($normalizedQuantity > 1) {
+                $modifiers[] = ['name' => 'Số lượng công trình', 'value' => $normalizedQuantity];
+            }
+            $calculatedTotalByRule = $baseHours !== null ? round($baseHours * $normalizedQuantity, 2) : null;
+            $memberHours = $calculatedTotalByRule !== null
+                ? round($calculatedTotalByRule / $normalizedMemberCount, 2)
+                : null;
+        }
+
+        return [
+            'rule_name' => $this->buildRuleName($rule, $strategy),
+            'distribution_strategy' => $strategy,
+            'base_hours' => $baseHours,
+            'modifiers' => $modifiers,
+            'total_hours_activity' => $calculatedTotalByRule,
+            'member_hours' => $memberHours,
+        ];
+    }
+
+    private function buildRuleName(object $rule, string $strategy): string
+    {
+        $kindCode = strtolower((string) ($rule->kind_code ?? ''));
+        $typeCode = strtolower((string) ($rule->type_code ?? ''));
+
+        return match (true) {
+            $kindCode === 'paper' && $typeCode === 'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm',
+            $kindCode === 'paper' && $typeCode === 'hdgsnn_600' => 'Bài báo HDGSNN đến 1 điểm',
+            $kindCode === 'paper' && $typeCode === 'hdgsnn_300' => 'Bài báo có ISSN/ISBN',
+            $kindCode === 'book' && $typeCode === 'textbook' => 'Giáo trình ISBN',
+            $kindCode === 'book' && $typeCode === 'reference' => 'Tài liệu tham khảo',
+            $kindCode === 'project' && $typeCode === 'bo' => 'Đề tài cấp Bộ',
+            $kindCode === 'project' && $typeCode === 'coso' => 'Đề tài cấp Trường',
+            $kindCode === 'conference' && $typeCode === 'report' => 'Hội nghị/Hội thảo - Báo cáo',
+            $kindCode === 'conference' && $typeCode === 'attend' => 'Hội nghị/Hội thảo - Tham dự',
+            default => 'Quy tắc ' . $strategy,
+        };
+    }
+
+    private function isPrincipalRole(?string $memberRoleCode): bool
+    {
+        if (! $memberRoleCode) {
+            return false;
+        }
+
+        return in_array(strtolower($memberRoleCode), ['principal', 'chief_editor'], true);
+    }
+
+    private function resolveAccessibleApprovedActivity(int $lecturerId, int $activityId, int $approvedStatusId): ?object
+    {
+        return DB::table('research_activities as ra')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturerId);
+            })
+            ->where('ra.id', $activityId)
+            ->where('ra.status_id', $approvedStatusId)
+            ->where(function ($query) use ($lecturerId) {
+                $query->where('ra.owner_lecturer_id', $lecturerId)
+                    ->orWhere('ram.confirmation_status', 'accepted');
+            })
+            ->select(['ra.id', 'ra.title', 'ra.kind_id', 'ra.type_id'])
+            ->first();
+    }
+
+    private function resolveHoursApprovalStatus(int $activityId, int $hoursStageId): ?string
+    {
+        $status = DB::table('activity_approvals')
+            ->where('activity_id', $activityId)
+            ->where('stage_id', $hoursStageId)
+            ->value('status');
+
+        return $status ? strtolower((string) $status) : null;
+    }
+
+    private function fetchEvidenceFiles(int $activityId): array
+    {
+        return DB::table('evidence_files as ef')
+            ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
+            ->where('ef.activity_id', $activityId)
+            ->select([
+                'ef.id',
+                'ef.activity_id',
+                'ef.file_type_id',
+                'ef.disk',
+                'ef.path',
+                'ef.original_name',
+                'ef.mime_type',
+                'ef.size_bytes',
+                'ef.sha256',
+                'ef.uploaded_by_user_id',
+                'ef.uploaded_at',
+                'ef.created_at',
+                'ef.updated_at',
+                'eft.name as file_type_name',
+            ])
+            ->orderByDesc('ef.uploaded_at')
+            ->get()
+            ->map(fn ($row) => $this->mapEvidenceRow($row))
+            ->all();
+    }
+
+    private function mapEvidenceRow(object $row): array
+    {
+        $id = (int) $row->id;
+
+        return [
+            'id' => $id,
+            'activity_id' => (int) $row->activity_id,
+            'file_type_id' => (int) $row->file_type_id,
+            'file_type_name' => $row->file_type_name ?? null,
+            'disk' => $row->disk,
+            'path' => $row->path,
+            'original_name' => $row->original_name,
+            'mime_type' => $row->mime_type,
+            'size_bytes' => (int) $row->size_bytes,
+            'sha256' => $row->sha256,
+            'uploaded_by_user_id' => (int) $row->uploaded_by_user_id,
+            'uploaded_at' => $row->uploaded_at,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+            'download_url' => route('lecturer.hours.evidence.download', ['evidence' => $id]),
+        ];
     }
 }

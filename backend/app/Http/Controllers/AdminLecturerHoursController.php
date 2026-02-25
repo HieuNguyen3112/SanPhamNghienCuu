@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\AdminLecturerHoursSummaryExport;
+use App\Support\AcademicYearResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -287,20 +288,12 @@ class AdminLecturerHoursController extends Controller
             return (int) $validated['academic_year_id'];
         }
 
-        $activeId = DB::table('academic_years')
-            ->where('is_active', true)
-            ->orderByDesc('id')
-            ->value('id');
-
-        if ($activeId) {
-            return (int) $activeId;
+        $resolved = AcademicYearResolver::currentId();
+        if ($resolved) {
+            return (int) $resolved;
         }
 
-        $fallbackId = DB::table('academic_years')
-            ->orderByDesc('id')
-            ->value('id');
-
-        return (int) $fallbackId;
+        return (int) (DB::table('academic_years')->orderByDesc('id')->value('id') ?? 0);
     }
 
     private function resolveAcademicYearCode(int $academicYearId): string

@@ -10,12 +10,10 @@
           <div class="border-b border-slate-200 px-4 py-3">
             <div class="flex items-center gap-2">
               <Info class="h-5 w-5 text-slate-500" />
-              <div class="text-sm font-semibold text-slate-900">
-                Từ chối yêu cầu
-              </div>
+              <div class="text-sm font-semibold text-slate-900">Từ chối yêu cầu</div>
             </div>
             <div class="mt-1 text-xs text-slate-500">
-              Chọn lý do để ghi nhận và phản hồi cho giảng viên.
+              Chọn lý do để phản hồi rõ ràng cho giảng viên.
             </div>
           </div>
 
@@ -31,11 +29,9 @@
                   v-model="reasonCode"
                 />
                 <div>
-                  <div class="text-sm font-medium text-slate-900">
-                    Giờ quy đổi chưa hợp lý
-                  </div>
+                  <div class="text-sm font-medium text-slate-900">Giờ quy đổi chưa hợp lý</div>
                   <div class="text-xs text-slate-500">
-                    Cần rà soát lại phân bổ/định mức quy đổi.
+                    Cần rà soát lại phân bổ hoặc định mức quy đổi.
                   </div>
                 </div>
               </label>
@@ -50,11 +46,9 @@
                   v-model="reasonCode"
                 />
                 <div>
-                  <div class="text-sm font-medium text-slate-900">
-                    Công trình chưa đủ điều kiện
-                  </div>
+                  <div class="text-sm font-medium text-slate-900">Công trình chưa đủ điều kiện</div>
                   <div class="text-xs text-slate-500">
-                    Một số công trình chưa đáp ứng tiêu chí.
+                    Một số công trình chưa đáp ứng tiêu chí để tính giờ.
                   </div>
                 </div>
               </label>
@@ -69,11 +63,9 @@
                   v-model="reasonCode"
                 />
                 <div>
-                  <div class="text-sm font-medium text-slate-900">
-                    Thiếu minh chứng
-                  </div>
+                  <div class="text-sm font-medium text-slate-900">Thiếu minh chứng</div>
                   <div class="text-xs text-slate-500">
-                    Cần bổ sung file/biên bản liên quan.
+                    Cần bổ sung hồ sơ hoặc bằng chứng liên quan.
                   </div>
                 </div>
               </label>
@@ -81,19 +73,10 @@
               <label
                 class="flex items-start gap-2 rounded-xl border border-slate-200 p-3 hover:bg-slate-50"
               >
-                <input
-                  type="radio"
-                  class="mt-1"
-                  value="other"
-                  v-model="reasonCode"
-                />
+                <input type="radio" class="mt-1" value="other" v-model="reasonCode" />
                 <div class="w-full">
-                  <div class="text-sm font-medium text-slate-900">
-                    Lý do khác
-                  </div>
-                  <div class="text-xs text-slate-500">
-                    Nhập nội dung chi tiết.
-                  </div>
+                  <div class="text-sm font-medium text-slate-900">Lý do khác</div>
+                  <div class="text-xs text-slate-500">Nhập nội dung chi tiết.</div>
 
                   <textarea
                     v-if="reasonCode === 'other'"
@@ -101,9 +84,7 @@
                     rows="3"
                     :value="reasonNote"
                     placeholder="Nhập lý do..."
-                    @input="
-                      reasonNote = ($event.target as HTMLTextAreaElement).value
-                    "
+                    @input="reasonNote = ($event.target as HTMLTextAreaElement).value"
                   />
                 </div>
               </label>

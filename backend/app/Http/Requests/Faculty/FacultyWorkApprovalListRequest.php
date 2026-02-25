@@ -22,8 +22,10 @@ class FacultyWorkApprovalListRequest extends FormRequest
 
             $statusMap = [
                 'PENDING_FACULTY_APPROVAL' => 'pending',
-                'APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY' => 'approved',
+                'APPROVED_BY_FACULTY_FINAL' => 'approved',
                 'REJECTED_BY_FACULTY' => 'rejected',
+                // legacy FE values
+                'APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY' => 'approved',
             ];
 
             if (is_string($status) && array_key_exists($status, $statusMap)) {

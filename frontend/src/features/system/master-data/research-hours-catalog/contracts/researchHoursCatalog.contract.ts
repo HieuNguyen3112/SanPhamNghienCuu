@@ -273,7 +273,7 @@ export function validateWorkConversionDraft(
   if (d.hours === null || !Number.isFinite(d.hours) || d.hours <= 0)
     e.hours = "Số giờ phải > 0.";
   if (d.notes.length > 500)
-    e.notes = "Ghi ch? t?i ?a 500 k? t?.";
+    e.notes = "Ghi chú tối đa 500 ký tự.";
   return e;
 }
 

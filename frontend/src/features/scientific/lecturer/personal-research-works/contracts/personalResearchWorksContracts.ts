@@ -5,13 +5,17 @@
 // =====================
 export type PersonalWorkStatusCodeDTO =
   | "draft"
+  | "pending_member_confirm"
+  | "member_rejected"
+  | "pending_faculty_review"
   | "submitted"
   | "approved"
   | "rejected";
 
-// UI tab "pending" sẽ map sang DTO "submitted"
+// UI tab "pending" maps to backend grouped pending filter
 export type PersonalWorkFilterTabDTO =
   | "all"
+  | "pending"
   | "approved"
   | "submitted"
   | "rejected"
@@ -20,7 +24,7 @@ export type PersonalWorkFilterTabDTO =
 export interface PersonalStatsDTO {
   total_count: number;
   approved_count: number;
-  pending_count: number; // pending == submitted
+  pending_count: number;
   rejected_count: number;
   draft_count: number;
 }
@@ -44,6 +48,7 @@ export interface PersonalWorkRowDTO {
   title: string;
 
   kind_id: number;
+  kind_code?: string;
   kind_name: string;
 
   type_id: number | null;
@@ -56,15 +61,12 @@ export interface PersonalWorkRowDTO {
   status_code: PersonalWorkStatusCodeDTO;
   status_name: string;
 
-  // Derived by BE DTO (see Field Coverage)
   work_year: number | null;
   venue_name: string | null;
 
-  // Current lecturer membership (derived/joined)
   member_role_id: number | null;
   member_role_name: string | null;
 
-  // Hours for current lecturer (from research_activity_members.hours_assigned)
   lecturer_hours: string | null;
 
   submitted_at: string | null;
@@ -82,6 +84,21 @@ export interface PersonalWorkAuthorDTO {
   department_name: string | null;
 
   contribution_share: string | null;
+  confirmation_status?: "pending" | "accepted" | "rejected" | null;
+  confirmation_note?: string | null;
+  responded_at?: string | null;
+}
+
+export interface PersonalWorkMemberConfirmationDTO {
+  member_id: number;
+  lecturer_id: number;
+  lecturer_code: string | null;
+  lecturer_full_name: string | null;
+  member_role_code: string | null;
+  member_role_name: string | null;
+  confirmation_status: "pending" | "accepted" | "rejected" | null;
+  confirmation_note: string | null;
+  responded_at: string | null;
 }
 
 export interface PersonalWorkEvidenceDTO {
@@ -112,7 +129,7 @@ export interface PersonalWorkApprovalDTO {
 }
 
 export interface PersonalWorkStatusHistoryDTO {
-  acted_at: string; // activity_status_histories.acted_at
+  acted_at: string;
   acted_by_user_id: number;
   acted_by_user_name: string;
 
@@ -130,6 +147,7 @@ export interface PersonalWorkDetailDTO {
   abstract: string | null;
 
   kind_id: number;
+  kind_code?: string;
   kind_name: string;
 
   type_id: number | null;
@@ -142,11 +160,9 @@ export interface PersonalWorkDetailDTO {
   status_code: PersonalWorkStatusCodeDTO;
   status_name: string;
 
-  // derived
   work_year: number | null;
   venue_name: string | null;
 
-  // current lecturer data
   member_role_id: number | null;
   member_role_name: string | null;
   lecturer_hours: string | null;
@@ -155,10 +171,11 @@ export interface PersonalWorkDetailDTO {
   approved_at: string | null;
   total_hours_calc: string | null;
 
-  // rejected reason (derived)
   rejection_note: string | null;
 
   authors: PersonalWorkAuthorDTO[];
+  member_confirmations?: PersonalWorkMemberConfirmationDTO[];
+  rejected_members?: PersonalWorkMemberConfirmationDTO[];
   evidence_items: PersonalWorkEvidenceDTO[];
 
   approvals: PersonalWorkApprovalDTO[];
@@ -190,6 +207,7 @@ export interface PersonalWorkRow {
   title: string;
 
   kindId: number;
+  kindCode: string;
   kindName: string;
 
   typeId: number | null;
@@ -224,6 +242,21 @@ export interface PersonalWorkAuthor {
 
   departmentName: string | null;
   contributionShare: string | null;
+  confirmationStatus: "pending" | "accepted" | "rejected" | null;
+  confirmationNote: string | null;
+  respondedAt: string | null;
+}
+
+export interface PersonalWorkMemberConfirmation {
+  memberId: number;
+  lecturerId: number;
+  lecturerCode: string | null;
+  lecturerFullName: string | null;
+  memberRoleCode: string | null;
+  memberRoleName: string | null;
+  confirmationStatus: "pending" | "accepted" | "rejected" | null;
+  confirmationNote: string | null;
+  respondedAt: string | null;
 }
 
 export interface PersonalWorkEvidence {
@@ -272,6 +305,7 @@ export interface PersonalWorkDetail {
   abstract: string | null;
 
   kindId: number;
+  kindCode: string;
   kindName: string;
 
   typeId: number | null;
@@ -298,6 +332,8 @@ export interface PersonalWorkDetail {
   rejectionNote: string | null;
 
   authors: PersonalWorkAuthor[];
+  memberConfirmations: PersonalWorkMemberConfirmation[];
+  rejectedMembers: PersonalWorkMemberConfirmation[];
   evidenceItems: PersonalWorkEvidence[];
 
   approvals: PersonalWorkApproval[];
@@ -310,7 +346,7 @@ export interface PersonalWorkDetail {
 export const mapper = {
   tab: {
     toDto(tab: PersonalWorkFilterTab): PersonalWorkFilterTabDTO {
-      if (tab === "pending") return "submitted";
+      if (tab === "pending") return "pending";
       return tab;
     },
   },
@@ -332,6 +368,7 @@ export const mapper = {
       title: dto.title,
 
       kindId: dto.kind_id,
+      kindCode: dto.kind_code ?? "",
       kindName: dto.kind_name,
 
       typeId: dto.type_id,
@@ -367,6 +404,7 @@ export const mapper = {
       abstract: dto.abstract,
 
       kindId: dto.kind_id,
+      kindCode: dto.kind_code ?? "",
       kindName: dto.kind_name,
 
       typeId: dto.type_id,
@@ -400,6 +438,33 @@ export const mapper = {
         memberRoleName: a.member_role_name,
         departmentName: a.department_name,
         contributionShare: a.contribution_share,
+        confirmationStatus: a.confirmation_status ?? null,
+        confirmationNote: a.confirmation_note ?? null,
+        respondedAt: a.responded_at ?? null,
+      })),
+
+      memberConfirmations: (dto.member_confirmations ?? []).map((m) => ({
+        memberId: m.member_id,
+        lecturerId: m.lecturer_id,
+        lecturerCode: m.lecturer_code,
+        lecturerFullName: m.lecturer_full_name,
+        memberRoleCode: m.member_role_code,
+        memberRoleName: m.member_role_name,
+        confirmationStatus: m.confirmation_status,
+        confirmationNote: m.confirmation_note,
+        respondedAt: m.responded_at,
+      })),
+
+      rejectedMembers: (dto.rejected_members ?? []).map((m) => ({
+        memberId: m.member_id,
+        lecturerId: m.lecturer_id,
+        lecturerCode: m.lecturer_code,
+        lecturerFullName: m.lecturer_full_name,
+        memberRoleCode: m.member_role_code,
+        memberRoleName: m.member_role_name,
+        confirmationStatus: m.confirmation_status,
+        confirmationNote: m.confirmation_note,
+        respondedAt: m.responded_at,
       })),
 
       evidenceItems: dto.evidence_items.map((e) => ({

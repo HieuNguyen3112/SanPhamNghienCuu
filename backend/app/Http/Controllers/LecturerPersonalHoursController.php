@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Lecturer\LecturerPersonalHoursRequest;
+use App\Services\Hours\HoursRecomputeService;
+use App\Support\AcademicYearResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +12,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class LecturerPersonalHoursController extends Controller
 {
+    private HoursRecomputeService $hoursRecomputeService;
+
+    public function __construct(
+        HoursRecomputeService $hoursRecomputeService
+    ) {
+        $this->hoursRecomputeService = $hoursRecomputeService;
+    }
+
     public function overview(LecturerPersonalHoursRequest $request)
     {
         $lecturer = $this->resolveLecturer($request);
@@ -17,12 +27,16 @@ class LecturerPersonalHoursController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $academicYear = $this->resolveAcademicYear($request->validated()['academic_year_id'] ?? null);
+        $hoursStageId = $this->resolveStageId('hours');
+        $academicYear = $this->resolveAcademicYear(
+            (int) $lecturer->id,
+            $hoursStageId,
+            $request->validated()['academic_year_id'] ?? null
+        );
         if (! $academicYear) {
             return response()->json(['message' => 'academic year not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $hoursStageId = $this->resolveStageId('hours');
         if (! $hoursStageId) {
             return response()->json([
                 'success' => true,
@@ -30,6 +44,8 @@ class LecturerPersonalHoursController extends Controller
                 'data' => $this->emptyOverviewPayload($academicYear),
             ], Response::HTTP_OK);
         }
+
+        $this->backfillComputedHoursForLecturer((int) $lecturer->id, (int) $academicYear->id);
 
         $totals = $this->summaryTotals($lecturer->id, (int) $academicYear->id, $hoursStageId);
         $requiredHours = $this->requiredHours((int) $academicYear->id);
@@ -55,12 +71,16 @@ class LecturerPersonalHoursController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $academicYear = $this->resolveAcademicYear($request->validated()['academic_year_id'] ?? null);
+        $hoursStageId = $this->resolveStageId('hours');
+        $academicYear = $this->resolveAcademicYear(
+            (int) $lecturer->id,
+            $hoursStageId,
+            $request->validated()['academic_year_id'] ?? null
+        );
         if (! $academicYear) {
             return response()->json(['message' => 'academic year not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $hoursStageId = $this->resolveStageId('hours');
         if (! $hoursStageId) {
             return response()->json([
                 'success' => true,
@@ -73,6 +93,8 @@ class LecturerPersonalHoursController extends Controller
                 ],
             ], Response::HTTP_OK);
         }
+
+        $this->backfillComputedHoursForLecturer((int) $lecturer->id, (int) $academicYear->id);
 
         $baseQuery = $this->hoursApprovalQuery($lecturer->id, (int) $academicYear->id, $hoursStageId);
         $rows = $baseQuery
@@ -121,12 +143,16 @@ class LecturerPersonalHoursController extends Controller
             return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $academicYear = $this->resolveAcademicYear($request->validated()['academic_year_id'] ?? null);
+        $hoursStageId = $this->resolveStageId('hours');
+        $academicYear = $this->resolveAcademicYear(
+            (int) $lecturer->id,
+            $hoursStageId,
+            $request->validated()['academic_year_id'] ?? null
+        );
         if (! $academicYear) {
             return response()->json(['message' => 'academic year not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $hoursStageId = $this->resolveStageId('hours');
         $page = max(1, (int) ($request->validated()['page'] ?? 1));
         $perPage = max(1, min(100, (int) ($request->validated()['per_page'] ?? 12)));
 
@@ -145,6 +171,8 @@ class LecturerPersonalHoursController extends Controller
                 ],
             ], Response::HTTP_OK);
         }
+
+        $this->backfillComputedHoursForLecturer((int) $lecturer->id, (int) $academicYear->id);
 
         $statusCase = "CASE
             WHEN SUM(CASE WHEN aa.status = 'pending' THEN 1 ELSE 0 END) > 0 THEN 'pending'
@@ -210,6 +238,8 @@ class LecturerPersonalHoursController extends Controller
         if (! $hoursStageId) {
             return response()->json(['message' => 'hours approval stage not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+
+        $this->backfillComputedHoursForLecturer((int) $lecturer->id, null);
 
         $items = $this->hoursApprovalQuery($lecturer->id, null, $hoursStageId)
             ->whereRaw('UNIX_TIMESTAMP(aa.created_at) = ?', [$batchId])
@@ -280,26 +310,39 @@ class LecturerPersonalHoursController extends Controller
         return $id ? (int) $id : null;
     }
 
-    private function resolveAcademicYear(?int $academicYearId)
+    private function resolveAcademicYear(int $lecturerId, ?int $hoursStageId, ?int $academicYearId)
     {
         if ($academicYearId) {
-            return DB::table('academic_years')
-                ->where('id', $academicYearId)
-                ->first();
+            return AcademicYearResolver::resolve($academicYearId);
         }
 
-        $active = DB::table('academic_years')
-            ->where('is_active', 1)
-            ->orderByDesc('start_date')
-            ->first();
+        if ($hoursStageId) {
+            $yearIdWithData = DB::table('activity_approvals as aa')
+                ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+                ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                    $join->on('ram.activity_id', '=', 'ra.id')
+                        ->where('ram.lecturer_id', '=', $lecturerId);
+                })
+                ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+                ->where('aa.stage_id', $hoursStageId)
+                ->where(function ($query) use ($lecturerId) {
+                    $query->where('ra.owner_lecturer_id', $lecturerId)
+                        ->orWhere('ram.confirmation_status', 'accepted');
+                })
+                ->whereNotNull('ra.academic_year_id')
+                ->orderByDesc('ay.is_active')
+                ->orderByDesc('ay.start_date')
+                ->value('ra.academic_year_id');
 
-        if ($active) {
-            return $active;
+            if ($yearIdWithData) {
+                $resolved = AcademicYearResolver::resolve((int) $yearIdWithData);
+                if ($resolved) {
+                    return $resolved;
+                }
+            }
         }
 
-        return DB::table('academic_years')
-            ->orderByDesc('start_date')
-            ->first();
+        return AcademicYearResolver::current();
     }
 
     private function requiredHours(int $academicYearId): float
@@ -309,6 +352,23 @@ class LecturerPersonalHoursController extends Controller
             ->value('required_hours');
 
         return $value !== null ? (float) $value : 0.0;
+    }
+
+    private function backfillComputedHoursForLecturer(int $lecturerId, ?int $academicYearId): void
+    {
+        $approvedStatusId = (int) (DB::table('activity_statuses')
+            ->where('code', 'approved')
+            ->value('id') ?? 0);
+
+        if ($approvedStatusId <= 0) {
+            return;
+        }
+
+        $this->hoursRecomputeService->recomputeApprovedActivitiesForLecturer(
+            $lecturerId,
+            $approvedStatusId,
+            $academicYearId
+        );
     }
 
     private function emptyOverviewPayload(object $academicYear): array

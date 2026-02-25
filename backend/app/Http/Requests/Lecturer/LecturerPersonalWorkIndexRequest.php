@@ -41,7 +41,7 @@ class LecturerPersonalWorkIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['nullable', 'string', 'in:all,draft,submitted,approved,rejected'],
+            'status' => ['nullable', 'string', 'in:all,pending,draft,pending_member_confirm,member_rejected,pending_faculty_review,submitted,approved,rejected'],
             'q' => ['nullable', 'string', 'max:255'],
             'year' => ['nullable', 'integer', 'min:1900', 'max:3000'],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],

@@ -17,7 +17,6 @@ use App\Http\Controllers\ResearchActivityController;
 use App\Http\Controllers\AdminResearchWorkController;
 use App\Http\Controllers\AdminResearchWorkSearchController;
 use App\Http\Controllers\AdminLecturerHoursController;
-use App\Http\Controllers\AdminLecturerHourApprovalController;
 use App\Http\Controllers\AdminLecturerHourWarningController;
 use App\Http\Controllers\AdminLecturerAccountController;
 use App\Http\Controllers\FacultyLecturerAccountController;
@@ -42,12 +41,12 @@ use App\Http\Controllers\FacultyOrgStructureController;
 // TOKEN-BASED (Sanctum Bearer)
 Route::prefix('auth')->group(function () {
 
-    // ✅ ME: dùng session sanctum, KHÔNG rotate token
+    // ME: uses Sanctum session auth, no token rotation.
     Route::middleware(['auth:sanctum', 'force.json'])->group(function () {
         Route::get('/me', [AuthMeController::class, 'show']);
     });
 
-    // ✅ Token endpoints: chỉ cho SCIENCE_OFFICE + rotate
+    // Token endpoints: SCIENCE_OFFICE only, with rotation.
     Route::middleware(['auth:sanctum', 'auto.rotate.sanctum'])->group(function () {
         Route::get('/tokens', [TokenAuthController::class, 'index']);
 
@@ -97,6 +96,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LE
         Route::get('/{activity}', [ResearchActivityController::class, 'show']);
         Route::put('/{activity}', [ResearchActivityController::class, 'update']);
         Route::put('/{activity}/members', [ResearchActivityController::class, 'syncMembers']);
+        Route::post('/{activity}/members/{member}/reinvite', [ResearchActivityController::class, 'reinviteMember']);
         Route::post('/{activity}/submit', [ResearchActivityController::class, 'submit']);
         Route::put('/{activity}/{detail}', [ResearchActivityController::class, 'upsertDetail']);
         Route::get('/{activity}/evidence-files', [ResearchActivityController::class, 'listEvidenceFiles']);
@@ -127,6 +127,18 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LE
         Route::get('/', [LecturerHoursCalculateController::class, 'index']);
         Route::get('/{activity}', [LecturerHoursCalculateController::class, 'show']);
         Route::post('/submit', [LecturerHoursCalculateController::class, 'submit']);
+        Route::get('/{activity}/evidence', [LecturerHoursCalculateController::class, 'listEvidence']);
+        Route::post('/{activity}/evidence', [LecturerHoursCalculateController::class, 'uploadEvidence']);
+    });
+
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
+    ->prefix('lecturer/hours')
+    ->group(function () {
+        Route::put('/{activity}/proposed-hours', [LecturerHoursCalculateController::class, 'updateProposedHours']);
+        Route::post('/submit', [LecturerHoursCalculateController::class, 'submit']);
+        Route::delete('/evidence/{evidence}', [LecturerHoursCalculateController::class, 'deleteEvidence']);
+        Route::get('/evidence/{evidence}/download', [LecturerHoursCalculateController::class, 'downloadEvidence'])
+            ->name('lecturer.hours.evidence.download');
     });
 
 // LECTURER HOURS PERSONAL
@@ -169,7 +181,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])
 // SCIENCE_OFFICE only demo/ping
 Route::middleware(['auth:sanctum', 'role:SCIENCE_OFFICE'])->group(function () {
     Route::get('/admin/ping', fn() => ['ok' => true]);
-    // TODO: thêm route quản trị API
+    // TODO: add API admin management routes.
 });
 
 // SCIENCE_OFFICE research works management
@@ -231,6 +243,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DE
         Route::get('/approvals/{requestId}', [FacultyLecturerHourApprovalController::class, 'show']);
         Route::put('/approvals/{requestId}/approve', [FacultyLecturerHourApprovalController::class, 'approve']);
         Route::put('/approvals/{requestId}/reject', [FacultyLecturerHourApprovalController::class, 'reject']);
+        Route::get('/evidence/{evidence}/download', [FacultyLecturerHourApprovalController::class, 'downloadEvidence'])
+            ->name('faculty.hours.evidence.download');
         Route::get('/lecturers/summary/export/excel', [FacultyLecturerHoursController::class, 'exportSummaryExcel']);
         Route::get('/lecturers/summary/export/pdf', [FacultyLecturerHoursController::class, 'exportSummaryPdf']);
         Route::get('/lecturers/summary', [FacultyLecturerHoursController::class, 'index']);
@@ -302,15 +316,11 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SC
         Route::get('/lecturers/summary/export/pdf', [AdminLecturerHoursController::class, 'exportSummaryPdf']);
         Route::get('/lecturers/summary', [AdminLecturerHoursController::class, 'index']);
         Route::get('/lecturers/{lecturer}', [AdminLecturerHoursController::class, 'show']);
-        Route::get('/approvals', [AdminLecturerHourApprovalController::class, 'index']);
-        Route::get('/approvals/{requestId}', [AdminLecturerHourApprovalController::class, 'show']);
-        Route::put('/approvals/{requestId}/approve', [AdminLecturerHourApprovalController::class, 'approve']);
-        Route::put('/approvals/{requestId}/reject', [AdminLecturerHourApprovalController::class, 'reject']);
         Route::get('/warnings', [AdminLecturerHourWarningController::class, 'index']);
         Route::post('/warnings/{lecturerId}/send', [AdminLecturerHourWarningController::class, 'sendWarning']);
     });
 
-// ✅ REMOVED: admin/uni-approvals (University approval removed by requirement)
+// REMOVED: admin/uni-approvals (University approval removed by requirement)
 
 // SCIENCE_OFFICE lecturer accounts
 Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])

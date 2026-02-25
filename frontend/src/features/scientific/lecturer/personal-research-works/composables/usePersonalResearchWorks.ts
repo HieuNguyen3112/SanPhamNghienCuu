@@ -46,6 +46,8 @@ export function usePersonalResearchWorks() {
 
   const loadingDetail = ref(false);
   const errorDetail = ref<string | null>(null);
+  const noticeMessage = ref<string | null>(null);
+  const noticeTone = ref<"success" | "info" | "error">("info");
 
   const activeRow = computed(() => {
     if (!selectedWorkId.value) return null;
@@ -118,14 +120,94 @@ export function usePersonalResearchWorks() {
     }
   }
 
+  function findKindCode(workId: number): string | null {
+    const fromRow = rows.value.find((r) => r.activityId === workId)?.kindCode;
+    if (fromRow) return fromRow;
+    if (selectedWorkDetail.value?.activityId === workId) {
+      return selectedWorkDetail.value.kindCode;
+    }
+    return null;
+  }
+
   function goToEditDraft(workId: number) {
-    // TODO(router): integrate vue-router:
-    // router.push(`/ke-khai-cong-trinh/${workId}`)
-    window.location.assign(`/ke-khai-cong-trinh/${workId}`);
+    const kindCode = findKindCode(workId);
+    const query = `?activity_id=${workId}`;
+
+    if (kindCode === "book") {
+      window.location.assign(`/declarations/books${query}`);
+      return;
+    }
+
+    if (kindCode === "project") {
+      window.location.assign(`/declarations/projects${query}`);
+      return;
+    }
+
+    if (kindCode === "conference") {
+      window.location.assign(`/declarations/others${query}`);
+      return;
+    }
+
+    window.location.assign(`/declarations/articles${query}`);
   }
 
   function copyFromRejected(workId: number) {
     goToEditDraft(workId);
+  }
+
+  async function reinviteFromRow(workId: number) {
+    noticeMessage.value = null;
+
+    if (!selectedWorkDetail.value || selectedWorkDetail.value.activityId !== workId) {
+      await openDetail(workId);
+    }
+
+    const detail = selectedWorkDetail.value;
+    if (!detail) {
+      noticeTone.value = "error";
+      noticeMessage.value = "Không tải được danh sách thành viên bị từ chối.";
+      return;
+    }
+
+    if (detail.rejectedMembers.length === 0) {
+      noticeTone.value = "info";
+      noticeMessage.value = "Không còn thành viên nào ở trạng thái từ chối.";
+      return;
+    }
+
+    if (detail.rejectedMembers.length > 1) {
+      noticeTone.value = "info";
+      noticeMessage.value =
+        "Công trình có nhiều thành viên từ chối. Vui lòng mở chi tiết và chọn người cần gửi lại yêu cầu.";
+      isDetailOpen.value = true;
+      return;
+    }
+
+    const memberId = detail.rejectedMembers[0]?.memberId;
+    if (!memberId) return;
+    await reinviteMember(memberId);
+  }
+
+  async function reinviteMember(memberId: number) {
+    if (!selectedWorkDetail.value) return;
+
+    noticeMessage.value = null;
+    try {
+      await personalResearchWorksService.reinviteMember(
+        selectedWorkDetail.value.activityId,
+        memberId
+      );
+      noticeTone.value = "success";
+      noticeMessage.value = "Đã gửi lại yêu cầu xác nhận tham gia cho thành viên.";
+      await Promise.all([
+        loadWorks(),
+        loadDetail(selectedWorkDetail.value.activityId),
+      ]);
+    } catch (err) {
+      noticeTone.value = "error";
+      noticeMessage.value =
+        err instanceof Error ? err.message : "Không thể gửi lại yêu cầu xác nhận.";
+    }
   }
 
   async function handleSortChange(nextKey: SortKey, nextOrder: SortOrder) {
@@ -166,6 +248,8 @@ export function usePersonalResearchWorks() {
     errorList,
     loadingDetail,
     errorDetail,
+    noticeMessage,
+    noticeTone,
 
     activeRow,
 
@@ -177,6 +261,8 @@ export function usePersonalResearchWorks() {
     closeDetail,
     goToEditDraft,
     copyFromRejected,
+    reinviteFromRow,
+    reinviteMember,
     handleSortChange,
     setPage,
     setPageSize,

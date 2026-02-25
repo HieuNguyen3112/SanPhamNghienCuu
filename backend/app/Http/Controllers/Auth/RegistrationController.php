@@ -29,7 +29,7 @@ class RegistrationController extends Controller
 
         // Gán role mặc định GV (nếu có)
         if (class_exists(\Spatie\Permission\Models\Role::class)) {
-            $user->assignRole('GV');
+            $user->assignRole('LECTURER');
         }
 
         event(new Registered($user)); // gửi email verify

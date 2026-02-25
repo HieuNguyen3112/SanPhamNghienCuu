@@ -67,11 +67,22 @@ class LookupController extends Controller
 
     public function academicYears()
     {
+        $today = Carbon::now()->toDateString();
+
         $data = DB::table('academic_years')
             ->select(['id', 'code', 'start_date', 'end_date', 'is_active'])
-            ->orderByDesc('is_active')
-            ->orderByDesc('id')
-            ->get();
+            ->orderByDesc('start_date')
+            ->get()
+            ->map(function ($row) use ($today) {
+                return [
+                    'id' => (int) $row->id,
+                    'code' => $row->code,
+                    'start_date' => $row->start_date,
+                    'end_date' => $row->end_date,
+                    'is_active' => (bool) $row->is_active,
+                    'is_current' => $row->start_date <= $today && $row->end_date >= $today,
+                ];
+            });
 
         return response()->json(['data' => $data], Response::HTTP_OK);
     }
