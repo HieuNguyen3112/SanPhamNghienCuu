@@ -106,6 +106,7 @@
       <ParticipationNotificationDetailPanel
         :open="detailOpen"
         :notification="selected"
+        :processing="processingDecision"
         @close="closeDetail"
         @accept="acceptSelected"
         @reject="rejectSelected"
@@ -141,6 +142,7 @@ const {
   selected,
   openDetail,
   closeDetail,
+  processingDecision,
 
   acceptSelected,
   rejectSelected,

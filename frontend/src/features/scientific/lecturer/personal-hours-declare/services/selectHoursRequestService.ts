@@ -16,6 +16,44 @@ export interface LoadApprovedWorksParams {
   per_page?: number;
 }
 
+const normalizeText = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const normalizeHoursStatusParam = (status?: string): string | undefined => {
+  if (!status || !status.trim()) return undefined;
+
+  const normalized = normalizeText(status);
+  switch (normalized) {
+    case "all":
+    case "tat_ca":
+      return "all";
+    case "not_submitted":
+    case "hours_not_submitted":
+    case "chua_gui_duyet_gio":
+      return "hours_not_submitted";
+    case "pending":
+    case "hours_pending_faculty":
+    case "cho_khoa_duyet_gio":
+      return "hours_pending_faculty";
+    case "approved":
+    case "hours_approved":
+    case "da_duyet_gio":
+      return "hours_approved";
+    case "rejected":
+    case "hours_rejected":
+    case "khoa_tu_choi_gio":
+      return "hours_rejected";
+    default:
+      return status;
+  }
+};
+
 const extractErrorMessage = (err: unknown, fallback: string) => {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status ?? 0;
@@ -43,8 +81,9 @@ export async function loadApprovedWorksDTO(
   params: LoadApprovedWorksParams
 ): Promise<ApprovedWorkListResponseDTO> {
   try {
+    const statusParam = normalizeHoursStatusParam(params.status);
     const normalizedStatus =
-      !params.status || params.status === "all" ? undefined : params.status;
+      !statusParam || statusParam === "all" ? undefined : statusParam;
     const includeAllYears =
       params.academic_year_id === undefined || params.academic_year_id === null;
 

@@ -94,16 +94,6 @@
       </table>
     </div>
 
-    <div class="flex items-center justify-end">
-      <!-- <SharedPaginationControls
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        @update:page="emit('update:page', $event)"
-        @update:page-size="emit('update:pageSize', $event)"
-      /> -->
-    </div>
-
     <CatalogUpsertModal
       :open="modalOpen"
       :title="modalTitle"
@@ -127,6 +117,7 @@
               "
               type="text"
               class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+              placeholder="Ví dụ: AI"
             />
             <p v-if="errors.code" class="mt-1 text-xs text-rose-600">
               {{ errors.code }}
@@ -206,7 +197,6 @@
 import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
 import type { ResearchField } from "../contracts/researchFields.contract";
-import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 defineProps<{
   rows: ResearchField[];
@@ -249,3 +239,4 @@ const emit = defineEmits<{
   ): void;
 }>();
 </script>
+

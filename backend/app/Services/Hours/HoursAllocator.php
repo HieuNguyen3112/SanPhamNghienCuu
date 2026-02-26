@@ -52,12 +52,21 @@ class HoursAllocator
         } elseif ($this->isProjectPoolRule($rule)) {
             $leaderHoursTotal = round((float) $rule->hours_total_per_activity * $normalizedQuantity, 2);
             $memberPoolTotal = round((float) $rule->hours_per_occurrence * $normalizedQuantity, 2);
-            $totalHours = round($leaderHoursTotal + $memberPoolTotal, 2);
 
             $principalIndexes = $this->principalIndexes($members);
             $principalCount = count($principalIndexes);
+            if ($principalCount === 0) {
+                $fallbackOwnerIndexes = $this->ownerIndexes($members);
+                if (count($fallbackOwnerIndexes) > 0) {
+                    $principalIndexes = $fallbackOwnerIndexes;
+                    $principalCount = count($principalIndexes);
+                }
+            }
+
             $nonPrincipalIndexes = array_values(array_diff(range(0, $memberCount - 1), $principalIndexes));
             $nonPrincipalCount = count($nonPrincipalIndexes);
+            $appliedMemberPoolTotal = $nonPrincipalCount > 0 ? $memberPoolTotal : 0.0;
+            $totalHours = round($leaderHoursTotal + $appliedMemberPoolTotal, 2);
 
             if ($principalCount === 0) {
                 $equalShare = round($totalHours / $memberCount, 2);
@@ -69,15 +78,9 @@ class HoursAllocator
                 }
 
                 if ($nonPrincipalCount > 0) {
-                    $memberShare = round($memberPoolTotal / $nonPrincipalCount, 2);
+                    $memberShare = round($appliedMemberPoolTotal / $nonPrincipalCount, 2);
                     foreach ($nonPrincipalIndexes as $index) {
                         $memberHours[$index] = $memberShare;
-                    }
-                } else {
-                    // Fallback: no co-author/member row, keep total hours conserved for principals.
-                    $poolToPrincipal = round($memberPoolTotal / $principalCount, 2);
-                    foreach ($principalIndexes as $index) {
-                        $memberHours[$index] = round(($memberHours[$index] ?? 0) + $poolToPrincipal, 2);
                     }
                 }
             }
@@ -85,6 +88,7 @@ class HoursAllocator
             $formula['mode'] = 'project_leader_and_member_pool';
             $formula['leader_hours_total'] = $leaderHoursTotal;
             $formula['member_pool_total'] = $memberPoolTotal;
+            $formula['member_pool_applied_total'] = $appliedMemberPoolTotal;
             $formula['principal_count'] = $principalCount;
             $formula['non_principal_count'] = $nonPrincipalCount;
         } else {
@@ -175,6 +179,23 @@ class HoursAllocator
         return $indexes;
     }
 
+    private function ownerIndexes(array $members): array
+    {
+        $indexes = [];
+        foreach ($members as $index => $member) {
+            $ownerLecturerId = isset($member->owner_lecturer_id) ? (int) $member->owner_lecturer_id : null;
+            if ($ownerLecturerId === null) {
+                continue;
+            }
+
+            if ((int) $member->lecturer_id === $ownerLecturerId) {
+                $indexes[] = $index;
+            }
+        }
+
+        return $indexes;
+    }
+
     private function isProjectPoolRule(object $rule): bool
     {
         $kindCode = strtolower((string) ($rule->kind_code ?? ''));
@@ -187,4 +208,3 @@ class HoursAllocator
             && $rule->hours_per_occurrence !== null;
     }
 }
-

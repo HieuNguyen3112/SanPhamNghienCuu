@@ -1,4 +1,4 @@
-﻿import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import type {
   ResearchWorkApprovalEntry,
   ResearchWorkApprovalUiConfiguration,
@@ -16,6 +16,7 @@ import {
   type FacultyApprovalDetailResponse,
   type FacultyApprovalListItem,
 } from "../../shared/services/facultyApproval.service";
+import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
 export function useFacultyResearchWorkApprovalProvider() {
   const uiConfiguration = ref<ResearchWorkApprovalUiConfiguration>({
@@ -55,8 +56,10 @@ export function useFacultyResearchWorkApprovalProvider() {
   const academicYearIdByCode = ref<Record<string, number>>({});
   const facultyIdentifierById = ref<Record<number, string>>({});
 
-  const toastMessage = ref<string | null>(null);
-  let toastTimer: number | null = null;
+  const {
+    showSuccessModal,
+    showErrorModal,
+  } = useActionResultModal();
 
   const totalPendingResearchWorkCount = computed<number>(() => {
     const pendingValue = displayMapping.getPendingApprovalStatusValue();
@@ -72,13 +75,12 @@ export function useFacultyResearchWorkApprovalProvider() {
     () => `Chờ duyệt: ${totalPendingResearchWorkCount.value} công trình`
   );
 
-  function showToast(message: string): void {
-    toastMessage.value = message;
-    if (toastTimer != null) window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => {
-      toastMessage.value = null;
-      toastTimer = null;
-    }, 3500);
+  function showActionSuccess(message: string): void {
+    showSuccessModal(message);
+  }
+
+  function showActionError(message: string, details?: unknown): void {
+    showErrorModal(message, "Có lỗi xảy ra", details);
   }
 
   function openResearchWorkDetailDrawer(
@@ -352,7 +354,7 @@ export function useFacultyResearchWorkApprovalProvider() {
       selectedResearchWorkApprovalEntry.value = mapDetailEntry(detail);
     } catch (error) {
       console.error(error);
-      showToast("Không tải được chi tiết. Vui lòng thử lại.");
+      showActionError("Không tải được chi tiết. Vui lòng thử lại.");
     }
   }
 
@@ -363,12 +365,12 @@ export function useFacultyResearchWorkApprovalProvider() {
   }): Promise<void> {
     try {
       await approveFacultyApproval(payload.researchWorkIdentifier);
-      showToast("Đã duyệt công trình.");
+      showActionSuccess("Đã duyệt công trình.");
       await loadList();
       closeResearchWorkDetailDrawer();
     } catch (error) {
       console.error(error);
-      showToast("Không thể duyệt công trình. Vui lòng thử lại.");
+      showActionError("Không thể duyệt công trình. Vui lòng thử lại.");
     }
   }
 
@@ -382,19 +384,19 @@ export function useFacultyResearchWorkApprovalProvider() {
         reason_type: payload.rejectionReasonType,
         reason_detail: payload.rejectionReasonDetail,
       });
-      showToast("Đã từ chối công trình.");
+      showActionSuccess("Đã từ chối công trình.");
       await loadList();
       closeResearchWorkDetailDrawer();
     } catch (error) {
       console.error(error);
-      showToast("Không thể từ chối công trình. Vui lòng thử lại.");
+      showActionError("Không thể từ chối công trình. Vui lòng thử lại.");
     }
   }
 
   onMounted(() => {
     loadLookups().then(loadList).catch((error) => {
       console.error(error);
-      showToast("Không tải được dữ liệu. Vui lòng thử lại.");
+      showActionError("Không tải được dữ liệu. Vui lòng thử lại.");
     });
   });
 
@@ -410,7 +412,7 @@ export function useFacultyResearchWorkApprovalProvider() {
       if (!lookupReady.value) return;
       loadList().catch((error) => {
         console.error(error);
-        showToast("Không tải được dữ liệu. Vui lòng thử lại.");
+        showActionError("Không tải được dữ liệu. Vui lòng thử lại.");
       });
     }
   );
@@ -421,9 +423,6 @@ export function useFacultyResearchWorkApprovalProvider() {
     pageTitle: computed(() => uiConfiguration.value.pageTitle),
     pageSubtitle: computed(() => uiConfiguration.value.pageSubtitle),
     pendingBadgeText,
-
-    toastMessage,
-
     filterPanelHelperText: computed(
       () =>
         "Không có bộ lọc khoa vì phạm vi đã cố định theo khoa đăng nhập. Mặc định hiển thị tất cả năm học."
@@ -469,3 +468,5 @@ export function useFacultyResearchWorkApprovalProvider() {
     reject,
   };
 }
+
+

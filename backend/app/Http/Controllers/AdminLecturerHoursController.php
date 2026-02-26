@@ -54,7 +54,7 @@ class AdminLecturerHoursController extends Controller
             ->first();
 
         if (! $lecturerRow) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursTotal = (float) (DB::table('lecturer_yearly_hours')
@@ -305,7 +305,7 @@ class AdminLecturerHoursController extends Controller
     {
         return (float) (DB::table('workload_quotas')
             ->where('academic_year_id', $academicYearId)
-            ->value('required_hours') ?? 600);
+            ->value('required_hours') ?? 0);
     }
 
     private function normalizeKpiStatus(?string $kpiStatus): string

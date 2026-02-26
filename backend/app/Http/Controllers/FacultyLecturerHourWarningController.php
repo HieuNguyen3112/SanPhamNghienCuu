@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\WorkflowNotification;
 use App\Support\AcademicYearResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -185,6 +186,36 @@ class FacultyLecturerHourWarningController extends Controller
                 ->where('id', $existing->id)
                 ->update(['updated_at' => $now]);
         }
+
+        $reasonLabel = match ($validated['reason_code']) {
+            'MISSING_HOURS' => 'thiếu giờ NCKH',
+            'DEADLINE_NEAR' => 'sắp đến hạn nộp',
+            'DEADLINE_PASSED' => 'đã quá hạn nộp',
+            'MISSING_EVIDENCE' => 'thiếu minh chứng',
+            default => 'cần rà soát hồ sơ giờ NCKH',
+        };
+
+        $detail = trim((string) ($validated['reason_note'] ?? ''));
+        $message = 'Khoa đã gửi nhắc nhở giờ NCKH năm học ' . $year['code'] . ' (' . $reasonLabel . ').';
+        if ($detail !== '') {
+            $message .= ' Ghi chú: ' . $detail;
+        }
+
+        WorkflowNotification::notifyLecturer(
+            $lecturerId,
+            WorkflowNotification::makePayload(
+                'hours_warning',
+                'Nhắc nhở giờ NCKH',
+                $message,
+                '/hours/personal_warnings',
+                [
+                    'lecturer_id' => (int) $lecturerId,
+                    'academic_year' => $year['code'],
+                    'reason_code' => $validated['reason_code'],
+                    'reason_note' => $validated['reason_note'] ?? null,
+                ]
+            )
+        );
 
         return response()->json([
             'success' => true,

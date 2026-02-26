@@ -5,6 +5,7 @@ import { useUserStore } from "@/app/stores/userStore";
 import { useLayoutStore } from "@/app/stores/layoutStore";
 import Sidebar from "@/shared/components/layout/Sidebar.vue";
 import Navbar from "@/shared/components/layout/Navbar.vue";
+import GlobalActionResultModal from "@/shared/components/GlobalActionResultModal.vue";
 import ChangePasswordModal from "@/features/auth/components/ChangePasswordModal.vue";
 
 const userStore = useUserStore();
@@ -58,5 +59,6 @@ const handleGoHome = async () => {
     </div>
 
     <ChangePasswordModal v-model="isChangePasswordOpen" />
+    <GlobalActionResultModal />
   </div>
 </template>

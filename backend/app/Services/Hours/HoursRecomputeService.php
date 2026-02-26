@@ -70,13 +70,14 @@ class HoursRecomputeService
                 'ram.id',
                 'ram.lecturer_id',
                 'mr.code as member_role_code',
+                'ra.owner_lecturer_id',
             ])
             ->orderBy('ram.id')
             ->get();
 
         if ($members->isEmpty()) {
             return [
-                'rule_id' => $rule?->id ? (int) $rule->id : null,
+                'rule_id' => $this->resolveRuleId($rule),
                 'rule_summary' => $this->ruleResolver->formatRuleSummary($rule),
                 'total_hours_activity' => null,
                 'members' => [],
@@ -89,6 +90,7 @@ class HoursRecomputeService
             $activity->quantity ? (int) $activity->quantity : 1,
             $members->all()
         );
+        $resolvedRuleId = $this->resolveRuleId($rule);
 
         if ($persist && $calculated['total_hours_activity'] !== null) {
             DB::table('research_activities')
@@ -108,35 +110,37 @@ class HoursRecomputeService
                     ]);
             }
 
-            DB::table('calculation_logs')->insert([
-                'activity_id' => $activityId,
-                'executed_at' => $timestamp,
-                'rule_id' => $rule ? (int) $rule->id : null,
-                'input_snapshot' => json_encode([
-                    'kind_code' => $activity->kind_code,
-                    'type_code' => $activity->type_code,
-                    'distribution_strategy' => $rule?->distribution_strategy,
-                    'quantity' => max(1, (int) ($activity->quantity ?? 1)),
-                    'member_count' => $members->count(),
-                    'members' => array_map(static fn ($member) => [
-                        'member_row_id' => (int) $member->id,
-                        'lecturer_id' => (int) $member->lecturer_id,
-                        'member_role_code' => $member->member_role_code ? (string) $member->member_role_code : null,
-                    ], $members->all()),
-                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                'result_snapshot' => json_encode([
-                    'total_hours_activity' => $calculated['total_hours_activity'],
-                    'members' => $calculated['members'],
-                    'formula' => $calculated['formula'] ?? null,
-                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                'total_hours' => $calculated['total_hours_activity'],
-                'created_at' => $timestamp,
-                'updated_at' => $timestamp,
-            ]);
+            if ($resolvedRuleId !== null) {
+                DB::table('calculation_logs')->insert([
+                    'activity_id' => $activityId,
+                    'executed_at' => $timestamp,
+                    'rule_id' => $resolvedRuleId,
+                    'input_snapshot' => json_encode([
+                        'kind_code' => $activity->kind_code,
+                        'type_code' => $activity->type_code,
+                        'distribution_strategy' => $rule?->distribution_strategy,
+                        'quantity' => max(1, (int) ($activity->quantity ?? 1)),
+                        'member_count' => $members->count(),
+                        'members' => array_map(static fn ($member) => [
+                            'member_row_id' => (int) $member->id,
+                            'lecturer_id' => (int) $member->lecturer_id,
+                            'member_role_code' => $member->member_role_code ? (string) $member->member_role_code : null,
+                        ], $members->all()),
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'result_snapshot' => json_encode([
+                        'total_hours_activity' => $calculated['total_hours_activity'],
+                        'members' => $calculated['members'],
+                        'formula' => $calculated['formula'] ?? null,
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'total_hours' => $calculated['total_hours_activity'],
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
+                ]);
+            }
         }
 
         return [
-            'rule_id' => $rule?->id ? (int) $rule->id : null,
+            'rule_id' => $this->resolveRuleId($rule),
             'rule_summary' => $this->ruleResolver->formatRuleSummary($rule),
             'total_hours_activity' => $calculated['total_hours_activity'],
             'members' => $calculated['members'],
@@ -275,5 +279,15 @@ class HoursRecomputeService
             ->pluck('ra.id')
             ->map(fn ($id) => (int) $id)
             ->all();
+    }
+
+    private function resolveRuleId(?object $rule): ?int
+    {
+        if (! $rule || ! isset($rule->id)) {
+            return null;
+        }
+
+        $id = (int) $rule->id;
+        return $id > 0 ? $id : null;
     }
 }

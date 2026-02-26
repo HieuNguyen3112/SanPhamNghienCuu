@@ -1,6 +1,5 @@
 <template>
   <div class="space-y-3">
-    <!-- Toolbar -->
     <div
       class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
     >
@@ -31,7 +30,6 @@
       </div>
     </div>
 
-    <!-- Table -->
     <div
       class="max-h-[560px] overflow-auto rounded-2xl border border-slate-200"
     >
@@ -77,18 +75,17 @@
               {{ formatPointRange(row.pointMin ?? null, row.pointMax ?? null) }}
             </td>
 
-            <!-- ✅ refactor: chỉ tính 1 lần -->
             <td class="px-4 py-3">
               <span
                 class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                :class="getCategoryMeta(getDerivedRow(row).category).badgeClass"
+                :class="resolveCategoryMeta(row).badgeClass"
               >
-                {{ getCategoryMeta(getDerivedRow(row).category).label }}
+                {{ resolveCategoryMeta(row).label }}
               </span>
             </td>
 
             <td class="px-4 py-3 text-right font-semibold text-slate-900">
-              {{ getDerivedRow(row).hours }} giờ
+              {{ resolveResearchHours(row) }} giờ
             </td>
 
             <td class="px-4 py-3">
@@ -104,17 +101,15 @@
               </span>
             </td>
 
-            <td class="px-4 py-3">
-              <div class="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  title="Sửa thông tin"
-                  @click="emit('edit', row.id)"
-                >
-                  <Pencil class="h-4 w-4" />
-                </button>
-              </div>
+            <td class="px-4 py-3 text-right">
+              <button
+                type="button"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                title="Sửa thông tin"
+                @click="emit('edit', row.id)"
+              >
+                <Pencil class="h-4 w-4" />
+              </button>
             </td>
           </tr>
 
@@ -130,7 +125,6 @@
       </table>
     </div>
 
-    <!-- Modal: Add/Edit Journal -->
     <CatalogUpsertModal
       :open="modalOpen"
       :title="modalTitle"
@@ -166,7 +160,7 @@
               "
               type="text"
               class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-              placeholder="VD: 1234-5678"
+              placeholder="Ví dụ: 1234-5678"
             />
             <p v-if="errors.issn" class="mt-1 text-xs text-rose-600">
               {{ errors.issn }}
@@ -213,14 +207,13 @@
             "
             type="text"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-            placeholder="VD: HDGSNN 2025 / Scopus / ISI / Link..."
+            placeholder="Ví dụ: HDGSNN 2025 / Scopus / Web of Science"
           />
           <p v-if="errors.sourceName" class="mt-1 text-xs text-rose-600">
             {{ errors.sourceName }}
           </p>
         </div>
 
-        <!-- Điểm công trình -->
         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div class="text-xs font-semibold text-slate-900">
             Điểm công trình (theo nguồn uy tín)
@@ -244,7 +237,7 @@
                 step="0.1"
                 min="0"
                 class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-                placeholder="VD: 0"
+                placeholder="Ví dụ: 0"
               />
               <p v-if="errors.pointMin" class="mt-1 text-xs text-rose-600">
                 {{ errors.pointMin }}
@@ -268,7 +261,7 @@
                 step="0.1"
                 min="0"
                 class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-                placeholder="VD: 1.5 / 2 / 3"
+                placeholder="Ví dụ: 1.5 / 2 / 3"
               />
               <p v-if="errors.pointMax" class="mt-1 text-xs text-rose-600">
                 {{ errors.pointMax }}
@@ -276,7 +269,6 @@
             </div>
           </div>
 
-          <!-- Derived (REACTIVE) -->
           <div
             class="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
           >
@@ -301,16 +293,14 @@
             </div>
 
             <div class="mt-2 text-slate-600">
-              Quy tắc: max điểm ≥ 2 → 900h; max điểm ≥ 1 → 600h; nếu &lt; 1 điểm
-              thì xét ISSN/ISBN → 300h.
+              Quy tắc: max điểm >= 2 → 900h; max điểm >= 1 → 600h; nếu thấp
+              hơn nhưng có ISSN/ISBN → 300h.
             </div>
           </div>
         </div>
 
         <div>
-          <label class="text-xs font-medium text-slate-600"
-            >Địa chỉ (optional)</label
-          >
+          <label class="text-xs font-medium text-slate-600">Địa chỉ</label>
           <input
             :value="localForm.address ?? ''"
             @input="
@@ -321,6 +311,21 @@
           />
           <p v-if="errors.address" class="mt-1 text-xs text-rose-600">
             {{ errors.address }}
+          </p>
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-slate-600">Quốc gia</label>
+          <input
+            :value="localForm.country ?? ''"
+            @input="
+              patchForm({ country: ($event.target as HTMLInputElement).value })
+            "
+            type="text"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+          />
+          <p v-if="errors.country" class="mt-1 text-xs text-rose-600">
+            {{ errors.country }}
           </p>
         </div>
 
@@ -349,10 +354,10 @@ import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
 
 export type DerivedCategory =
-  | "POINT_GE_2" // maxPoint >= 2 => 900h
-  | "POINT_GE_1" // maxPoint >= 1 => 600h
-  | "ISSN_ISBN" // có ISSN/ISBN => 300h
-  | "UNKNOWN";
+  | "POINT_GE_2"
+  | "POINT_GE_1"
+  | "ISSN_ISBN"
+  | "OTHER";
 
 export interface JournalRow {
   id: number;
@@ -360,13 +365,13 @@ export interface JournalRow {
   issn: string | null;
   notes: string | null;
   isActive: boolean;
-
   address?: string | null;
   country?: string | null;
-
   sourceName?: string | null;
   pointMin?: number | null;
   pointMax?: number | null;
+  classification?: DerivedCategory;
+  researchHours?: number;
 }
 
 export interface JournalFormModel {
@@ -374,7 +379,7 @@ export interface JournalFormModel {
   name: string;
   issn: string;
   address: string;
-  country: string; // <-- thêm dòng này
+  country: string;
   notes: string;
   isActive: boolean;
   sourceName: string;
@@ -386,6 +391,7 @@ type JournalFormErrors = Partial<
   Record<
     | "name"
     | "address"
+    | "country"
     | "issn"
     | "notes"
     | "sourceName"
@@ -422,11 +428,6 @@ const emit = defineEmits<{
   (e: "update:form", v: JournalFormModel): void;
 }>();
 
-/**
- * ✅ Local reactive form:
- * - nhập liệu update UI ngay
- * - vẫn emit lên parent để sync
- */
 const localForm = ref<JournalFormModel>({ ...props.form });
 
 watch(
@@ -450,8 +451,8 @@ function toNumberOrNull(raw: string): number | null {
 
 function formatPointRange(min: number | null, max: number | null): string {
   if (min === null && max === null) return "—";
-  if (min !== null && max === null) return `≥ ${min}`;
-  if (min === null && max !== null) return `≤ ${max}`;
+  if (min !== null && max === null) return `>= ${min}`;
+  if (min === null && max !== null) return `<= ${max}`;
   return `${min} – ${max}`;
 }
 
@@ -459,11 +460,6 @@ function hasIssnIsbn(v: string | null): boolean {
   return !!(v && v.trim().length > 0);
 }
 
-/**
- * ✅ Normalize điểm:
- * - chỉ có min hoặc max => coi đó là maxPoint
- * - có đủ 2 => swap nếu nhập ngược
- */
 function normalizePoints(pointMin: number | null, pointMax: number | null) {
   if (pointMin === null && pointMax === null) {
     return {
@@ -472,24 +468,21 @@ function normalizePoints(pointMin: number | null, pointMax: number | null) {
       maxPoint: null as number | null,
     };
   }
+
   if (pointMin !== null && pointMax === null) {
     return { min: pointMin, max: null, maxPoint: pointMin };
   }
+
   if (pointMin === null && pointMax !== null) {
     return { min: null, max: pointMax, maxPoint: pointMax };
   }
+
   const min = Math.min(pointMin!, pointMax!);
   const max = Math.max(pointMin!, pointMax!);
+
   return { min, max, maxPoint: max };
 }
 
-/**
- * ✅ Rule mới (chuẩn hơn):
- * - maxPoint >= 2  => 900h
- * - maxPoint >= 1  => 600h
- * - else có ISSN   => 300h
- * - else           => 0h
- */
 function deriveCategory(
   issn: string | null,
   pointMin: number | null,
@@ -500,55 +493,56 @@ function deriveCategory(
   if (maxPoint !== null && maxPoint >= 2) return "POINT_GE_2";
   if (maxPoint !== null && maxPoint >= 1) return "POINT_GE_1";
   if (hasIssnIsbn(issn)) return "ISSN_ISBN";
-  return "UNKNOWN";
+  return "OTHER";
 }
 
-/**
- * ✅ Bảng meta chung: label + giờ + màu badge
- */
 const CATEGORY_RULES: Record<
   DerivedCategory,
   { label: string; hours: number; badgeClass: string }
 > = {
   POINT_GE_2: {
-    label: "≥ 2 điểm",
+    label: "HDGSNN 1-2 điểm",
     hours: 900,
     badgeClass: "bg-emerald-50 text-emerald-700",
   },
   POINT_GE_1: {
-    label: "≥ 1 điểm",
+    label: "HDGSNN >= 1 điểm",
     hours: 600,
     badgeClass: "bg-sky-50 text-sky-700",
   },
   ISSN_ISBN: {
-    label: "ISSN/ISBN",
+    label: "Có ISSN/ISBN",
     hours: 300,
     badgeClass: "bg-amber-50 text-amber-800",
   },
-  UNKNOWN: {
-    label: "Chưa xác định",
+  OTHER: {
+    label: "Khác",
     hours: 0,
     badgeClass: "bg-slate-100 text-slate-700",
   },
 };
 
-function getCategoryMeta(c: DerivedCategory) {
-  return CATEGORY_RULES[c];
+function resolveCategoryCode(row: JournalRow): DerivedCategory {
+  const fromApi = row.classification;
+  if (fromApi && CATEGORY_RULES[fromApi]) {
+    return fromApi;
+  }
+
+  return deriveCategory(row.issn ?? null, row.pointMin ?? null, row.pointMax ?? null);
 }
 
-/**
- * ✅ Helper tính 1 lần/row để render bảng (tránh gọi derive nhiều lần)
- */
-function getDerivedRow(row: JournalRow) {
-  const category = deriveCategory(
-    row.issn ?? null,
-    row.pointMin ?? null,
-    row.pointMax ?? null,
-  );
-  return { category, hours: getCategoryMeta(category).hours };
+function resolveCategoryMeta(row: JournalRow) {
+  return CATEGORY_RULES[resolveCategoryCode(row)];
 }
 
-/** ✅ computed cho phần preview trong modal */
+function resolveResearchHours(row: JournalRow): number {
+  if (typeof row.researchHours === "number" && Number.isFinite(row.researchHours)) {
+    return row.researchHours;
+  }
+
+  return resolveCategoryMeta(row).hours;
+}
+
 const derivedCategoryValue = computed(() =>
   deriveCategory(
     localForm.value.issn ?? null,
@@ -557,19 +551,13 @@ const derivedCategoryValue = computed(() =>
   ),
 );
 
-const derivedHours = computed(
-  () => getCategoryMeta(derivedCategoryValue.value).hours,
-);
-const derivedLabel = computed(
-  () => getCategoryMeta(derivedCategoryValue.value).label,
-);
+const derivedHours = computed(() => CATEGORY_RULES[derivedCategoryValue.value].hours);
+const derivedLabel = computed(() => CATEGORY_RULES[derivedCategoryValue.value].label);
 const derivedBadgeClass = computed(
-  () => getCategoryMeta(derivedCategoryValue.value).badgeClass,
+  () => CATEGORY_RULES[derivedCategoryValue.value].badgeClass,
 );
 const derivedRangeText = computed(() =>
-  formatPointRange(
-    localForm.value.pointMin ?? null,
-    localForm.value.pointMax ?? null,
-  ),
+  formatPointRange(localForm.value.pointMin ?? null, localForm.value.pointMax ?? null),
 );
 </script>
+

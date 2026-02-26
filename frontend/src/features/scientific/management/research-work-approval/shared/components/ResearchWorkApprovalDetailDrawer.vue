@@ -455,6 +455,7 @@ import type {
   ResearchWorkRejectionReasonType,
 } from "../models/researchWorkApprovalModels";
 import { useResearchWorkApprovalDisplayMapping } from "../composables/useResearchWorkApprovalDisplayMapping";
+import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
 const props = defineProps<{
   approvalScopeIdentifier: ResearchWorkApprovalScopeIdentifier;
@@ -527,6 +528,7 @@ const {
   formatIntegerValue,
   formatDateTimeDisplayValue,
 } = displayMapping;
+const { openActionResultModal } = useActionResultModal();
 
 // chỉ cấp trường mới được chốt giờ
 const canFinalizeHours = computed(() => {
@@ -689,16 +691,9 @@ function approveSelectedResearchWork(): void {
     if (!isOfficialHoursValid.value) return;
   }
 
-  const ok = window.confirm(
-    canFinalizeHours.value
-      ? "Xác nhận duyệt & chốt giờ?"
-      : "Xác nhận hồ sơ hợp lệ và duyệt công trình?",
-  );
-  if (!ok) return;
-
-  emit("approve", {
+  const approvalPayload = {
     researchWorkIdentifier: entry.researchWorkIdentifier,
-    // tạm thời giữ API cũ: chốt = tổng giờ; khoa = null
+    // giu API cu: cap truong gui tong gio, cap khoa gui null.
     officialResearchHours: canFinalizeHours.value
       ? Math.round(totalOfficialHours.value)
       : null,
@@ -708,6 +703,19 @@ function approveSelectedResearchWork(): void {
         officialHoursDraftByAuthorId.value[row.authorIdentifier] ?? 0,
       ),
     })),
+  };
+
+  openActionResultModal({
+    type: "warning",
+    title: "Xác nhận",
+    message: canFinalizeHours.value
+      ? "Xác nhận duyệt và chốt giờ NCKH cho công trình này?"
+      : "Xác nhận hồ sơ hợp lệ và duyệt công trình?",
+    closeLabel: "Hủy",
+    secondaryLabel: "Duyệt",
+    onSecondary: () => {
+      emit("approve", approvalPayload);
+    },
   });
 }
 
@@ -728,17 +736,27 @@ async function onRejectActionButtonClicked(): Promise<void> {
   shouldShowRejectionValidationHint.value = true;
   if (!isRejectionFormValid.value || !selectedRejectionReasonType.value) return;
 
-  if (!window.confirm("Xác nhận từ chối công trình này? (Demo UI)")) return;
-
-  emit("reject", {
+  const rejectionPayload = {
     researchWorkIdentifier: entry.researchWorkIdentifier,
     rejectionReasonType: selectedRejectionReasonType.value,
     rejectionReasonDetail:
       selectedRejectionReasonType.value === "OTHER"
         ? rejectionReasonDetail.value.trim()
         : null,
-  });
+  };
 
-  resetRejectionFlowState();
+  openActionResultModal({
+    type: "warning",
+    title: "Xác nhận",
+    message: "Xác nhận từ chối công trình này?",
+    closeLabel: "Hủy",
+    secondaryLabel: "Từ chối",
+    onSecondary: () => {
+      emit("reject", rejectionPayload);
+      resetRejectionFlowState();
+    },
+  });
 }
 </script>
+
+

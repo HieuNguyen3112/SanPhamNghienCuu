@@ -32,7 +32,7 @@ class LecturerPersonalHoursOverviewSeeder extends Seeder
             DB::table('approval_stages')->updateOrInsert(
                 ['code' => 'hours'],
                 [
-                    'name' => 'Hours Approval',
+                    'name' => 'Khoa duyệt giờ NCKH',
                     'order_no' => 3,
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -79,7 +79,7 @@ class LecturerPersonalHoursOverviewSeeder extends Seeder
             if ($seed['status'] === 'rejected') {
                 $note = json_encode([
                     'reason_code' => 'missing_evidence',
-                    'reason_detail' => 'Thieu minh chung',
+                    'reason_detail' => 'Thiếu minh chứng',
                 ], JSON_UNESCAPED_UNICODE);
             }
 

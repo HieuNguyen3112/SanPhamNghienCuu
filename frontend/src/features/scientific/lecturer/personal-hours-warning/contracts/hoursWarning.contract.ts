@@ -16,7 +16,7 @@ export interface HoursWarningsSummaryDTO {
 }
 
 export interface HoursWarningItemDTO {
-  id: number;
+  id: string;
   type_key: string;
   severity_key: HoursWarningSeverityDTO;
   title: string;
@@ -32,7 +32,7 @@ export interface HoursWarningItemDTO {
 }
 
 export interface HoursWarningSuggestionDTO {
-  id: number;
+  id: string;
   title: string;
   description: string;
   cta_label: string | null;
@@ -48,7 +48,7 @@ export interface HoursWarningsResponseDTO {
 }
 
 export interface HoursWarningSeenResponseDTO {
-  id: number;
+  id: string;
   status_key: HoursWarningStatusDTO;
   seen_at: string | null;
 }
@@ -72,7 +72,7 @@ export interface HoursAlertsSummary {
 }
 
 export interface HoursAlertItem {
-  id: number;
+  id: string;
   level: HoursAlertLevel;
   title: string;
   description: string;
@@ -87,7 +87,7 @@ export interface HoursAlertItem {
 }
 
 export interface HoursAlertActionSuggestion {
-  id: number;
+  id: string;
   title: string;
   description: string;
   ctaLabel: string | null;

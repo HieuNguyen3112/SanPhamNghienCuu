@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import type {
   WorkLevel,
   WorkLevelUpsertDTO,
@@ -34,9 +34,7 @@ export function useWorkLevelCatalog() {
     isActive: true,
   });
 
-  const workLevelErrors = reactive<
-    Partial<Record<keyof typeof workLevelForm, string>>
-  >({});
+  const workLevelErrors = reactive<FormErrors<typeof workLevelForm>>({});
 
   function clearErrors() {
     Object.keys(workLevelErrors).forEach(
@@ -49,6 +47,7 @@ export function useWorkLevelCatalog() {
     if (value.length > max) return `Tối đa ${max} ký tự.`;
     return null;
   }
+
   function validateOptional(value: string, max: number): string | null {
     if (value.length > max) return `Tối đa ${max} ký tự.`;
     return null;
@@ -60,12 +59,25 @@ export function useWorkLevelCatalog() {
       page: pageWorkLevel.value,
       per_page: pageSizeWorkLevel.value,
     });
+
     workLevels.value = res.items;
     workLevelTotal.value = res.pagination.total;
   }
 
   const filteredWorkLevels = computed(() => workLevels.value);
   const pagedWorkLevels = computed(() => workLevels.value);
+
+  watch(qWorkLevel, () => {
+    if (pageWorkLevel.value !== 1) {
+      pageWorkLevel.value = 1;
+      return;
+    }
+    void load();
+  });
+
+  watch([pageWorkLevel, pageSizeWorkLevel], () => {
+    void load();
+  });
 
   function openCreateWorkLevel() {
     modalMode.value = "create";
@@ -108,6 +120,7 @@ export function useWorkLevelCatalog() {
       validateRequired(workLevelForm.name, 255) ?? undefined;
     workLevelErrors.notes =
       validateOptional(workLevelForm.notes, 255) ?? undefined;
+
     if (workLevelErrors.name || workLevelErrors.notes) return;
 
     const payload: WorkLevelUpsertDTO = {
@@ -142,3 +155,4 @@ export function useWorkLevelCatalog() {
     onUpdateWorkLevelForm,
   };
 }
+

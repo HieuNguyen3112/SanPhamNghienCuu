@@ -13,23 +13,35 @@ class HoursRuleResolver
 
         $rule = $this->findExactRule($kindId, $typeId, $windowStart, $windowEnd);
         if ($rule) {
-            return $this->normalizeFixedPaperRule($rule, $requestedTypeCode);
+            return $rule;
         }
 
-        $fallbackRule = $this->findExactRule($kindId, $typeId);
-        if ($fallbackRule) {
-            return $this->normalizeFixedPaperRule($fallbackRule, $requestedTypeCode);
+        $mappedTypeId = $this->resolveMappedTypeId($kindId, $requestedTypeCode);
+        if ($mappedTypeId !== null && $mappedTypeId !== $typeId) {
+            $rule = $this->findExactRule($kindId, $mappedTypeId, $windowStart, $windowEnd);
+            if ($rule) {
+                return $rule;
+            }
         }
 
-        $paperFallbackRule = $this->findPaperFamilyFallbackRule(
-            $kindId,
-            $typeId,
-            $requestedTypeCode,
-            $windowStart,
-            $windowEnd
-        );
+        $rule = $this->findGenericRule($kindId, $windowStart, $windowEnd);
+        if ($rule) {
+            return $rule;
+        }
 
-        return $this->normalizeFixedPaperRule($paperFallbackRule, $requestedTypeCode);
+        $rule = $this->findExactRule($kindId, $typeId);
+        if ($rule) {
+            return $rule;
+        }
+
+        if ($mappedTypeId !== null && $mappedTypeId !== $typeId) {
+            $rule = $this->findExactRule($kindId, $mappedTypeId);
+            if ($rule) {
+                return $rule;
+            }
+        }
+
+        return $this->findGenericRule($kindId);
     }
 
     public function formatRuleSummary(?object $rule): string
@@ -118,45 +130,19 @@ class HoursRuleResolver
         return $query->first();
     }
 
-    private function findPaperFamilyFallbackRule(
+    private function findGenericRule(
         int $kindId,
-        ?int $typeId,
-        ?string $requestedTypeCode,
-        ?string $windowStart,
-        ?string $windowEnd
+        ?string $windowStart = null,
+        ?string $windowEnd = null
     ): ?object {
-        if (! $typeId || ! $requestedTypeCode) {
-            return null;
-        }
-
-        if (! in_array($requestedTypeCode, ['hdgsnn_900', 'hdgsnn_600', 'hdgsnn_300'], true)) {
-            return null;
-        }
-
-        $kindCode = DB::table('activity_kinds')->where('id', $kindId)->value('code');
-        if (strtolower((string) $kindCode) !== 'paper') {
-            return null;
-        }
-
-        $query = $this->baseRuleQuery($kindId, null, false);
+        $query = $this->baseRuleQuery($kindId, null, false)
+            ->whereNull('hr.type_id');
 
         if ($windowStart && $windowEnd) {
             $this->applyRuleWindowFilter($query, $windowStart, $windowEnd);
         }
 
-        $row = $query->first();
-        if (! $row) {
-            $row = $this->baseRuleQuery($kindId, null, false)->first();
-        }
-
-        if (! $row) {
-            return null;
-        }
-
-        $row->type_id = $typeId;
-        $row->type_code = $requestedTypeCode;
-
-        return $row;
+        return $query->first();
     }
 
     private function baseRuleQuery(int $kindId, ?int $typeId, bool $withTypeFilter = true)
@@ -212,37 +198,33 @@ class HoursRuleResolver
         return strtolower((string) $code);
     }
 
-    private function normalizeFixedPaperRule(?object $rule, ?string $requestedTypeCode = null): ?object
+    private function resolveMappedTypeId(int $kindId, ?string $typeCode): ?int
     {
-        if (! $rule) {
+        if ($typeCode === null) {
             return null;
         }
 
-        $kindCode = strtolower((string) ($rule->kind_code ?? ''));
-        $typeCode = strtolower((string) ($rule->type_code ?? $requestedTypeCode ?? ''));
-        if ($kindCode !== 'paper') {
-            return $rule;
+        $kindCode = DB::table('activity_kinds')->where('id', $kindId)->value('code');
+        if (strtolower((string) $kindCode) !== 'project') {
+            return null;
         }
 
-        $fixedHours = match ($typeCode) {
-            'hdgsnn_900' => 900.0,
-            'hdgsnn_600' => 600.0,
-            'hdgsnn_300' => 300.0,
-            default => null,
-        };
-
-        if ($fixedHours === null) {
-            return $rule;
+        $normalized = strtolower(trim($typeCode));
+        if ($normalized === 'ministry') {
+            $normalized = 'bo';
+        } elseif ($normalized === 'university') {
+            $normalized = 'coso';
         }
 
-        $rule->distribution_strategy = 'equal_all_members';
-        $rule->hours_total_per_activity = $fixedHours;
-        $rule->hours_per_occurrence = null;
-        $rule->principal_fraction = null;
-        $rule->others_fraction_total = null;
-        $rule->max_occurrences_per_year = null;
-        $rule->type_code = $typeCode;
+        if (! in_array($normalized, ['bo', 'coso'], true)) {
+            return null;
+        }
 
-        return $rule;
+        $typeId = DB::table('activity_types')
+            ->where('kind_id', $kindId)
+            ->where('code', $normalized)
+            ->value('id');
+
+        return $typeId ? (int) $typeId : null;
     }
 }

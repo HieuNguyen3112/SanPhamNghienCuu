@@ -29,16 +29,27 @@ class AdminResearchHoursCatalogController extends Controller
         $kinds = DB::table('activity_kinds')
             ->select(['id', 'code', 'name'])
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn ($row) => (object) [
+                'id' => (int) $row->id,
+                'code' => $row->code,
+                'name' => $this->mapKindDisplayName($row->code, $row->name),
+            ]);
 
         $types = DB::table('activity_types')
             ->select(['id', 'kind_id', 'code', 'name'])
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn ($row) => (object) [
+                'id' => (int) $row->id,
+                'kind_id' => (int) $row->kind_id,
+                'code' => $row->code,
+                'name' => $this->mapTypeDisplayName($row->code, $row->name),
+            ]);
 
         $statuses = [
-            ['key' => 'ACTIVE', 'label' => 'Active'],
-            ['key' => 'INACTIVE', 'label' => 'Inactive'],
+            ['key' => 'ACTIVE', 'label' => 'Đang áp dụng'],
+            ['key' => 'INACTIVE', 'label' => 'Ngừng áp dụng'],
         ];
 
         return response()->json([
@@ -124,13 +135,13 @@ class AdminResearchHoursCatalogController extends Controller
 
         if (! $this->validateTypeForKind($data['type_id'] ?? null, $data['kind_id'])) {
             return response()->json([
-                'message' => 'Invalid type for selected kind.',
+                'message' => 'Loại chi tiết không thuộc nhóm công trình đã chọn.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         if ($this->existsHourRuleDuplicate($data, null)) {
             return response()->json([
-                'message' => 'Duplicate rule for the same kind/type and effective date.',
+                'message' => 'Đã tồn tại quy đổi cho cùng loại công trình và thời gian áp dụng.',
             ], Response::HTTP_CONFLICT);
         }
 
@@ -175,27 +186,27 @@ class AdminResearchHoursCatalogController extends Controller
     {
         $existing = DB::table('hour_rules')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $this->validateHourRule($request);
 
         if (! $this->validateTypeForKind($data['type_id'] ?? null, $data['kind_id'])) {
             return response()->json([
-                'message' => 'Invalid type for selected kind.',
+                'message' => 'Loại chi tiết không thuộc nhóm công trình đã chọn.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $locked = $this->isHourRuleLocked($id);
         if ($locked && $this->hasHourRuleChanges($existing, $data)) {
             return response()->json([
-                'message' => 'Rule is locked and cannot be updated.',
+                'message' => 'Quy đổi đã được sử dụng, không thể chỉnh sửa.',
             ], Response::HTTP_CONFLICT);
         }
 
         if ($this->existsHourRuleDuplicate($data, $id)) {
             return response()->json([
-                'message' => 'Duplicate rule for the same kind/type and effective date.',
+                'message' => 'Đã tồn tại quy đổi cho cùng loại công trình và thời gian áp dụng.',
             ], Response::HTTP_CONFLICT);
         }
 
@@ -240,7 +251,7 @@ class AdminResearchHoursCatalogController extends Controller
     {
         $existing = DB::table('hour_rules')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -336,7 +347,7 @@ class AdminResearchHoursCatalogController extends Controller
             ->exists();
         if ($exists) {
             return response()->json([
-                'message' => 'Quota already exists for this academic year.',
+                'message' => 'Định mức cho năm học này đã tồn tại.',
             ], Response::HTTP_CONFLICT);
         }
 
@@ -372,7 +383,7 @@ class AdminResearchHoursCatalogController extends Controller
     {
         $existing = DB::table('workload_quotas')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -383,7 +394,7 @@ class AdminResearchHoursCatalogController extends Controller
         $locked = $this->isAcademicYearLocked((int) $existing->academic_year_id);
         if ($locked && (float) $data['required_hours'] !== (float) $existing->required_hours) {
             return response()->json([
-                'message' => 'Quota is locked and cannot be updated.',
+                'message' => 'Định mức đã được sử dụng, không thể chỉnh sửa.',
             ], Response::HTTP_CONFLICT);
         }
 
@@ -499,7 +510,7 @@ class AdminResearchHoursCatalogController extends Controller
     {
         $existing = DB::table('academic_years')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $this->validateAcademicYear($request, $id);
@@ -507,7 +518,7 @@ class AdminResearchHoursCatalogController extends Controller
         $locked = $this->isAcademicYearLocked($id);
         if ($locked && $this->hasAcademicYearChanges($existing, $data)) {
             return response()->json([
-                'message' => 'Academic year is locked and cannot be updated.',
+                'message' => 'Năm học đã được sử dụng, không thể chỉnh sửa.',
             ], Response::HTTP_CONFLICT);
         }
 
@@ -550,7 +561,7 @@ class AdminResearchHoursCatalogController extends Controller
     {
         $existing = DB::table('academic_years')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         DB::transaction(function () use ($id) {
@@ -874,5 +885,44 @@ class AdminResearchHoursCatalogController extends Controller
         ];
 
         return implode(', ', $parts);
+    }
+
+    private function mapKindDisplayName(?string $code, ?string $fallback): ?string
+    {
+        if (! $code) {
+            return $fallback;
+        }
+
+        $mapped = match (strtolower($code)) {
+            'paper' => 'Bài báo khoa học',
+            'book' => 'Sách, giáo trình',
+            'project' => 'Đề tài KH&CN',
+            'conference' => 'Hội nghị, hội thảo',
+            default => null,
+        };
+
+        return $mapped ?? $fallback ?? $code;
+    }
+
+    private function mapTypeDisplayName(?string $code, ?string $fallback): ?string
+    {
+        if (! $code) {
+            return $fallback;
+        }
+
+        $mapped = match (strtolower($code)) {
+            'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)',
+            'hdgsnn_600' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)',
+            'hdgsnn_300' => 'Bài báo có ISSN/ISBN (300 giờ)',
+            'textbook' => 'Giáo trình',
+            'reference' => 'Tài liệu tham khảo',
+            'bo', 'ministry' => 'Đề tài cấp Bộ (2 năm)',
+            'coso', 'university' => 'Đề tài cấp Trường (1 năm)',
+            'report' => 'Báo cáo hội thảo',
+            'attend' => 'Tham dự hội thảo',
+            default => null,
+        };
+
+        return $mapped ?? $fallback ?? $code;
     }
 }

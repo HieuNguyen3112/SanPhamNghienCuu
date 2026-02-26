@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
         WorkCatalogSeeder::class,
         AuditLogSeeder::class,
         FacultyHoursApprovalSeeder::class,
+        NotificationIconDemoSeeder::class,
     ]);
 }
 

@@ -1,17 +1,14 @@
-<!-- src/shared/components/layout/Navbar.vue -->
 <template>
   <header
     class="flex h-14 w-full items-center justify-between bg-[#234a74] px-4 text-slate-100 shadow-sm md:h-16 md:px-8"
   >
-    <!-- LEFT: toggle (mobile) + title -->
     <div class="flex items-center gap-3">
-      <!-- Nút toggle sidebar cho mobile -->
       <button
         type="button"
         class="flex h-9 w-9 items-center justify-center rounded-md border border-white/20 bg-white/10 text-slate-100 shadow-sm hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/60 md:hidden"
         @click="emit('toggle-sidebar')"
       >
-        <span class="sr-only">Toggle sidebar</span>
+        <span class="sr-only">Mở/đóng thanh điều hướng</span>
         <span class="space-y-1">
           <span class="block h-0.5 w-4 bg-current"></span>
           <span class="block h-0.5 w-4 bg-current"></span>
@@ -19,56 +16,188 @@
         </span>
       </button>
 
-      <!-- Logo + title trường -->
       <div class="flex items-center gap-3">
         <span
           class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-100 md:text-sm"
         >
-          {{ "TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH" }}
+          {{ title }}
         </span>
       </div>
     </div>
 
-    <!-- RIGHT: flag + notification + user avatar + dropdown -->
     <div class="flex items-center gap-4 md:gap-6">
-      <!-- Cờ Việt Nam -->
-      <!-- <button
-        type="button"
-        class="flex h-6 items-center rounded-sm border border-white/10 bg-red-600 px-2 shadow-sm hover:bg-red-500"
-      >
-        <span class="sr-only">Ngôn ngữ: Tiếng Việt</span>
-        <span class="text-[10px] font-semibold text-yellow-300">VN</span>
-      </button> -->
-
-      <!-- Notification bell -->
-      <button
-        type="button"
-        class="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-100 shadow-sm hover:bg-white/20"
-      >
-        <span class="sr-only">Thông báo</span>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.7"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+      <div ref="notificationRootRef" class="relative">
+        <button
+          type="button"
+          class="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-100 shadow-sm hover:bg-white/20"
+          :aria-expanded="isNotificationOpen"
+          aria-haspopup="menu"
+          aria-label="Mở danh sách thông báo"
+          @click.stop="toggleNotificationMenu"
         >
-          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
+          <Bell class="h-5 w-5" />
 
-        <span
-          v-if="notificationCount > 0"
-          class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white"
+          <span
+            v-if="displayNotificationCount > 0"
+            class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white"
+          >
+            {{ displayNotificationCount }}
+          </span>
+        </button>
+
+        <transition
+          enter-active-class="transition duration-150 ease-out"
+          enter-from-class="opacity-0 translate-y-1"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition duration-100 ease-in"
+          leave-from-class="opacity-100 translate-y-0"
+          leave-to-class="opacity-0 translate-y-1"
         >
-          {{ notificationCount }}
-        </span>
-      </button>
+          <div
+            v-if="isNotificationOpen"
+            class="absolute right-0 top-11 z-[90] w-[380px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-xl"
+            role="menu"
+            aria-label="Danh sách thông báo"
+          >
+            <div
+              class="flex items-center justify-between border-b border-slate-200 px-4 py-3"
+            >
+              <div class="text-sm font-semibold text-slate-900">Thông báo</div>
+              <div class="flex items-center gap-3">
+                <button
+                  type="button"
+                  class="text-xs font-medium text-slate-600 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="
+                    !canUseNotifications ||
+                    markingAllRead ||
+                    displayNotificationCount === 0
+                  "
+                  @click="markAllAsRead"
+                >
+                  Đánh dấu tất cả đã đọc
+                </button>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-slate-500 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="
+                    !canUseNotifications || deletingRead || readNotificationCount === 0
+                  "
+                  @click="deleteReadNotifications"
+                >
+                  Xóa đã đọc
+                </button>
+              </div>
+            </div>
 
-      <!-- Avatar + dropdown -->
+            <div class="max-h-[60vh] overflow-y-auto">
+              <div
+                v-if="!canUseNotifications"
+                class="px-4 py-6 text-center text-sm text-slate-500"
+              >
+                Vai trò hiện tại chưa hỗ trợ thông báo nhanh.
+              </div>
+
+              <div
+                v-else-if="loadingNotifications"
+                class="px-4 py-6 text-center text-sm text-slate-500"
+              >
+                Đang tải thông báo...
+              </div>
+
+              <div
+                v-else-if="notifications.length === 0"
+                class="px-4 py-6 text-center text-sm text-slate-500"
+              >
+                Chưa có thông báo mới.
+              </div>
+
+              <ul v-else class="divide-y divide-slate-100">
+                <li
+                  v-for="entry in notificationsWithVisual"
+                  :key="entry.item.id"
+                  class="px-3 py-2"
+                >
+                  <div
+                    class="rounded-xl border px-3 py-2 transition"
+                    :class="
+                      entry.item.is_unread
+                        ? 'border-blue-200 bg-blue-50/40'
+                        : 'border-slate-200/60 bg-white'
+                    "
+                  >
+                    <div class="flex items-start gap-3">
+                      <div
+                        class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1"
+                        :class="entry.visual.wrapClass"
+                      >
+                        <component
+                          :is="entry.visual.icon"
+                          class="h-4 w-4"
+                          :class="entry.visual.iconClass"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        class="flex-1 text-left"
+                        @click="openNotification(entry.item)"
+                      >
+                        <p
+                          class="line-clamp-1 text-sm"
+                          :class="
+                            entry.item.is_unread
+                              ? 'font-semibold text-slate-900'
+                              : 'font-medium text-slate-800'
+                          "
+                        >
+                          {{ entry.item.title }}
+                        </p>
+                        <p class="mt-0.5 line-clamp-2 text-xs text-slate-600">
+                          {{ entry.item.message }}
+                        </p>
+                        <p class="mt-1 text-[11px] text-slate-400">
+                          {{ formatRelativeTime(entry.item.created_at) }}
+                        </p>
+                      </button>
+
+                      <button
+                        v-if="entry.item.is_unread"
+                        type="button"
+                        class="mt-0.5 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="markingReadId === entry.item.id"
+                        @click.stop="markAsReadOnly(entry.item.id)"
+                      >
+                        Đã đọc
+                      </button>
+
+                      <div v-else class="flex items-center gap-2">
+                        <span
+                          class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-slate-400"
+                        >
+                          <span
+                            class="inline-block h-1.5 w-1.5 rounded-full bg-slate-300"
+                          ></span>
+                          Đã đọc
+                        </span>
+                        <button
+                          type="button"
+                          class="mt-0.5 rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          :disabled="deletingId === entry.item.id"
+                          @click.stop="deleteNotification(entry.item.id)"
+                        >
+                          <span class="sr-only">Xóa thông báo</span>
+                          <Trash2 class="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </transition>
+      </div>
+
       <div>
         <button
           ref="avatarBtnRef"
@@ -105,15 +234,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { Bell, Trash2 } from "lucide-vue-next";
+import { useUserStore, type UserRole } from "@/app/stores/userStore";
 import UserDropdown from "@/shared/components/layout/UserDropdown.vue";
+import { getNotificationVisual } from "@/shared/notifications/notificationVisual";
+import {
+  deleteNotificationByRole,
+  deleteReadNotificationsByRole,
+  listNotificationsByRole,
+  markAllNotificationsAsReadByRole,
+  markNotificationAsReadByRole,
+  type AppNotificationItem,
+  type NotificationRole,
+} from "@/shared/services/lecturerNotifications.service";
 
 const emit = defineEmits<{
   (e: "toggle-sidebar"): void;
   (e: "open-profile"): void;
   (e: "change-password"): void;
   (e: "logout"): void;
+  (e: "go-home"): void;
 }>();
 
 const props = withDefaults(
@@ -131,58 +273,279 @@ const props = withDefaults(
   }
 );
 
-// TODO: khi có logo thật:
-// import logoReal from "@/assets/images/logo-university.svg";
-// const logoSrc = logoReal;
-// const logoSrc = "" as string;
+const router = useRouter();
+const userStore = useUserStore();
+
+const notificationRole = computed<NotificationRole | null>(() => {
+  const role = (userStore.role ?? null) as UserRole | null;
+  if (role === "LECTURER" || role === "DEPARTMENT_BOARD") {
+    return role;
+  }
+  return null;
+});
+const canUseNotifications = computed(() => notificationRole.value !== null);
 
 const isUserMenuOpen = ref(false);
 const avatarBtnRef = ref<HTMLElement | null>(null);
-const userMenuRef = ref<HTMLElement | null>(null);
 
-const toggleUserMenu = () => {
+const isNotificationOpen = ref(false);
+const notificationRootRef = ref<HTMLElement | null>(null);
+const notifications = ref<AppNotificationItem[]>([]);
+const unreadCount = ref(0);
+const loadingNotifications = ref(false);
+const markingReadId = ref<string | null>(null);
+const markingAllRead = ref(false);
+const deletingId = ref<string | null>(null);
+const deletingRead = ref(false);
+
+const displayNotificationCount = computed(() => {
+  const fallbackCount = Number(props.notificationCount ?? 0);
+  return Math.max(unreadCount.value, fallbackCount);
+});
+
+const notificationsWithVisual = computed(() =>
+  notifications.value.map((item) => ({
+    item,
+    visual: getNotificationVisual(item),
+  }))
+);
+
+const readNotificationCount = computed(
+  () => notifications.value.filter((item) => !item.is_unread).length
+);
+
+const defaultTargetByRole: Record<NotificationRole, string> = {
+  LECTURER: "/declarations/gateway",
+  DEPARTMENT_BOARD: "/works/facapprovals",
+};
+
+function toggleUserMenu() {
   isUserMenuOpen.value = !isUserMenuOpen.value;
-};
+}
 
-const closeUserMenu = () => {
+function closeUserMenu() {
   isUserMenuOpen.value = false;
-};
+}
 
-const handleOpenProfile = () => {
+function handleOpenProfile() {
   emit("open-profile");
   closeUserMenu();
-};
+}
 
-const handleChangePassword = () => {
+function handleChangePassword() {
   emit("change-password");
   closeUserMenu();
-};
+}
 
-const handleLogout = () => {
+function handleLogout() {
   emit("logout");
   closeUserMenu();
-};
+}
 
-const handleClickOutside = (event: MouseEvent) => {
-  if (!isUserMenuOpen.value) return;
-  const target = event.target as Node | null;
-  if (
-    userMenuRef.value &&
-    !userMenuRef.value.contains(target) &&
-    avatarBtnRef.value &&
-    !avatarBtnRef.value.contains(target)
-  ) {
-    closeUserMenu();
+function formatRelativeTime(value: string | null) {
+  if (!value) return "Vừa xong";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Vừa xong";
+
+  const diffMs = date.getTime() - Date.now();
+  const diffMinute = Math.round(diffMs / 60000);
+  const absMinute = Math.abs(diffMinute);
+
+  const formatter = new Intl.RelativeTimeFormat("vi", { numeric: "auto" });
+
+  if (absMinute < 1) return "Vừa xong";
+  if (absMinute < 60) return formatter.format(diffMinute, "minute");
+
+  const diffHour = Math.round(diffMinute / 60);
+  if (Math.abs(diffHour) < 24) return formatter.format(diffHour, "hour");
+
+  const diffDay = Math.round(diffHour / 24);
+  if (Math.abs(diffDay) < 7) return formatter.format(diffDay, "day");
+
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+async function fetchNotifications(options?: { silent?: boolean }) {
+  const role = notificationRole.value;
+  if (!role) {
+    notifications.value = [];
+    unreadCount.value = 0;
+    return;
   }
-};
+
+  const silent = options?.silent ?? false;
+  if (!silent) {
+    loadingNotifications.value = true;
+  }
+
+  try {
+    const response = await listNotificationsByRole(role, { page: 1, per_page: 12 });
+    notifications.value = response.items;
+    unreadCount.value = response.unread_count;
+  } catch (error) {
+    console.error(error);
+  } finally {
+    if (!silent) {
+      loadingNotifications.value = false;
+    }
+  }
+}
+
+async function markAsReadOnly(notificationId: string) {
+  const role = notificationRole.value;
+  if (!role) return;
+  if (markingReadId.value) return;
+
+  markingReadId.value = notificationId;
+  try {
+    await markNotificationAsReadByRole(role, notificationId);
+    notifications.value = notifications.value.map((item) =>
+      item.id === notificationId
+        ? {
+            ...item,
+            is_unread: false,
+            read_at: item.read_at ?? new Date().toISOString(),
+          }
+        : item
+    );
+    unreadCount.value = Math.max(0, unreadCount.value - 1);
+  } catch (error) {
+    console.error(error);
+  } finally {
+    markingReadId.value = null;
+  }
+}
+
+async function openNotification(item: AppNotificationItem) {
+  const role = notificationRole.value;
+  if (!role) return;
+
+  if (item.is_unread) {
+    await markAsReadOnly(item.id);
+  }
+
+  isNotificationOpen.value = false;
+
+  const fallbackTarget = defaultTargetByRole[role];
+  const targetPath = item.target_url || fallbackTarget;
+  await router.push(targetPath).catch(() => undefined);
+}
+
+async function markAllAsRead() {
+  const role = notificationRole.value;
+  if (!role) return;
+  if (markingAllRead.value || displayNotificationCount.value === 0) return;
+
+  markingAllRead.value = true;
+  try {
+    await markAllNotificationsAsReadByRole(role);
+    notifications.value = notifications.value.map((item) => ({
+      ...item,
+      is_unread: false,
+      read_at: item.read_at ?? new Date().toISOString(),
+    }));
+    unreadCount.value = 0;
+  } catch (error) {
+    console.error(error);
+  } finally {
+    markingAllRead.value = false;
+  }
+}
+
+async function deleteNotification(notificationId: string) {
+  const role = notificationRole.value;
+  if (!role || deletingId.value) return;
+
+  deletingId.value = notificationId;
+  try {
+    await deleteNotificationByRole(role, notificationId);
+    const removed = notifications.value.find((item) => item.id === notificationId);
+    notifications.value = notifications.value.filter(
+      (item) => item.id !== notificationId
+    );
+
+    if (removed?.is_unread) {
+      unreadCount.value = Math.max(0, unreadCount.value - 1);
+    }
+  } catch (error) {
+    console.error(error);
+  } finally {
+    deletingId.value = null;
+  }
+}
+
+async function deleteReadNotifications() {
+  const role = notificationRole.value;
+  if (!role || deletingRead.value || readNotificationCount.value === 0) return;
+
+  deletingRead.value = true;
+  try {
+    await deleteReadNotificationsByRole(role);
+    notifications.value = notifications.value.filter((item) => item.is_unread);
+  } catch (error) {
+    console.error(error);
+  } finally {
+    deletingRead.value = false;
+  }
+}
+
+async function toggleNotificationMenu() {
+  isNotificationOpen.value = !isNotificationOpen.value;
+  if (!isNotificationOpen.value) return;
+
+  if (!canUseNotifications.value) return;
+  await fetchNotifications();
+}
+
+function closeNotificationMenu() {
+  isNotificationOpen.value = false;
+}
+
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as Node | null;
+
+  if (isNotificationOpen.value) {
+    if (notificationRootRef.value && !notificationRootRef.value.contains(target)) {
+      closeNotificationMenu();
+    }
+  }
+
+  if (isUserMenuOpen.value) {
+    if (avatarBtnRef.value && !avatarBtnRef.value.contains(target)) {
+      closeUserMenu();
+    }
+  }
+}
+
+function handleEsc(event: KeyboardEvent) {
+  if (event.key !== "Escape") return;
+  closeNotificationMenu();
+  closeUserMenu();
+}
+
+watch(notificationRole, () => {
+  notifications.value = [];
+  unreadCount.value = 0;
+  void fetchNotifications({ silent: true });
+});
 
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
+  document.addEventListener("keydown", handleEsc);
+  void fetchNotifications({ silent: true });
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("click", handleClickOutside);
+  document.removeEventListener("keydown", handleEsc);
 });
 
-const { notificationCount, userName, userCode } = props;
+const { userName, userCode, title } = props;
 </script>

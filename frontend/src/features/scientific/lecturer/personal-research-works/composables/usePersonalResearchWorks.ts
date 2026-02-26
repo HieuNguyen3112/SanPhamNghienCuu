@@ -77,7 +77,8 @@ export function usePersonalResearchWorks() {
       rows.value = dto.items.map(mapper.rowFromDto);
       totalItemCount.value = dto.pagination.total;
     } catch (err) {
-      errorList.value = err instanceof Error ? err.message : "Failed to load works.";
+      errorList.value =
+        err instanceof Error ? err.message : "Không tải được danh sách công trình.";
     } finally {
       loadingList.value = false;
     }
@@ -114,7 +115,8 @@ export function usePersonalResearchWorks() {
       const dto = await personalResearchWorksService.getDetail(workId);
       selectedWorkDetail.value = mapper.detailFromDto(dto);
     } catch (err) {
-      errorDetail.value = err instanceof Error ? err.message : "Failed to load work detail.";
+      errorDetail.value =
+        err instanceof Error ? err.message : "Không tải được chi tiết công trình.";
     } finally {
       loadingDetail.value = false;
     }

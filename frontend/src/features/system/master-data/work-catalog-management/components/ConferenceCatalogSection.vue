@@ -58,15 +58,7 @@
               </div>
             </td>
             <td class="px-4 py-3 text-slate-700">
-              {{
-                row.level === "FACULTY"
-                  ? "Khoa"
-                  : row.level === "UNIVERSITY"
-                    ? "Trường"
-                    : row.level === "NATIONAL"
-                      ? "Quốc gia"
-                      : "Quốc tế"
-              }}
+              {{ levelLabelMap[row.level] ?? row.level }}
             </td>
             <td class="px-4 py-3">
               <span
@@ -102,16 +94,6 @@
           </tr>
         </tbody>
       </table>
-    </div>
-
-    <div class="flex items-center justify-end">
-      <!-- <SharedPaginationControls
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        @update:page="emit('update:page', $event)"
-        @update:page-size="emit('update:pageSize', $event)"
-      /> -->
     </div>
 
     <CatalogUpsertModal
@@ -154,8 +136,8 @@
             "
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
           >
-            <option value="FACULTY">Khoa</option>
-            <option value="UNIVERSITY">Trường</option>
+            <option value="FACULTY">Cấp Khoa</option>
+            <option value="UNIVERSITY">Cấp Trường</option>
             <option value="NATIONAL">Quốc gia</option>
             <option value="INTERNATIONAL">Quốc tế</option>
           </select>
@@ -213,7 +195,13 @@
 import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
 import type { Conference } from "../contracts/conferences.contract";
-// import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
+
+const levelLabelMap: Record<string, string> = {
+  FACULTY: "Cấp Khoa",
+  UNIVERSITY: "Cấp Trường",
+  NATIONAL: "Quốc gia",
+  INTERNATIONAL: "Quốc tế",
+};
 
 defineProps<{
   rows: Conference[];
@@ -256,3 +244,4 @@ const emit = defineEmits<{
   ): void;
 }>();
 </script>
+

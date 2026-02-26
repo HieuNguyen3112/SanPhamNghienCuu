@@ -6,6 +6,7 @@ use App\Http\Requests\Faculty\FacultyWorkApprovalListRequest;
 use App\Http\Requests\Faculty\FacultyWorkApprovalRejectRequest;
 use App\Services\Hours\HoursRecomputeService;
 use App\Support\AuditLogger;
+use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -321,6 +322,23 @@ class FacultyResearchWorkApprovalController extends Controller
             ], $user);
         });
 
+        $workTitle = trim((string) ($current->title ?? ''));
+        WorkflowNotification::notifyLecturer(
+            (int) $current->lecturer_id,
+            WorkflowNotification::makePayload(
+                'work_approved',
+                'Công trình đã được duyệt',
+                $workTitle !== ''
+                    ? 'Công trình "' . $workTitle . '" đã được khoa duyệt.'
+                    : 'Công trình của bạn đã được khoa duyệt.',
+                '/works/personal?activity_id=' . $activity,
+                [
+                    'activity_id' => (int) $activity,
+                    'lecturer_id' => (int) $current->lecturer_id,
+                ]
+            )
+        );
+
         return response()->json([
             'message' => 'faculty approved (final)',
         ], Response::HTTP_OK);
@@ -419,6 +437,24 @@ class FacultyResearchWorkApprovalController extends Controller
                 ],
             ], $user);
         });
+
+        $workTitle = trim((string) ($current->title ?? ''));
+        WorkflowNotification::notifyLecturer(
+            (int) $current->lecturer_id,
+            WorkflowNotification::makePayload(
+                'work_rejected',
+                'Công trình bị từ chối',
+                $workTitle !== ''
+                    ? 'Công trình "' . $workTitle . '" đã bị từ chối ở cấp khoa.'
+                    : 'Công trình của bạn đã bị từ chối ở cấp khoa.',
+                '/works/personal?activity_id=' . $activity,
+                [
+                    'activity_id' => (int) $activity,
+                    'lecturer_id' => (int) $current->lecturer_id,
+                    'rejection_note' => $note,
+                ]
+            )
+        );
 
         return response()->json([
             'message' => 'faculty approval rejected',

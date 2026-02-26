@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\ParticipationInvitationAcceptedNotification;
 use App\Notifications\ParticipationInvitationRejectedNotification;
 use App\Support\AuditLogger;
+use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -138,7 +139,7 @@ class LecturerParticipationNotificationController extends Controller
                 ]);
 
             $this->notifyOwnerOnAccept((int) $member->activity_id, (string) ($lecturer->full_name ?? ''), (int) $requestId);
-            $this->tryAutoSendToFaculty((int) $member->activity_id, $now, (int) $request->user()->id);
+            $facultyNotification = $this->tryAutoSendToFaculty((int) $member->activity_id, $now, (int) $request->user()->id);
 
             AuditLogger::log($request, [
                 'action_group' => 'approval',
@@ -155,11 +156,32 @@ class LecturerParticipationNotificationController extends Controller
                 ],
             ], $request->user());
 
-            return ['ok' => true];
+            return [
+                'ok' => true,
+                'faculty_notification' => $facultyNotification,
+            ];
         });
 
         if (isset($result['error'])) {
             return response()->json(['message' => $result['error']], $result['status']);
+        }
+
+        $facultyNotification = $result['faculty_notification'] ?? null;
+        if (is_array($facultyNotification) && isset($facultyNotification['activity_id'])) {
+            WorkflowNotification::notifyFacultyBoardByActivityId(
+                (int) $facultyNotification['activity_id'],
+                WorkflowNotification::makePayload(
+                    'work_submitted_to_faculty',
+                    'Có hồ sơ công trình mới cần duyệt',
+                    (string) ($facultyNotification['message'] ?? 'Có công trình mới đang chờ khoa duyệt.'),
+                    '/works/facapprovals?activity_id=' . (int) $facultyNotification['activity_id'],
+                    [
+                        'activity_id' => (int) $facultyNotification['activity_id'],
+                        'lecturer_id' => (int) ($facultyNotification['owner_lecturer_id'] ?? 0),
+                    ]
+                ),
+                (int) ($request->user()?->id ?? 0)
+            );
         }
 
         return $this->show($request, $requestId);
@@ -240,26 +262,34 @@ class LecturerParticipationNotificationController extends Controller
         return $this->show($request, $requestId);
     }
 
-    private function tryAutoSendToFaculty(int $activityId, $now, int $actedByUserId): void
+    private function tryAutoSendToFaculty(int $activityId, $now, int $actedByUserId): ?array
     {
         $pendingFacultyId = $this->getStatusId(self::ACT_PENDING_FACULTY_REVIEW);
         if (! $pendingFacultyId) {
-            return;
+            return null;
         }
 
         $activity = DB::table('research_activities as ra')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->leftJoin('lecturers as owner', 'ra.owner_lecturer_id', '=', 'owner.id')
             ->where('ra.id', $activityId)
             ->lockForUpdate()
-            ->select(['ra.id', 'ra.status_id', 'ast.code as status_code'])
+            ->select([
+                'ra.id',
+                'ra.status_id',
+                'ra.title',
+                'ra.owner_lecturer_id',
+                'owner.full_name as owner_name',
+                'ast.code as status_code',
+            ])
             ->first();
 
         if (! $activity) {
-            return;
+            return null;
         }
 
         if ($activity->status_code !== self::ACT_PENDING_MEMBER_CONFIRM) {
-            return;
+            return null;
         }
 
         $hasPending = DB::table('research_activity_members as ram')
@@ -278,11 +308,11 @@ class LecturerParticipationNotificationController extends Controller
 
         if ($hasRejected) {
             $this->markActivityMemberRejected($activityId, $now, $actedByUserId, 'member_rejected');
-            return;
+            return null;
         }
 
         if ($hasPending) {
-            return;
+            return null;
         }
 
         DB::table('research_activities')
@@ -305,6 +335,17 @@ class LecturerParticipationNotificationController extends Controller
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+
+        $ownerName = trim((string) ($activity->owner_name ?? 'Giảng viên'));
+        $activityTitle = trim((string) ($activity->title ?? ''));
+
+        return [
+            'activity_id' => (int) $activityId,
+            'owner_lecturer_id' => (int) ($activity->owner_lecturer_id ?? 0),
+            'message' => $ownerName . ' đã gửi công trình "' .
+                ($activityTitle !== '' ? $activityTitle : 'Không rõ tiêu đề') .
+                '" lên khoa duyệt.',
+        ];
     }
 
     private function markActivityMemberRejected(int $activityId, $now, int $actedByUserId, string $note = 'member_rejected'): void
@@ -580,6 +621,7 @@ class LecturerParticipationNotificationController extends Controller
         }
 
         $owner->notify(new ParticipationInvitationAcceptedNotification([
+            'event_key' => 'participation_accepted',
             'title' => 'Giảng viên đã xác nhận tham gia',
             'message' => trim(($inviteeName ?: 'Một giảng viên') . ' đã xác nhận tham gia công trình ' . ($activity->title ?? '') . '.'),
             'activity_id' => $activityId,
@@ -607,6 +649,7 @@ class LecturerParticipationNotificationController extends Controller
         }
 
         $owner->notify(new ParticipationInvitationRejectedNotification([
+            'event_key' => 'participation_rejected',
             'title' => 'Giảng viên đã từ chối tham gia',
             'message' => trim(($inviteeName ?: 'Một giảng viên') . ' đã từ chối tham gia công trình ' . ($activity->title ?? '') . '.'),
             'activity_id' => $activityId,
@@ -746,3 +789,4 @@ class LecturerParticipationNotificationController extends Controller
         return 'https://doi.org/' . $trimmed;
     }
 }
+

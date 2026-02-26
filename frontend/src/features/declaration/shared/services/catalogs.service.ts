@@ -24,7 +24,7 @@ import http from "@/lib/http";
 const MOCK = false;
 
 const ROLE_LABELS_VI: Record<string, string> = {
-  principal: "Tác giả chính",
+  principal: "Chủ nhiệm",
   corresponding_author: "Tác giả chính",
   coauthor: "Đồng tác giả",
   member: "Thành viên",
@@ -32,13 +32,19 @@ const ROLE_LABELS_VI: Record<string, string> = {
   chief_editor: "Chủ biên",
 };
 
-const PAPER_TYPE_LABELS_VI: Record<string, string> = {
+const ACTIVITY_TYPE_LABELS_VI: Record<string, string> = {
   hdgsnn_900: "HDGSNN 1-2 điểm (900 giờ)",
   hdgsnn_600: "HDGSNN >= 1 điểm (600 giờ)",
   hdgsnn_300: "Có ISSN/ISBN (300 giờ)",
+  textbook: "Giáo trình",
+  reference: "Tài liệu tham khảo",
+  report: "Báo cáo hội thảo",
+  attend: "Tham dự hội thảo",
+  bo: "Đề tài cấp Bộ (2 năm)",
+  ministry: "Đề tài cấp Bộ (2 năm)",
+  coso: "Đề tài cấp Trường (1 năm)",
+  university: "Đề tài cấp Trường (1 năm)",
 };
-
-const EXPECTED_PAPER_TYPE_CODES = ["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"];
 const EXPECTED_ACADEMIC_YEAR_CODES = ["2024-2025", "2025-2026"];
 
 const mock_academic_years: AcademicYearDto[] = [
@@ -218,53 +224,20 @@ export async function fetch_activity_kinds(): Promise<ActivityKindDto[]> {
 export async function fetch_activity_types_by_kind(
   kind_id: number
 ): Promise<ActivityTypeDto[]> {
-  if (MOCK) return mock_types.filter((t) => t.kind_id === kind_id);
+  if (MOCK) {
+    return mock_types
+      .filter((t) => t.kind_id === kind_id)
+      .map((t) => ({ ...t, name: ACTIVITY_TYPE_LABELS_VI[t.code] ?? t.name }));
+  }
+
   const { data } = await http.get<{ data: ActivityTypeDto[] }>(
     "/api/lookups/activity-types",
     { params: { kind_id } }
   );
-  let mapped = data.data.map((t) => ({
+  return data.data.map((t) => ({
     ...t,
-    name: PAPER_TYPE_LABELS_VI[t.code] ?? t.name,
+    name: ACTIVITY_TYPE_LABELS_VI[t.code] ?? t.name,
   }));
-
-  const expectedCodes = new Set(EXPECTED_PAPER_TYPE_CODES);
-  const missing = EXPECTED_PAPER_TYPE_CODES.filter(
-    (code) => !mapped.some((t) => t.code === code)
-  );
-  if (missing.length > 0) {
-    const { data: all } = await http.get<{ data: ActivityTypeDto[] }>(
-      "/api/lookups/activity-types"
-    );
-    const fallback = all.data
-      .filter((t) => expectedCodes.has(t.code))
-      .map((t) => ({
-        ...t,
-        name: PAPER_TYPE_LABELS_VI[t.code] ?? t.name,
-      }));
-
-    const byCode = new Map<string, ActivityTypeDto>();
-    for (const item of [...mapped, ...fallback]) {
-      byCode.set(item.code, item);
-    }
-    mapped = Array.from(byCode.values());
-  }
-
-  if (import.meta.env.DEV) {
-    const codes = new Set(mapped.map((t) => t.code));
-    const hasPaper = EXPECTED_PAPER_TYPE_CODES.some((c) => codes.has(c));
-    if (hasPaper) {
-      const missing = EXPECTED_PAPER_TYPE_CODES.filter((c) => !codes.has(c));
-      if (missing.length > 0) {
-        console.warn(
-          "[catalogs] Missing paper activity types in API:",
-          missing.join(", ")
-        );
-      }
-    }
-  }
-
-  return mapped;
 }
 
 export async function fetch_member_roles(): Promise<MemberRoleDto[]> {

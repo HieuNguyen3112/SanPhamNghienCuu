@@ -18,6 +18,53 @@ export interface PersonalWorksIndexParams {
   per_page?: number;
 }
 
+const normalizeText = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const normalizeWorkStatusParam = (status?: string): string | undefined => {
+  if (!status || !status.trim()) return undefined;
+
+  const normalized = normalizeText(status);
+  switch (normalized) {
+    case "all":
+    case "tat_ca":
+      return "all";
+    case "pending":
+      return "pending";
+    case "draft":
+    case "ban_nhap":
+      return "draft";
+    case "pending_member_confirm":
+    case "cho_thanh_vien_xac_nhan":
+      return "pending_member_confirm";
+    case "member_rejected":
+    case "thanh_vien_tu_choi":
+      return "member_rejected";
+    case "pending_faculty_review":
+    case "cho_khoa_duyet":
+      return "pending_faculty_review";
+    case "submitted":
+    case "da_gui_duyet":
+      return "submitted";
+    case "approved":
+    case "da_duyet":
+    case "khoa_duyet":
+      return "approved";
+    case "rejected":
+    case "tu_choi":
+    case "khoa_tu_choi":
+      return "rejected";
+    default:
+      return status;
+  }
+};
+
 const extractErrorMessage = (err: unknown, fallback: string) => {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status ?? 0;
@@ -36,12 +83,17 @@ export const personalResearchWorksService = {
     try {
       const response = await http.get<{ data: PersonalWorkIndexResponseDTO }>(
         "/api/lecturer/works/my",
-        { params }
+        {
+          params: {
+            ...params,
+            status: normalizeWorkStatusParam(params.status),
+          },
+        }
       );
 
       return response.data.data;
     } catch (err) {
-      throw new Error(extractErrorMessage(err, "Failed to load works."));
+      throw new Error(extractErrorMessage(err, "Không tải được danh sách công trình."));
     }
   },
 
@@ -53,7 +105,7 @@ export const personalResearchWorksService = {
 
       return response.data.data;
     } catch (err) {
-      throw new Error(extractErrorMessage(err, "Failed to load work detail."));
+      throw new Error(extractErrorMessage(err, "Không tải được chi tiết công trình."));
     }
   },
 
@@ -65,7 +117,7 @@ export const personalResearchWorksService = {
       );
     } catch (err) {
       throw new Error(
-        extractErrorMessage(err, "Failed to resend participation invitation.")
+        extractErrorMessage(err, "Không thể gửi lại yêu cầu xác nhận tham gia.")
       );
     }
   },

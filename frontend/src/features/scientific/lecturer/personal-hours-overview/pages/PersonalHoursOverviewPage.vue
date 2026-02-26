@@ -12,6 +12,26 @@
           @exportPdfClicked="() => {}"
           @exportExcelClicked="() => {}"
         />
+
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <label
+            for="hours-scope-select"
+            class="text-xs font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Phạm vi thống kê
+          </label>
+          <select
+            id="hours-scope-select"
+            class="min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-0 transition focus:border-slate-400"
+            :value="selectedScopeValue"
+            :disabled="loadingAcademicYears"
+            @change="onScopeChange"
+          >
+            <option v-for="option in scopeOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </div>
       </div>
 
       <HoursOverviewSection
@@ -54,6 +74,8 @@ const {
   overview,
   distribution,
   batches,
+  scopeOptions,
+  selectedScopeValue,
 
   detailOpen,
   selectedBatchDetail,
@@ -66,15 +88,21 @@ const {
   errorBatches,
   loadingBatchDetail,
   errorBatchDetail,
+  loadingAcademicYears,
 
-  loadOverview,
-  loadDistribution,
-  loadBatches,
+  initialize,
+  changeScope,
   openBatchDetail,
   closeBatchDetail,
 } = useLecturerHoursOverview();
 
+async function onScopeChange(event: Event) {
+  const target = event.target as HTMLSelectElement | null;
+  if (!target) return;
+  await changeScope(target.value);
+}
+
 onMounted(async () => {
-  await Promise.all([loadOverview(), loadDistribution(), loadBatches()]);
+  await initialize();
 });
 </script>

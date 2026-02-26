@@ -34,9 +34,10 @@ class WorkCatalogSeeder extends Seeder
         $workLevels = [
             ['name' => 'Quốc tế', 'priority' => 1, 'notes' => 'Ưu tiên cao nhất', 'is_active' => true],
             ['name' => 'Quốc gia', 'priority' => 2, 'notes' => null, 'is_active' => true],
-            ['name' => 'Cấp trường', 'priority' => 3, 'notes' => null, 'is_active' => true],
-            ['name' => 'Cấp khoa', 'priority' => 4, 'notes' => null, 'is_active' => true],
-            ['name' => 'Khác', 'priority' => 5, 'notes' => null, 'is_active' => false],
+            ['name' => 'Cấp Bộ', 'priority' => 3, 'notes' => 'Cấp Bộ hoặc cơ quan ngang Bộ', 'is_active' => true],
+            ['name' => 'Cấp trường', 'priority' => 4, 'notes' => null, 'is_active' => true],
+            ['name' => 'Cấp khoa', 'priority' => 5, 'notes' => null, 'is_active' => true],
+            ['name' => 'Khác', 'priority' => 6, 'notes' => null, 'is_active' => false],
         ];
 
         foreach ($workLevels as $item) {

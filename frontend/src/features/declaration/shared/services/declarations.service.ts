@@ -341,6 +341,52 @@ export type ResearchActivityDetailResponse = {
   evidence_files?: EvidenceFileDto[];
 };
 
+export type ProjectHoursPreviewRequestDto = {
+  academic_year_id?: number | null;
+  type_id?: number | null;
+  quantity?: number | null;
+  members: Array<{
+    lecturer_id: number;
+    member_role_id: number;
+  }>;
+};
+
+export type ProjectHoursPreviewResponseDto = {
+  kind_code: "project";
+  type_id: number | null;
+  type_code: string | null;
+  type_name: string | null;
+  level_label?: string | null;
+  rule_summary: string;
+  distribution_strategy: string | null;
+  quantity: number;
+  formula: {
+    leader_hours: number | null;
+    member_pool_hours: number | null;
+    member_pool_count: number;
+    member_pool_each: number;
+    rule_total_hours: number | null;
+    total_hours_allocated: number | null;
+    progress_multiplier_applied: boolean;
+    progress_supported: boolean;
+    progress_note: string | null;
+  };
+  formula_rows?: Array<{
+    role_label: string;
+    total_hours: number;
+    formula_text: string;
+  }>;
+  current_lecturer_hours: number | null;
+  members: Array<{
+    lecturer_id: number;
+    lecturer_full_name: string;
+    member_role_code: string | null;
+    member_role_name: string | null;
+    hours_assigned: number | null;
+    is_leader: boolean;
+  }>;
+};
+
 export async function fetch_activity(
   activity_id: number
 ): Promise<ResearchActivityDetailResponse> {
@@ -355,4 +401,15 @@ export async function fetch_current_lecturer_id(): Promise<number | null> {
     "/api/profile/me"
   );
   return data?.data?.lecturer?.id ?? null;
+}
+
+export async function preview_project_hours(
+  payload: ProjectHoursPreviewRequestDto
+): Promise<ProjectHoursPreviewResponseDto> {
+  await ensureCsrfCookie();
+  const { data } = await http.post<{ data: ProjectHoursPreviewResponseDto }>(
+    "/api/lecturer/declarations/projects/preview-hours",
+    payload
+  );
+  return data.data;
 }

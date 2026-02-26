@@ -10,7 +10,16 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdminWorkCatalogController extends Controller
 {
-    private const JOURNAL_CLASSIFICATIONS = ['ISI', 'SCOPUS', 'OTHER'];
+    private const JOURNAL_CLASSIFICATIONS = ['POINT_GE_2', 'POINT_GE_1', 'ISSN_ISBN', 'OTHER'];
+    private const LEGACY_JOURNAL_CLASSIFICATION_MAP = [
+        'HDGSNN_GE_2' => 'POINT_GE_2',
+        'HDGSNN_1_2' => 'POINT_GE_2',
+        'HDGSNN_GE_1' => 'POINT_GE_1',
+        'ISI' => 'POINT_GE_2',
+        'SCOPUS' => 'POINT_GE_1',
+        'ISSN' => 'ISSN_ISBN',
+        'ISBN' => 'ISSN_ISBN',
+    ];
     private const JOURNAL_RANKS = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'OTHER'];
     private const CONFERENCE_LEVELS = ['FACULTY', 'UNIVERSITY', 'NATIONAL', 'INTERNATIONAL'];
 
@@ -55,7 +64,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'created',
+            'message' => 'Tạo mới thành công.',
             'data' => $this->workTypePayload($row),
         ], Response::HTTP_CREATED);
     }
@@ -64,7 +73,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('work_types')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -86,7 +95,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->workTypePayload($row),
         ], Response::HTTP_OK);
     }
@@ -95,7 +104,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('work_types')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -113,7 +122,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->workTypePayload($row),
         ], Response::HTTP_OK);
     }
@@ -161,7 +170,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'created',
+            'message' => 'Tạo mới thành công.',
             'data' => $this->workLevelPayload($row),
         ], Response::HTTP_CREATED);
     }
@@ -170,7 +179,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('work_levels')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -194,7 +203,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->workLevelPayload($row),
         ], Response::HTTP_OK);
     }
@@ -203,7 +212,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('work_levels')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -221,7 +230,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->workLevelPayload($row),
         ], Response::HTTP_OK);
     }
@@ -276,10 +285,12 @@ class AdminWorkCatalogController extends Controller
             'source_name'       => ['nullable', 'string', 'max:255'],
             'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2'],
             'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2', 'gte:point_min'],
-            'classification'    => ['required', 'string', Rule::in(self::JOURNAL_CLASSIFICATIONS)],
+            'classification'    => ['nullable', 'string', 'max:30'],
             'research_hours'    => ['nullable', 'integer', 'min:0', 'max:65535'],
             'is_active'         => ['required', 'boolean'],
         ]);
+
+        $derived = $this->deriveJournalClassificationAndHours($data);
 
         $now = now();
 
@@ -292,8 +303,8 @@ class AdminWorkCatalogController extends Controller
             'source_name'    => $data['source_name'] ?? null,
             'point_min'      => $data['point_min'] ?? null,
             'point_max'      => $data['point_max'] ?? null,
-            'classification' => $data['classification'],
-            'research_hours' => $data['research_hours'] ?? 0,
+            'classification' => $derived['classification'],
+            'research_hours' => $derived['research_hours'],
             'is_active'      => (bool) $data['is_active'],
             'created_at'     => $now,
             'updated_at'     => $now,
@@ -303,7 +314,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'created',
+            'message' => 'Tạo mới thành công.',
             'data'    => $this->journalPayload($row),
         ], Response::HTTP_CREATED);
     }
@@ -311,7 +322,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('journals')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy tạp chí.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -323,10 +334,12 @@ class AdminWorkCatalogController extends Controller
             'source_name'       => ['nullable', 'string', 'max:255'],
             'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2'],
             'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2', 'gte:point_min'],
-            'classification'    => ['required', 'string', Rule::in(self::JOURNAL_CLASSIFICATIONS)],
+            'classification'    => ['nullable', 'string', 'max:30'],
             'research_hours'    => ['nullable', 'integer', 'min:0', 'max:65535'],
             'is_active'         => ['required', 'boolean'],
         ]);
+
+        $derived = $this->deriveJournalClassificationAndHours($data);
 
         DB::table('journals')
             ->where('id', $id)
@@ -339,8 +352,8 @@ class AdminWorkCatalogController extends Controller
                 'source_name'    => $data['source_name'] ?? null,
                 'point_min'      => $data['point_min'] ?? null,
                 'point_max'      => $data['point_max'] ?? null,
-                'classification' => $data['classification'],
-                'research_hours' => $data['research_hours'] ?? 0,
+                'classification' => $derived['classification'],
+                'research_hours' => $derived['research_hours'],
                 'is_active'      => (bool) $data['is_active'],
                 'updated_at'     => now(),
             ]);
@@ -349,7 +362,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data'    => $this->journalPayload($row),
         ], Response::HTTP_OK);
     }
@@ -358,7 +371,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('journals')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -376,7 +389,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->journalPayload($row),
         ], Response::HTTP_OK);
     }
@@ -385,7 +398,7 @@ class AdminWorkCatalogController extends Controller
     {
         $journal = DB::table('journals')->where('id', $journalId)->first();
         if (! $journal) {
-            return response()->json(['message' => 'Journal not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy tạp chí.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -418,7 +431,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Ranking created',
+            'message' => 'Đã thêm xếp hạng tạp chí.',
             'data'    => $this->journalRankingPayload($newRanking),
         ], Response::HTTP_CREATED);
     }
@@ -462,7 +475,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'created',
+            'message' => 'Tạo mới thành công.',
             'data' => $this->conferencePayload($row),
         ], Response::HTTP_CREATED);
     }
@@ -471,7 +484,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('conferences')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -495,7 +508,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->conferencePayload($row),
         ], Response::HTTP_OK);
     }
@@ -504,7 +517,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('conferences')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -522,7 +535,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->conferencePayload($row),
         ], Response::HTTP_OK);
     }
@@ -575,7 +588,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'created',
+            'message' => 'Tạo mới thành công.',
             'data' => $this->researchFieldPayload($row),
         ], Response::HTTP_CREATED);
     }
@@ -584,7 +597,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('research_fields')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -613,7 +626,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->researchFieldPayload($row),
         ], Response::HTTP_OK);
     }
@@ -622,7 +635,7 @@ class AdminWorkCatalogController extends Controller
     {
         $existing = DB::table('research_fields')->where('id', $id)->first();
         if (! $existing) {
-            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validate([
@@ -640,7 +653,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'updated',
+            'message' => 'Cập nhật thành công.',
             'data' => $this->researchFieldPayload($row),
         ], Response::HTTP_OK);
     }
@@ -672,7 +685,7 @@ class AdminWorkCatalogController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'ok',
+            'message' => 'Thành công.',
             'data' => [
                 'items' => $items,
                 'pagination' => [
@@ -706,6 +719,77 @@ class AdminWorkCatalogController extends Controller
             ]);
     }
 
+    private function deriveJournalClassificationAndHours(array $data): array
+    {
+        $pointMin = $this->toNullableFloat($data['point_min'] ?? null);
+        $pointMax = $this->toNullableFloat($data['point_max'] ?? null);
+        $maxPoint = $pointMax ?? $pointMin;
+        $issn = trim((string) ($data['issn'] ?? ''));
+        $providedClassification = $this->normalizeJournalClassification($data['classification'] ?? null);
+        $providedHours = isset($data['research_hours']) ? (int) $data['research_hours'] : null;
+
+        $classification = 'OTHER';
+        $hours = 0;
+
+        if ($maxPoint !== null && $maxPoint >= 2) {
+            $classification = 'POINT_GE_2';
+            $hours = 900;
+        } elseif ($maxPoint !== null && $maxPoint >= 1) {
+            $classification = 'POINT_GE_1';
+            $hours = 600;
+        } elseif ($issn !== '') {
+            $classification = 'ISSN_ISBN';
+            $hours = 300;
+        }
+
+        if ($providedClassification !== null) {
+            $classification = $providedClassification;
+        }
+
+        if ($providedHours !== null) {
+            $hours = max(0, $providedHours);
+        } else {
+            $hours = match ($classification) {
+                'POINT_GE_2' => 900,
+                'POINT_GE_1' => 600,
+                'ISSN_ISBN' => 300,
+                default => $hours,
+            };
+        }
+
+        return [
+            'classification' => $classification,
+            'research_hours' => $hours,
+        ];
+    }
+
+    private function normalizeJournalClassification(?string $classification): ?string
+    {
+        if ($classification === null) {
+            return null;
+        }
+
+        $normalized = strtoupper(trim($classification));
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (isset(self::LEGACY_JOURNAL_CLASSIFICATION_MAP[$normalized])) {
+            return self::LEGACY_JOURNAL_CLASSIFICATION_MAP[$normalized];
+        }
+
+        return in_array($normalized, self::JOURNAL_CLASSIFICATIONS, true) ? $normalized : null;
+    }
+
+    private function toNullableFloat(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
     private function workTypePayload($row): array
     {
         return [
@@ -731,12 +815,24 @@ class AdminWorkCatalogController extends Controller
 
     private function journalPayload($row): array
     {
+        $derived = $this->deriveJournalClassificationAndHours([
+            'issn' => $row->issn,
+            'point_min' => $row->point_min,
+            'point_max' => $row->point_max,
+            'classification' => $row->classification,
+            'research_hours' => $row->research_hours,
+        ]);
+
         return [
             'id' => (int) $row->id,
             'name' => $row->name,
             'address' => $row->address,
             'issn' => $row->issn,
-            'classification' => $row->classification,
+            'source_name' => $row->source_name,
+            'point_min' => $row->point_min !== null ? (float) $row->point_min : null,
+            'point_max' => $row->point_max !== null ? (float) $row->point_max : null,
+            'classification' => $derived['classification'],
+            'research_hours' => $derived['research_hours'],
             'country' => $row->country,
             'notes' => $row->notes,
             'is_active' => (bool) $row->is_active,

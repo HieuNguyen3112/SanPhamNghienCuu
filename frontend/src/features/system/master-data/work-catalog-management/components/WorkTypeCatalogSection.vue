@@ -1,6 +1,5 @@
 <template>
   <div class="space-y-3">
-    <!-- Toolbar -->
     <div
       class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
     >
@@ -31,7 +30,6 @@
       </div>
     </div>
 
-    <!-- Table -->
     <div
       class="max-h-[560px] overflow-auto rounded-2xl border border-slate-200"
     >
@@ -101,19 +99,6 @@
       </table>
     </div>
 
-    <!-- Pagination -->
-    <div class="flex items-center justify-end">
-      <!-- TODO: chỉnh import/path + props theo SharedPaginationControls thật của dự án -->
-      <!-- <SharedPaginationControls
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        @update:page="emit('update:page', $event)"
-        @update:page-size="emit('update:pageSize', $event)"
-      /> -->
-    </div>
-
-    <!-- Modal -->
     <CatalogUpsertModal
       :open="modalOpen"
       :title="modalTitle"
@@ -194,8 +179,6 @@
 import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
 import type { WorkType } from "../contracts/workTypes.contract";
-// TODO: chỉnh path theo project của bạn
-import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 defineProps<{
   rows: WorkType[];
@@ -227,3 +210,4 @@ const emit = defineEmits<{
   ): void;
 }>();
 </script>
+

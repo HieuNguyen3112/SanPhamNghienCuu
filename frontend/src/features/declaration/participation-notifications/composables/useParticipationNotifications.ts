@@ -10,6 +10,7 @@ import {
   list_participation_notifications,
   reject_participation_notification,
 } from "../services/participationNotifications.service";
+import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
 export type StatusFilter = "ALL" | NotificationStatus;
 
@@ -22,6 +23,7 @@ export interface NotificationFilters {
 
 export function useParticipationNotifications() {
   const loading = ref(false);
+  const processingDecision = ref(false);
   const rows = ref<ParticipationNotification[]>([]);
 
   const filters = ref<NotificationFilters>({
@@ -40,6 +42,8 @@ export function useParticipationNotifications() {
   const selectedId = ref<number | null>(null);
   const selected = ref<ParticipationNotification | null>(null);
 
+  const { showSuccessModal, showErrorModal } = useActionResultModal();
+
   const notificationMessage = ref<string | null>(null);
   let notificationTimer: number | null = null;
 
@@ -52,6 +56,22 @@ export function useParticipationNotifications() {
       notificationMessage.value = null;
       notificationTimer = null;
     }, 2500);
+  }
+
+  function resolveFriendlyErrorMessage(error: unknown, fallback: string) {
+    const raw =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "";
+    const message = raw.split("\n")[0]?.trim() ?? "";
+
+    if (!message) return fallback;
+    if (/Network Error|timeout|ECONN/i.test(message)) {
+      return "Không thể kết nối máy chủ. Vui lòng thử lại.";
+    }
+    return message;
   }
 
   function buildListParams() {
@@ -79,7 +99,7 @@ export function useParticipationNotifications() {
       rows.value = [];
       totalItems.value = 0;
       totalPages.value = 1;
-      setNotification("Unable to load participation requests. Please try again.");
+      setNotification("Không thể tải danh sách yêu cầu xác nhận. Vui lòng thử lại.");
     } finally {
       loading.value = false;
     }
@@ -93,7 +113,7 @@ export function useParticipationNotifications() {
     } catch (error) {
       console.error(error);
       selected.value = null;
-      setNotification("Unable to load request detail. Please try again.");
+      setNotification("Không thể tải chi tiết yêu cầu. Vui lòng thử lại.");
     } finally {
       loading.value = false;
     }
@@ -121,27 +141,41 @@ export function useParticipationNotifications() {
   async function acceptSelected() {
     if (!selected.value) return;
     if (selected.value.status !== "PENDING") return;
+    if (processingDecision.value) return;
 
-    loading.value = true;
+    processingDecision.value = true;
     try {
       const updatedDto = await accept_participation_notification(selected.value.id);
       const updated = mapParticipationNotificationDtoToModel(updatedDto);
       selected.value = updated;
       rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
-      await loadList();
+      showSuccessModal("Đã xác nhận tham gia thành công.", "Thành công", undefined, {
+        onClose: async () => {
+          closeDetail();
+          await loadList();
+        },
+      });
     } catch (error) {
       console.error(error);
-      setNotification("Unable to confirm participation. Please try again.");
+      showErrorModal(
+        resolveFriendlyErrorMessage(
+          error,
+          "Không thể xác nhận tham gia. Vui lòng thử lại."
+        ),
+        "Xác nhận thất bại",
+        error
+      );
     } finally {
-      loading.value = false;
+      processingDecision.value = false;
     }
   }
 
   async function rejectSelected(reason: string) {
     if (!selected.value) return;
     if (selected.value.status !== "PENDING") return;
+    if (processingDecision.value) return;
 
-    loading.value = true;
+    processingDecision.value = true;
     try {
       const updatedDto = await reject_participation_notification(
         selected.value.id,
@@ -150,12 +184,24 @@ export function useParticipationNotifications() {
       const updated = mapParticipationNotificationDtoToModel(updatedDto);
       selected.value = updated;
       rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
-      await loadList();
+      showSuccessModal("Đã từ chối tham gia thành công.", "Thành công", undefined, {
+        onClose: async () => {
+          closeDetail();
+          await loadList();
+        },
+      });
     } catch (error) {
       console.error(error);
-      setNotification("Unable to reject participation. Please try again.");
+      showErrorModal(
+        resolveFriendlyErrorMessage(
+          error,
+          "Không thể từ chối tham gia. Vui lòng thử lại."
+        ),
+        "Từ chối thất bại",
+        error
+      );
     } finally {
-      loading.value = false;
+      processingDecision.value = false;
     }
   }
 
@@ -209,6 +255,7 @@ export function useParticipationNotifications() {
     selected,
     openDetail,
     closeDetail,
+    processingDecision,
 
     acceptSelected,
     rejectSelected,

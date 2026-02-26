@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div v-if="open" class="fixed inset-0 z-50">
     <div class="absolute inset-0 bg-slate-900/40" @click="emit('close')" />
 

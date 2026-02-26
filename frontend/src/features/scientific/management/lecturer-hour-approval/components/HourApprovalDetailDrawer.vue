@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <teleport to="body">
     <transition
       enter-active-class="transition-opacity duration-200"

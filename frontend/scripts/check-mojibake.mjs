@@ -1,7 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const roots = ["src", "../backend/app", "../backend/routes", "../backend/tests"];
+const roots = [
+  "src",
+  "../backend/app",
+  "../backend/routes",
+  "../backend/tests",
+  "../backend/database/seeders",
+];
 const textExtensions = new Set([
   ".vue",
   ".ts",

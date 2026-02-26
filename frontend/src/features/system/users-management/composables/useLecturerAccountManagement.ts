@@ -1,4 +1,4 @@
-﻿import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import type {
   AssignRolesPayload,
   LecturerAccount,
@@ -18,6 +18,7 @@ import {
 } from "../contracts/lecturerAccountManagement.contract";
 import type { LecturerAccountManagementService } from "../services/lecturerAccountManagementService";
 import { createLecturerAccountManagementService } from "../services/lecturerAccountManagementService";
+import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
 export interface UseLecturerAccountManagementOptions {
   scope?: LecturerAccountScope;
@@ -44,6 +45,11 @@ export function useLecturerAccountManagement(
       faculty_unit_id: options?.faculty_unit_id,
     });
 
+  const {
+    showSuccessModal,
+    showErrorModal,
+  } = useActionResultModal();
+
   // filter state
   const filter = ref<LecturerAccountFilterState>(defaultFilterState());
 
@@ -65,10 +71,6 @@ export function useLecturerAccountManagement(
   const error = ref<string | null>(null);
   const resultCount = computed(() => totalItems.value);
 
-  // toast
-  const toastMessage = ref<string | null>(null);
-  let toastTimer: number | null = null;
-
   // modal states
   const editOpen = ref(false);
   const rolesOpen = ref(false);
@@ -85,15 +87,6 @@ export function useLecturerAccountManagement(
   const savingRoles = ref(false);
   const savingDeactivate = ref(false);
   const savingError = ref<string | null>(null);
-
-  function showToast(message: string) {
-    toastMessage.value = message;
-    if (toastTimer != null) window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => {
-      toastMessage.value = null;
-      toastTimer = null;
-    }, 2500);
-  }
 
   function updateFilter(next: LecturerAccountFilterState) {
     // Faculty scope: unit filter is locked (but we still keep it in state for UI consistency)
@@ -149,8 +142,7 @@ export function useLecturerAccountManagement(
     try {
       await fetchList();
     } catch (e) {
-      error.value =
-        e instanceof Error ? e.message : "Không tải được danh sách.";
+      error.value = e instanceof Error ? e.message : "Không tải được danh sách.";
     } finally {
       loading.value = false;
     }
@@ -202,12 +194,13 @@ export function useLecturerAccountManagement(
     savingError.value = null;
     try {
       await service.updateLecturerAccountDTO(payload);
-      showToast("Đã cập nhật thông tin giảng viên.");
+      showSuccessModal("Đã cập nhật thông tin giảng viên.");
       closeAllModals();
       await search({ resetPage: false });
     } catch (e) {
-      savingError.value =
-        e instanceof Error ? e.message : "Không thể lưu.";
+      const message = e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value = message;
+      showErrorModal(message, "Cập nhật thất bại", e);
     } finally {
       savingEdit.value = false;
     }
@@ -218,12 +211,13 @@ export function useLecturerAccountManagement(
     savingError.value = null;
     try {
       await service.assignRolesDTO(payload);
-      showToast("Đã lưu phân quyền.");
+      showSuccessModal("Đã lưu phân quyền.");
       closeAllModals();
       await search({ resetPage: false });
     } catch (e) {
-      savingError.value =
-        e instanceof Error ? e.message : "Không thể lưu.";
+      const message = e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value = message;
+      showErrorModal(message, "Lưu phân quyền thất bại", e);
     } finally {
       savingRoles.value = false;
     }
@@ -234,27 +228,22 @@ export function useLecturerAccountManagement(
     savingError.value = null;
     try {
       await service.toggleAccountStatusDTO(payload);
-      showToast("Đã cập nhật trạng thái tài khoản.");
+      showSuccessModal("Đã cập nhật trạng thái tài khoản.");
       closeAllModals();
       await search({ resetPage: false });
     } catch (e) {
-      savingError.value =
-        e instanceof Error ? e.message : "Không thể lưu.";
+      const message = e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value = message;
+      showErrorModal(message, "Cập nhật thất bại", e);
     } finally {
       savingDeactivate.value = false;
     }
   }
 
-  const unitOptionsUi = computed(() =>
-    unitOptions.value.map(unitOptionFromDto)
-  );
+  const unitOptionsUi = computed(() => unitOptions.value.map(unitOptionFromDto));
 
   onMounted(() => {
     void bootstrap();
-  });
-
-  onBeforeUnmount(() => {
-    if (toastTimer != null) window.clearTimeout(toastTimer);
   });
 
   return {
@@ -273,10 +262,6 @@ export function useLecturerAccountManagement(
     currentPageNumber,
     pageSize,
     totalItems,
-
-    // toast
-    toastMessage,
-
     // modal state
     editOpen,
     rolesOpen,

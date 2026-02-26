@@ -8,6 +8,7 @@ use App\Services\Hours\HoursRecomputeService;
 use App\Services\Hours\HoursRuleResolver;
 use App\Support\StorageDownload;
 use App\Support\AcademicYearResolver;
+use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -33,14 +34,14 @@ class LecturerHoursCalculateController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursStageId = $this->resolveStageId('hours');
         $approvedStatusId = $this->resolveStatusId('approved');
         if (! $hoursStageId || ! $approvedStatusId) {
             return response()->json([
-                'message' => 'hours stage or approved status not configured',
+                'message' => 'Chưa cấu hình bước duyệt giờ hoặc trạng thái đã duyệt.',
                 'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -56,7 +57,7 @@ class LecturerHoursCalculateController extends Controller
                 $filters['academic_year_id'] ?? null
             );
             if (! $selectedAcademicYear) {
-                return response()->json(['message' => 'academic year not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+                return response()->json(['message' => 'Không tìm thấy năm học.'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
         }
 
@@ -115,14 +116,14 @@ class LecturerHoursCalculateController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursStageId = $this->resolveStageId('hours');
         $approvedStatusId = $this->resolveStatusId('approved');
         if (! $hoursStageId || ! $approvedStatusId) {
             return response()->json([
-                'message' => 'hours stage or approved status not configured',
+                'message' => 'Chưa cấu hình bước duyệt giờ hoặc trạng thái đã duyệt.',
                 'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -134,7 +135,7 @@ class LecturerHoursCalculateController extends Controller
             ->first();
 
         if (! $row) {
-            return response()->json(['message' => 'work not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursMeta = $this->resolveHoursMeta(
@@ -160,10 +161,10 @@ class LecturerHoursCalculateController extends Controller
             'data' => [
                 'activity_id' => (int) $row->activity_id,
                 'title' => $row->title,
-                'kind_name' => $row->kind_name,
+                'kind_name' => $this->mapKindName($row->kind_code ?? null, $row->kind_name ?? null),
                 'academic_year_code' => $row->academic_year_code,
                 'publication_or_unit' => $this->resolvePublicationOrUnit($row),
-                'member_role_name' => $row->member_role_name,
+                'member_role_name' => $this->mapRoleName($row->member_role_code ?? null, $row->member_role_name ?? null),
                 'contribution_share' => $row->contribution_share !== null ? (float) $row->contribution_share : null,
                 'rule_summary' => $hoursValues['rule_summary'],
                 'conversion_rule_present' => $hoursValues['conversion_rule_present'],
@@ -194,14 +195,14 @@ class LecturerHoursCalculateController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursStageId = $this->resolveStageId('hours');
         $approvedStatusId = $this->resolveStatusId('approved');
         if (! $hoursStageId || ! $approvedStatusId) {
             return response()->json([
-                'message' => 'hours stage or approved status not configured',
+                'message' => 'Chưa cấu hình bước duyệt giờ hoặc trạng thái đã duyệt.',
                 'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -212,7 +213,7 @@ class LecturerHoursCalculateController extends Controller
 
         if (! empty($ineligibleIds)) {
             return response()->json([
-                'message' => 'Some works are not eligible. Only faculty-approved works can be submitted for hours review.',
+                'message' => 'Một số công trình chưa đủ điều kiện. Chỉ công trình đã được duyệt nội dung mới được gửi duyệt giờ.',
                 'code' => 'WORK_NOT_FACULTY_APPROVED',
                 'invalid_activity_ids' => $ineligibleIds,
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -220,7 +221,7 @@ class LecturerHoursCalculateController extends Controller
 
         if (empty($eligibleIds)) {
             return response()->json([
-                'message' => 'no eligible works found',
+                'message' => 'Không có công trình đủ điều kiện gửi duyệt giờ.',
                 'code' => 'NO_ELIGIBLE_WORKS',
                 'data' => [
                     'submitted_count' => 0,
@@ -348,6 +349,32 @@ class LecturerHoursCalculateController extends Controller
             }
         });
 
+        if (! empty($submittedIds)) {
+            $academicYearCode = DB::table('research_activities as ra')
+                ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+                ->whereIn('ra.id', $submittedIds)
+                ->whereNotNull('ay.code')
+                ->value('ay.code');
+
+            $lecturerName = trim((string) ($lecturer->full_name ?? 'Giảng viên'));
+            WorkflowNotification::notifyFacultyBoardByActivityId(
+                (int) $submittedIds[0],
+                WorkflowNotification::makePayload(
+                    'hours_submitted_to_faculty',
+                    'Có yêu cầu duyệt giờ mới',
+                    $lecturerName . ' đã gửi duyệt giờ NCKH cho ' . count($submittedIds) . ' công trình' .
+                        ($academicYearCode ? (' (' . $academicYearCode . ').') : '.'),
+                    '/hours/facapprovals?lecturer_id=' . (int) $lecturer->id,
+                    [
+                        'lecturer_id' => (int) $lecturer->id,
+                        'activity_ids' => array_values(array_map('intval', $submittedIds)),
+                        'academic_year' => $academicYearCode,
+                    ]
+                ),
+                (int) ($request->user()?->id ?? 0)
+            );
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'submitted',
@@ -372,13 +399,13 @@ class LecturerHoursCalculateController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $approvedStatusId = $this->resolveStatusId('approved');
         if (! $approvedStatusId) {
             return response()->json([
-                'message' => 'approved status not configured',
+                'message' => 'Chưa cấu hình trạng thái đã duyệt.',
                 'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -386,7 +413,7 @@ class LecturerHoursCalculateController extends Controller
         $activity = $this->resolveAccessibleApprovedActivity((int) $lecturer->id, $activityId, $approvedStatusId);
         if (! $activity) {
             return response()->json([
-                'message' => 'work not found',
+                'message' => 'Không tìm thấy công trình.',
                 'code' => 'WORK_NOT_FOUND',
             ], Response::HTTP_NOT_FOUND);
         }
@@ -402,14 +429,14 @@ class LecturerHoursCalculateController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursStageId = $this->resolveStageId('hours');
         $approvedStatusId = $this->resolveStatusId('approved');
         if (! $hoursStageId || ! $approvedStatusId) {
             return response()->json([
-                'message' => 'hours stage or approved status not configured',
+                'message' => 'Chưa cấu hình bước duyệt giờ hoặc trạng thái đã duyệt.',
                 'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -417,7 +444,7 @@ class LecturerHoursCalculateController extends Controller
         $activity = $this->resolveAccessibleApprovedActivity((int) $lecturer->id, $activityId, $approvedStatusId);
         if (! $activity) {
             return response()->json([
-                'message' => 'work not found',
+                'message' => 'Không tìm thấy công trình.',
                 'code' => 'WORK_NOT_FOUND',
             ], Response::HTTP_NOT_FOUND);
         }
@@ -425,7 +452,7 @@ class LecturerHoursCalculateController extends Controller
         $hoursStatus = $this->resolveHoursApprovalStatus($activityId, $hoursStageId);
         if ($hoursStatus === 'approved') {
             return response()->json([
-                'message' => 'evidence is locked because hours were already approved',
+                'message' => 'Đã duyệt giờ, không thể cập nhật minh chứng.',
                 'code' => 'EVIDENCE_LOCKED_BY_APPROVED_HOURS',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -468,7 +495,7 @@ class LecturerHoursCalculateController extends Controller
         if ($existingByHash) {
             return response()->json([
                 'success' => true,
-                'message' => 'already uploaded',
+                'message' => 'Minh chứng đã tồn tại.',
                 'data' => $this->mapEvidenceRow($existingByHash),
             ], Response::HTTP_OK);
         }
@@ -492,7 +519,7 @@ class LecturerHoursCalculateController extends Controller
 
         if (! $storedPath) {
             return response()->json([
-                'message' => 'failed to store evidence file',
+                'message' => 'Không thể lưu tệp minh chứng.',
                 'code' => 'EVIDENCE_STORE_FAILED',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -536,7 +563,7 @@ class LecturerHoursCalculateController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'uploaded',
+            'message' => 'Đã tải minh chứng lên.',
             'data' => $saved ? $this->mapEvidenceRow($saved) : null,
         ], Response::HTTP_CREATED);
     }
@@ -545,13 +572,13 @@ class LecturerHoursCalculateController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursStageId = $this->resolveStageId('hours');
         if (! $hoursStageId) {
             return response()->json([
-                'message' => 'hours stage not configured',
+                'message' => 'Chưa cấu hình bước duyệt giờ.',
                 'code' => 'HOURS_WORKFLOW_NOT_CONFIGURED',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -578,7 +605,7 @@ class LecturerHoursCalculateController extends Controller
 
         if (! $evidence) {
             return response()->json([
-                'message' => 'evidence not found',
+                'message' => 'Không tìm thấy minh chứng.',
                 'code' => 'EVIDENCE_NOT_FOUND',
             ], Response::HTTP_NOT_FOUND);
         }
@@ -586,7 +613,7 @@ class LecturerHoursCalculateController extends Controller
         $hoursStatus = $this->resolveHoursApprovalStatus((int) $evidence->activity_id, $hoursStageId);
         if ($hoursStatus === 'approved') {
             return response()->json([
-                'message' => 'evidence is locked because hours were already approved',
+                'message' => 'Đã duyệt giờ, không thể cập nhật minh chứng.',
                 'code' => 'EVIDENCE_LOCKED_BY_APPROVED_HOURS',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
@@ -600,7 +627,7 @@ class LecturerHoursCalculateController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'deleted',
+            'message' => 'Đã xóa minh chứng.',
             'data' => [
                 'evidence_id' => (int) $evidenceId,
                 'activity_id' => (int) $evidence->activity_id,
@@ -612,7 +639,7 @@ class LecturerHoursCalculateController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $file = DB::table('evidence_files as ef')
@@ -636,7 +663,7 @@ class LecturerHoursCalculateController extends Controller
             ->first();
 
         if (! $file) {
-            return response()->json(['message' => 'evidence not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy minh chứng.'], Response::HTTP_NOT_FOUND);
         }
 
         $disk = $file->disk ?: 'local';
@@ -655,14 +682,75 @@ class LecturerHoursCalculateController extends Controller
 
     private function resolveStageId(string $code): ?int
     {
-        $id = DB::table('approval_stages')->where('code', $code)->value('id');
+        $query = DB::table('approval_stages');
+        $id = $query->where('code', $code)->value('id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $codeAliases = match ($code) {
+            'hours' => ['hours', 'hours_approval', 'duyet_gio', 'xet_duyet_gio'],
+            default => [$code],
+        };
+
+        $id = DB::table('approval_stages')
+            ->whereIn('code', $codeAliases)
+            ->value('id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $nameAliases = match ($code) {
+            'hours' => ['Hours Approval', 'Duyệt giờ', 'Xét duyệt giờ', 'Duyệt giờ NCKH'],
+            default => [],
+        };
+
+        if ($nameAliases !== []) {
+            $id = DB::table('approval_stages')
+                ->whereIn('name', $nameAliases)
+                ->value('id');
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
         return $id ? (int) $id : null;
     }
 
     private function resolveStatusId(string $code): ?int
     {
         $id = DB::table('activity_statuses')->where('code', $code)->value('id');
-        return $id ? (int) $id : null;
+        if ($id) {
+            return (int) $id;
+        }
+
+        $codeAliases = match ($code) {
+            'approved' => ['approved', 'da_duyet', 'khoa_duyet'],
+            default => [$code],
+        };
+
+        $id = DB::table('activity_statuses')
+            ->whereIn('code', $codeAliases)
+            ->value('id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $nameAliases = match ($code) {
+            'approved' => ['Đã duyệt', 'Khoa duyệt', 'Approved'],
+            default => [],
+        };
+
+        if ($nameAliases !== []) {
+            $id = DB::table('activity_statuses')
+                ->whereIn('name', $nameAliases)
+                ->value('id');
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
+        return null;
     }
 
     private function baseQuery(int $lecturerId, int $hoursStageId, int $approvedStatusId)
@@ -831,7 +919,7 @@ class LecturerHoursCalculateController extends Controller
 
     private function resolveAcademicYearForCalculate(
         int $lecturerId,
-        int $approvedStatusId,
+        int $_approvedStatusId,
         ?int $requestedAcademicYearId
     ): ?object {
         if ($requestedAcademicYearId) {
@@ -840,22 +928,7 @@ class LecturerHoursCalculateController extends Controller
 
         $currentAcademicYear = AcademicYearResolver::current();
         if ($currentAcademicYear) {
-            $hasCurrentYearData = DB::table('research_activities as ra')
-                ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
-                    $join->on('ram.activity_id', '=', 'ra.id')
-                        ->where('ram.lecturer_id', '=', $lecturerId);
-                })
-                ->where('ra.status_id', $approvedStatusId)
-                ->where('ra.academic_year_id', (int) $currentAcademicYear->id)
-                ->where(function ($query) use ($lecturerId) {
-                    $query->where('ra.owner_lecturer_id', $lecturerId)
-                        ->orWhere('ram.confirmation_status', 'accepted');
-                })
-                ->exists();
-
-            if ($hasCurrentYearData) {
-                return $currentAcademicYear;
-            }
+            return $currentAcademicYear;
         }
 
         $yearIdWithData = DB::table('research_activities as ra')
@@ -864,7 +937,6 @@ class LecturerHoursCalculateController extends Controller
                     ->where('ram.lecturer_id', '=', $lecturerId);
             })
             ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
-            ->where('ra.status_id', $approvedStatusId)
             ->where(function ($query) use ($lecturerId) {
                 $query->where('ra.owner_lecturer_id', $lecturerId)
                     ->orWhere('ram.confirmation_status', 'accepted');
@@ -907,8 +979,8 @@ class LecturerHoursCalculateController extends Controller
             'activity_code' => $row->activity_code,
             'academic_year_code' => $row->academic_year_code,
             'title' => $row->title,
-            'kind_name' => $row->kind_name,
-            'member_role_name' => $row->member_role_name,
+            'kind_name' => $this->mapKindName($row->kind_code ?? null, $row->kind_name ?? null),
+            'member_role_name' => $this->mapRoleName($row->member_role_code ?? null, $row->member_role_name ?? null),
             'hours_assigned' => $row->hours_assigned !== null ? (float) $row->hours_assigned : null,
             'rule_summary' => $hoursValues['rule_summary'],
             'conversion_rule_present' => $hoursValues['conversion_rule_present'],
@@ -1015,6 +1087,42 @@ class LecturerHoursCalculateController extends Controller
         }
 
         return '-';
+    }
+
+    private function mapKindName(?string $code, ?string $fallback): ?string
+    {
+        if (! $code) {
+            return $fallback;
+        }
+
+        $mapped = match (strtolower($code)) {
+            'paper' => 'Bài báo',
+            'book' => 'Sách/Giáo trình',
+            'project' => 'Đề tài KH&CN',
+            'conference' => 'Hội nghị/Hội thảo',
+            default => null,
+        };
+
+        return $mapped ?? $fallback ?? $code;
+    }
+
+    private function mapRoleName(?string $code, ?string $fallback): ?string
+    {
+        if (! $code) {
+            return $fallback;
+        }
+
+        $mapped = match (strtolower($code)) {
+            'principal' => 'Chủ nhiệm',
+            'secretary' => 'Thư ký',
+            'member' => 'Thành viên',
+            'coauthor' => 'Đồng tác giả',
+            'corresponding_author' => 'Tác giả chính',
+            'chief_editor' => 'Chủ biên',
+            default => null,
+        };
+
+        return $mapped ?? $fallback ?? $code;
     }
 
     private function resolveHoursValues(
@@ -1134,11 +1242,13 @@ class LecturerHoursCalculateController extends Controller
                 : null;
             $leaderHoursTotal = round((float) $rule->hours_total_per_activity * $normalizedQuantity, 2);
             $memberPoolTotal = round((float) $rule->hours_per_occurrence * $normalizedQuantity, 2);
-            $calculatedTotalByRule = round($leaderHoursTotal + $memberPoolTotal, 2);
 
             $nonPrincipalCount = max(0, $normalizedMemberCount - $normalizedPrincipalCount);
+            $memberPoolAppliedTotal = $nonPrincipalCount > 0 ? $memberPoolTotal : 0.0;
+            $calculatedTotalByRule = round($leaderHoursTotal + $memberPoolAppliedTotal, 2);
             $modifiers[] = ['name' => 'Giờ chủ nhiệm', 'value' => $leaderHoursTotal];
             $modifiers[] = ['name' => 'Quỹ giờ thành viên', 'value' => $memberPoolTotal];
+            $modifiers[] = ['name' => 'Quỹ giờ thành viên áp dụng', 'value' => $memberPoolAppliedTotal];
             $modifiers[] = ['name' => 'Số chủ nhiệm/chủ biên', 'value' => $normalizedPrincipalCount];
             $modifiers[] = ['name' => 'Số thành viên', 'value' => $nonPrincipalCount];
 
@@ -1146,15 +1256,9 @@ class LecturerHoursCalculateController extends Controller
                 $memberHours = round($calculatedTotalByRule / $normalizedMemberCount, 2);
             } elseif ($this->isPrincipalRole($memberRoleCode)) {
                 $memberHours = round($leaderHoursTotal / $normalizedPrincipalCount, 2);
-                if ($nonPrincipalCount === 0) {
-                    $memberHours = round(
-                        $memberHours + ($memberPoolTotal / $normalizedPrincipalCount),
-                        2
-                    );
-                }
             } else {
                 $memberHours = $nonPrincipalCount > 0
-                    ? round($memberPoolTotal / $nonPrincipalCount, 2)
+                    ? round($memberPoolAppliedTotal / $nonPrincipalCount, 2)
                     : 0.0;
             }
         } elseif ($strategy === 'principal_fraction_others_equal') {

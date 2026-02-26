@@ -139,7 +139,7 @@ class ResearchHoursCatalogSeeder extends Seeder
                 ['academic_year_id' => $year->id],
                 [
                     'required_hours' => 600,
-                    'notes' => 'Định mức chuẩn',
+                    'notes' => 'Định mức mặc định',
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]

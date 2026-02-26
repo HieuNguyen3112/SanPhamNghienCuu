@@ -252,6 +252,93 @@ class HoursListFiltersTest extends TestCase
         $this->assertContains($oldYearActivityId, $activityIds);
     }
 
+    public function test_calculate_endpoint_handles_missing_project_rule_without_crashing(): void
+    {
+        $projectKindId = DB::table('activity_kinds')->insertGetId([
+            'code' => 'project',
+            'name' => 'Project',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $projectTypeId = DB::table('activity_types')->insertGetId([
+            'kind_id' => $projectKindId,
+            'code' => 'bo',
+            'name' => 'Project - Ministry',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $activityId = DB::table('research_activities')->insertGetId([
+            'activity_code' => 'ACT-PROJECT-SYNTHETIC',
+            'owner_lecturer_id' => $this->lecturerId,
+            'kind_id' => $projectKindId,
+            'type_id' => $projectTypeId,
+            'academic_year_id' => $this->academicYearId,
+            'status_id' => $this->approvedStatusId,
+            'title' => 'Project hours synthetic rule',
+            'abstract' => null,
+            'start_date' => null,
+            'end_date' => null,
+            'quantity' => 1,
+            'submitted_at' => now(),
+            'approved_at' => now(),
+            'total_hours_calc' => null,
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('research_activity_members')->insert([
+            'activity_id' => $activityId,
+            'lecturer_id' => $this->lecturerId,
+            'member_role_id' => $this->memberRoleId,
+            'contribution_share' => 1,
+            'hours_assigned' => null,
+            'confirmation_status' => 'accepted',
+            'responded_at' => now(),
+            'confirmation_note' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->lecturerUser);
+
+        $response = $this->getJson('/api/lecturer/hours/calculate?status=all&include_all_years=1')
+            ->assertOk();
+
+        $item = collect($response->json('data.items'))
+            ->firstWhere('activity_id', $activityId);
+
+        $this->assertNotNull($item);
+        $this->assertSame('hours_not_submitted', (string) ($item['hours_request_state'] ?? ''));
+        $this->assertNull($item['effective_hours_display'] ?? null);
+    }
+
+    public function test_calculate_endpoint_accepts_academic_year_code_and_vietnamese_status_filter(): void
+    {
+        $activityId = $this->createApprovedActivityForYear(
+            'ACT-STATUS-VI',
+            $this->academicYearId
+        );
+
+        Sanctum::actingAs($this->lecturerUser);
+
+        $query = http_build_query([
+            'academic_year' => '2025-2026',
+            'status' => 'Chưa gửi duyệt giờ',
+        ]);
+
+        $response = $this->getJson('/api/lecturer/hours/calculate?' . $query)->assertOk();
+
+        $activityIds = collect($response->json('data.items'))
+            ->pluck('activity_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $this->assertContains($activityId, $activityIds);
+    }
+
     private function seedBaseData(): void
     {
         $facultyId = DB::table('faculties')->insertGetId([

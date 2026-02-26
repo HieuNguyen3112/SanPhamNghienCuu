@@ -65,6 +65,24 @@ class HoursPagesDataRegressionTest extends TestCase
         $this->assertSame(42.5, (float) $response->json('data.approved_hours'));
     }
 
+    public function test_lecturer_personal_overview_accepts_academic_year_code_filter(): void
+    {
+        $this->createHoursApprovalActivity(
+            ownerLecturerId: $this->lecturerId,
+            memberLecturerId: $this->lecturerId,
+            academicYearId: $this->dataAcademicYearId,
+            approvalStatus: 'approved',
+            hoursAssigned: 30
+        );
+
+        Sanctum::actingAs($this->lecturerUser);
+
+        $query = http_build_query(['academic_year' => '2024-2025']);
+        $response = $this->getJson('/api/lecturer/hours/personal/overview?' . $query)->assertOk();
+
+        $this->assertSame($this->dataAcademicYearId, (int) $response->json('data.academic_year_id'));
+    }
+
     public function test_faculty_hours_approvals_defaults_to_year_with_pending_requests(): void
     {
         $this->createHoursApprovalActivity(
@@ -278,4 +296,3 @@ class HoursPagesDataRegressionTest extends TestCase
         return $activityId;
     }
 }
-

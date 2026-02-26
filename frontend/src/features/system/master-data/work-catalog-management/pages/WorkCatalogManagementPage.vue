@@ -1,13 +1,12 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
-      <!-- Header -->
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
           title="Danh mục công trình"
-          subtitle="Quản lý các danh mục nền phục vụ kê khai và xét duyệt công trình nghiên cứu khoa học"
+          subtitle="Quản lý danh mục phục vụ kê khai và xét duyệt công trình nghiên cứu khoa học"
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"
@@ -15,14 +14,12 @@
         />
       </div>
 
-      <!-- Tabs -->
       <CatalogTabs
         :model-value="activeTab"
         :tabs="tabs"
         @update:model-value="setActiveTab"
       />
 
-      <!-- Content Card -->
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
@@ -49,7 +46,7 @@
             :format-date-time="formatDateTime"
             :modal-open="modalWorkTypeOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeWorkType === 'create'
                 ? 'Thêm loại công trình'
                 : 'Chỉnh sửa loại công trình'
             "
@@ -76,7 +73,7 @@
             :page-size="pageSizeWorkLevel"
             :modal-open="modalWorkLevelOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeWorkLevel === 'create'
                 ? 'Thêm cấp công trình'
                 : 'Chỉnh sửa cấp công trình'
             "
@@ -103,7 +100,7 @@
             :page-size="pageSizeJournal"
             :modal-open="modalJournalOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeJournal === 'create'
                 ? 'Thêm tạp chí khoa học'
                 : 'Chỉnh sửa tạp chí khoa học'
             "
@@ -130,7 +127,7 @@
             :page-size="pageSizeConference"
             :modal-open="modalConferenceOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeConference === 'create'
                 ? 'Thêm hội nghị khoa học'
                 : 'Chỉnh sửa hội nghị khoa học'
             "
@@ -157,7 +154,7 @@
             :page-size="pageSizeResearchField"
             :modal-open="modalResearchFieldOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeResearchField === 'create'
                 ? 'Thêm lĩnh vực nghiên cứu'
                 : 'Chỉnh sửa lĩnh vực nghiên cứu'
             "
@@ -195,7 +192,6 @@ import { useWorkCatalogs } from "../composables/useWorkCatalogs";
 
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
-// tabs config
 const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
   { key: "work_type", label: "Loại công trình", icon: Layers },
   { key: "work_level", label: "Cấp công trình", icon: Flag },
@@ -207,28 +203,24 @@ const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
 const wc = useWorkCatalogs();
 
 const {
-  // global
   activeTab,
   loading,
   errorMessage,
   loadActiveTab,
   formatDateTime,
 
-  // data stores
   workTypes,
   workLevels,
   journals,
   conferences,
   researchFields,
 
-  // search
   qWorkType,
   qWorkLevel,
   qJournal,
   qConference,
   qResearchField,
 
-  // pagination
   pageWorkType,
   pageWorkLevel,
   pageJournal,
@@ -240,7 +232,6 @@ const {
   pageSizeConference,
   pageSizeResearchField,
 
-  // computed rows
   pagedWorkTypes,
   pagedWorkLevels,
   pagedJournals,
@@ -252,15 +243,18 @@ const {
   conferenceTotal,
   researchFieldTotal,
 
-  // modal mode + open states
-  modalMode,
+  modalModeWorkType,
+  modalModeWorkLevel,
+  modalModeJournal,
+  modalModeConference,
+  modalModeResearchField,
+
   modalWorkTypeOpen,
   modalWorkLevelOpen,
   modalJournalOpen,
   modalConferenceOpen,
   modalResearchFieldOpen,
 
-  // forms + errors
   workTypeForm,
   workTypeErrors,
   workLevelForm,
@@ -272,7 +266,6 @@ const {
   researchFieldForm,
   researchFieldErrors,
 
-  // actions
   openCreateWorkType,
   openEditWorkType,
   saveWorkType,
@@ -312,20 +305,25 @@ function onEditWorkType(id: number) {
   const item = workTypes.value.find((x: any) => x.id === id);
   if (item) openEditWorkType(item);
 }
+
 function onEditWorkLevel(id: number) {
   const item = workLevels.value.find((x: any) => x.id === id);
   if (item) openEditWorkLevel(item);
 }
+
 function onEditJournal(id: number) {
   const item = journals.value.find((x: any) => x.id === id);
   if (item) openEditJournal(item);
 }
+
 function onEditConference(id: number) {
   const item = conferences.value.find((x: any) => x.id === id);
   if (item) openEditConference(item);
 }
+
 function onEditResearchField(id: number) {
   const item = researchFields.value.find((x: any) => x.id === id);
   if (item) openEditResearchField(item);
 }
 </script>
+

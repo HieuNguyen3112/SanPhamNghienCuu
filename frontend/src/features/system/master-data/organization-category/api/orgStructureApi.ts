@@ -1,4 +1,4 @@
-﻿import http, { ensureCsrfCookie } from "@/lib/http";
+import http, { ensureCsrfCookie } from "@/lib/http";
 import type {
   DepartmentDTO,
   DepartmentListResponseDTO,

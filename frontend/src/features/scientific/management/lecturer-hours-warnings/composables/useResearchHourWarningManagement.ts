@@ -1,4 +1,4 @@
-﻿import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import type {
   LecturerResearchHourShortfallWarningEntry,
   LecturerResearchHourWarningOverview,
@@ -10,6 +10,7 @@ import type {
 } from "../contracts/lecturerResearchHourWarning.contract";
 import { overviewFromDto } from "../contracts/lecturerResearchHourWarning.contract";
 import type { ResearchHourWarningService } from "../services/researchHourWarningService";
+import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
 export interface ResearchHourWarningFilterState {
   selectedFacultyIdentifier: FacultyIdentifier | "ALL_FACULTIES";
@@ -24,6 +25,7 @@ export interface ResearchHourWarningFilterState {
 export function useResearchHourWarningManagement(
   service: ResearchHourWarningService
 ) {
+  const { showSuccessModal, showErrorModal } = useActionResultModal();
   const overview = ref<LecturerResearchHourWarningOverview | null>(null);
 
   const filter = ref<ResearchHourWarningFilterState>({
@@ -152,20 +154,19 @@ export function useResearchHourWarningManagement(
         reason_code: payload.reasonCode,
         reason_note: payload.reasonNote,
       });
-
-      await loadOverview();
-
-      if (selectedEntry.value) {
-        const refreshed = entryList.value.find(
-          (x) =>
-            x.lecturerIdentifier === payload.lecturerIdentifier &&
-            x.academicYearIdentifier === payload.academicYearIdentifier
-        );
-        if (refreshed) selectedEntry.value = refreshed;
-      }
+      showSuccessModal("Đã gửi cảnh báo đến giảng viên.", "Thành công", undefined, {
+        onClose: async () => {
+          closeDetail();
+          await loadOverview();
+        },
+      });
     } catch (e) {
       console.error(e);
-      submitWarningError.value = "Không thể gửi cảnh báo. Vui lòng thử lại.";
+      showErrorModal(
+        "Không thể gửi cảnh báo. Vui lòng thử lại.",
+        "Có lỗi xảy ra",
+        e
+      );
     } finally {
       submittingWarning.value = false;
     }

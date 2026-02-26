@@ -1,7 +1,9 @@
 export type HoursBatchStatus = "approved" | "pending" | "rejected";
+export type HoursOverviewMode = "year" | "overall";
 
 export interface HoursOverview {
-  academicYearId: number;
+  mode: HoursOverviewMode;
+  academicYearId: number | null;
   academicYearCode: string;
 
   targetHours: number;
@@ -21,8 +23,9 @@ export interface HoursApprovalBatchSummary {
   batchId: number;
   batchName: string;
 
-  academicYearId: number;
-  academicYearCode: string;
+  mode: HoursOverviewMode;
+  academicYearId: number | null;
+  academicYearCode: string | null;
 
   status: HoursBatchStatus;
   submittedAt: string;
@@ -42,7 +45,7 @@ export interface HoursApprovalBatchDetail {
   batchId: number;
   batchName: string;
 
-  academicYearId: number;
+  academicYearId: number | null;
   academicYearCode: string;
 
   status: HoursBatchStatus;

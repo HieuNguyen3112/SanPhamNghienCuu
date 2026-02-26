@@ -94,9 +94,7 @@ class LecturerPersonalWorkController extends Controller
 
     private function backfillApprovedHours(int $lecturerId): void
     {
-        $approvedStatusId = (int) (DB::table('activity_statuses')
-            ->where('code', 'approved')
-            ->value('id') ?? 0);
+        $approvedStatusId = (int) ($this->resolveStatusId('approved') ?? 0);
 
         if ($approvedStatusId <= 0) {
             return;
@@ -107,6 +105,42 @@ class LecturerPersonalWorkController extends Controller
             $approvedStatusId,
             null
         );
+    }
+
+    private function resolveStatusId(string $code): ?int
+    {
+        $id = DB::table('activity_statuses')->where('code', $code)->value('id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $codeAliases = match ($code) {
+            'approved' => ['approved', 'da_duyet', 'khoa_duyet'],
+            default => [$code],
+        };
+
+        $id = DB::table('activity_statuses')
+            ->whereIn('code', $codeAliases)
+            ->value('id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $nameAliases = match ($code) {
+            'approved' => ['Đã duyệt', 'Khoa duyệt', 'Approved'],
+            default => [],
+        };
+
+        if ($nameAliases !== []) {
+            $id = DB::table('activity_statuses')
+                ->whereIn('name', $nameAliases)
+                ->value('id');
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
+        return null;
     }
 
     private function normalizeFilters(array $validated): array
@@ -604,53 +638,72 @@ class LecturerPersonalWorkController extends Controller
 
     private function mapStatusName(?string $code, ?string $fallback): ?string
     {
-        if ($fallback !== null && $fallback !== '') {
-            return $fallback;
-        }
-
-        return match ($code) {
-            'draft' => 'Draft',
+        $mapped = match ($code) {
+            'draft' => 'Bản nháp',
             'pending_member_confirm' => 'Chờ thành viên xác nhận',
             'member_rejected' => 'Thành viên từ chối',
             'pending_faculty_review' => 'Chờ khoa duyệt',
-            'submitted' => 'Submitted',
-            'approved' => 'Approved',
-            'rejected' => 'Rejected',
-            default => $code,
+            'submitted' => 'Đã gửi duyệt',
+            'approved' => 'Đã duyệt',
+            'rejected' => 'Từ chối',
+            default => null,
         };
+
+        return $mapped ?? ($fallback !== null && $fallback !== '' ? $fallback : $code);
     }
 
     private function mapKindName(?string $code, ?string $fallback): ?string
     {
-        if ($fallback !== null && $fallback !== '') {
-            return $fallback;
-        }
-
-        return match ($code) {
-            'paper' => 'Paper',
-            'book' => 'Book',
-            'project' => 'Project',
-            'conference' => 'Conference',
-            default => $code,
+        $mapped = match ($code) {
+            'paper' => 'Bài báo',
+            'book' => 'Sách/Giáo trình',
+            'project' => 'Đề tài KH&CN',
+            'conference' => 'Hội nghị/Hội thảo',
+            default => null,
         };
+
+        return $mapped ?? ($fallback !== null && $fallback !== '' ? $fallback : $code);
     }
 
     private function mapTypeName(?string $code, ?string $fallback): ?string
     {
-        if ($fallback !== null && $fallback !== '') {
+        if (! $code) {
             return $fallback;
         }
 
-        return $code ? strtoupper($code) : null;
+        $mapped = match (strtolower($code)) {
+            'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)',
+            'hdgsnn_600' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)',
+            'hdgsnn_300' => 'Bài báo có ISSN/ISBN (300 giờ)',
+            'textbook' => 'Giáo trình',
+            'reference' => 'Tài liệu tham khảo',
+            'bo', 'ministry' => 'Đề tài cấp Bộ (2 năm)',
+            'coso', 'university' => 'Đề tài cấp Trường (1 năm)',
+            'report' => 'Báo cáo hội thảo',
+            'attend' => 'Tham dự hội thảo',
+            default => null,
+        };
+
+        return $mapped ?? ($fallback !== null && $fallback !== '' ? $fallback : strtoupper($code));
     }
 
     private function mapRoleName(?string $code, ?string $fallback): ?string
     {
-        if ($fallback !== null && $fallback !== '') {
+        if (! $code) {
             return $fallback;
         }
 
-        return $code ? ucwords(str_replace('_', ' ', $code)) : null;
+        $mapped = match (strtolower($code)) {
+            'principal' => 'Chủ nhiệm',
+            'secretary' => 'Thư ký',
+            'member' => 'Thành viên',
+            'coauthor' => 'Đồng tác giả',
+            'corresponding_author' => 'Tác giả chính',
+            'chief_editor' => 'Chủ biên',
+            default => null,
+        };
+
+        return $mapped ?? ($fallback !== null && $fallback !== '' ? $fallback : ucwords(str_replace('_', ' ', $code)));
     }
 
     private function normalizeDateTime($value): ?string

@@ -20,7 +20,7 @@ class FacultyHoursApprovalSeeder extends Seeder
 
         DB::table('approval_stages')->updateOrInsert(
             ['code' => 'hours'],
-            ['name' => 'Hours Approval', 'order_no' => 3, 'created_at' => $now, 'updated_at' => $now]
+            ['name' => 'Khoa duyệt giờ NCKH', 'order_no' => 3, 'created_at' => $now, 'updated_at' => $now]
         );
         $stageId = DB::table('approval_stages')->where('code', 'hours')->value('id');
 
@@ -180,7 +180,7 @@ class FacultyHoursApprovalSeeder extends Seeder
                     'submitted_at' => $submittedAt,
                     'approved_at' => $submittedAt,
                     'total_hours_calc' => $activity['hours'],
-                    'notes' => 'seeded',
+                    'notes' => 'dữ liệu mẫu',
                     'created_at' => $submittedAt,
                     'updated_at' => $submittedAt,
                 ]
@@ -239,7 +239,7 @@ class FacultyHoursApprovalSeeder extends Seeder
                     'reason_detail' => 'Thiếu minh chứng',
                 ], JSON_UNESCAPED_UNICODE);
             } elseif ($status === 'approved') {
-                $note = 'seeded';
+                $note = 'dữ liệu mẫu';
             }
 
             DB::table('activity_approvals')->updateOrInsert(

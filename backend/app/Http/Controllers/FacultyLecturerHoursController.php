@@ -17,13 +17,13 @@ class FacultyLecturerHoursController extends Controller
     {
         $scope = $this->resolveFacultyScope($request);
         if (! $scope) {
-            return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
+            return response()->json(['message' => 'Không xác định được phạm vi khoa của tài khoản.'], Response::HTTP_FORBIDDEN);
         }
 
         $validated = $request->validated();
         $requestedFacultyId = $validated['faculty_id'] ?? null;
         if ($requestedFacultyId && (int) $requestedFacultyId !== $scope['faculty_id']) {
-            return response()->json(['message' => 'faculty scope mismatch'], Response::HTTP_FORBIDDEN);
+            return response()->json(['message' => 'Bạn không có quyền truy cập dữ liệu ngoài phạm vi khoa.'], Response::HTTP_FORBIDDEN);
         }
 
         $result = $this->summaryData($validated, $scope, true);
@@ -43,7 +43,7 @@ class FacultyLecturerHoursController extends Controller
     {
         $scope = $this->resolveFacultyScope($request);
         if (! $scope) {
-            return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
+            return response()->json(['message' => 'Không xác định được phạm vi khoa của tài khoản.'], Response::HTTP_FORBIDDEN);
         }
 
         $validated = $request->validated();
@@ -73,7 +73,7 @@ class FacultyLecturerHoursController extends Controller
             ->first();
 
         if (! $lecturerRow) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursTotal = $hoursStageId
@@ -146,13 +146,13 @@ class FacultyLecturerHoursController extends Controller
     {
         $scope = $this->resolveFacultyScope($request);
         if (! $scope) {
-            return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
+            return response()->json(['message' => 'Không xác định được phạm vi khoa của tài khoản.'], Response::HTTP_FORBIDDEN);
         }
 
         $validated = $request->validated();
         $requestedFacultyId = $validated['faculty_id'] ?? null;
         if ($requestedFacultyId && (int) $requestedFacultyId !== $scope['faculty_id']) {
-            return response()->json(['message' => 'faculty scope mismatch'], Response::HTTP_FORBIDDEN);
+            return response()->json(['message' => 'Bạn không có quyền truy cập dữ liệu ngoài phạm vi khoa.'], Response::HTTP_FORBIDDEN);
         }
 
         $result = $this->summaryData($validated, $scope, false);
@@ -165,13 +165,13 @@ class FacultyLecturerHoursController extends Controller
     {
         $scope = $this->resolveFacultyScope($request);
         if (! $scope) {
-            return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
+            return response()->json(['message' => 'Không xác định được phạm vi khoa của tài khoản.'], Response::HTTP_FORBIDDEN);
         }
 
         $validated = $request->validated();
         $requestedFacultyId = $validated['faculty_id'] ?? null;
         if ($requestedFacultyId && (int) $requestedFacultyId !== $scope['faculty_id']) {
-            return response()->json(['message' => 'faculty scope mismatch'], Response::HTTP_FORBIDDEN);
+            return response()->json(['message' => 'Bạn không có quyền truy cập dữ liệu ngoài phạm vi khoa.'], Response::HTTP_FORBIDDEN);
         }
 
         $result = $this->summaryData($validated, $scope, false);
@@ -371,17 +371,17 @@ class FacultyLecturerHoursController extends Controller
             return (int) $validated['academic_year_id'];
         }
 
+        $resolved = AcademicYearResolver::currentId();
+        if ($resolved) {
+            return (int) $resolved;
+        }
+
         $stageId = $hoursStageId ?? $this->resolveHoursStageId();
         if ($stageId) {
             $yearIdWithData = $this->findAcademicYearIdWithApprovedHours($stageId, $facultyId, $lecturerId);
             if ($yearIdWithData) {
                 return $yearIdWithData;
             }
-        }
-
-        $resolved = AcademicYearResolver::currentId();
-        if ($resolved) {
-            return (int) $resolved;
         }
 
         return (int) (DB::table('academic_years')->orderByDesc('id')->value('id') ?? 0);
@@ -456,7 +456,7 @@ class FacultyLecturerHoursController extends Controller
     {
         return (float) (DB::table('workload_quotas')
             ->where('academic_year_id', $academicYearId)
-            ->value('required_hours') ?? 600);
+            ->value('required_hours') ?? 0);
     }
 
     private function normalizeKpiStatus(?string $kpiStatus): string

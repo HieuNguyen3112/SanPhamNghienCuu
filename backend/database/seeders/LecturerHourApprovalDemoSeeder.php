@@ -18,7 +18,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
             DB::table('approval_stages')->updateOrInsert(
                 ['code' => 'hours'],
                 [
-                    'name' => 'Hours Approval',
+                    'name' => 'Khoa duyệt giờ NCKH',
                     'order_no' => 3,
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -233,7 +233,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                     'submitted_at' => $submittedAt,
                     'approved_at' => $submittedAt,
                     'total_hours_calc' => $activity['hours_assigned'],
-                    'notes' => 'hours seed',
+                    'notes' => 'dữ liệu seed giờ',
                     'created_at' => $submittedAt,
                     'updated_at' => $submittedAt,
                 ]
@@ -269,7 +269,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                     'reason_code' => 'missing_evidence',
                     'reason_detail' => 'Thiếu minh chứng',
                 ], JSON_UNESCAPED_UNICODE)
-                : ($status === 'approved' ? 'seeded' : null);
+                : ($status === 'approved' ? 'dữ liệu mẫu' : null);
 
             DB::table('activity_approvals')->updateOrInsert(
                 [

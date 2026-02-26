@@ -24,6 +24,7 @@ import {
   submitHoursApprovalRequestDTO,
   uploadHoursEvidenceDTO,
 } from "../services/selectHoursRequestService";
+import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
 export function useSelectHoursRequest() {
   const works = ref<ApprovedWorkRow[]>([]);
@@ -52,7 +53,10 @@ export function useSelectHoursRequest() {
 
   const submitting = ref(false);
   const submitError = ref<string | null>(null);
-  const toastMessage = ref<string | null>(null);
+  const {
+    showSuccessModal,
+    showErrorModal,
+  } = useActionResultModal();
 
   const evidenceFiles = ref<EvidenceFile[]>([]);
   const evidenceFileTypes = ref<EvidenceFileType[]>([]);
@@ -67,6 +71,25 @@ export function useSelectHoursRequest() {
   const uploadingEvidence = ref(false);
   const deletingEvidenceId = ref<number | null>(null);
   const loadingAcademicYears = ref(false);
+
+  function resolveFriendlyErrorMessage(error: unknown, fallback: string) {
+    const raw =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "";
+    const message = raw.split("\n")[0]?.trim() ?? "";
+
+    if (!message) return fallback;
+    if (/Network Error|timeout|ECONN/i.test(message)) {
+      return "Không thể kết nối máy chủ. Vui lòng thử lại.";
+    }
+    if (/Request failed with status code/i.test(message)) {
+      return fallback;
+    }
+    return message;
+  }
 
   const contentApprovedWorks = computed(() => works.value);
   const filteredWorks = computed(() => works.value);
@@ -293,11 +316,14 @@ export function useSelectHoursRequest() {
   }
 
   async function submitRequest() {
+    if (submitting.value) return;
+
     submitError.value = null;
-    toastMessage.value = null;
 
     if (selectedWorkIdSet.value.size === 0) {
-      submitError.value = "Bạn chưa chọn công trình nào.";
+      const message = "Bạn chưa chọn công trình nào.";
+      submitError.value = message;
+      showErrorModal(message, "Chưa thể gửi duyệt");
       return;
     }
 
@@ -308,11 +334,14 @@ export function useSelectHoursRequest() {
 
       selectedWorkIdSet.value = new Set();
       await loadApprovedWorks();
-
-      toastMessage.value = "Đã gửi duyệt giờ lên khoa.";
-      window.setTimeout(() => (toastMessage.value = null), 2500);
+      showSuccessModal("Đã gửi duyệt giờ lên khoa thành công.");
     } catch (e) {
-      submitError.value = e instanceof Error ? e.message : String(e);
+      const message = resolveFriendlyErrorMessage(
+        e,
+        "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại."
+      );
+      submitError.value = message;
+      showErrorModal(message, "Gửi duyệt thất bại", e);
     } finally {
       submitting.value = false;
     }
@@ -329,8 +358,12 @@ export function useSelectHoursRequest() {
   }
 
   async function uploadEvidence() {
+    if (uploadingEvidence.value) return;
+
     if (!workDetail.value || !selectedEvidenceFile.value || !selectedEvidenceTypeId.value) {
-      uploadEvidenceError.value = "Bạn cần chọn loại minh chứng và tệp trước khi tải lên.";
+      const message = "Bạn cần chọn loại minh chứng và tệp trước khi tải lên.";
+      uploadEvidenceError.value = message;
+      showErrorModal(message, "Thiếu thông tin minh chứng");
       return;
     }
 
@@ -349,10 +382,14 @@ export function useSelectHoursRequest() {
         loadEvidence(workDetail.value.activityId),
         loadApprovedWorks(),
       ]);
-      toastMessage.value = "Đã tải lên minh chứng.";
-      window.setTimeout(() => (toastMessage.value = null), 2500);
+      showSuccessModal("Đã tải lên minh chứng thành công.");
     } catch (e) {
-      uploadEvidenceError.value = e instanceof Error ? e.message : String(e);
+      const message = resolveFriendlyErrorMessage(
+        e,
+        "Không thể tải lên minh chứng. Vui lòng thử lại."
+      );
+      uploadEvidenceError.value = message;
+      showErrorModal(message, "Tải lên thất bại", e);
     } finally {
       uploadingEvidence.value = false;
     }
@@ -360,6 +397,7 @@ export function useSelectHoursRequest() {
 
   async function deleteEvidence(evidenceId: number) {
     if (!workDetail.value) return;
+    if (deletingEvidenceId.value !== null) return;
 
     deletingEvidenceId.value = evidenceId;
     uploadEvidenceError.value = null;
@@ -370,10 +408,14 @@ export function useSelectHoursRequest() {
         loadEvidence(workDetail.value.activityId),
         loadApprovedWorks(),
       ]);
-      toastMessage.value = "Đã xóa minh chứng.";
-      window.setTimeout(() => (toastMessage.value = null), 2500);
+      showSuccessModal("Đã xóa minh chứng thành công.");
     } catch (e) {
-      uploadEvidenceError.value = e instanceof Error ? e.message : String(e);
+      const message = resolveFriendlyErrorMessage(
+        e,
+        "Không thể xóa minh chứng. Vui lòng thử lại."
+      );
+      uploadEvidenceError.value = message;
+      showErrorModal(message, "Xóa minh chứng thất bại", e);
     } finally {
       deletingEvidenceId.value = null;
     }
@@ -409,7 +451,6 @@ export function useSelectHoursRequest() {
 
     submitting,
     submitError,
-    toastMessage,
 
     totalApprovedCount,
     currentPageNumber,

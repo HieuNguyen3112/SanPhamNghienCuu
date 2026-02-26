@@ -33,7 +33,7 @@
         <RouterLink
           v-if="!isAuthenticated"
           to="/login"
-          class="h-9 rounded-md bg-[#e11d48] px-4 text-xs font-extrabold text-white shadow-sm hover:brightness-110 focus:outline-none"
+          class="inline-flex h-9 items-center justify-center rounded-md bg-[#e11d48] px-4 text-xs font-extrabold text-white shadow-sm hover:brightness-110 focus:outline-none"
         >
           Đăng nhập
         </RouterLink>

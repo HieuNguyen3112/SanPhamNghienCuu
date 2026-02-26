@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ResearchActivities\ResearchActivityDetailRequest;
+use App\Http\Requests\ResearchActivities\ProjectHoursPreviewRequest;
 use App\Http\Requests\ResearchActivities\ResearchActivityMembersRequest;
 use App\Http\Requests\ResearchActivities\SubmitResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\StoreResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\UpdateResearchActivityRequest;
 use App\Notifications\ParticipationInvitationNotification;
+use App\Services\Hours\ProjectHoursCalculator;
 use App\Support\AuditLogger;
+use App\Support\WorkflowNotification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +27,12 @@ class ResearchActivityController extends Controller
     private const STATUS_PENDING_FACULTY_REVIEW = 'pending_faculty_review';
     private const STATUS_APPROVED = 'approved';
     private const STATUS_REJECTED = 'rejected';
+    private ProjectHoursCalculator $projectHoursCalculator;
+
+    public function __construct(ProjectHoursCalculator $projectHoursCalculator)
+    {
+        $this->projectHoursCalculator = $projectHoursCalculator;
+    }
 
     public function store(StoreResearchActivityRequest $request)
     {
@@ -668,6 +677,7 @@ class ResearchActivityController extends Controller
             $roleName = $roleNames[$row->member_role_id] ?? null;
 
             $invitee->notify(new ParticipationInvitationNotification([
+                'event_key' => 'participation_invitation',
                 'title' => 'Lời mời tham gia công trình',
                 'message' => trim('Bạn được mời tham gia công trình ' . $activityTitle . ($ownerName ? (' bởi ' . $ownerName) : '') . '.'),
                 'activity_id' => (int) $activity,
@@ -676,7 +686,22 @@ class ResearchActivityController extends Controller
                 'action_route' => '/declarations/participatier',
             ]));
         }
-
+        if (! $hasPending) {
+            WorkflowNotification::notifyFacultyBoardByActivityId(
+                (int) $activity,
+                WorkflowNotification::makePayload(
+                    'work_submitted_to_faculty',
+                    'Có hồ sơ công trình mới cần duyệt',
+                    trim(($ownerName ?: 'Giảng viên') . ' đã gửi công trình "' . ($activityTitle ?: 'Không rõ tiêu đề') . '" lên khoa duyệt.'),
+                    '/works/facapprovals?activity_id=' . (int) $activity,
+                    [
+                        'activity_id' => (int) $activity,
+                        'lecturer_id' => (int) $ownerLecturerId,
+                    ]
+                ),
+                (int) ($user->id ?? 0)
+            );
+        }
         // Audit log (đúng nghĩa submit công trình)
         AuditLogger::log($request, [
             'action_group' => 'approval',
@@ -794,6 +819,190 @@ class ResearchActivityController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function previewProjectHours(ProjectHoursPreviewRequest $request)
+    {
+        $user = $request->user();
+        $lecturer = $user?->lecturer;
+
+        if (! $lecturer) {
+            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $payload = $request->validated();
+        $kindId = DB::table('activity_kinds')->where('code', 'project')->value('id');
+        if (! $kindId) {
+            return response()->json([
+                'message' => 'project kind is not configured',
+                'code' => 'PROJECT_KIND_NOT_CONFIGURED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $typeId = isset($payload['type_id']) && $payload['type_id'] !== null
+            ? (int) $payload['type_id']
+            : null;
+        $quantity = max(1, (int) ($payload['quantity'] ?? 1));
+
+        if ($typeId === null) {
+            return response()->json([
+                'message' => 'type_id is required for project hour preview',
+                'code' => 'PROJECT_TYPE_REQUIRED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $typeMeta = null;
+        if (! $this->activityTypeMatchesKind($typeId, (int) $kindId)) {
+            return response()->json([
+                'message' => 'type_id does not match project kind',
+                'code' => 'TYPE_KIND_MISMATCH',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $typeMeta = DB::table('activity_types')
+            ->where('id', $typeId)
+            ->select(['id', 'code', 'name'])
+            ->first();
+
+        $roleRows = DB::table('member_roles')
+            ->select(['id', 'code', 'name'])
+            ->get();
+        $roleById = $roleRows->keyBy('id');
+        $roleByCode = $roleRows->keyBy('code');
+        $principalRoleId = optional($roleByCode->get('principal'))->id;
+
+        $members = collect($payload['members'] ?? [])
+            ->filter(fn ($member) => is_array($member))
+            ->map(function ($member) {
+                $lecturerId = isset($member['lecturer_id']) && $member['lecturer_id'] !== null
+                    ? (int) $member['lecturer_id']
+                    : null;
+                $memberRoleId = isset($member['member_role_id']) && $member['member_role_id'] !== null
+                    ? (int) $member['member_role_id']
+                    : null;
+                return [
+                    'lecturer_id' => $lecturerId,
+                    'member_role_id' => $memberRoleId,
+                ];
+            })
+            ->filter(fn ($member) => $member['lecturer_id'] !== null && $member['member_role_id'] !== null)
+            ->unique('lecturer_id')
+            ->values();
+
+        if (! $members->contains(fn ($member) => (int) $member['lecturer_id'] === (int) $lecturer->id)) {
+            $fallbackRoleId = $principalRoleId
+                ? (int) $principalRoleId
+                : ($roleRows->first()?->id ? (int) $roleRows->first()->id : null);
+            if ($fallbackRoleId === null) {
+                return response()->json([
+                    'message' => 'member roles are not configured',
+                    'code' => 'MEMBER_ROLES_NOT_CONFIGURED',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $members->prepend([
+                'lecturer_id' => (int) $lecturer->id,
+                'member_role_id' => $fallbackRoleId,
+            ]);
+        }
+
+        $members = $members->values();
+        if ($members->isEmpty()) {
+            return response()->json([
+                'message' => 'at least one internal member is required',
+                'code' => 'MEMBERS_REQUIRED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $normalizedMembers = [];
+        $lecturerIds = [];
+        foreach ($members as $member) {
+            $memberRole = $roleById->get((int) $member['member_role_id']);
+            if (! $memberRole) {
+                continue;
+            }
+
+            $lecturerId = (int) $member['lecturer_id'];
+            $lecturerIds[] = $lecturerId;
+            $normalizedMembers[] = [
+                'lecturer_id' => $lecturerId,
+                'member_role_code' => (string) $memberRole->code,
+                'member_role_name' => (string) $memberRole->name,
+            ];
+        }
+
+        if (empty($normalizedMembers)) {
+            return response()->json([
+                'message' => 'cannot resolve member roles for preview',
+                'code' => 'INVALID_MEMBER_ROLE',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $typeCode = $typeMeta?->code ? strtolower((string) $typeMeta->code) : null;
+        if (! $this->projectHoursCalculator->supports($typeCode)) {
+            return response()->json([
+                'message' => 'project level is not supported for automatic hour split',
+                'code' => 'PROJECT_LEVEL_UNSUPPORTED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $lecturerNames = DB::table('lecturers')
+            ->whereIn('id', array_values(array_unique($lecturerIds)))
+            ->pluck('full_name', 'id');
+        foreach ($normalizedMembers as $index => $member) {
+            $lecturerId = (int) $member['lecturer_id'];
+            $normalizedMembers[$index]['lecturer_full_name'] = (string) ($lecturerNames[$lecturerId] ?? ('GV #' . $lecturerId));
+        }
+
+        // Root-cause note:
+        // previous preview relied on hour_rules and inherited stale project config (equal_all_members, 120h),
+        // causing formula rows to show 0 while distribution showed small equal shares.
+        // We now use canonical fixed project rules (bo/coso) from ProjectHoursCalculator.
+        $calculated = $this->projectHoursCalculator->calculate(
+            $typeCode,
+            $quantity,
+            $normalizedMembers,
+            (int) $lecturer->id
+        );
+        if (! $calculated) {
+            return response()->json([
+                'message' => 'cannot compute project hours preview',
+                'code' => 'PROJECT_HOURS_PREVIEW_FAILED',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $currentLecturerHours = collect($calculated['members'])
+            ->firstWhere('lecturer_id', (int) $lecturer->id)['hours_assigned'] ?? null;
+
+        return response()->json([
+            'data' => [
+                'kind_code' => 'project',
+                'type_id' => $typeMeta?->id ? (int) $typeMeta->id : null,
+                'type_code' => $typeCode,
+                'type_name' => $typeMeta?->name,
+                'rule_summary' => $calculated['rule_summary'],
+                'distribution_strategy' => 'principal_fraction_others_equal',
+                'level_label' => $calculated['level_label'],
+                'quantity' => $quantity,
+                'formula' => [
+                    'leader_hours' => $calculated['leader_hours'],
+                    'member_pool_hours' => $calculated['member_pool_hours'],
+                    'member_pool_count' => $calculated['member_pool_count'],
+                    'member_pool_each' => $calculated['member_pool_each'],
+                    'rule_total_hours' => round(
+                        (float) $calculated['leader_hours'] + (float) $calculated['member_pool_hours'],
+                        2
+                    ),
+                    'total_hours_allocated' => $calculated['total_hours_allocated'],
+                    'progress_multiplier_applied' => (bool) $calculated['progress_multiplier_applied'],
+                    'progress_supported' => (bool) $calculated['progress_supported'],
+                    'progress_note' => $calculated['progress_note'],
+                ],
+                'formula_rows' => $calculated['formula_rows'],
+                'current_lecturer_hours' => $currentLecturerHours !== null ? (float) $currentLecturerHours : null,
+                'members' => $calculated['members'],
+            ],
+        ], Response::HTTP_OK);
+    }
+
     private function sendParticipationInvitationNotification(int $activityId, array $member): void
     {
         $inviteeUserId = isset($member['lecturer_user_id']) ? (int) $member['lecturer_user_id'] : 0;
@@ -820,6 +1029,7 @@ class ResearchActivityController extends Controller
         }
 
         $invitee->notify(new ParticipationInvitationNotification([
+                'event_key' => 'participation_invitation',
             'title' => 'Loi moi tham gia cong trinh',
             'message' => trim('Ban duoc moi tham gia cong trinh ' . ($activity->title ?? '') . (($activity->owner_name ?? '') ? (' boi ' . $activity->owner_name) : '') . '.'),
             'activity_id' => $activityId,
@@ -1002,3 +1212,4 @@ class ResearchActivityController extends Controller
             ->all();
     }
 }
+

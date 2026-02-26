@@ -21,6 +21,7 @@ export function useWorkCatalogs() {
   async function loadActiveTab(): Promise<void> {
     loading.value = true;
     errorMessage.value = null;
+
     try {
       if (activeTab.value === "work_type") await workType.load();
       else if (activeTab.value === "work_level") await workLevel.load();
@@ -37,7 +38,6 @@ export function useWorkCatalogs() {
 
   function formatDateTime(v: string | null | undefined): string {
     if (!v) return "";
-    // backend thường trả ISO / datetime string
     return v.replace("T", " ").replace(".000000Z", "");
   }
 
@@ -54,7 +54,6 @@ export function useWorkCatalogs() {
     loadActiveTab,
     formatDateTime,
 
-    // Work Types
     workTypes,
     workTypeTotal: workType.workTypeTotal,
     qWorkType: workType.qWorkType,
@@ -63,7 +62,7 @@ export function useWorkCatalogs() {
     filteredWorkTypes: workType.filteredWorkTypes,
     pagedWorkTypes: workType.pagedWorkTypes,
     modalWorkTypeOpen: workType.modalWorkTypeOpen,
-    modalMode: workType.modalMode,
+    modalModeWorkType: workType.modalMode,
     workTypeForm: workType.workTypeForm,
     workTypeErrors: workType.workTypeErrors,
     openCreateWorkType: workType.openCreateWorkType,
@@ -71,7 +70,6 @@ export function useWorkCatalogs() {
     saveWorkType: workType.saveWorkType,
     onUpdateWorkTypeForm: workType.onUpdateWorkTypeForm,
 
-    // Work Levels
     workLevels,
     workLevelTotal: workLevel.workLevelTotal,
     qWorkLevel: workLevel.qWorkLevel,
@@ -80,6 +78,7 @@ export function useWorkCatalogs() {
     filteredWorkLevels: workLevel.filteredWorkLevels,
     pagedWorkLevels: workLevel.pagedWorkLevels,
     modalWorkLevelOpen: workLevel.modalWorkLevelOpen,
+    modalModeWorkLevel: workLevel.modalMode,
     workLevelForm: workLevel.workLevelForm,
     workLevelErrors: workLevel.workLevelErrors,
     openCreateWorkLevel: workLevel.openCreateWorkLevel,
@@ -87,7 +86,6 @@ export function useWorkCatalogs() {
     saveWorkLevel: workLevel.saveWorkLevel,
     onUpdateWorkLevelForm: workLevel.onUpdateWorkLevelForm,
 
-    // Journals
     journals,
     journalTotal: journal.journalTotal,
     qJournal: journal.qJournal,
@@ -96,6 +94,7 @@ export function useWorkCatalogs() {
     filteredJournals: journal.filteredJournals,
     pagedJournals: journal.pagedJournals,
     modalJournalOpen: journal.modalJournalOpen,
+    modalModeJournal: journal.modalMode,
     journalForm: journal.journalForm,
     journalErrors: journal.journalErrors,
     openCreateJournal: journal.openCreateJournal,
@@ -103,7 +102,6 @@ export function useWorkCatalogs() {
     saveJournal: journal.saveJournal,
     onUpdateJournalForm: journal.onUpdateJournalForm,
 
-    // Conferences
     conferences,
     conferenceTotal: conference.conferenceTotal,
     qConference: conference.qConference,
@@ -112,6 +110,7 @@ export function useWorkCatalogs() {
     filteredConferences: conference.filteredConferences,
     pagedConferences: conference.pagedConferences,
     modalConferenceOpen: conference.modalConferenceOpen,
+    modalModeConference: conference.modalMode,
     conferenceForm: conference.conferenceForm,
     conferenceErrors: conference.conferenceErrors,
     openCreateConference: conference.openCreateConference,
@@ -119,7 +118,6 @@ export function useWorkCatalogs() {
     saveConference: conference.saveConference,
     onUpdateConferenceForm: conference.onUpdateConferenceForm,
 
-    // Research fields
     researchFields,
     researchFieldTotal: researchField.researchFieldTotal,
     qResearchField: researchField.qResearchField,
@@ -128,6 +126,7 @@ export function useWorkCatalogs() {
     filteredResearchFields: researchField.filteredResearchFields,
     pagedResearchFields: researchField.pagedResearchFields,
     modalResearchFieldOpen: researchField.modalResearchFieldOpen,
+    modalModeResearchField: researchField.modalMode,
     researchFieldForm: researchField.researchFieldForm,
     researchFieldErrors: researchField.researchFieldErrors,
     openCreateResearchField: researchField.openCreateResearchField,
@@ -136,3 +135,4 @@ export function useWorkCatalogs() {
     onUpdateResearchFieldForm: researchField.onUpdateResearchFieldForm,
   };
 }
+

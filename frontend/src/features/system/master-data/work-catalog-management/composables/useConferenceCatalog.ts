@@ -1,8 +1,7 @@
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import {
   conferenceFromDto,
   type Conference,
-  type ConferenceDTO,
   type ConferenceLevel,
   type ConferenceUpsertDTO,
 } from "../contracts/conferences.contract";
@@ -45,12 +44,13 @@ export function useConferenceCatalog() {
     );
   }
 
-  function validateRequired(v: string, max: number) {
+  function validateRequired(v: string, max: number): string | null {
     if (!v.trim()) return "Trường này là bắt buộc.";
     if (v.length > max) return `Tối đa ${max} ký tự.`;
     return null;
   }
-  function validateOptional(v: string, max: number) {
+
+  function validateOptional(v: string, max: number): string | null {
     if (v.length > max) return `Tối đa ${max} ký tự.`;
     return null;
   }
@@ -61,12 +61,25 @@ export function useConferenceCatalog() {
       page: pageConference.value,
       per_page: pageSizeConference.value,
     });
+
     conferences.value = res.items.map(conferenceFromDto);
     conferenceTotal.value = res.pagination.total;
   }
 
   const pagedConferences = computed(() => conferences.value);
   const filteredConferences = computed(() => conferences.value);
+
+  watch(qConference, () => {
+    if (pageConference.value !== 1) {
+      pageConference.value = 1;
+      return;
+    }
+    void load();
+  });
+
+  watch([pageConference, pageSizeConference], () => {
+    void load();
+  });
 
   function openCreateConference() {
     modalMode.value = "create";
@@ -152,3 +165,4 @@ export function useConferenceCatalog() {
     saveConference,
   };
 }
+

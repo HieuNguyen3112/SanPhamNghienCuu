@@ -1,4 +1,4 @@
-﻿// src/features/organization-category/contracts/organizationCategory.contract.ts
+// src/features/organization-category/contracts/organizationCategory.contract.ts
 
 export type TabKey = "faculties" | "departments";
 

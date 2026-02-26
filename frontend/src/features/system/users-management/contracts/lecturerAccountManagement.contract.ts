@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Lecturer Account Management - Contract
  *
  * - DTO is snake_case (simulating backend)

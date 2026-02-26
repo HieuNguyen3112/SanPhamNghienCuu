@@ -10,6 +10,9 @@
     "check:utf8": "node scripts/check-utf8.mjs src",
     "check:mojibake": "node scripts/check-mojibake.mjs"
   },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",
     "@vueuse/core": "^14.0.0",
