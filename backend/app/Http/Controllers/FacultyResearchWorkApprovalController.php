@@ -147,7 +147,9 @@ class FacultyResearchWorkApprovalController extends Controller
         }
 
         // Đồng bộ trước khi hiển thị để bảng "Thành viên & số giờ" luôn có dữ liệu dự kiến mới nhất.
-        $calculation = $this->hoursRecomputeService->recomputeActivity((int) $activity, now(), true);
+        $now = now();
+        $this->ensureOwnerMemberExists((int) $activity, (int) $row->lecturer_id, $now);
+        $calculation = $this->hoursRecomputeService->recomputeActivity((int) $activity, $now, true);
         $members = $this->fetchMembers($activity);
         $computedHoursByLecturer = [];
         foreach (($calculation['members'] ?? []) as $memberHours) {
@@ -164,12 +166,31 @@ class FacultyResearchWorkApprovalController extends Controller
             $recommendedPerMember = (float) $computedTotalHours / $memberCount;
         }
 
+        $ruleResolved = ! empty($calculation['rule_id']);
+        $ruleSummary = isset($calculation['rule_summary'])
+            ? (string) $calculation['rule_summary']
+            : null;
+        $hoursResolutionNote = null;
+        if (! $ruleResolved) {
+            $hoursResolutionNote = $this->buildMissingRuleReason($row);
+        } elseif ($memberCount === 0) {
+            $hoursResolutionNote = 'Chưa có thành viên hợp lệ để tính giờ quy đổi.';
+        } elseif ($computedTotalHours === null) {
+            $hoursResolutionNote = 'Không thể tính giờ quy đổi tự động cho công trình này.';
+        }
+
         $membersPayload = array_map(function ($member) use ($recommendedPerMember, $computedHoursByLecturer) {
             $payload = (array) $member;
             $computed = $computedHoursByLecturer[(int) $member->lecturer_id]['hours_assigned'] ?? null;
             $declared = $member->hours_assigned !== null
                 ? (float) $member->hours_assigned
                 : ($computed !== null ? (float) $computed : null);
+            $ownerFacultyId = isset($member->owner_faculty_id) && $member->owner_faculty_id !== null
+                ? (int) $member->owner_faculty_id
+                : null;
+            $memberFacultyId = isset($member->member_faculty_id) && $member->member_faculty_id !== null
+                ? (int) $member->member_faculty_id
+                : null;
 
             $payload['declared_hours'] = $declared;
             $payload['computed_member_hours'] = $computed !== null ? (float) $computed : $declared;
@@ -177,6 +198,11 @@ class FacultyResearchWorkApprovalController extends Controller
                 ? (float) $recommendedPerMember
                 : null;
             $payload['official_hours'] = null;
+            $payload['owner_faculty_id'] = $ownerFacultyId;
+            $payload['member_faculty_id'] = $memberFacultyId;
+            $payload['is_outside_faculty'] = $ownerFacultyId !== null
+                && $memberFacultyId !== null
+                && $ownerFacultyId !== $memberFacultyId;
             return $payload;
         }, $members);
 
@@ -205,6 +231,9 @@ class FacultyResearchWorkApprovalController extends Controller
                     'hours_request_state' => $hoursSummary['state'],
                     'hours_request_status_raw' => $hoursSummary['raw_status'],
                     'official_hours' => null,
+                    'rule_resolved' => $ruleResolved,
+                    'rule_summary' => $ruleSummary,
+                    'hours_resolution_note' => $hoursResolutionNote,
                     'evidence_count' => (int) ($row->evidence_count ?? 0),
                     'lecturer' => [
                         'id' => (int) $row->lecturer_id,
@@ -251,7 +280,7 @@ class FacultyResearchWorkApprovalController extends Controller
         $now = now();
         $user = $request->user();
 
-        DB::transaction(function () use ($activity, $stageIds, $approvedStatusId, $now, $request, $user) {
+        DB::transaction(function () use ($activity, $current, $stageIds, $approvedStatusId, $now, $request, $user) {
             $locked = DB::table('research_activities as ra')
                 ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
                 ->where('ra.id', $activity)
@@ -267,6 +296,7 @@ class FacultyResearchWorkApprovalController extends Controller
                 abort(Response::HTTP_CONFLICT, 'activity is not pending faculty approval');
             }
 
+            $this->ensureOwnerMemberExists((int) $activity, (int) $current->lecturer_id, $now);
             $calculation = $this->calculateAndPersistHoursDistribution($activity, $now);
 
             $activityUpdate = [
@@ -705,8 +735,10 @@ class FacultyResearchWorkApprovalController extends Controller
         $rows = DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->join('lecturers as owner_l', 'ra.owner_lecturer_id', '=', 'owner_l.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
+            ->leftJoin('departments as owner_d', 'owner_l.department_id', '=', 'owner_d.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->whereIn('ram.activity_id', $activityIds)
             ->where(function ($query) {
@@ -721,7 +753,9 @@ class FacultyResearchWorkApprovalController extends Controller
                 'mr.code as member_role_code',
                 'mr.name as member_role_name',
                 'd.name as department_name',
+                'f.id as member_faculty_id',
                 'f.name as faculty_name',
+                'owner_d.faculty_id as owner_faculty_id',
             ])
             ->orderBy('ram.activity_id')
             ->get();
@@ -729,6 +763,8 @@ class FacultyResearchWorkApprovalController extends Controller
         $grouped = [];
         foreach ($rows as $row) {
             $activityId = (int) $row->activity_id;
+            $ownerFacultyId = $row->owner_faculty_id !== null ? (int) $row->owner_faculty_id : null;
+            $memberFacultyId = $row->member_faculty_id !== null ? (int) $row->member_faculty_id : null;
             $grouped[$activityId][] = [
                 'lecturer_id' => (int) $row->lecturer_id,
                 'lecturer_code' => $row->lecturer_code,
@@ -736,6 +772,11 @@ class FacultyResearchWorkApprovalController extends Controller
                 'member_role_code' => $row->member_role_code,
                 'member_role_name' => $row->member_role_name,
                 'department_name' => $row->department_name,
+                'member_faculty_id' => $memberFacultyId,
+                'owner_faculty_id' => $ownerFacultyId,
+                'is_outside_faculty' => $ownerFacultyId !== null
+                    && $memberFacultyId !== null
+                    && $ownerFacultyId !== $memberFacultyId,
                 'faculty_name' => $row->faculty_name,
             ];
         }
@@ -748,8 +789,10 @@ class FacultyResearchWorkApprovalController extends Controller
         return DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->join('lecturers as owner_l', 'ra.owner_lecturer_id', '=', 'owner_l.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
+            ->leftJoin('departments as owner_d', 'owner_l.department_id', '=', 'owner_d.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activityId)
             ->where(function ($query) {
@@ -765,12 +808,89 @@ class FacultyResearchWorkApprovalController extends Controller
                 'mr.name as member_role_name',
                 'ram.contribution_share',
                 'ram.hours_assigned',
+                'owner_d.faculty_id as owner_faculty_id',
+                'f.id as member_faculty_id',
                 'd.name as department_name',
                 'f.name as faculty_name',
             ])
             ->orderBy('ram.id')
             ->get()
             ->all();
+    }
+
+    private function buildMissingRuleReason(object $row): string
+    {
+        $academicYear = trim((string) ($row->academic_year_code ?? ''));
+        $kind = trim((string) ($row->kind_name ?? $row->kind_code ?? ''));
+        $type = trim((string) ($row->type_name ?? $row->type_code ?? ''));
+
+        return sprintf(
+            'Chưa cấu hình quy tắc quy đổi cho: %s - %s - %s.',
+            $academicYear !== '' ? $academicYear : 'Chưa xác định năm học',
+            $kind !== '' ? $kind : 'Chưa xác định loại công trình',
+            $type !== '' ? $type : 'Chưa xác định hình thức'
+        );
+    }
+
+    private function ensureOwnerMemberExists(int $activityId, int $ownerLecturerId, $now): void
+    {
+        if ($activityId <= 0 || $ownerLecturerId <= 0) {
+            return;
+        }
+
+        $ownerRow = DB::table('research_activity_members')
+            ->where('activity_id', $activityId)
+            ->where('lecturer_id', $ownerLecturerId)
+            ->first();
+
+        if ($ownerRow) {
+            if (($ownerRow->confirmation_status ?? null) !== 'accepted') {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activityId)
+                    ->where('lecturer_id', $ownerLecturerId)
+                    ->update([
+                        'confirmation_status' => 'accepted',
+                        'responded_at' => $now,
+                        'confirmation_note' => null,
+                        'updated_at' => $now,
+                    ]);
+            }
+            return;
+        }
+
+        $preferredCodes = ['principal', 'corresponding_author', 'chief_editor', 'member'];
+        $roleIdsByCode = DB::table('member_roles')
+            ->whereIn('code', $preferredCodes)
+            ->pluck('id', 'code');
+
+        $defaultRoleId = null;
+        foreach ($preferredCodes as $code) {
+            if (isset($roleIdsByCode[$code])) {
+                $defaultRoleId = (int) $roleIdsByCode[$code];
+                break;
+            }
+        }
+
+        if (! $defaultRoleId) {
+            $fallbackRoleId = DB::table('member_roles')->value('id');
+            if (! $fallbackRoleId) {
+                return;
+            }
+            $defaultRoleId = (int) $fallbackRoleId;
+        }
+
+        DB::table('research_activity_members')->insert([
+            'activity_id' => $activityId,
+            'lecturer_id' => $ownerLecturerId,
+            'member_role_id' => $defaultRoleId,
+            'contribution_share' => null,
+            'hours_assigned' => null,
+            'confirmation_status' => 'accepted',
+            'confirmation_note' => null,
+            'responded_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     private function fetchApprovals(int $activityId): array

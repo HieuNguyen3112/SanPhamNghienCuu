@@ -139,19 +139,30 @@ export function useFacultyResearchWorkApprovalProvider() {
   }
 
   function mapAuthors(item: FacultyApprovalListItem, submitterId: number) {
+    const ownerFacultyId = item.lecturer.faculty_id ?? null;
     return item.authors.map((author) => {
       const isPrimary =
         author.member_role_code === "principal" ||
         author.member_role_code === "corresponding_author" ||
         author.member_role_code === "chief_editor";
+      const memberFacultyId = author.member_faculty_id ?? null;
+      const isOutsideFaculty =
+        author.is_outside_faculty ??
+        (ownerFacultyId !== null &&
+          memberFacultyId !== null &&
+          ownerFacultyId !== memberFacultyId);
       return {
         authorIdentifier: author.lecturer_id,
         authorDisplayName: `${author.lecturer_full_name} (${author.lecturer_code})`,
         authorFacultyIdentifier:
-          facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
+          facultyIdentifierById.value[memberFacultyId ?? 0] ??
+          facultyIdentifierById.value[ownerFacultyId ?? 0] ??
           "ALL_DEPARTMENTS",
         authorFacultyDisplayName:
           author.faculty_name ?? author.department_name ?? "",
+        authorFacultyId: memberFacultyId,
+        ownerFacultyId,
+        isOutsideFaculty,
         isPrimaryAuthor: isPrimary,
         isSubmittingLecturer: author.lecturer_id === submitterId,
       };
@@ -220,13 +231,24 @@ export function useFacultyResearchWorkApprovalProvider() {
         member.member_role_code === "chief_editor";
       const computedMemberHours =
         member.computed_member_hours ?? member.declared_hours ?? member.hours_assigned ?? null;
+      const ownerFacultyId = member.owner_faculty_id ?? item.lecturer.faculty_id ?? null;
+      const memberFacultyId = member.member_faculty_id ?? null;
+      const isOutsideFaculty =
+        member.is_outside_faculty ??
+        (ownerFacultyId !== null &&
+          memberFacultyId !== null &&
+          ownerFacultyId !== memberFacultyId);
       return {
         authorIdentifier: member.lecturer_id,
         authorDisplayName: `${member.lecturer_full_name} (${member.lecturer_code})`,
         authorFacultyIdentifier:
-          facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
+          facultyIdentifierById.value[memberFacultyId ?? 0] ??
+          facultyIdentifierById.value[ownerFacultyId ?? 0] ??
           "ALL_DEPARTMENTS",
-        authorFacultyDisplayName: member.faculty_name ?? "",
+        authorFacultyDisplayName: member.faculty_name ?? member.department_name ?? "",
+        authorFacultyId: memberFacultyId,
+        ownerFacultyId,
+        isOutsideFaculty,
         isPrimaryAuthor: isPrimary,
         isSubmittingLecturer: member.lecturer_id === item.lecturer.id,
         authorRoleDisplayName:
@@ -287,6 +309,9 @@ export function useFacultyResearchWorkApprovalProvider() {
       lecturerDeclaredResearchHours: item.declared_hours ?? 0,
       recommendedResearchHoursByPolicy: item.computed_total_hours ?? 0,
       officialResearchHours: item.official_hours ?? 0,
+      ruleResolved: item.rule_resolved ?? false,
+      ruleSummary: item.rule_summary ?? null,
+      hoursResolutionNote: item.hours_resolution_note ?? null,
 
       approvalStatus: item.approval_status as any,
 
@@ -468,5 +493,3 @@ export function useFacultyResearchWorkApprovalProvider() {
     reject,
   };
 }
-
-

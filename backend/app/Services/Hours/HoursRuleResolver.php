@@ -3,6 +3,7 @@
 namespace App\Services\Hours;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class HoursRuleResolver
 {
@@ -11,14 +12,10 @@ class HoursRuleResolver
         [$windowStart, $windowEnd] = $this->resolveRuleWindow($academicYearId);
         $requestedTypeCode = $this->resolveTypeCode($typeId);
 
-        $rule = $this->findExactRule($kindId, $typeId, $windowStart, $windowEnd);
-        if ($rule) {
-            return $rule;
-        }
+        $candidateTypeIds = $this->buildCandidateTypeIds($kindId, $typeId, $requestedTypeCode);
 
-        $mappedTypeId = $this->resolveMappedTypeId($kindId, $requestedTypeCode);
-        if ($mappedTypeId !== null && $mappedTypeId !== $typeId) {
-            $rule = $this->findExactRule($kindId, $mappedTypeId, $windowStart, $windowEnd);
+        foreach ($candidateTypeIds as $candidateTypeId) {
+            $rule = $this->findExactRule($kindId, $candidateTypeId, $windowStart, $windowEnd);
             if ($rule) {
                 return $rule;
             }
@@ -29,13 +26,8 @@ class HoursRuleResolver
             return $rule;
         }
 
-        $rule = $this->findExactRule($kindId, $typeId);
-        if ($rule) {
-            return $rule;
-        }
-
-        if ($mappedTypeId !== null && $mappedTypeId !== $typeId) {
-            $rule = $this->findExactRule($kindId, $mappedTypeId);
+        foreach ($candidateTypeIds as $candidateTypeId) {
+            $rule = $this->findExactRule($kindId, $candidateTypeId);
             if ($rule) {
                 return $rule;
             }
@@ -47,35 +39,35 @@ class HoursRuleResolver
     public function formatRuleSummary(?object $rule): string
     {
         if (! $rule) {
-            return 'Chưa có quy tắc quy đổi cho loại công trình này. Vui lòng liên hệ Phòng quản lý khoa học để cấu hình.';
+            return 'Chưa có quy tắc quy đổi cho công trình này. Vui lòng liên hệ Phòng Quản lý khoa học để cấu hình.';
         }
 
         $parts = [
-            'chien_luoc=' . $rule->distribution_strategy,
+            'chiến lược=' . $rule->distribution_strategy,
         ];
 
         if ($rule->hours_total_per_activity !== null) {
-            $parts[] = 'tong_gio=' . $rule->hours_total_per_activity;
+            $parts[] = 'tổng giờ=' . $rule->hours_total_per_activity;
         }
 
         if ($rule->hours_per_occurrence !== null) {
             if ($this->isProjectPoolRule($rule)) {
-                $parts[] = 'quy_gio_thanh_vien=' . $rule->hours_per_occurrence;
+                $parts[] = 'quỹ giờ thành viên=' . $rule->hours_per_occurrence;
             } else {
-                $parts[] = 'gio_moi_lan=' . $rule->hours_per_occurrence;
+                $parts[] = 'giờ mỗi lần=' . $rule->hours_per_occurrence;
             }
         }
 
         if ($rule->principal_fraction !== null) {
-            $parts[] = 'ty_le_chu_nhiem_chu_bien=' . $rule->principal_fraction;
+            $parts[] = 'tỷ lệ chủ nhiệm/chủ biên=' . $rule->principal_fraction;
         }
 
         if ($rule->others_fraction_total !== null) {
-            $parts[] = 'ty_le_nhom_thanh_vien=' . $rule->others_fraction_total;
+            $parts[] = 'tỷ lệ nhóm thành viên=' . $rule->others_fraction_total;
         }
 
         if ($rule->max_occurrences_per_year !== null) {
-            $parts[] = 'so_lan_toi_da=' . $rule->max_occurrences_per_year;
+            $parts[] = 'số lần tối đa=' . $rule->max_occurrences_per_year;
         }
 
         return 'Quy tắc quy đổi: ' . implode(', ', $parts);
@@ -95,6 +87,22 @@ class HoursRuleResolver
             && $rule->distribution_strategy === 'principal_fraction_others_equal'
             && $rule->hours_total_per_activity !== null
             && $rule->hours_per_occurrence !== null;
+    }
+
+    private function buildCandidateTypeIds(int $kindId, ?int $typeId, ?string $requestedTypeCode): array
+    {
+        $ids = [];
+        if ($typeId !== null) {
+            $ids[] = (int) $typeId;
+        }
+
+        foreach ($this->resolveMappedTypeIds($kindId, $requestedTypeCode) as $mappedTypeId) {
+            if (! in_array($mappedTypeId, $ids, true)) {
+                $ids[] = $mappedTypeId;
+            }
+        }
+
+        return $ids;
     }
 
     private function resolveRuleWindow(?int $academicYearId): array
@@ -195,36 +203,111 @@ class HoursRuleResolver
             return null;
         }
 
-        return strtolower((string) $code);
+        return (string) $code;
     }
 
-    private function resolveMappedTypeId(int $kindId, ?string $typeCode): ?int
+    private function resolveMappedTypeIds(int $kindId, ?string $typeCode): array
     {
-        if ($typeCode === null) {
-            return null;
+        if ($typeCode === null || trim($typeCode) === '') {
+            return [];
         }
 
-        $kindCode = DB::table('activity_kinds')->where('id', $kindId)->value('code');
-        if (strtolower((string) $kindCode) !== 'project') {
-            return null;
+        $kindCode = strtolower((string) DB::table('activity_kinds')->where('id', $kindId)->value('code'));
+        if ($kindCode === '') {
+            return [];
         }
 
-        $normalized = strtolower(trim($typeCode));
-        if ($normalized === 'ministry') {
-            $normalized = 'bo';
-        } elseif ($normalized === 'university') {
-            $normalized = 'coso';
+        $normalized = $this->normalizeToken($typeCode);
+        if ($normalized === '') {
+            return [];
         }
 
-        if (! in_array($normalized, ['bo', 'coso'], true)) {
-            return null;
+        $aliasGroups = [];
+
+        if ($kindCode === 'project') {
+            if ($this->containsAny($normalized, ['ministry', 'bo', 'cap_bo'])) {
+                $aliasGroups[] = ['bo', 'ministry', 'cap_bo', 'project_bo', 'project_ministry'];
+            }
+            if ($this->containsAny($normalized, ['university', 'coso', 'co_so', 'cap_truong'])) {
+                $aliasGroups[] = ['coso', 'university', 'co_so', 'cap_truong', 'project_university'];
+            }
         }
 
-        $typeId = DB::table('activity_types')
+        if ($kindCode === 'conference') {
+            if ($this->containsAny($normalized, ['attend', 'tham_du', 'thamdu', 'participant'])) {
+                $aliasGroups[] = ['attend', 'tham_du', 'conference_attend'];
+            }
+            if ($this->containsAny($normalized, ['report', 'bao_cao', 'presentation', 'present'])) {
+                $aliasGroups[] = ['report', 'bao_cao', 'conference_report', 'presentation'];
+            }
+        }
+
+        if ($kindCode === 'book') {
+            if ($this->containsAny($normalized, ['textbook', 'giao_trinh'])) {
+                $aliasGroups[] = ['textbook', 'giao_trinh', 'book_textbook'];
+            }
+            if ($this->containsAny($normalized, ['reference', 'tham_khao', 'tai_lieu'])) {
+                $aliasGroups[] = ['reference', 'tham_khao', 'tai_lieu', 'book_reference'];
+            }
+        }
+
+        if ($aliasGroups === []) {
+            $aliasGroups[] = [$normalized];
+        }
+
+        $typeIds = [];
+        foreach ($aliasGroups as $aliases) {
+            foreach ($this->findTypeIdsByAliases($kindId, $aliases) as $aliasTypeId) {
+                if (! in_array($aliasTypeId, $typeIds, true)) {
+                    $typeIds[] = $aliasTypeId;
+                }
+            }
+        }
+
+        return $typeIds;
+    }
+
+    private function findTypeIdsByAliases(int $kindId, array $aliases): array
+    {
+        $normalizedAliases = array_values(array_unique(array_filter(array_map(
+            fn ($alias) => $this->normalizeToken((string) $alias),
+            $aliases
+        ))));
+
+        if ($normalizedAliases === []) {
+            return [];
+        }
+
+        return DB::table('activity_types')
             ->where('kind_id', $kindId)
-            ->where('code', $normalized)
-            ->value('id');
+            ->where(function ($query) use ($normalizedAliases) {
+                foreach ($normalizedAliases as $alias) {
+                    $query->orWhereRaw('LOWER(code) = ?', [strtolower($alias)])
+                        ->orWhereRaw('LOWER(code) LIKE ?', ['%' . strtolower($alias) . '%']);
+                }
+            })
+            ->orderByDesc('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
 
-        return $typeId ? (int) $typeId : null;
+    private function normalizeToken(string $value): string
+    {
+        $ascii = Str::lower(Str::ascii($value));
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $ascii);
+        return trim((string) $normalized, '_');
+    }
+
+    private function containsAny(string $haystack, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if ($needle !== '' && str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
+

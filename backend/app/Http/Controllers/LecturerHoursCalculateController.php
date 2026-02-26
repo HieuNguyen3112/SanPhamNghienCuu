@@ -152,7 +152,14 @@ class LecturerHoursCalculateController extends Controller
             $row->contribution_share !== null ? (float) $row->contribution_share : null,
             $row->member_role_code ? (string) $row->member_role_code : null,
             $row->member_count !== null ? (int) $row->member_count : 1,
-            $row->principal_count !== null ? (int) $row->principal_count : 0
+            $row->principal_count !== null ? (int) $row->principal_count : 0,
+            (int) $row->activity_id,
+            $row->title ? (string) $row->title : null,
+            $row->kind_code ? (string) $row->kind_code : null,
+            $row->kind_name ? (string) $row->kind_name : null,
+            $row->type_code ? (string) $row->type_code : null,
+            $row->type_name ? (string) $row->type_name : null,
+            $row->academic_year_code ? (string) $row->academic_year_code : null
         );
 
         return response()->json([
@@ -266,7 +273,14 @@ class LecturerHoursCalculateController extends Controller
                 $row->contribution_share !== null ? (float) $row->contribution_share : null,
                 $row->member_role_code ? (string) $row->member_role_code : null,
                 $row->member_count !== null ? (int) $row->member_count : 1,
-                $row->principal_count !== null ? (int) $row->principal_count : 0
+                $row->principal_count !== null ? (int) $row->principal_count : 0,
+                (int) $row->activity_id,
+                $row->title ? (string) $row->title : null,
+                $row->kind_code ? (string) $row->kind_code : null,
+                $row->kind_name ? (string) $row->kind_name : null,
+                $row->type_code ? (string) $row->type_code : null,
+                $row->type_name ? (string) $row->type_name : null,
+                $row->academic_year_code ? (string) $row->academic_year_code : null
             );
 
             if ($hoursValues['effective_hours_display'] === null) {
@@ -785,6 +799,7 @@ class LecturerHoursCalculateController extends Controller
                     ->where('ram.lecturer_id', '=', $lecturerId);
             })
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
             ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
@@ -811,7 +826,10 @@ class LecturerHoursCalculateController extends Controller
                 'ra.quantity',
                 'ra.kind_id',
                 'ra.type_id',
+                'ak.code as kind_code',
                 'ak.name as kind_name',
+                'at.code as type_code',
+                'at.name as type_name',
                 'mr.name as member_role_name',
                 'mr.code as member_role_code',
                 'ram.hours_assigned',
@@ -971,7 +989,14 @@ class LecturerHoursCalculateController extends Controller
             $row->contribution_share !== null ? (float) $row->contribution_share : null,
             $row->member_role_code ? (string) $row->member_role_code : null,
             $row->member_count !== null ? (int) $row->member_count : 1,
-            $row->principal_count !== null ? (int) $row->principal_count : 0
+            $row->principal_count !== null ? (int) $row->principal_count : 0,
+            (int) $row->activity_id,
+            $row->title ? (string) $row->title : null,
+            $row->kind_code ? (string) $row->kind_code : null,
+            $row->kind_name ? (string) $row->kind_name : null,
+            $row->type_code ? (string) $row->type_code : null,
+            $row->type_name ? (string) $row->type_name : null,
+            $row->academic_year_code ? (string) $row->academic_year_code : null
         );
 
         return [
@@ -1135,10 +1160,26 @@ class LecturerHoursCalculateController extends Controller
         ?float $contributionShare = null,
         ?string $memberRoleCode = null,
         ?int $memberCount = null,
-        ?int $principalCount = null
+        ?int $principalCount = null,
+        ?int $activityId = null,
+        ?string $activityTitle = null,
+        ?string $kindCode = null,
+        ?string $kindName = null,
+        ?string $typeCode = null,
+        ?string $typeName = null,
+        ?string $academicYearCode = null
     ): array
     {
-        $rule = $this->hoursRuleResolver->resolveForActivity($kindId, $typeId, $academicYearId);
+        $resolvedTypeId = $this->resolveRuleTypeId(
+            $kindId,
+            $typeId,
+            $activityId,
+            $activityTitle,
+            $kindCode,
+            $typeCode
+        );
+
+        $rule = $this->hoursRuleResolver->resolveForActivity($kindId, $resolvedTypeId, $academicYearId);
         $rulePresent = $rule !== null;
         $ruleSnapshot = $this->calculateRuleSnapshot(
             $rule,
@@ -1180,9 +1221,21 @@ class LecturerHoursCalculateController extends Controller
         $calculatedHours = $rulePresent ? $memberHours : null;
         $proposedHours = null;
         $effectiveHours = $calculatedHours;
+        $ruleSummary = $rulePresent
+            ? $this->hoursRuleResolver->formatRuleSummary($rule)
+            : $this->buildMissingRuleSummary(
+                $kindId,
+                $resolvedTypeId,
+                $academicYearId,
+                $kindCode,
+                $kindName,
+                $typeCode,
+                $typeName,
+                $academicYearCode
+            );
 
         return [
-            'rule_summary' => $this->hoursRuleResolver->formatRuleSummary($rule),
+            'rule_summary' => $ruleSummary,
             'conversion_rule_present' => $rulePresent,
             'calculated_hours' => $calculatedHours,
             'proposed_hours' => $proposedHours,
@@ -1192,6 +1245,227 @@ class LecturerHoursCalculateController extends Controller
             'formula_explanation' => $formulaExplanation,
             'can_edit_proposed_hours' => false,
         ];
+    }
+
+    private function resolveRuleTypeId(
+        int $kindId,
+        ?int $typeId,
+        ?int $activityId,
+        ?string $activityTitle,
+        ?string $kindCode,
+        ?string $typeCode
+    ): ?int {
+        if ($typeId !== null) {
+            return $typeId;
+        }
+
+        $normalizedKindCode = strtolower(trim((string) ($kindCode ?? '')));
+        if ($normalizedKindCode === '') {
+            $normalizedKindCode = strtolower((string) (DB::table('activity_kinds')->where('id', $kindId)->value('code') ?? ''));
+        }
+
+        if ($normalizedKindCode === 'book') {
+            $bookSignal = $this->resolveBookSubtypeSignal($activityId, $activityTitle, $typeCode);
+            if ($bookSignal === 'textbook') {
+                return $this->lookupTypeIdByAliases($kindId, ['textbook', 'giao_trinh', 'book_textbook']);
+            }
+            if ($bookSignal === 'reference') {
+                return $this->lookupTypeIdByAliases($kindId, ['reference', 'tai_lieu', 'tham_khao', 'book_reference']);
+            }
+        }
+
+        if ($normalizedKindCode === 'conference') {
+            $conferenceSignal = $this->resolveConferenceSubtypeSignal($activityId, $activityTitle, $typeCode);
+            if ($conferenceSignal === 'attend') {
+                return $this->lookupTypeIdByAliases($kindId, ['attend', 'tham_du', 'conference_attend']);
+            }
+            if ($conferenceSignal === 'report') {
+                return $this->lookupTypeIdByAliases($kindId, ['report', 'bao_cao', 'presentation', 'conference_report']);
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveBookSubtypeSignal(?int $activityId, ?string $activityTitle, ?string $typeCode): ?string
+    {
+        $normalized = $this->normalizeToken(((string) $activityTitle) . ' ' . ((string) $typeCode));
+        if ($this->containsAny($normalized, ['textbook', 'giao_trinh'])) {
+            return 'textbook';
+        }
+        if ($this->containsAny($normalized, ['reference', 'tham_khao', 'tai_lieu'])) {
+            return 'reference';
+        }
+
+        if (! $activityId) {
+            return null;
+        }
+
+        $row = DB::table('book_details')
+            ->where('activity_id', $activityId)
+            ->select(['isbn', 'approval_decision_no', 'approval_decision_date'])
+            ->first();
+        if (! $row) {
+            return null;
+        }
+
+        $hasTextbookSignals = trim((string) ($row->isbn ?? '')) !== ''
+            || trim((string) ($row->approval_decision_no ?? '')) !== ''
+            || ! empty($row->approval_decision_date);
+
+        return $hasTextbookSignals ? 'textbook' : 'reference';
+    }
+
+    private function resolveConferenceSubtypeSignal(?int $activityId, ?string $activityTitle, ?string $typeCode): ?string
+    {
+        $buffer = ((string) $activityTitle) . ' ' . ((string) $typeCode);
+        if ($activityId) {
+            $conferenceName = DB::table('conference_details')
+                ->where('activity_id', $activityId)
+                ->value('conference_name');
+            if ($conferenceName) {
+                $buffer .= ' ' . (string) $conferenceName;
+            }
+        }
+
+        $normalized = $this->normalizeToken($buffer);
+        if ($this->containsAny($normalized, ['attend', 'tham_du', 'thamdu', 'participant'])) {
+            return 'attend';
+        }
+        if ($this->containsAny($normalized, ['report', 'bao_cao', 'presentation', 'present'])) {
+            return 'report';
+        }
+
+        return null;
+    }
+
+    private function lookupTypeIdByAliases(int $kindId, array $aliases): ?int
+    {
+        $normalizedAliases = array_values(array_unique(array_filter(array_map(
+            fn ($alias) => $this->normalizeToken((string) $alias),
+            $aliases
+        ))));
+
+        if ($normalizedAliases === []) {
+            return null;
+        }
+
+        $id = DB::table('activity_types')
+            ->where('kind_id', $kindId)
+            ->where(function ($query) use ($normalizedAliases) {
+                foreach ($normalizedAliases as $alias) {
+                    $query->orWhereRaw('LOWER(code) = ?', [$alias])
+                        ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $alias . '%']);
+                }
+            })
+            ->orderByDesc('id')
+            ->value('id');
+
+        return $id ? (int) $id : null;
+    }
+
+    private function buildMissingRuleSummary(
+        int $kindId,
+        ?int $typeId,
+        ?int $academicYearId,
+        ?string $kindCode,
+        ?string $kindName,
+        ?string $typeCode,
+        ?string $typeName,
+        ?string $academicYearCode
+    ): string {
+        $yearLabel = trim((string) ($academicYearCode ?? ''));
+        if ($yearLabel === '' && $academicYearId) {
+            $yearLabel = (string) (DB::table('academic_years')->where('id', $academicYearId)->value('code') ?? '');
+        }
+        if ($yearLabel === '') {
+            $yearLabel = 'Chưa xác định năm học';
+        }
+
+        $kindCodeResolved = strtolower(trim((string) ($kindCode ?? '')));
+        $kindLabel = trim((string) ($kindName ?? ''));
+        if ($kindLabel === '') {
+            if ($kindCodeResolved === '') {
+                $kindCodeResolved = strtolower((string) (DB::table('activity_kinds')->where('id', $kindId)->value('code') ?? ''));
+            }
+            $kindNameDb = DB::table('activity_kinds')->where('id', $kindId)->value('name');
+            $kindLabel = $this->mapKindName($kindCodeResolved !== '' ? $kindCodeResolved : null, $kindNameDb ? (string) $kindNameDb : null)
+                ?? 'Chưa xác định loại công trình';
+        }
+
+        $typeLabel = trim((string) ($typeName ?? ''));
+        $typeCodeResolved = strtolower(trim((string) ($typeCode ?? '')));
+        if ($typeCodeResolved === '' && $typeId) {
+            $typeCodeResolved = strtolower((string) (DB::table('activity_types')->where('id', $typeId)->value('code') ?? ''));
+        }
+        if ($typeLabel === '') {
+            $typeLabel = $this->mapTypeName($kindCodeResolved !== '' ? $kindCodeResolved : null, $typeCodeResolved !== '' ? $typeCodeResolved : null)
+                ?? 'Chưa xác định hình thức';
+        }
+
+        return sprintf(
+            'Chưa cấu hình quy tắc quy đổi cho: %s - %s - Cấp: Mặc định - Hình thức: %s.',
+            $yearLabel,
+            $kindLabel,
+            $typeLabel
+        );
+    }
+
+    private function mapTypeName(?string $kindCode, ?string $typeCode): ?string
+    {
+        $kind = strtolower(trim((string) $kindCode));
+        $type = strtolower(trim((string) $typeCode));
+        if ($kind === '' || $type === '') {
+            return null;
+        }
+
+        if ($kind === 'book' && $type === 'textbook') {
+            return 'Giáo trình';
+        }
+        if ($kind === 'book' && $type === 'reference') {
+            return 'Tài liệu tham khảo';
+        }
+        if ($kind === 'conference' && $type === 'report') {
+            return 'Báo cáo hội thảo';
+        }
+        if ($kind === 'conference' && $type === 'attend') {
+            return 'Tham dự hội thảo';
+        }
+        if ($kind === 'project' && $type === 'bo') {
+            return 'Đề tài cấp Bộ';
+        }
+        if ($kind === 'project' && $type === 'coso') {
+            return 'Đề tài cấp Trường';
+        }
+        if ($kind === 'paper' && $type === 'hdgsnn_900') {
+            return 'Bài báo HDGSNN 1-2 điểm';
+        }
+        if ($kind === 'paper' && $type === 'hdgsnn_600') {
+            return 'Bài báo HDGSNN đến 1 điểm';
+        }
+        if ($kind === 'paper' && $type === 'hdgsnn_300') {
+            return 'Bài báo có ISSN/ISBN';
+        }
+
+        return strtoupper($type);
+    }
+
+    private function normalizeToken(string $value): string
+    {
+        $ascii = Str::lower(Str::ascii($value));
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $ascii);
+        return trim((string) $normalized, '_');
+    }
+
+    private function containsAny(string $haystack, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if ($needle !== '' && str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function calculateRuleSnapshot(

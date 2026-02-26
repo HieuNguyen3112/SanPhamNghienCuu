@@ -239,6 +239,7 @@
             :memberRoles="filteredMemberRoles"
             :readOnly="readOnly"
             :currentLecturerId="currentLecturerId"
+            :ownerFacultyId="ownerFacultyId"
             :hoursByLecturerId="hoursByLecturerId"
             @request-search="onSearchLecturers"
           />
@@ -485,6 +486,11 @@ const typeCodeById = computed(() =>
 );
 const lecturerNameById = computed(() =>
   Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name]))
+);
+const ownerFacultyId = computed(
+  () =>
+    lecturers.value.find((l) => l.id === currentLecturerId.value)?.faculty_id ??
+    null
 );
 
 const memberRoleCodeById = computed(() =>

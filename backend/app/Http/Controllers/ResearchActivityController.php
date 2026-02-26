@@ -206,15 +206,51 @@ class ResearchActivityController extends Controller
         $ownerLecturerId = (int) $current->owner_lecturer_id;
 
         $synced = DB::transaction(function () use ($activity, $items, $now, $ownerLecturerId) {
-            if (count($items) === 0) {
-                DB::table('research_activity_members')
+            $itemsToSync = $items;
+            $ownerInPayload = false;
+            foreach ($itemsToSync as $memberItem) {
+                if ((int) ($memberItem['lecturer_id'] ?? 0) === $ownerLecturerId) {
+                    $ownerInPayload = true;
+                    break;
+                }
+            }
+
+            if (! $ownerInPayload) {
+                $ownerRoleId = DB::table('research_activity_members')
                     ->where('activity_id', $activity)
-                    ->delete();
-                return [];
+                    ->where('lecturer_id', $ownerLecturerId)
+                    ->value('member_role_id');
+
+                if (! $ownerRoleId) {
+                    $preferredCodes = ['principal', 'corresponding_author', 'chief_editor', 'member'];
+                    $roleIdsByCode = DB::table('member_roles')
+                        ->whereIn('code', $preferredCodes)
+                        ->pluck('id', 'code');
+
+                    foreach ($preferredCodes as $code) {
+                        if (isset($roleIdsByCode[$code])) {
+                            $ownerRoleId = (int) $roleIdsByCode[$code];
+                            break;
+                        }
+                    }
+                }
+
+                if (! $ownerRoleId) {
+                    $ownerRoleId = DB::table('member_roles')->value('id');
+                }
+
+                if ($ownerRoleId) {
+                    $itemsToSync[] = [
+                        'lecturer_id' => $ownerLecturerId,
+                        'member_role_id' => (int) $ownerRoleId,
+                        'contribution_share' => null,
+                        'hours_assigned' => null,
+                    ];
+                }
             }
 
             $handled = [];
-            foreach ($items as $item) {
+            foreach ($itemsToSync as $item) {
                 $payload = [
                     'activity_id' => $activity,
                     'lecturer_id' => $item['lecturer_id'],
@@ -767,8 +803,17 @@ class ResearchActivityController extends Controller
             ? DB::table($detailKind)->where('activity_id', $activity)->first()
             : null;
 
+        $ownerFacultyId = DB::table('lecturers as owner_l')
+            ->leftJoin('departments as owner_d', 'owner_l.department_id', '=', 'owner_d.id')
+            ->where('owner_l.id', (int) $current->owner_lecturer_id)
+            ->value('owner_d.faculty_id');
+        $ownerFacultyId = $ownerFacultyId !== null ? (int) $ownerFacultyId : null;
+
         $members = DB::table('research_activity_members as ram')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
+            ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
             ->where('ram.activity_id', $activity)
             ->select([
                 'ram.lecturer_id',
@@ -780,8 +825,23 @@ class ResearchActivityController extends Controller
                 'ram.responded_at',
                 'mr.code as member_role_code',
                 'mr.name as member_role_name',
+                'd.id as department_id',
+                'd.name as department_name',
+                'f.id as member_faculty_id',
+                'f.name as faculty_name',
             ])
-            ->get();
+            ->get()
+            ->map(function ($row) use ($ownerFacultyId) {
+                $memberFacultyId = $row->member_faculty_id !== null ? (int) $row->member_faculty_id : null;
+                return array_merge((array) $row, [
+                    'owner_faculty_id' => $ownerFacultyId,
+                    'is_outside_faculty' => $ownerFacultyId !== null
+                        && $memberFacultyId !== null
+                        && $ownerFacultyId !== $memberFacultyId,
+                ]);
+            })
+            ->values()
+            ->all();
 
         $evidenceFiles = $this->fetchEvidenceFiles($activity);
 
@@ -1212,4 +1272,3 @@ class ResearchActivityController extends Controller
             ->all();
     }
 }
-

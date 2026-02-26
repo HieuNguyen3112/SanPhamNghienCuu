@@ -339,7 +339,7 @@ class LecturerPersonalHoursController extends Controller
         }
 
         $nameAliases = match ($code) {
-            'hours' => ['Hours Approval', 'Duyá»‡t giá»', 'Xét duyệt giờ', 'Duyá»‡t giá» NCKH'],
+            'hours' => ['Hours Approval', 'Duyệt giờ', 'Xét duyệt giờ', 'Duyệt giờ NCKH'],
             default => [],
         };
 
@@ -412,7 +412,7 @@ class LecturerPersonalHoursController extends Controller
                 'mode' => 'overall',
                 'academic_year' => null,
                 'year_ids' => $allAcademicYearIds,
-                'label' => 'Tá»•ng thá»ƒ',
+                'label' => 'Tổng thể',
             ];
         }
 
@@ -518,7 +518,7 @@ class LecturerPersonalHoursController extends Controller
         }
 
         $nameAliases = match ($code) {
-            'approved' => ['Đã duyệt', 'Khoa duyá»‡t', 'Approved'],
+            'approved' => ['Đã duyệt', 'Khoa duyệt', 'Approved'],
             default => [],
         };
 
@@ -586,9 +586,9 @@ class LecturerPersonalHoursController extends Controller
     private function statusLabel(string $status): string
     {
         return match ($status) {
-            'pending' => 'Chá» duyá»‡t',
+            'pending' => 'Chờ duyệt',
             'approved' => 'Đã duyệt',
-            'rejected' => 'Tá»« chá»‘i',
+            'rejected' => 'Từ chối',
             default => $status,
         };
     }
@@ -623,7 +623,7 @@ class LecturerPersonalHoursController extends Controller
             'paper' => 'Bài báo',
             'book' => 'Sách/Giáo trình',
             'project' => 'Đề tài KH&CN',
-            'conference' => 'Há»™i nghá»‹/Há»™i tháº£o',
+            'conference' => 'Hội nghị/Hội thảo',
             default => null,
         };
 

@@ -145,12 +145,15 @@ class LookupController extends Controller
     {
         $query = DB::table('lecturers as l')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
+            ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
             ->select([
                 'l.id',
                 'l.code',
                 'l.full_name',
                 'l.department_id',
                 'd.name as department_name',
+                'd.faculty_id',
+                'f.name as faculty_name',
             ]);
 
         if ($request->filled('search')) {

@@ -42,6 +42,9 @@ export interface ResearchWorkAuthor {
   authorDisplayName: string;
   authorFacultyIdentifier: string;
   authorFacultyDisplayName: string;
+  authorFacultyId?: number | null;
+  ownerFacultyId?: number | null;
+  isOutsideFaculty?: boolean;
   isPrimaryAuthor: boolean;
   isSubmittingLecturer: boolean;
   authorRoleDisplayName?: string;
@@ -94,6 +97,9 @@ export interface ResearchWorkApprovalEntry {
   lecturerDeclaredResearchHours: number;
   recommendedResearchHoursByPolicy: number;
   officialResearchHours: number;
+  ruleResolved?: boolean;
+  ruleSummary?: string | null;
+  hoursResolutionNote?: string | null;
 
   approvalStatus: ResearchWorkApprovalStatus;
 
