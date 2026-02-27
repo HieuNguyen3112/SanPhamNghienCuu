@@ -90,6 +90,7 @@ import HoursKpiOverview from "@/features/scientific/management/lecturer-hours-ma
 import LecturerHoursTable from "@/features/scientific/management/lecturer-hours-management/components/LecturerHoursTable.vue";
 import LecturerHoursDrawer from "@/features/scientific/management/lecturer-hours-management/components/LecturerHoursDrawer.vue";
 import { useLecturerHoursManagement } from "@/features/scientific/management/lecturer-hours-management/composables/useLecturerHoursManagement";
+import { useExportActionFeedback } from "@/shared/composables/useExportActionFeedback";
 import {
   exportHoursExcel,
   exportHoursPdf,
@@ -133,6 +134,8 @@ const {
   initialFacultyId: null,
 });
 
+const { runExport } = useExportActionFeedback();
+
 const selectedAcademicYearCode = computed(() => {
   return yearOptions.value.find((y) => y.id === filter.yearId)?.code ?? "";
 });
@@ -146,35 +149,12 @@ function buildExportParams() {
   };
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-}
-
 async function onExportExcel() {
-  try {
-    const result = await exportHoursExcel(buildExportParams());
-    downloadBlob(result.blob, result.filename);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(error);
-  }
+  await runExport("excel", () => exportHoursExcel(buildExportParams()));
 }
 
 async function onExportPdf() {
-  try {
-    const result = await exportHoursPdf(buildExportParams());
-    downloadBlob(result.blob, result.filename);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(error);
-  }
+  await runExport("pdf", () => exportHoursPdf(buildExportParams()));
 }
 
 onMounted(() => {

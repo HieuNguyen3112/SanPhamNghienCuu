@@ -10,15 +10,18 @@ import {
   list_participation_notifications,
   reject_participation_notification,
 } from "../services/participationNotifications.service";
-import { useActionResultModal } from "@/shared/composables/useActionResultModal";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 export type StatusFilter = "ALL" | NotificationStatus;
 
 export interface NotificationFilters {
   status: StatusFilter;
   q: string;
-  from: string; // YYYY-MM-DD
-  to: string; // YYYY-MM-DD
+  from: string;
+  to: string;
 }
 
 export function useParticipationNotifications() {
@@ -41,11 +44,10 @@ export function useParticipationNotifications() {
   const detailOpen = ref(false);
   const selectedId = ref<number | null>(null);
   const selected = ref<ParticipationNotification | null>(null);
-
-  const { showSuccessModal, showErrorModal } = useActionResultModal();
-
   const notificationMessage = ref<string | null>(null);
   let notificationTimer: number | null = null;
+
+  const { runWithFeedback } = useActionFeedback();
 
   function setNotification(message: string) {
     notificationMessage.value = message;
@@ -56,22 +58,6 @@ export function useParticipationNotifications() {
       notificationMessage.value = null;
       notificationTimer = null;
     }, 2500);
-  }
-
-  function resolveFriendlyErrorMessage(error: unknown, fallback: string) {
-    const raw =
-      error instanceof Error
-        ? error.message
-        : typeof error === "string"
-          ? error
-          : "";
-    const message = raw.split("\n")[0]?.trim() ?? "";
-
-    if (!message) return fallback;
-    if (/Network Error|timeout|ECONN/i.test(message)) {
-      return "Không thể kết nối máy chủ. Vui lòng thử lại.";
-    }
-    return message;
   }
 
   function buildListParams() {
@@ -122,14 +108,14 @@ export function useParticipationNotifications() {
   function resetFilters() {
     filters.value = { status: "ALL", q: "", from: "", to: "" };
     currentPageNumber.value = 1;
-    loadList();
+    void loadList();
   }
 
   function openDetail(rowId: number) {
     selectedId.value = rowId;
     detailOpen.value = true;
     selected.value = null;
-    loadDetail(rowId);
+    void loadDetail(rowId);
   }
 
   function closeDetail() {
@@ -145,26 +131,38 @@ export function useParticipationNotifications() {
 
     processingDecision.value = true;
     try {
-      const updatedDto = await accept_participation_notification(selected.value.id);
-      const updated = mapParticipationNotificationDtoToModel(updatedDto);
-      selected.value = updated;
-      rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
-      showSuccessModal("Đã xác nhận tham gia thành công.", "Thành công", undefined, {
-        onClose: async () => {
+      await runWithFeedback(
+        async () => {
+          const updatedDto = await accept_participation_notification(
+            selected.value!.id
+          );
+          const updated = mapParticipationNotificationDtoToModel(updatedDto);
+          selected.value = updated;
+          rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
           closeDetail();
           await loadList();
         },
-      });
+        {
+          loading: {
+            title: "Đang xác nhận",
+            message: "Hệ thống đang ghi nhận phản hồi...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã xác nhận tham gia thành công.",
+          },
+          error: {
+            title: "Xác nhận thất bại",
+            message: (error) =>
+              resolveApiErrorMessage(
+                error,
+                "Không thể xác nhận tham gia. Vui lòng thử lại."
+              ),
+          },
+        }
+      );
     } catch (error) {
       console.error(error);
-      showErrorModal(
-        resolveFriendlyErrorMessage(
-          error,
-          "Không thể xác nhận tham gia. Vui lòng thử lại."
-        ),
-        "Xác nhận thất bại",
-        error
-      );
     } finally {
       processingDecision.value = false;
     }
@@ -177,29 +175,39 @@ export function useParticipationNotifications() {
 
     processingDecision.value = true;
     try {
-      const updatedDto = await reject_participation_notification(
-        selected.value.id,
-        reason
-      );
-      const updated = mapParticipationNotificationDtoToModel(updatedDto);
-      selected.value = updated;
-      rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
-      showSuccessModal("Đã từ chối tham gia thành công.", "Thành công", undefined, {
-        onClose: async () => {
+      await runWithFeedback(
+        async () => {
+          const updatedDto = await reject_participation_notification(
+            selected.value!.id,
+            reason
+          );
+          const updated = mapParticipationNotificationDtoToModel(updatedDto);
+          selected.value = updated;
+          rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
           closeDetail();
           await loadList();
         },
-      });
+        {
+          loading: {
+            title: "Đang xử lý từ chối",
+            message: "Hệ thống đang ghi nhận phản hồi...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã từ chối tham gia thành công.",
+          },
+          error: {
+            title: "Từ chối thất bại",
+            message: (error) =>
+              resolveApiErrorMessage(
+                error,
+                "Không thể từ chối tham gia. Vui lòng thử lại."
+              ),
+          },
+        }
+      );
     } catch (error) {
       console.error(error);
-      showErrorModal(
-        resolveFriendlyErrorMessage(
-          error,
-          "Không thể từ chối tham gia. Vui lòng thử lại."
-        ),
-        "Từ chối thất bại",
-        error
-      );
     } finally {
       processingDecision.value = false;
     }
@@ -207,13 +215,13 @@ export function useParticipationNotifications() {
 
   function onUpdateCurrentPageNumber(n: number) {
     currentPageNumber.value = n;
-    loadList();
+    void loadList();
   }
 
   function onUpdatePageSize(s: number) {
     pageSize.value = s;
     currentPageNumber.value = 1;
-    loadList();
+    void loadList();
   }
 
   let filterTimer: number | null = null;
@@ -230,12 +238,14 @@ export function useParticipationNotifications() {
       }
       filterTimer = window.setTimeout(() => {
         currentPageNumber.value = 1;
-        loadList();
+        void loadList();
       }, 300);
     }
   );
 
-  onMounted(loadList);
+  onMounted(() => {
+    void loadList();
+  });
 
   return {
     loading,

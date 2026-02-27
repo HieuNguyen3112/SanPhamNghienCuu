@@ -33,7 +33,8 @@
       >
         <div
           ref="panelRef"
-          class="relative flex w-full max-w-[480px] max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-slate-300/70 bg-white shadow-[0_26px_70px_-32px_rgba(15,23,42,0.55)]"
+          tabindex="-1"
+          class="relative flex max-h-[90vh] w-full max-w-[480px] flex-col overflow-hidden rounded-2xl border border-slate-300/70 bg-white shadow-[0_26px_70px_-32px_rgba(15,23,42,0.55)]"
           @click.stop
         >
           <header
@@ -45,6 +46,7 @@
             </h2>
 
             <button
+              v-if="!loading"
               ref="closeButtonRef"
               type="button"
               class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white/90 transition hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -62,8 +64,14 @@
                 class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full ring-1"
                 :class="toneClasses.iconWrap"
               >
+                <LoaderCircle
+                  v-if="loading"
+                  class="h-8 w-8 animate-spin text-slate-700"
+                  aria-hidden="true"
+                />
                 <component
                   :is="toneClasses.icon"
+                  v-else
                   class="h-8 w-8"
                   :class="toneClasses.iconColor"
                   aria-hidden="true"
@@ -77,6 +85,7 @@
           </section>
 
           <footer
+            v-if="!loading"
             class="flex items-center gap-2 border-t border-neutral-900/10 px-5 py-4"
             :class="secondaryLabel ? 'justify-end' : 'justify-center'"
           >
@@ -105,7 +114,14 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from "lucide-vue-next";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  LoaderCircle,
+  TriangleAlert,
+  X,
+} from "lucide-vue-next";
 import type { ActionResultType } from "@/shared/composables/useActionResultModal";
 
 const props = withDefaults(
@@ -115,11 +131,13 @@ const props = withDefaults(
     title: string;
     message: string;
     details?: unknown;
+    loading?: boolean;
     closeLabel?: string;
     secondaryLabel?: string | null;
     disableClose?: boolean;
   }>(),
   {
+    loading: false,
     closeLabel: "Đóng",
     secondaryLabel: null,
     disableClose: false,
@@ -138,6 +156,7 @@ let previousFocusedElement: HTMLElement | null = null;
 const resolvedTitle = computed(() => {
   const explicitTitle = props.title?.trim();
   if (explicitTitle) return explicitTitle;
+  if (props.loading) return "Đang xử lý";
   if (props.type === "success") return "Thành công";
   if (props.type === "error") return "Thất bại";
   if (props.type === "warning") return "Cảnh báo";
@@ -145,6 +164,15 @@ const resolvedTitle = computed(() => {
 });
 
 const toneClasses = computed(() => {
+  if (props.loading) {
+    return {
+      header: "bg-slate-700",
+      iconWrap: "bg-slate-50 ring-slate-200",
+      iconColor: "text-slate-700",
+      icon: Info,
+    };
+  }
+
   switch (props.type) {
     case "success":
       return {
@@ -178,7 +206,7 @@ const toneClasses = computed(() => {
 });
 
 function requestClose() {
-  if (props.disableClose) return;
+  if (props.disableClose || props.loading) return;
   emit("close");
 }
 
@@ -233,7 +261,11 @@ watch(
       previousFocusedElement = document.activeElement as HTMLElement | null;
       window.addEventListener("keydown", onWindowKeydown);
       await nextTick();
-      closeButtonRef.value?.focus();
+      if (props.loading) {
+        panelRef.value?.focus();
+      } else {
+        closeButtonRef.value?.focus();
+      }
       return;
     }
 

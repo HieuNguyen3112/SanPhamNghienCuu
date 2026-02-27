@@ -39,6 +39,10 @@
 import { onMounted, computed, ref } from "vue";
 import { Repeat, Gauge, CalendarRange } from "lucide-vue-next";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 import ResearchHoursCatalogTabs from "../components/ResearchHoursCatalogTabs.vue";
 import WorkConversionCatalogSection from "../components/WorkConversionCatalogSection.vue";
@@ -70,6 +74,7 @@ const tabs = [
 const work = useWorkConversionCatalog();
 const quota = useHoursQuotaCatalog();
 const year = useAcademicYearPeriodCatalog();
+const { runWithFeedback } = useActionFeedback();
 
 onMounted(async () => {
   await Promise.all([work.fetch(), quota.fetch(), year.fetch()]);
@@ -97,8 +102,8 @@ const workVm = computed(() => ({
   openCreate: work.openCreate,
   openEdit: work.openEdit,
   closeModal: work.closeModal,
-  save: work.save,
-  setActiveWithConfirm: work.setActiveWithConfirm,
+  save: saveWorkConversion,
+  setActiveWithConfirm: setWorkConversionActiveWithFeedback,
   setPage: work.setPage,
   setPageSize: work.setPageSize,
 }));
@@ -123,7 +128,7 @@ const quotaVm = computed(() => ({
   openCreate: quota.openCreate,
   openEdit: quota.openEdit,
   closeModal: quota.closeModal,
-  save: quota.save,
+  save: saveQuota,
   setPage: quota.setPage,
   setPageSize: quota.setPageSize,
 }));
@@ -146,11 +151,121 @@ const yearVm = computed(() => ({
   openCreateYear: year.openCreateYear,
   openEditYear: year.openEditYear,
   closeModal: year.closeModal,
-  saveYear: year.saveYear,
-  setActiveYearWithConfirm: year.setActiveYearWithConfirm,
+  saveYear: saveAcademicYear,
+  setActiveYearWithConfirm: setAcademicYearActiveWithFeedback,
   setPage: year.setPage,
   setPageSize: year.setPageSize,
 
   statusLabel: year.statusLabel,
 }));
+
+function resolveActionErrorMessage(error: unknown, fallback: string) {
+  return resolveApiErrorMessage(error, fallback);
+}
+
+async function saveWorkConversion() {
+  const isCreate = work.modal.mode === "create";
+  await runWithFeedback(() => work.save(), {
+    loading: {
+      title: "Đang xử lý",
+      message: "Hệ thống đang cập nhật quy đổi giờ...",
+    },
+    success: {
+      title: "Thành công",
+      message: isCreate
+        ? "Thêm quy đổi giờ thành công."
+        : "Cập nhật quy đổi giờ thành công.",
+    },
+    error: {
+      title: "Có lỗi xảy ra",
+      message: (error) =>
+        resolveActionErrorMessage(error, "Thao tác thất bại. Vui lòng thử lại."),
+    },
+    rethrow: false,
+  });
+}
+
+async function setWorkConversionActiveWithFeedback(id: number, isActive: boolean) {
+  await runWithFeedback(() => work.setActiveWithConfirm(id, isActive), {
+    loading: {
+      title: "Đang xử lý",
+      message: "Đang cập nhật trạng thái quy đổi giờ...",
+    },
+    success: {
+      title: "Thành công",
+      message: isActive
+        ? "Đã áp dụng quy đổi giờ thành công."
+        : "Ngừng áp dụng quy đổi giờ thành công.",
+    },
+    error: {
+      title: "Có lỗi xảy ra",
+      message: (error) =>
+        resolveActionErrorMessage(error, "Thao tác thất bại. Vui lòng thử lại."),
+    },
+    rethrow: false,
+  });
+}
+
+async function saveQuota() {
+  const isCreate = quota.modal.mode === "create";
+  await runWithFeedback(() => quota.save(), {
+    loading: {
+      title: "Đang xử lý",
+      message: "Hệ thống đang cập nhật định mức giờ...",
+    },
+    success: {
+      title: "Thành công",
+      message: isCreate
+        ? "Thêm định mức giờ NCKH thành công."
+        : "Cập nhật định mức giờ NCKH thành công.",
+    },
+    error: {
+      title: "Có lỗi xảy ra",
+      message: (error) =>
+        resolveActionErrorMessage(error, "Thao tác thất bại. Vui lòng thử lại."),
+    },
+    rethrow: false,
+  });
+}
+
+async function saveAcademicYear() {
+  const isCreate = year.modal.mode === "create";
+  await runWithFeedback(() => year.saveYear(), {
+    loading: {
+      title: "Đang xử lý",
+      message: "Hệ thống đang cập nhật năm học...",
+    },
+    success: {
+      title: "Thành công",
+      message: isCreate
+        ? "Thêm năm học thành công."
+        : "Cập nhật năm học thành công.",
+    },
+    error: {
+      title: "Có lỗi xảy ra",
+      message: (error) =>
+        resolveActionErrorMessage(error, "Thao tác thất bại. Vui lòng thử lại."),
+    },
+    rethrow: false,
+  });
+}
+
+async function setAcademicYearActiveWithFeedback(id: number) {
+  await runWithFeedback(() => year.setActiveYearWithConfirm(id), {
+    loading: {
+      title: "Đang xử lý",
+      message: "Đang cập nhật năm học áp dụng...",
+    },
+    success: {
+      title: "Thành công",
+      message: "Đặt năm học đang áp dụng thành công.",
+    },
+    error: {
+      title: "Có lỗi xảy ra",
+      message: (error) =>
+        resolveActionErrorMessage(error, "Thao tác thất bại. Vui lòng thử lại."),
+    },
+    rethrow: false,
+  });
+}
 </script>

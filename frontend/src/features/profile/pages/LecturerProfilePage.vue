@@ -1,9 +1,7 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
-      <div
-        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
-      >
+      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
         <PageHeader
           title="Hồ sơ khoa học & Công trình NCKH"
           subtitle="Xem và cập nhật thông tin cá nhân, hồ sơ khoa học; tổng hợp công trình đã duyệt."
@@ -49,7 +47,10 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
-import { useActionResultModal } from "@/shared/composables/useActionResultModal";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 import LecturerPersonalInfoCard from "../components/LecturerPersonalInfoCard.vue";
 import LecturerContactInfoCard from "../components/LecturerContactInfoCard.vue";
@@ -64,46 +65,43 @@ import {
   useLecturerProfile,
 } from "../composables/useLecturerProfile";
 
-const {
-  showSuccessModal,
-  showErrorModal,
-} = useActionResultModal();
+const { runWithFeedback } = useActionFeedback();
 
 function normalizeProfileError(error: unknown) {
-  const raw =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
-  const message = raw.split("\n")[0]?.trim() ?? "";
-
-  if (!message) {
-    return "Không thể cập nhật thông tin. Vui lòng thử lại.";
-  }
-
-  if (message === "Khong tim thay hoc vi trong danh muc.") {
+  const raw = resolveApiErrorMessage(
+    error,
+    "Không thể cập nhật thông tin. Vui lòng thử lại."
+  );
+  if (raw === "Khong tim thay hoc vi trong danh muc.") {
     return "Không tìm thấy học vị trong danh mục. Vui lòng chọn lại.";
   }
-  if (message === "Khong tim thay hoc ham trong danh muc.") {
+  if (raw === "Khong tim thay hoc ham trong danh muc.") {
     return "Không tìm thấy học hàm trong danh mục. Vui lòng chọn lại.";
   }
-  if (/Unable to update|Unable to load/i.test(message)) {
+  if (/Unable to update|Unable to load/i.test(raw)) {
     return "Không thể cập nhật thông tin. Vui lòng thử lại.";
   }
-  if (/Network Error|timeout|ECONN/i.test(message)) {
-    return "Không thể kết nối máy chủ. Vui lòng thử lại.";
-  }
-
-  return message;
+  return raw;
 }
 
 function showCardResult(payload: { type: "success" | "error"; message: string }) {
-  if (payload.type === "success") {
-    showSuccessModal(payload.message);
-    return;
-  }
-  showErrorModal(payload.message, "Có lỗi xảy ra");
+  void runWithFeedback(
+    async () => undefined,
+    {
+      loading: { enabled: false },
+      success: {
+        enabled: payload.type === "success",
+        title: "Thành công",
+        message: payload.message,
+      },
+      error: {
+        enabled: payload.type === "error",
+        title: "Có lỗi xảy ra",
+        message: payload.message,
+      },
+      rethrow: false,
+    }
+  );
 }
 
 const saving = reactive({ personal: false, contact: false, academic: false });
@@ -136,10 +134,25 @@ const worksByKind = computed<Record<ResearchWorkKind, typeof works.value>>(
 async function onUpdatePersonal(next: LecturerPersonalInfo) {
   saving.personal = true;
   try {
-    await updatePersonalInfo(next);
-    showSuccessModal("Cập nhật thông tin thành công.");
-  } catch (e) {
-    showErrorModal(normalizeProfileError(e), "Cập nhật thất bại", e);
+    await runWithFeedback(
+      async () => {
+        await updatePersonalInfo(next);
+      },
+      {
+        loading: {
+          title: "Đang cập nhật",
+          message: "Đang lưu thông tin cá nhân...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Cập nhật thông tin thành công.",
+        },
+        error: {
+          title: "Cập nhật thất bại",
+          message: (error) => normalizeProfileError(error),
+        },
+      }
+    );
   } finally {
     saving.personal = false;
   }
@@ -148,10 +161,25 @@ async function onUpdatePersonal(next: LecturerPersonalInfo) {
 async function onUpdateContact(next: LecturerContactInfo) {
   saving.contact = true;
   try {
-    await updateContactInfo(next);
-    showSuccessModal("Cập nhật thông tin thành công.");
-  } catch (e) {
-    showErrorModal(normalizeProfileError(e), "Cập nhật thất bại", e);
+    await runWithFeedback(
+      async () => {
+        await updateContactInfo(next);
+      },
+      {
+        loading: {
+          title: "Đang cập nhật",
+          message: "Đang lưu thông tin liên hệ...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Cập nhật thông tin thành công.",
+        },
+        error: {
+          title: "Cập nhật thất bại",
+          message: (error) => normalizeProfileError(error),
+        },
+      }
+    );
   } finally {
     saving.contact = false;
   }
@@ -160,10 +188,25 @@ async function onUpdateContact(next: LecturerContactInfo) {
 async function onUpdateAcademic(next: LecturerAcademicProfile) {
   saving.academic = true;
   try {
-    await updateAcademicProfile(next);
-    showSuccessModal("Cập nhật thông tin thành công.");
-  } catch (e) {
-    showErrorModal(normalizeProfileError(e), "Cập nhật thất bại", e);
+    await runWithFeedback(
+      async () => {
+        await updateAcademicProfile(next);
+      },
+      {
+        loading: {
+          title: "Đang cập nhật",
+          message: "Đang lưu thông tin học hàm, học vị...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Cập nhật thông tin thành công.",
+        },
+        error: {
+          title: "Cập nhật thất bại",
+          message: (error) => normalizeProfileError(error),
+        },
+      }
+    );
   } finally {
     saving.academic = false;
   }
@@ -171,9 +214,24 @@ async function onUpdateAcademic(next: LecturerAcademicProfile) {
 
 onMounted(async () => {
   try {
-    await loadProfile();
-  } catch (e) {
-    showErrorModal(normalizeProfileError(e), "Không thể tải hồ sơ", e);
+    await runWithFeedback(
+      async () => {
+        await loadProfile();
+      },
+      {
+        loading: {
+          title: "Đang tải hồ sơ",
+          message: "Vui lòng đợi trong giây lát...",
+        },
+        success: { enabled: false },
+        error: {
+          title: "Không thể tải hồ sơ",
+          message: (error) => normalizeProfileError(error),
+        },
+      }
+    );
+  } catch {
+    // Error modal đã hiển thị.
   }
 });
 </script>

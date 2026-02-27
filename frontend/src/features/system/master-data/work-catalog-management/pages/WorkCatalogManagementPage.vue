@@ -59,7 +59,7 @@
             @create="openCreateWorkType"
             @edit="onEditWorkType"
             @close-modal="modalWorkTypeOpen = false"
-            @submit="saveWorkType"
+            @submit="handleSaveWorkType"
             @update:form="onUpdateWorkTypeForm"
           />
 
@@ -86,7 +86,7 @@
             @create="openCreateWorkLevel"
             @edit="onEditWorkLevel"
             @close-modal="modalWorkLevelOpen = false"
-            @submit="saveWorkLevel"
+            @submit="handleSaveWorkLevel"
             @update:form="onUpdateWorkLevelForm"
           />
 
@@ -113,7 +113,7 @@
             @create="openCreateJournal"
             @edit="onEditJournal"
             @close-modal="modalJournalOpen = false"
-            @submit="saveJournal"
+            @submit="handleSaveJournal"
             @update:form="onUpdateJournalForm"
           />
 
@@ -140,7 +140,7 @@
             @create="openCreateConference"
             @edit="onEditConference"
             @close-modal="modalConferenceOpen = false"
-            @submit="saveConference"
+            @submit="handleSaveConference"
             @update:form="onUpdateConferenceForm"
           />
 
@@ -167,7 +167,7 @@
             @create="openCreateResearchField"
             @edit="onEditResearchField"
             @close-modal="modalResearchFieldOpen = false"
-            @submit="saveResearchField"
+            @submit="handleSaveResearchField"
             @update:form="onUpdateResearchFieldForm"
           />
         </template>
@@ -189,6 +189,10 @@ import ResearchFieldCatalogSection from "../components/ResearchFieldCatalogSecti
 
 import type { WorkCatalogTabKey } from "../contracts/workCatalogTabs.contract";
 import { useWorkCatalogs } from "../composables/useWorkCatalogs";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
@@ -291,6 +295,7 @@ const {
   saveResearchField,
   onUpdateResearchFieldForm,
 } = wc;
+const { runWithFeedback } = useActionFeedback();
 
 const setActiveTab = (tab: WorkCatalogTabKey) => {
   activeTab.value = tab;
@@ -324,6 +329,93 @@ function onEditConference(id: number) {
 function onEditResearchField(id: number) {
   const item = researchFields.value.find((x: any) => x.id === id);
   if (item) openEditResearchField(item);
+}
+
+function resolveActionErrorMessage(error: unknown, fallback: string) {
+  return resolveApiErrorMessage(error, fallback);
+}
+
+function buildStatusActionText(
+  mode: "create" | "edit",
+  isActive: boolean,
+  createText: string,
+  updateText: string
+) {
+  if (mode === "create") return createText;
+  if (!isActive) return "Ngừng sử dụng thành công.";
+  return updateText;
+}
+
+async function runCatalogAction(
+  action: () => Promise<void>,
+  successMessage: string
+) {
+  await runWithFeedback(action, {
+    loading: {
+      title: "Đang xử lý",
+      message: "Hệ thống đang cập nhật danh mục...",
+    },
+    success: {
+      title: "Thành công",
+      message: successMessage,
+    },
+    error: {
+      title: "Có lỗi xảy ra",
+      message: (error) =>
+        resolveActionErrorMessage(error, "Thao tác thất bại. Vui lòng thử lại."),
+    },
+    rethrow: false,
+  });
+}
+
+async function handleSaveWorkType() {
+  const successMessage = buildStatusActionText(
+    modalModeWorkType.value,
+    workTypeForm.isActive,
+    "Thêm loại công trình thành công.",
+    "Cập nhật loại công trình thành công."
+  );
+  await runCatalogAction(() => saveWorkType(), successMessage);
+}
+
+async function handleSaveWorkLevel() {
+  const successMessage = buildStatusActionText(
+    modalModeWorkLevel.value,
+    workLevelForm.isActive,
+    "Thêm cấp công trình thành công.",
+    "Cập nhật cấp công trình thành công."
+  );
+  await runCatalogAction(() => saveWorkLevel(), successMessage);
+}
+
+async function handleSaveJournal() {
+  const successMessage = buildStatusActionText(
+    modalModeJournal.value,
+    journalForm.isActive,
+    "Thêm tạp chí khoa học thành công.",
+    "Cập nhật tạp chí khoa học thành công."
+  );
+  await runCatalogAction(() => saveJournal(), successMessage);
+}
+
+async function handleSaveConference() {
+  const successMessage = buildStatusActionText(
+    modalModeConference.value,
+    conferenceForm.isActive,
+    "Thêm hội nghị khoa học thành công.",
+    "Cập nhật hội nghị khoa học thành công."
+  );
+  await runCatalogAction(() => saveConference(), successMessage);
+}
+
+async function handleSaveResearchField() {
+  const successMessage = buildStatusActionText(
+    modalModeResearchField.value,
+    researchFieldForm.isActive,
+    "Thêm lĩnh vực nghiên cứu thành công.",
+    "Cập nhật lĩnh vực nghiên cứu thành công."
+  );
+  await runCatalogAction(() => saveResearchField(), successMessage);
 }
 </script>
 

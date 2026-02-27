@@ -10,6 +10,8 @@ export interface ActionResultModalState {
   title: string;
   message: string;
   details: unknown;
+  loading: boolean;
+  disableClose: boolean;
   closeLabel: string;
   secondaryLabel: string | null;
   onClose: ActionResultCallback;
@@ -22,7 +24,9 @@ const actionResultModal = reactive<ActionResultModalState>({
   title: "",
   message: "",
   details: null,
-  closeLabel: "\u0110\u00f3ng",
+  loading: false,
+  disableClose: false,
+  closeLabel: "Đóng",
   secondaryLabel: null,
   onClose: null,
   onSecondary: null,
@@ -41,6 +45,8 @@ export function useActionResultModal() {
     details?: unknown;
     closeLabel?: string;
     secondaryLabel?: string | null;
+    loading?: boolean;
+    disableClose?: boolean;
     onClose?: ActionResultCallback;
     onSecondary?: ActionResultCallback;
   }) {
@@ -48,8 +54,9 @@ export function useActionResultModal() {
     actionResultModal.title = payload.title;
     actionResultModal.message = payload.message;
     actionResultModal.details = payload.details ?? null;
-    actionResultModal.closeLabel =
-      payload.closeLabel?.trim() || "\u0110\u00f3ng";
+    actionResultModal.loading = payload.loading ?? false;
+    actionResultModal.disableClose = payload.disableClose ?? false;
+    actionResultModal.closeLabel = payload.closeLabel?.trim() || "Đóng";
     actionResultModal.secondaryLabel = payload.secondaryLabel ?? null;
     actionResultModal.onClose = payload.onClose ?? null;
     actionResultModal.onSecondary = payload.onSecondary ?? null;
@@ -58,7 +65,7 @@ export function useActionResultModal() {
 
   function showSuccessModal(
     message: string,
-    title = "Th\u00e0nh c\u00f4ng",
+    title = "Thành công",
     details?: unknown,
     options?: {
       secondaryLabel?: string | null;
@@ -79,7 +86,7 @@ export function useActionResultModal() {
 
   function showErrorModal(
     message: string,
-    title = "C\u00f3 l\u1ed7i x\u1ea3y ra",
+    title = "Có lỗi xảy ra",
     details?: unknown,
     options?: {
       secondaryLabel?: string | null;
@@ -92,9 +99,25 @@ export function useActionResultModal() {
       title,
       message,
       details,
+      loading: false,
+      disableClose: false,
       secondaryLabel: options?.secondaryLabel ?? null,
       onClose: options?.onClose ?? null,
       onSecondary: options?.onSecondary ?? null,
+    });
+  }
+
+  function showLoadingModal(message: string, title = "Đang xử lý") {
+    openActionResultModal({
+      type: "info",
+      title,
+      message,
+      closeLabel: "Đang xử lý...",
+      secondaryLabel: null,
+      loading: true,
+      disableClose: true,
+      onClose: null,
+      onSecondary: null,
     });
   }
 
@@ -102,7 +125,9 @@ export function useActionResultModal() {
     const closeCallback = actionResultModal.onClose;
     actionResultModal.open = false;
     actionResultModal.details = null;
-    actionResultModal.closeLabel = "\u0110\u00f3ng";
+    actionResultModal.loading = false;
+    actionResultModal.disableClose = false;
+    actionResultModal.closeLabel = "Đóng";
     actionResultModal.secondaryLabel = null;
     resetCallbacks();
 
@@ -125,6 +150,7 @@ export function useActionResultModal() {
     openActionResultModal,
     showSuccessModal,
     showErrorModal,
+    showLoadingModal,
     closeActionResultModal,
     runActionResultSecondary,
   };

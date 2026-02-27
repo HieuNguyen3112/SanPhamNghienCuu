@@ -8,6 +8,7 @@ import type {
 import { useResearchWorkApprovalFiltering } from "../../shared/composables/useResearchWorkApprovalFiltering";
 import { useResearchWorkApprovalDisplayMapping } from "../../shared/composables/useResearchWorkApprovalDisplayMapping";
 import http from "@/lib/http";
+import { useActionFeedback } from "@/shared/composables/useActionFeedback";
 import {
   fetchUniversityApprovalDetail,
   fetchUniversityApprovals,
@@ -18,6 +19,7 @@ import {
 } from "../../shared/services/universityApproval.service";
 
 export function useUniversityResearchWorkApprovalProvider() {
+  const { runWithFeedback } = useActionFeedback();
   const uiConfiguration = ref<ResearchWorkApprovalUiConfiguration>({
     approvalScopeIdentifier: "UNIVERSITY_SCOPE",
     pageTitle: "Duyệt công trình nghiên cứu – Cấp trường",
@@ -368,12 +370,30 @@ export function useUniversityResearchWorkApprovalProvider() {
         official_hours: member.officialHours,
       })) ?? [];
 
-    await finalizeUniversityApproval(payload.researchWorkIdentifier, {
-      members: memberHours,
-    });
-
-    await loadList();
-    closeResearchWorkDetailDrawer();
+    await runWithFeedback(
+      async () => {
+        await finalizeUniversityApproval(payload.researchWorkIdentifier, {
+          members: memberHours,
+        });
+        await loadList();
+        closeResearchWorkDetailDrawer();
+      },
+      {
+        loading: {
+          title: "Đang duyệt & chốt giờ",
+          message: "Hệ thống đang cập nhật kết quả duyệt...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Đã duyệt công trình và chốt giờ NCKH.",
+        },
+        error: {
+          title: "Có lỗi xảy ra",
+          message: "Không thể duyệt công trình. Vui lòng thử lại.",
+        },
+        rethrow: false,
+      }
+    );
   }
 
   async function reject(payload: {
@@ -381,13 +401,31 @@ export function useUniversityResearchWorkApprovalProvider() {
     rejectionReasonType: ResearchWorkRejectionReasonType;
     rejectionReasonDetail: string | null;
   }): Promise<void> {
-    await rejectUniversityApproval(payload.researchWorkIdentifier, {
-      reason_type: payload.rejectionReasonType,
-      reason_detail: payload.rejectionReasonDetail,
-    });
-
-    await loadList();
-    closeResearchWorkDetailDrawer();
+    await runWithFeedback(
+      async () => {
+        await rejectUniversityApproval(payload.researchWorkIdentifier, {
+          reason_type: payload.rejectionReasonType,
+          reason_detail: payload.rejectionReasonDetail,
+        });
+        await loadList();
+        closeResearchWorkDetailDrawer();
+      },
+      {
+        loading: {
+          title: "Đang xử lý từ chối",
+          message: "Hệ thống đang cập nhật kết quả duyệt...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Đã từ chối công trình.",
+        },
+        error: {
+          title: "Có lỗi xảy ra",
+          message: "Không thể từ chối công trình. Vui lòng thử lại.",
+        },
+        rethrow: false,
+      }
+    );
   }
 
   onMounted(() => {

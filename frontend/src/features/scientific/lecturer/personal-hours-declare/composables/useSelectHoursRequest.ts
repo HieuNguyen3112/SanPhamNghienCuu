@@ -24,7 +24,10 @@ import {
   submitHoursApprovalRequestDTO,
   uploadHoursEvidenceDTO,
 } from "../services/selectHoursRequestService";
-import { useActionResultModal } from "@/shared/composables/useActionResultModal";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 export function useSelectHoursRequest() {
   const works = ref<ApprovedWorkRow[]>([]);
@@ -53,10 +56,7 @@ export function useSelectHoursRequest() {
 
   const submitting = ref(false);
   const submitError = ref<string | null>(null);
-  const {
-    showSuccessModal,
-    showErrorModal,
-  } = useActionResultModal();
+  const { runWithFeedback } = useActionFeedback();
 
   const evidenceFiles = ref<EvidenceFile[]>([]);
   const evidenceFileTypes = ref<EvidenceFileType[]>([]);
@@ -73,22 +73,7 @@ export function useSelectHoursRequest() {
   const loadingAcademicYears = ref(false);
 
   function resolveFriendlyErrorMessage(error: unknown, fallback: string) {
-    const raw =
-      error instanceof Error
-        ? error.message
-        : typeof error === "string"
-          ? error
-          : "";
-    const message = raw.split("\n")[0]?.trim() ?? "";
-
-    if (!message) return fallback;
-    if (/Network Error|timeout|ECONN/i.test(message)) {
-      return "Không thể kết nối máy chủ. Vui lòng thử lại.";
-    }
-    if (/Request failed with status code/i.test(message)) {
-      return fallback;
-    }
-    return message;
+    return resolveApiErrorMessage(error, fallback);
   }
 
   const contentApprovedWorks = computed(() => works.value);
@@ -323,25 +308,43 @@ export function useSelectHoursRequest() {
     if (selectedWorkIdSet.value.size === 0) {
       const message = "Bạn chưa chọn công trình nào.";
       submitError.value = message;
-      showErrorModal(message, "Chưa thể gửi duyệt");
       return;
     }
 
     submitting.value = true;
     try {
-      const activityIds = [...selectedWorkIdSet.value];
-      await submitHoursApprovalRequestDTO({ activity_ids: activityIds });
-
-      selectedWorkIdSet.value = new Set();
-      await loadApprovedWorks();
-      showSuccessModal("Đã gửi duyệt giờ lên khoa thành công.");
+      await runWithFeedback(
+        async () => {
+          const activityIds = [...selectedWorkIdSet.value];
+          await submitHoursApprovalRequestDTO({ activity_ids: activityIds });
+          selectedWorkIdSet.value = new Set();
+          await loadApprovedWorks();
+        },
+        {
+          loading: {
+            title: "Đang gửi duyệt",
+            message: "Đang gửi yêu cầu duyệt giờ lên khoa...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã gửi duyệt giờ lên khoa thành công.",
+          },
+          error: {
+            title: "Gửi duyệt thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(
+                error,
+                "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại."
+              ),
+          },
+        }
+      );
     } catch (e) {
       const message = resolveFriendlyErrorMessage(
         e,
         "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại."
       );
       submitError.value = message;
-      showErrorModal(message, "Gửi duyệt thất bại", e);
     } finally {
       submitting.value = false;
     }
@@ -363,7 +366,6 @@ export function useSelectHoursRequest() {
     if (!workDetail.value || !selectedEvidenceFile.value || !selectedEvidenceTypeId.value) {
       const message = "Bạn cần chọn loại minh chứng và tệp trước khi tải lên.";
       uploadEvidenceError.value = message;
-      showErrorModal(message, "Thiếu thông tin minh chứng");
       return;
     }
 
@@ -371,25 +373,44 @@ export function useSelectHoursRequest() {
     uploadEvidenceError.value = null;
 
     try {
-      await uploadHoursEvidenceDTO({
-        activityId: workDetail.value.activityId,
-        fileTypeId: selectedEvidenceTypeId.value,
-        file: selectedEvidenceFile.value,
-      });
-
-      selectedEvidenceFile.value = null;
-      await Promise.all([
-        loadEvidence(workDetail.value.activityId),
-        loadApprovedWorks(),
-      ]);
-      showSuccessModal("Đã tải lên minh chứng thành công.");
+      await runWithFeedback(
+        async () => {
+          await uploadHoursEvidenceDTO({
+            activityId: workDetail.value!.activityId,
+            fileTypeId: selectedEvidenceTypeId.value!,
+            file: selectedEvidenceFile.value!,
+          });
+          selectedEvidenceFile.value = null;
+          await Promise.all([
+            loadEvidence(workDetail.value!.activityId),
+            loadApprovedWorks(),
+          ]);
+        },
+        {
+          loading: {
+            title: "Đang tải minh chứng",
+            message: "Vui lòng đợi hệ thống xử lý tệp đính kèm...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã tải lên minh chứng thành công.",
+          },
+          error: {
+            title: "Tải lên thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(
+                error,
+                "Không thể tải lên minh chứng. Vui lòng thử lại."
+              ),
+          },
+        }
+      );
     } catch (e) {
       const message = resolveFriendlyErrorMessage(
         e,
         "Không thể tải lên minh chứng. Vui lòng thử lại."
       );
       uploadEvidenceError.value = message;
-      showErrorModal(message, "Tải lên thất bại", e);
     } finally {
       uploadingEvidence.value = false;
     }
@@ -403,19 +424,39 @@ export function useSelectHoursRequest() {
     uploadEvidenceError.value = null;
 
     try {
-      await deleteHoursEvidenceDTO(evidenceId);
-      await Promise.all([
-        loadEvidence(workDetail.value.activityId),
-        loadApprovedWorks(),
-      ]);
-      showSuccessModal("Đã xóa minh chứng thành công.");
+      await runWithFeedback(
+        async () => {
+          await deleteHoursEvidenceDTO(evidenceId);
+          await Promise.all([
+            loadEvidence(workDetail.value!.activityId),
+            loadApprovedWorks(),
+          ]);
+        },
+        {
+          loading: {
+            title: "Đang xóa minh chứng",
+            message: "Đang cập nhật dữ liệu...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã xóa minh chứng thành công.",
+          },
+          error: {
+            title: "Xóa minh chứng thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(
+                error,
+                "Không thể xóa minh chứng. Vui lòng thử lại."
+              ),
+          },
+        }
+      );
     } catch (e) {
       const message = resolveFriendlyErrorMessage(
         e,
         "Không thể xóa minh chứng. Vui lòng thử lại."
       );
       uploadEvidenceError.value = message;
-      showErrorModal(message, "Xóa minh chứng thất bại", e);
     } finally {
       deletingEvidenceId.value = null;
     }
@@ -487,3 +528,4 @@ export function useSelectHoursRequest() {
     deleteEvidence,
   };
 }
+

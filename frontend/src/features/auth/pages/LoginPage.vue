@@ -6,15 +6,16 @@ import AuthLayout from "@/layouts/AuthLayout.vue";
 import LoginCard from "@/features/auth/components/LoginCard.vue";
 import ForgotCard from "@/features/auth/components/ForgotCard.vue";
 import UniversityLogo from "@/features/auth/components/UniversityLogo.vue";
-
+import { useActionFeedback } from "@/shared/composables/useActionFeedback";
 import { useUserStore, type UserRole } from "@/app/stores/userStore";
 
 const router = useRouter();
 const userStore = useUserStore();
+const { runWithFeedback } = useActionFeedback();
 
 const email = ref("");
 const password = ref("");
-const role = ref<UserRole>("LECTURER"); // role chọn trên form
+const role = ref<UserRole>("LECTURER");
 const isForgot = ref(false);
 
 const errors = reactive({
@@ -25,7 +26,7 @@ const errors = reactive({
 
 const submitting = ref(false);
 
-const validate = () => {
+function validate() {
   let ok = true;
   errors.email = errors.password = errors.role = null;
 
@@ -45,60 +46,90 @@ const validate = () => {
   }
 
   return ok;
-};
+}
+
+function resolveLoginErrorMessage(error: unknown) {
+  const err = error as {
+    message?: string;
+    response?: { status?: number; data?: { message?: string } };
+  };
+
+  if (err?.message === "CSRF_FAILED") {
+    return "Không thể kết nối máy chủ. Vui lòng thử lại.";
+  }
+  if (err?.message === "ROLE_KHONG_HOP_LE") {
+    return "Tài khoản này không có quyền với vai trò đã chọn. Vui lòng chọn lại.";
+  }
+
+  const backendMessage = err?.response?.data?.message;
+  if (typeof backendMessage === "string" && backendMessage.trim()) {
+    return backendMessage.trim();
+  }
+
+  const status = err?.response?.status;
+  if (status === 422) {
+    return "Dữ liệu đăng nhập không hợp lệ hoặc tài khoản/mật khẩu sai.";
+  }
+  if (status === 401) {
+    return "Tài khoản hoặc mật khẩu không đúng. Vui lòng thử lại.";
+  }
+  if (status === 403) {
+    return "Tài khoản chưa xác minh email hoặc không đủ quyền.";
+  }
+
+  return "Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản/mật khẩu.";
+}
+
+function resolveRedirectTarget() {
+  const redirectParam = router.currentRoute.value.query.redirect;
+  const redirect = typeof redirectParam === "string" ? redirectParam : "";
+  const isSafeRedirect =
+    redirect.startsWith("/") &&
+    !redirect.startsWith("//") &&
+    !redirect.includes("://");
+  return isSafeRedirect && redirect && redirect !== "/login"
+    ? redirect
+    : "/profile";
+}
 
 const handleSubmit = async () => {
-  if (submitting.value) return; // chặn double-submit gây lặp request
+  if (submitting.value) return;
   if (!validate()) return;
 
   submitting.value = true;
+  errors.password = null;
 
   try {
-    // 1. Đăng nhập backend (CSRF + session)
-    await userStore.login({
-      email: email.value,
-      password: password.value,
-      role: role.value,
-    });
+    await runWithFeedback(
+      async () => {
+        await userStore.login({
+          email: email.value,
+          password: password.value,
+          role: role.value,
+        });
 
-    // 2. Gán role đang đăng nhập theo dropdown
-    try {
-      userStore.setRole(role.value);
-    } catch (err: any) {
-      if (err.message === "ROLE_KHONG_HOP_LE") {
-        errors.role =
-          "Tài khoản này không có quyền với vai trò đã chọn. Vui lòng chọn lại.";
-        return;
+        userStore.setRole(role.value);
+        await router.replace(resolveRedirectTarget());
+      },
+      {
+        loading: {
+          title: "Đang xác thực",
+          message: "Đang đăng nhập vào hệ thống...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Đăng nhập thành công.",
+        },
+        error: {
+          title: "Đăng nhập thất bại",
+          message: (error) => resolveLoginErrorMessage(error),
+        },
       }
-      throw err;
-    }
-
-    // 3. OK thì chuyển vào app
-    const redirectParam = router.currentRoute.value.query.redirect;
-    const redirect = typeof redirectParam === "string" ? redirectParam : "";
-    const isSafeRedirect =
-      redirect.startsWith("/") && !redirect.startsWith("//") && !redirect.includes("://");
-    const target =
-      isSafeRedirect && redirect && redirect !== "/login"
-        ? redirect
-        : "/profile";
-    await router.replace(target);
-  } catch (err: any) {
-    if (err?.message === "CSRF_FAILED") {
-      errors.password =
-        "Khong the ket noi server hoac CSRF that bai. Vui long thu lai.";
-      return;
-    }
-    if (err?.response?.status === 422) {
-      errors.password =
-        "Dữ liệu đăng nhập không hợp lệ hoặc tài khoản/mật khẩu sai.";
-    } else if (err?.response?.status === 401) {
-      errors.password =
-        "Tài khoản hoặc mật khẩu không đúng. Vui lòng thử lại.";
-    } else if (err?.response?.status === 403) {
-      errors.password = "Tài khoản chưa xác minh email hoặc không đủ quyền.";
-    } else if (!errors.role) {
-      errors.password = "Đăng nhập không thành công. Vui lòng thử lại.";
+    );
+  } catch (error) {
+    const message = resolveLoginErrorMessage(error);
+    if (!errors.role) {
+      errors.password = message;
     }
   } finally {
     submitting.value = false;

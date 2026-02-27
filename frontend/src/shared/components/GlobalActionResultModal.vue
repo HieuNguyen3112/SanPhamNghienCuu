@@ -5,6 +5,8 @@
     :title="actionResultModal.title"
     :message="actionResultModal.message"
     :details="actionResultModal.details"
+    :loading="actionResultModal.loading"
+    :disable-close="actionResultModal.disableClose"
     :close-label="actionResultModal.closeLabel"
     :secondary-label="actionResultModal.secondaryLabel"
     @close="onClose"

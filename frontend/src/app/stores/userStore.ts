@@ -190,15 +190,20 @@ export const useUserStore = defineStore("user", {
     },
 
     async logout() {
+      let remoteLogoutOk = true;
       try {
         await apiLogout();
-      } catch (e) {
-        // best effort
+      } catch (error) {
+        remoteLogoutOk = false;
+        if (import.meta.env.DEV) {
+          console.error("[logout] API error", error);
+        }
       }
       this.currentUser = null;
       this.currentRole = null;
       this._initPromise = null;
       this.isInitialized = false;
+      return remoteLogoutOk;
     },
   },
 });
