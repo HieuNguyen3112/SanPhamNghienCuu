@@ -9,7 +9,8 @@ use App\Http\Requests\ResearchActivities\SubmitResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\StoreResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\UpdateResearchActivityRequest;
 use App\Notifications\ParticipationInvitationNotification;
-use App\Services\Hours\ProjectHoursCalculator;
+use App\Services\Hours\HoursAllocator;
+use App\Services\Hours\HoursRuleResolver;
 use App\Support\AuditLogger;
 use App\Support\WorkflowNotification;
 use App\Models\User;
@@ -27,11 +28,15 @@ class ResearchActivityController extends Controller
     private const STATUS_PENDING_FACULTY_REVIEW = 'pending_faculty_review';
     private const STATUS_APPROVED = 'approved';
     private const STATUS_REJECTED = 'rejected';
-    private ProjectHoursCalculator $projectHoursCalculator;
+    private HoursRuleResolver $hoursRuleResolver;
+    private HoursAllocator $hoursAllocator;
 
-    public function __construct(ProjectHoursCalculator $projectHoursCalculator)
-    {
-        $this->projectHoursCalculator = $projectHoursCalculator;
+    public function __construct(
+        HoursRuleResolver $hoursRuleResolver,
+        HoursAllocator $hoursAllocator
+    ) {
+        $this->hoursRuleResolver = $hoursRuleResolver;
+        $this->hoursAllocator = $hoursAllocator;
     }
 
     public function store(StoreResearchActivityRequest $request)
@@ -930,7 +935,7 @@ class ResearchActivityController extends Controller
         $principalRoleId = optional($roleByCode->get('principal'))->id;
 
         $members = collect($payload['members'] ?? [])
-            ->filter(fn ($member) => is_array($member))
+            ->filter(fn($member) => is_array($member))
             ->map(function ($member) {
                 $lecturerId = isset($member['lecturer_id']) && $member['lecturer_id'] !== null
                     ? (int) $member['lecturer_id']
@@ -943,11 +948,11 @@ class ResearchActivityController extends Controller
                     'member_role_id' => $memberRoleId,
                 ];
             })
-            ->filter(fn ($member) => $member['lecturer_id'] !== null && $member['member_role_id'] !== null)
+            ->filter(fn($member) => $member['lecturer_id'] !== null && $member['member_role_id'] !== null)
             ->unique('lecturer_id')
             ->values();
 
-        if (! $members->contains(fn ($member) => (int) $member['lecturer_id'] === (int) $lecturer->id)) {
+        if (! $members->contains(fn($member) => (int) $member['lecturer_id'] === (int) $lecturer->id)) {
             $fallbackRoleId = $principalRoleId
                 ? (int) $principalRoleId
                 : ($roleRows->first()?->id ? (int) $roleRows->first()->id : null);
@@ -996,12 +1001,24 @@ class ResearchActivityController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        $academicYearId = isset($payload['academic_year_id']) && $payload['academic_year_id'] !== null
+            ? (int) $payload['academic_year_id']
+            : null;
+
         $typeCode = $typeMeta?->code ? strtolower((string) $typeMeta->code) : null;
-        if (! $this->projectHoursCalculator->supports($typeCode)) {
+        $rule = $this->hoursRuleResolver->resolveForActivity((int) $kindId, $typeId, $academicYearId);
+        if (! $rule) {
             return response()->json([
-                'message' => 'project level is not supported for automatic hour split',
-                'code' => 'PROJECT_LEVEL_UNSUPPORTED',
+                'message' => 'project hour rule is not configured',
+                'code' => 'PROJECT_RULE_NOT_CONFIGURED',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! isset($rule->kind_code) || ! $rule->kind_code) {
+            $rule->kind_code = 'project';
+        }
+        if (! isset($rule->type_code) || ! $rule->type_code) {
+            $rule->type_code = $typeCode;
         }
 
         $lecturerNames = DB::table('lecturers')
@@ -1012,25 +1029,104 @@ class ResearchActivityController extends Controller
             $normalizedMembers[$index]['lecturer_full_name'] = (string) ($lecturerNames[$lecturerId] ?? ('GV #' . $lecturerId));
         }
 
-        // Root-cause note:
-        // previous preview relied on hour_rules and inherited stale project config (equal_all_members, 120h),
-        // causing formula rows to show 0 while distribution showed small equal shares.
-        // We now use canonical fixed project rules (bo/coso) from ProjectHoursCalculator.
-        $calculated = $this->projectHoursCalculator->calculate(
-            $typeCode,
-            $quantity,
-            $normalizedMembers,
-            (int) $lecturer->id
-        );
-        if (! $calculated) {
+        $allocatorMembers = collect($normalizedMembers)
+            ->values()
+            ->map(function (array $member, int $index) use ($lecturer) {
+                return (object) [
+                    'id' => $index + 1,
+                    'lecturer_id' => (int) $member['lecturer_id'],
+                    'member_role_code' => $member['member_role_code'] ? (string) $member['member_role_code'] : null,
+                    'owner_lecturer_id' => (int) $lecturer->id,
+                ];
+            })
+            ->all();
+
+        $calculated = $this->hoursAllocator->allocateByRule($rule, $quantity, $allocatorMembers);
+        if (($calculated['total_hours_activity'] ?? null) === null) {
             return response()->json([
                 'message' => 'cannot compute project hours preview',
                 'code' => 'PROJECT_HOURS_PREVIEW_FAILED',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $currentLecturerHours = collect($calculated['members'])
+        $assignedByLecturerId = collect($calculated['members'] ?? [])->keyBy('lecturer_id');
+
+        $principalLecturerIds = collect($normalizedMembers)
+            ->filter(fn(array $member) => strtolower((string) ($member['member_role_code'] ?? '')) === 'principal')
+            ->pluck('lecturer_id')
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (count($principalLecturerIds) === 0) {
+            $principalLecturerIds = [(int) $lecturer->id];
+        }
+
+        $membersPayload = collect($normalizedMembers)
+            ->map(function (array $member) use ($assignedByLecturerId, $principalLecturerIds) {
+                $lecturerId = (int) $member['lecturer_id'];
+                $assigned = $assignedByLecturerId->get($lecturerId);
+
+                return [
+                    'lecturer_id' => $lecturerId,
+                    'lecturer_full_name' => (string) $member['lecturer_full_name'],
+                    'member_role_code' => $member['member_role_code'] ? (string) $member['member_role_code'] : null,
+                    'member_role_name' => $member['member_role_name'] ? (string) $member['member_role_name'] : null,
+                    'hours_assigned' => $assigned && $assigned['hours_assigned'] !== null
+                        ? (float) $assigned['hours_assigned']
+                        : 0.0,
+                    'is_leader' => in_array($lecturerId, $principalLecturerIds, true),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $formula = (array) ($calculated['formula'] ?? []);
+        $isProjectPoolRule = $this->hoursRuleResolver->isProjectPoolRule($rule);
+        $leaderHours = null;
+        $memberPoolHours = null;
+        $memberPoolAppliedHours = null;
+        $memberPoolCount = 0;
+        $memberPoolEach = 0.0;
+
+        if ($isProjectPoolRule) {
+            $leaderHours = isset($formula['leader_hours_total']) ? (float) $formula['leader_hours_total'] : null;
+            $memberPoolHours = isset($formula['member_pool_total']) ? (float) $formula['member_pool_total'] : null;
+            $memberPoolAppliedHours = isset($formula['member_pool_applied_total']) ? (float) $formula['member_pool_applied_total'] : 0.0;
+            $memberPoolCount = isset($formula['non_principal_count']) ? (int) $formula['non_principal_count'] : 0;
+            $memberPoolEach = $memberPoolCount > 0
+                ? round((float) $memberPoolAppliedHours / $memberPoolCount, 2)
+                : 0.0;
+        }
+
+        $formulaRows = [];
+        if ($isProjectPoolRule) {
+            $formulaRows[] = [
+                'role_label' => 'Chủ nhiệm',
+                'total_hours' => round((float) ($leaderHours ?? 0), 2),
+                'formula_text' => round((float) ($leaderHours ?? 0), 2) . ' giờ (chia đều cho nhóm chủ nhiệm)',
+            ];
+            $formulaRows[] = [
+                'role_label' => 'Nhóm thành viên',
+                'total_hours' => round((float) ($memberPoolHours ?? 0), 2),
+                'formula_text' => $memberPoolCount > 0
+                    ? round((float) ($memberPoolAppliedHours ?? 0), 2) . ' / ' . $memberPoolCount . ' = ' . round($memberPoolEach, 2) . ' giờ/người'
+                    : round((float) ($memberPoolHours ?? 0), 2) . ' / 0 = 0 giờ/người (chưa có thành viên)',
+            ];
+        } elseif (($calculated['total_hours_activity'] ?? null) !== null) {
+            $formulaRows[] = [
+                'role_label' => 'Nhóm tham gia',
+                'total_hours' => round((float) $calculated['total_hours_activity'], 2),
+                'formula_text' => 'Phân bổ theo chiến lược ' . (string) ($rule->distribution_strategy ?? 'unknown'),
+            ];
+        }
+
+        $currentLecturerHours = collect($membersPayload)
             ->firstWhere('lecturer_id', (int) $lecturer->id)['hours_assigned'] ?? null;
+
+        $ruleSummary = $this->hoursRuleResolver->formatRuleSummary($rule);
+
+        $levelLabel = $typeMeta?->name ? (string) $typeMeta->name : null;
 
         return response()->json([
             'data' => [
@@ -1038,27 +1134,28 @@ class ResearchActivityController extends Controller
                 'type_id' => $typeMeta?->id ? (int) $typeMeta->id : null,
                 'type_code' => $typeCode,
                 'type_name' => $typeMeta?->name,
-                'rule_summary' => $calculated['rule_summary'],
-                'distribution_strategy' => 'principal_fraction_others_equal',
-                'level_label' => $calculated['level_label'],
+                'rule_summary' => $ruleSummary,
+                'distribution_strategy' => (string) ($rule->distribution_strategy ?? ''),
+                'level_label' => $levelLabel,
                 'quantity' => $quantity,
                 'formula' => [
-                    'leader_hours' => $calculated['leader_hours'],
-                    'member_pool_hours' => $calculated['member_pool_hours'],
-                    'member_pool_count' => $calculated['member_pool_count'],
-                    'member_pool_each' => $calculated['member_pool_each'],
-                    'rule_total_hours' => round(
-                        (float) $calculated['leader_hours'] + (float) $calculated['member_pool_hours'],
-                        2
-                    ),
-                    'total_hours_allocated' => $calculated['total_hours_allocated'],
-                    'progress_multiplier_applied' => (bool) $calculated['progress_multiplier_applied'],
-                    'progress_supported' => (bool) $calculated['progress_supported'],
-                    'progress_note' => $calculated['progress_note'],
+                    'leader_hours' => $leaderHours,
+                    'member_pool_hours' => $memberPoolHours,
+                    'member_pool_count' => $memberPoolCount,
+                    'member_pool_each' => $memberPoolEach,
+                    'rule_total_hours' => ($leaderHours !== null && $memberPoolHours !== null)
+                        ? round($leaderHours + $memberPoolHours, 2)
+                        : null,
+                    'total_hours_allocated' => $calculated['total_hours_activity'] !== null
+                        ? (float) $calculated['total_hours_activity']
+                        : null,
+                    'progress_multiplier_applied' => false,
+                    'progress_supported' => false,
+                    'progress_note' => null,
                 ],
-                'formula_rows' => $calculated['formula_rows'],
+                'formula_rows' => $formulaRows,
                 'current_lecturer_hours' => $currentLecturerHours !== null ? (float) $currentLecturerHours : null,
-                'members' => $calculated['members'],
+                'members' => $membersPayload,
             ],
         ], Response::HTTP_OK);
     }
@@ -1089,7 +1186,7 @@ class ResearchActivityController extends Controller
         }
 
         $invitee->notify(new ParticipationInvitationNotification([
-                'event_key' => 'participation_invitation',
+            'event_key' => 'participation_invitation',
             'title' => 'Loi moi tham gia cong trinh',
             'message' => trim('Ban duoc moi tham gia cong trinh ' . ($activity->title ?? '') . (($activity->owner_name ?? '') ? (' boi ' . $activity->owner_name) : '') . '.'),
             'activity_id' => $activityId,
