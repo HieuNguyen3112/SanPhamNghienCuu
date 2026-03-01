@@ -25,6 +25,15 @@ const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value;
 };
 
+const handleOpenProfile = async () => {
+  if (router.hasRoute("profile.scientific")) {
+    await router.push({ name: "profile.scientific" });
+    return;
+  }
+
+  await router.push("/profile");
+};
+
 const handleLogout = async () => {
   try {
     await runWithFeedback(
@@ -80,6 +89,7 @@ const handleGoHome = async () => {
         :user-name="userName"
         :user-code="userCode"
         @toggle-sidebar="toggleSidebar"
+        @open-profile="handleOpenProfile"
         @change-password="isChangePasswordOpen = true"
         @logout="handleLogout"
         @go-home="handleGoHome"

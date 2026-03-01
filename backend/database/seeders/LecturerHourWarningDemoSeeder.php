@@ -34,7 +34,7 @@ class LecturerHourWarningDemoSeeder extends Seeder
 
         DB::table('workload_quotas')->updateOrInsert(
             ['academic_year_id' => $academicYearId],
-            ['required_hours' => 300, 'notes' => 'Demo quota', 'created_at' => $now, 'updated_at' => $now]
+            ['required_hours' => 300, 'notes' => 'Định mức minh họa cho dữ liệu cảnh báo', 'created_at' => $now, 'updated_at' => $now]
         );
 
         $facultyCatalog = FacultyCatalog::byCode();
@@ -74,16 +74,18 @@ class LecturerHourWarningDemoSeeder extends Seeder
             return;
         }
 
-                        $lecturers = [
-            ['code' => 'GV-001', 'full_name' => 'Nguyễn Văn A', 'email' => 'gv001@local.test', 'phone' => '090000001', 'department_code' => 'BM-KTPM'],
-            ['code' => 'GV-002', 'full_name' => 'Trần Thị B', 'email' => 'gv002@local.test', 'phone' => '090000002', 'department_code' => 'BM-KTPM'],
-            ['code' => 'GV-003', 'full_name' => 'Phạm Quốc C', 'email' => 'gv003@local.test', 'phone' => '090000003', 'department_code' => 'BM-KTPM'],
-            ['code' => 'GV-004', 'full_name' => 'Lê Thị D', 'email' => 'gv004@local.test', 'phone' => '090000004', 'department_code' => 'BM-TT'],
-            ['code' => 'GV-005', 'full_name' => 'Hoàng Văn E', 'email' => 'gv005@local.test', 'phone' => '090000005', 'department_code' => 'BM-TT'],
-            ['code' => 'GV-006', 'full_name' => 'Đỗng Thị F', 'email' => 'gv006@local.test', 'phone' => '090000006', 'department_code' => 'BM-TT'],
-            ['code' => 'GV-007', 'full_name' => 'Vũ Quốc G', 'email' => 'gv007@local.test', 'phone' => '090000007', 'department_code' => 'BM-TT'],
-            ['code' => 'GV-008', 'full_name' => 'Ngà Thị H', 'email' => 'gv008@local.test', 'phone' => '090000008', 'department_code' => 'BM-TT'],
-        ];
+        $lecturers = [
+            ['code' => 'GV-001', 'full_name' => 'Nguyễn Minh Tuấn', 'email' => 'gv001@local.test', 'phone' => '0900000001', 'department_code' => 'BM-KTPM'],
+            ['code' => 'GV-002', 'full_name' => 'Trần Thị Thu Hằng', 'email' => 'gv002@local.test', 'phone' => '0900000002', 'department_code' => 'BM-KTPM'],
+            ['code' => 'GV-003', 'full_name' => 'Phạm Quốc Đạt', 'email' => 'gv003@local.test', 'phone' => '0900000003', 'department_code' => 'TT-DL'],
+            ['code' => 'GV-004', 'full_name' => 'Lê Hoàng Anh', 'email' => 'gv004@local.test', 'phone' => '0900000004', 'department_code' => 'BM-TT'],
+            ['code' => 'GV-005', 'full_name' => 'Võ Thị Mỹ Linh', 'email' => 'gv005@local.test', 'phone' => '0900000005', 'department_code' => 'BM-TT'],
+            ['code' => 'GV-006', 'full_name' => 'Bùi Quang Khải', 'email' => 'gv006@local.test', 'phone' => '0900000006', 'department_code' => 'BM-TT'],
+            ['code' => 'GV-007', 'full_name' => 'Đặng Gia Huy', 'email' => 'gv007@local.test', 'phone' => '0900000007', 'department_code' => 'BM-TT'],
+            ['code' => 'GV-008', 'full_name' => 'Hồ Ngọc Trâm', 'email' => 'gv008@local.test', 'phone' => '0900000008', 'department_code' => 'BM-TT'],
+            ['code' => 'GV-009', 'full_name' => 'Nguyễn Thanh Bình', 'email' => 'gv009@local.test', 'phone' => '0900000009', 'department_code' => 'TT-DL'],
+            ['code' => 'GV-010', 'full_name' => 'Trương Khánh Vy', 'email' => 'gv010@local.test', 'phone' => '0900000010', 'department_code' => 'BM-KTPM'],
+        ];
 
         $lecturerIds = [];
         foreach ($lecturers as $lecturer) {

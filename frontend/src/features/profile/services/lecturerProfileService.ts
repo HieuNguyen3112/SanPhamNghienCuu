@@ -265,6 +265,25 @@ export interface UpdateAcademicTitlesPayload {
   }>;
 }
 
+export interface SyncTrainingHistoriesPayload {
+  items: Array<{
+    id?: number;
+    degree_id?: number | null;
+    degree_title?: string | null;
+    major?: string | null;
+    institution?: string | null;
+    country?: string | null;
+    city?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    is_current?: boolean | null;
+    training_form?: string | null;
+    funding_source?: string | null;
+    certificate_no?: string | null;
+    notes?: string | null;
+  }>;
+}
+
 export async function fetchDegrees(): Promise<LookupItemDTO[]> {
   const { data } = await http.get<{ data: LookupItemDTO[] }>(
     "/api/lookups/degrees"
@@ -281,6 +300,11 @@ export async function fetchAcademicRanks(): Promise<LookupItemDTO[]> {
 
 export async function fetchScientificProfile(): Promise<ScientificProfilePayload> {
   const { data } = await http.get<ScientificProfileResponse>("/api/profile/me");
+  return data.data;
+}
+
+export async function fetchTrainingHistories(): Promise<EducationDTO[]> {
+  const { data } = await http.get<{ data: EducationDTO[] }>("/api/profile/educations");
   return data.data;
 }
 
@@ -323,6 +347,17 @@ export async function updateLanguages(
   await ensureCsrfCookie();
   const { data } = await http.put<{ data: LanguageDTO[] }>(
     "/api/profile/languages",
+    payload
+  );
+  return data.data;
+}
+
+export async function syncTrainingHistories(
+  payload: SyncTrainingHistoriesPayload
+): Promise<EducationDTO[]> {
+  await ensureCsrfCookie();
+  const { data } = await http.put<{ data: EducationDTO[] }>(
+    "/api/profile/educations",
     payload
   );
   return data.data;

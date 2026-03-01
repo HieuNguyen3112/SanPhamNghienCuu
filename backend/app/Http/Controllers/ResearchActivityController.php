@@ -75,6 +75,17 @@ class ResearchActivityController extends Controller
             'updated_at' => $now,
         ]);
 
+        AuditLogger::log($request, [
+            'action_group' => 'research',
+            'action_code' => 'WORK_CREATED',
+            'action_label' => 'Tạo mới công trình',
+            'target_type' => 'research_activity',
+            'target_id' => $activityId,
+            'target_display' => $data['title'] ?? ('ACT#' . $activityId),
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_CREATED,
+        ], $user);
+
         return response()->json([
             'message' => 'research activity created',
             'data' => $this->serializeActivity($activityId),
@@ -123,6 +134,26 @@ class ResearchActivityController extends Controller
         if ($updates) {
             $updates['updated_at'] = now();
             DB::table('research_activities')->where('id', $activity)->update($updates);
+
+            AuditLogger::log($request, [
+                'action_group' => 'research',
+                'action_code' => 'WORK_UPDATED',
+                'action_label' => 'Cập nhật công trình',
+                'target_type' => 'research_activity',
+                'target_id' => $activity,
+                'target_display' => $updates['title'] ?? $current->title ?? ('ACT#' . $activity),
+                'result_status' => 'success',
+                'request_http_status' => Response::HTTP_OK,
+                'changes' => collect($updates)
+                    ->except('updated_at')
+                    ->map(fn ($value, $field) => [
+                        'field' => $field,
+                        'before' => $current->{$field} ?? null,
+                        'after' => $value,
+                    ])
+                    ->values()
+                    ->all(),
+            ], $user);
         }
 
         return response()->json([
@@ -176,6 +207,18 @@ class ResearchActivityController extends Controller
         } else {
             DB::table($table)->where('activity_id', $activity)->update($payload);
         }
+
+        AuditLogger::log($request, [
+            'action_group' => 'research',
+            'action_code' => 'WORK_DETAIL_UPDATED',
+            'action_label' => 'Cập nhật chi tiết công trình',
+            'target_type' => 'research_activity',
+            'target_id' => $activity,
+            'target_display' => $current->title ?? ('ACT#' . $activity),
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_OK,
+            'note' => 'detail_table:' . $table,
+        ], $user);
 
         return response()->json([
             'message' => 'activity details updated',
@@ -325,6 +368,18 @@ class ResearchActivityController extends Controller
                 ->map(fn($row) => (array) $row)
                 ->all();
         });
+
+        AuditLogger::log($request, [
+            'action_group' => 'research',
+            'action_code' => 'WORK_MEMBERS_SYNCED',
+            'action_label' => 'Cập nhật danh sách thành viên công trình',
+            'target_type' => 'research_activity',
+            'target_id' => $activity,
+            'target_display' => $current->title ?? ('ACT#' . $activity),
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_OK,
+            'note' => 'members_count:' . count($synced),
+        ], $user);
 
         return response()->json([
             'message' => 'members synced',

@@ -11,9 +11,9 @@ class UsersDemoSeeder extends Seeder
     public function run(): void
     {
         $users = [
-            ['email' => 'truong@local.test', 'name' => 'Cap Truong', 'role' => 'SCIENCE_OFFICE'],
-            ['email' => 'khoa@local.test',   'name' => 'Cap Khoa',   'role' => 'DEPARTMENT_BOARD'],
-            ['email' => 'gv@local.test',     'name' => 'Giang Vien', 'role' => 'LECTURER'],
+            ['email' => 'truong@local.test', 'name' => 'Nguyễn Thành Nam', 'role' => 'SCIENCE_OFFICE'],
+            ['email' => 'khoa@local.test',   'name' => 'Đặng Thu Hà', 'role' => 'DEPARTMENT_BOARD'],
+            ['email' => 'gv@local.test',     'name' => 'Nguyễn Minh Tuấn', 'role' => 'LECTURER'],
         ];
 
         foreach ($users as $u) {

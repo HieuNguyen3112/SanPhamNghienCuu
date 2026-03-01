@@ -74,11 +74,10 @@
               <div class="font-medium text-slate-900">
                 {{ row.actionLabel }}
               </div>
-              <div class="text-xs text-slate-500">{{ row.actionCode }}</div>
             </td>
 
             <td class="px-4 py-3 md:px-6 text-slate-700">
-              {{ row.target.display ?? "-" }}
+              {{ row.objectDisplay }}
             </td>
 
             <td class="px-4 py-3 md:px-6">

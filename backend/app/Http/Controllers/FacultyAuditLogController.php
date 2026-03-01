@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Faculty\FacultyAuditLogIndexRequest;
 use App\Http\Requests\Faculty\FacultyAuditLogLookupsRequest;
+use App\Support\AuditLogObjectPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -193,6 +194,13 @@ class FacultyAuditLogController extends Controller
         $actorRoles = $this->decodeJson($row->actor_roles_snapshot);
         $targetParams = $this->decodeJson($row->target_route_params);
         $changes = $this->decodeJson($row->changes);
+        $object = AuditLogObjectPresenter::present(
+            $row->target_type,
+            $row->target_id,
+            $row->target_display,
+            $row->request_path,
+            $row->action_code
+        );
         $actorDisplayName = $row->actor_name ?? $row->actor_email ?? 'Không xác định';
         $resultLabel = $row->result_status === 'success' ? 'Thành công' : 'Thất bại';
 
@@ -223,10 +231,12 @@ class FacultyAuditLogController extends Controller
             'target' => [
                 'type' => $row->target_type,
                 'id' => $row->target_id,
-                'display' => $row->target_display,
+                'display' => $object['display'],
                 'route_name' => $row->target_route_name,
                 'route_params' => $targetParams,
             ],
+            'object_display' => $object['display'],
+            'object_type' => $object['type'],
             'result' => [
                 'status' => $row->result_status,
                 'error_message' => $row->result_error_message,

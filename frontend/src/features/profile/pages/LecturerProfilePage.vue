@@ -29,6 +29,8 @@
 
         <LecturerAcademicProfileCard
           :academic-profile="academicProfile"
+          :degree-options="degreeOptions"
+          :rank-options="rankOptions"
           :pending="saving.academic"
           :loading="loading"
           @update:academic-profile="onUpdateAcademic"
@@ -112,6 +114,8 @@ const {
   contactInfo,
   academicProfile,
   works,
+  degreeOptions,
+  rankOptions,
   loadProfile,
   updatePersonalInfo,
   updateContactInfo,

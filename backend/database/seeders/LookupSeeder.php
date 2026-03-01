@@ -75,9 +75,9 @@ class LookupSeeder extends Seeder
         }
 
         $degrees = [
-            ['code' => 'BACHELOR', 'name' => 'Bachelor'],
-            ['code' => 'MASTER', 'name' => 'Master'],
-            ['code' => 'PHD', 'name' => 'PhD'],
+            ['code' => 'BACHELOR', 'name' => 'Cử nhân'],
+            ['code' => 'MASTER', 'name' => 'Thạc sĩ'],
+            ['code' => 'PHD', 'name' => 'Tiến sĩ'],
         ];
 
         foreach ($degrees as $degree) {
@@ -87,9 +87,9 @@ class LookupSeeder extends Seeder
         }
 
         $ranks = [
-            ['code' => 'LECTURER', 'name' => 'Lecturer'],
-            ['code' => 'ASSOCIATE_PROFESSOR', 'name' => 'Associate Professor'],
-            ['code' => 'PROFESSOR', 'name' => 'Professor'],
+            ['code' => 'LECTURER', 'name' => 'Giảng viên'],
+            ['code' => 'ASSOCIATE_PROFESSOR', 'name' => 'Phó giáo sư'],
+            ['code' => 'PROFESSOR', 'name' => 'Giáo sư'],
         ];
 
         foreach ($ranks as $rank) {

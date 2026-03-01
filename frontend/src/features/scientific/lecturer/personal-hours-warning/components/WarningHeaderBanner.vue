@@ -1,8 +1,6 @@
 <template>
   <div class="rounded-2xl border border-slate-200 bg-white p-4 md:p-6">
-    <div v-if="loading" class="text-sm text-slate-700">
-      Đang tải trạng thái...
-    </div>
+    <div v-if="loading" class="text-sm text-slate-700">Đang tải trạng thái...</div>
 
     <div
       v-else-if="error"
@@ -35,14 +33,21 @@
 
         <div class="mt-1 grid gap-1 text-sm text-slate-700 md:grid-cols-2">
           <div>
-            <span class="text-slate-500">Giờ hiện tại:</span>
+            <span class="text-slate-500">Giờ đã duyệt:</span>
             <span class="ml-1 font-semibold text-slate-900">
-              {{ formatHours(summary.totalHoursCurrent) }} /
+              {{ formatHours(summary.approvedHours) }} /
               {{ formatHours(summary.requiredHours) }}
             </span>
             <span class="ml-1 text-slate-500"
               >(năm {{ summary.academicYearCode }})</span
             >
+          </div>
+
+          <div v-if="summary.pendingHours > 0">
+            <span class="text-slate-500">Giờ chờ duyệt:</span>
+            <span class="ml-1 font-semibold text-slate-900">
+              {{ formatHours(summary.pendingHours) }} giờ
+            </span>
           </div>
 
           <div v-if="summary.deadlineDate">
@@ -60,6 +65,14 @@
             <span class="ml-1 font-semibold" :class="missingToneClass">
               {{ formatHours(summary.shortageHours) }} giờ
             </span>
+          </div>
+
+          <div
+            v-else-if="summary.requiredHours > 0 && summary.approvedHours >= summary.requiredHours"
+            class="md:col-span-2"
+          >
+            <span class="text-slate-500">Trạng thái:</span>
+            <span class="ml-1 font-semibold text-emerald-700">Đã đủ định mức giờ NCKH</span>
           </div>
         </div>
       </div>

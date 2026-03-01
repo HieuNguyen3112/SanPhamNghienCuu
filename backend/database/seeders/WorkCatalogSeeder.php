@@ -54,21 +54,21 @@ class WorkCatalogSeeder extends Seeder
         }
         $journals = [
             [
-                'name'           => 'Journal of Advanced Research',
-                'address'        => 'Cairo University, Giza, Egypt',
+                'name'           => 'Tạp chí Khoa học Trường Đại học Sư phạm TP. Hồ Chí Minh',
+                'address'        => 'Trường Đại học Sư phạm Thành phố Hồ Chí Minh, TP. Hồ Chí Minh, Việt Nam',
                 'issn'           => '2090-1232',
                 'source_name'    => 'ISI',           // Chuyển ISI từ classification sang đây
                 'point_min'      => 1.00,            // Thêm cột mới
                 'point_max'      => 2.00,            // Thêm cột mới
                 'classification' => 'HDGSNN_GE_1',   // Cập nhật lại format theo schema
                 'research_hours' => 600,             // Thêm cột mới
-                'country'        => 'Egypt',
+                'country'        => 'Vietnam',
                 'notes'          => null,
                 'is_active'      => true,
             ],
             [
-                'name'           => 'Vietnam Journal of Science and Technology',
-                'address'        => 'VAST, Hanoi, Vietnam',
+                'name'           => 'Vietnam Journal of Education',
+                'address'        => 'Bộ Giáo dục và Đào tạo, Hà Nội, Việt Nam',
                 'issn'           => '0866-708X',
                 'source_name'    => 'Scopus',        // Chuyển SCOPUS từ classification sang đây
                 'point_min'      => 0.50,            // Thêm cột mới
@@ -76,20 +76,20 @@ class WorkCatalogSeeder extends Seeder
                 'classification' => 'HDGSNN_GE_2',   // Cập nhật lại format theo schema
                 'research_hours' => 300,             // Thêm cột mới
                 'country'        => 'Vietnam',
-                'notes'          => 'Scopus indexed',
+                'notes'          => 'Tạp chí chuyên ngành giáo dục',
                 'is_active'      => true,
             ],
             [
-                'name'           => 'International Journal of Computer Science',
-                'address'        => 'USA',
+                'name'           => 'Tạp chí Công nghệ Giáo dục',
+                'address'        => 'TP. Hồ Chí Minh, Việt Nam',
                 'issn'           => null,
                 'source_name'    => null,
                 'point_min'      => null,
                 'point_max'      => null,
                 'classification' => 'OTHER',
                 'research_hours' => 0,
-                'country'        => 'USA',
-                'notes'          => 'ISSN pending',
+                'country'        => 'Vietnam',
+                'notes'          => 'Chờ cập nhật ISSN chính thức',
                 'is_active'      => false,
             ],
         ];
@@ -152,10 +152,10 @@ class WorkCatalogSeeder extends Seeder
             );
         }
         $conferences = [
-            ['name' => 'Hội nghị quốc tế về AI', 'level' => 'INTERNATIONAL', 'notes' => null, 'is_active' => true],
-            ['name' => 'Hội nghị khoa học cấp trường', 'level' => 'UNIVERSITY', 'notes' => 'Tổ chức hằng năm', 'is_active' => true],
-            ['name' => 'Hội thảo cấp khoa', 'level' => 'FACULTY', 'notes' => null, 'is_active' => true],
-            ['name' => 'Hội thảo quốc gia về giáo dục', 'level' => 'NATIONAL', 'notes' => null, 'is_active' => false],
+            ['name' => 'Hội thảo quốc tế về Trí tuệ nhân tạo và Giáo dục', 'level' => 'INTERNATIONAL', 'notes' => null, 'is_active' => true],
+            ['name' => 'Hội nghị Khoa học trẻ HCMUE', 'level' => 'UNIVERSITY', 'notes' => 'Tổ chức thường niên tại HCMUE', 'is_active' => true],
+            ['name' => 'Seminar Khoa học dữ liệu Khoa Công nghệ Thông tin', 'level' => 'FACULTY', 'notes' => null, 'is_active' => true],
+            ['name' => 'Hội thảo quốc gia Toán học và Tin học ứng dụng', 'level' => 'NATIONAL', 'notes' => null, 'is_active' => true],
         ];
 
         foreach ($conferences as $item) {
@@ -175,6 +175,10 @@ class WorkCatalogSeeder extends Seeder
             ['code' => 'AI', 'name' => 'Trí tuệ nhân tạo', 'description' => 'Máy học, xử lý ngôn ngữ tự nhiên', 'is_active' => true],
             ['code' => 'EDU', 'name' => 'Khoa học giáo dục', 'description' => null, 'is_active' => true],
             ['code' => 'SE', 'name' => 'Kỹ thuật phần mềm', 'description' => null, 'is_active' => true],
+            ['code' => 'DS', 'name' => 'Khoa học dữ liệu', 'description' => 'Phân tích dữ liệu và học máy ứng dụng', 'is_active' => true],
+            ['code' => 'CYBER', 'name' => 'An toàn thông tin', 'description' => 'Bảo mật hệ thống và dữ liệu', 'is_active' => true],
+            ['code' => 'MATH', 'name' => 'Toán học ứng dụng', 'description' => 'Mô hình hóa toán học và tối ưu', 'is_active' => true],
+            ['code' => 'STAT', 'name' => 'Thống kê', 'description' => 'Suy luận thống kê và phân tích dữ liệu giáo dục', 'is_active' => true],
             ['code' => null, 'name' => 'Kinh tế học', 'description' => null, 'is_active' => false],
         ];
 

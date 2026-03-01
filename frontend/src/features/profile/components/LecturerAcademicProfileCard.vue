@@ -1,5 +1,3 @@
-// File:
-src/features/lecturer/profile/components/LecturerAcademicProfileCard.vue
 <template>
   <div
     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
@@ -138,24 +136,38 @@ src/features/lecturer/profile/components/LecturerAcademicProfileCard.vue
 
           <div>
             <label class="text-xs font-medium text-slate-600">Học vị</label>
-            <input
-              v-model.trim="draft.academicDegree"
-              maxlength="50"
+            <select
+              v-model="draft.academicDegree"
               class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
               :disabled="pending"
-              placeholder="VD: TS / ThS / CN..."
-            />
+            >
+              <option value="">Chọn học vị</option>
+              <option
+                v-for="option in mergedDegreeOptions"
+                :key="`degree_${option.id ?? option.name}`"
+                :value="option.name"
+              >
+                {{ option.name }}
+              </option>
+            </select>
           </div>
 
           <div>
             <label class="text-xs font-medium text-slate-600">Học hàm</label>
-            <input
-              v-model.trim="draft.academicRank"
-              maxlength="50"
+            <select
+              v-model="draft.academicRank"
               class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
               :disabled="pending"
-              placeholder="VD: PGS / GS..."
-            />
+            >
+              <option value="">Chọn học hàm</option>
+              <option
+                v-for="option in mergedRankOptions"
+                :key="`rank_${option.id ?? option.name}`"
+                :value="option.name"
+              >
+                {{ option.name }}
+              </option>
+            </select>
           </div>
 
           <div>
@@ -420,9 +432,12 @@ import {
   X,
 } from "lucide-vue-next";
 import type { LecturerAcademicProfile } from "../composables/useLecturerProfile";
+import type { LookupItemDTO } from "../services/lecturerProfileService";
 
 const props = defineProps<{
   academicProfile: LecturerAcademicProfile;
+  degreeOptions?: LookupItemDTO[];
+  rankOptions?: LookupItemDTO[];
   pending?: boolean;
   loading?: boolean;
 }>();
@@ -442,6 +457,24 @@ function clone<T>(value: T): T {
 
 const draft = reactive<LecturerAcademicProfile>(clone(props.academicProfile));
 const keywordsText = ref<string>(props.academicProfile.keywords.join(", "));
+
+const mergedDegreeOptions = computed(() => {
+  const options = [...(props.degreeOptions ?? [])];
+  const selected = draft.academicDegree.trim();
+  if (selected && !options.some((item) => item.name === selected)) {
+    options.unshift({ id: -1, code: selected, name: selected });
+  }
+  return options;
+});
+
+const mergedRankOptions = computed(() => {
+  const options = [...(props.rankOptions ?? [])];
+  const selected = draft.academicRank.trim();
+  if (selected && !options.some((item) => item.name === selected)) {
+    options.unshift({ id: -1, code: selected, name: selected });
+  }
+  return options;
+});
 
 watch(
   () => props.academicProfile,

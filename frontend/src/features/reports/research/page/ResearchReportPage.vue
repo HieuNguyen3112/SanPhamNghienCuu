@@ -9,6 +9,8 @@
           subtitle="Tổng quan công trình nghiên cứu khoa học trong trường đại học"
           :show-export-pdf="true"
           :show-export-excel="true"
+          :export-pdf-disabled="Boolean(exporting)"
+          :export-excel-disabled="Boolean(exporting)"
           @exportPdfClicked="handleExport('pdf')"
           @exportExcelClicked="handleExport('excel')"
         />
@@ -106,12 +108,6 @@
         @close="closeDetail"
       />
 
-      <div
-        v-if="notificationMessage"
-        class="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 shadow-sm"
-      >
-        {{ notificationMessage }}
-      </div>
     </div>
   </div>
 </template>
@@ -129,6 +125,7 @@ import WorksOverYearsLineChart from "../components/charts/WorksOverYearsLineChar
 import ResearchTypeDonutChart from "../components/charts/ResearchTypeDonutChart.vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import { useUserStore } from "@/app/stores/userStore";
+import { useExportActionFeedback } from "@/shared/composables/useExportActionFeedback";
 import {
   exportResearchReportExcel,
   exportResearchReportPdf,
@@ -171,8 +168,7 @@ const pageSize = ref(12);
 
 const isLoading = ref(false);
 const errorMessage = ref("");
-const notificationMessage = ref("");
-const exporting = ref<"pdf" | "excel" | null>(null);
+const { exporting, runExport } = useExportActionFeedback();
 
 const filterOptions = ref<ResearchReportFiltersResponse>({
   years: [],
@@ -316,40 +312,19 @@ function changePageSize(nextPageSize: number) {
   void loadReport();
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  window.URL.revokeObjectURL(url);
-}
-
 async function handleExport(type: "pdf" | "excel") {
-  if (exporting.value) return;
-  exporting.value = type;
-
-  try {
+  await runExport(type, async () => {
     const params = buildExportParams();
-    const result =
+    return (
       type === "excel"
         ? isFacultyScope.value
           ? await exportFacultyResearchReportExcel(params)
           : await exportResearchReportExcel(params)
         : isFacultyScope.value
           ? await exportFacultyResearchReportPdf(params)
-          : await exportResearchReportPdf(params);
-    downloadBlob(result.blob, result.filename);
-    notificationMessage.value = "Xuất báo cáo thành công.";
-  } catch (error) {
-    console.error(error);
-    notificationMessage.value = "Không thể xuất báo cáo. Vui lòng thử lại.";
-  } finally {
-    exporting.value = null;
-    window.setTimeout(() => {
-      notificationMessage.value = "";
-    }, 2500);
-  }
+          : await exportResearchReportPdf(params)
+    );
+  });
 }
 
 const detailModal = reactive({

@@ -104,13 +104,63 @@ function resolveStatus(item: AppNotificationItem): HoursWarningStatusDTO {
 
 function resolveActionLabel(item: AppNotificationItem): string | null {
   const data = asRecord(item.data);
-  const explicitLabel = typeof data.action_label === "string" ? data.action_label.trim() : "";
+  const explicitLabel =
+    typeof data.action_label === "string" ? data.action_label.trim() : "";
   if (explicitLabel) return explicitLabel;
+
+  const typeKey = resolveTypeKey(item);
+  if (typeKey === "missing_hours" || typeKey === "approved_not_submitted") {
+    return "Tính giờ NCKH";
+  }
+  if (typeKey === "deadline_passed" || typeKey === "hours_rejected") {
+    return "Xem công trình";
+  }
+  if (typeKey === "deadline_near" || typeKey === "hours_pending") {
+    return "Xem giờ NCKH";
+  }
 
   if (item.target_url.includes("/hours/calculate")) return "Tính giờ NCKH";
   if (item.target_url.includes("/works/personal")) return "Xem công trình";
   if (item.target_url.includes("/hours/personal")) return "Xem giờ NCKH";
   return "Xem chi tiết";
+}
+
+function normalizeRoutePath(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  if (trimmed.startsWith("/")) return trimmed;
+  return `/${trimmed}`;
+}
+
+function resolveActionRoute(item: AppNotificationItem, typeKey: string): string {
+  const data = asRecord(item.data);
+  const explicitRoute = typeof data.route_path === "string" ? data.route_path : "";
+  const normalizedExplicitRoute = normalizeRoutePath(explicitRoute);
+  if (normalizedExplicitRoute) {
+    return normalizedExplicitRoute;
+  }
+
+  const normalizedTargetUrl = normalizeRoutePath(item.target_url);
+  if (
+    normalizedTargetUrl &&
+    !normalizedTargetUrl.includes("/hours/personal_warnings")
+  ) {
+    return normalizedTargetUrl;
+  }
+
+  if (typeKey === "missing_hours" || typeKey === "approved_not_submitted") {
+    return "/hours/calculate";
+  }
+  if (
+    typeKey === "deadline_near" ||
+    typeKey === "deadline_passed" ||
+    typeKey === "hours_pending" ||
+    typeKey === "hours_rejected"
+  ) {
+    return "/hours/personal";
+  }
+  return "/hours/personal";
 }
 
 async function fetchWarningSummaryFromOverview() {
@@ -139,7 +189,7 @@ async function fetchWarningSummaryFromOverview() {
     approved_hours: overview.approved_hours,
     pending_hours: overview.pending_hours,
     rejected_hours: overview.rejected_hours,
-    total_hours_current: overview.approved_hours + overview.pending_hours,
+    total_hours_current: overview.approved_hours,
     shortage_hours: Math.max(overview.required_hours - overview.approved_hours, 0),
     deadline_date: year?.end_date ?? null,
     days_remaining: daysRemaining,
@@ -222,10 +272,12 @@ export async function fetchHoursWarnings(params?: {
     const items = notificationsResponse.items
       .map((item) => {
         const data = asRecord(item.data);
+        const typeKey = resolveTypeKey(item);
+        const routePath = resolveActionRoute(item, typeKey);
 
         return {
           id: item.id,
-          type_key: resolveTypeKey(item),
+          type_key: typeKey,
           severity_key: resolveSeverity(item),
           title: item.title,
           message: item.message,
@@ -239,7 +291,7 @@ export async function fetchHoursWarnings(params?: {
                 : null,
           action: {
             label: resolveActionLabel(item),
-            route_path: item.target_url || "/hours/personal_warnings",
+            route_path: routePath,
             external_url: null,
           },
         };

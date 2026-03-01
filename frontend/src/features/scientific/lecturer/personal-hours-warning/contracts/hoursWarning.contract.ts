@@ -53,9 +53,6 @@ export interface HoursWarningSeenResponseDTO {
   seen_at: string | null;
 }
 
-/* =========================
- * UI Models (camelCase)
- * ========================= */
 export type HoursAlertLevel = HoursWarningSeverityDTO;
 export type HoursAlertsFilter = HoursWarningsTabDTO;
 
@@ -94,9 +91,6 @@ export interface HoursAlertActionSuggestion {
   ctaTo: string | null;
 }
 
-/* =========================
- * Mappers
- * ========================= */
 export function hoursAlertsSummaryFromDto(
   dto: HoursWarningsSummaryDTO
 ): HoursAlertsSummary {
@@ -122,7 +116,11 @@ function statusLabel(status: HoursWarningStatusDTO): string {
 export function hoursAlertItemFromDto(dto: HoursWarningItemDTO): HoursAlertItem {
   const action = dto.action ?? {};
   const ctaTo = action.route_path ?? action.external_url ?? null;
-  const isExternal = Boolean(action.external_url);
+  const isExternal =
+    Boolean(action.external_url) ||
+    (typeof ctaTo === "string" &&
+      (ctaTo.startsWith("http://") || ctaTo.startsWith("https://")));
+
   return {
     id: dto.id,
     level: dto.severity_key,
@@ -151,9 +149,6 @@ export function hoursAlertActionSuggestionFromDto(
   };
 }
 
-/* =========================
- * Format helpers
- * ========================= */
 export function formatHours(value: number): string {
   if (!Number.isFinite(value)) return "0";
   return value.toFixed(0);

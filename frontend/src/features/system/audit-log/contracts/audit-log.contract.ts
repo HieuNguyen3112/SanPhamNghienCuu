@@ -59,6 +59,8 @@ export interface AuditLogEntryDTO {
   actor: AuditActorDTO;
   actor_display_name?: string | null;
   target: AuditTargetDTO;
+  object_display?: string | null;
+  object_type?: string | null;
   result: AuditResultDTO;
   result_label?: string | null;
 
@@ -167,6 +169,8 @@ export interface AuditLogEntry {
   actionGroup: AuditActionGroup;
   actionCode: string;
   actionLabel: string;
+  objectDisplay: string;
+  objectType: string | null;
 
   actor: AuditActor;
   target: AuditTarget;
@@ -388,6 +392,8 @@ export function auditLogEntryFromDto(dto: AuditLogEntryDTO): AuditLogEntry {
     actionGroup: dto.action_group,
     actionCode: dto.action_code,
     actionLabel: dto.action_label,
+    objectDisplay: dto.object_display ?? dto.target.display ?? "-",
+    objectType: dto.object_type ?? null,
 
     actor: auditActorFromDto(dto.actor),
     target: auditTargetFromDto(dto.target),

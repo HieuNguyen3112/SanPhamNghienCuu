@@ -83,9 +83,9 @@
         </select>
       </div>
 
-      <!-- Action code -->
+      <!-- Action -->
       <div class="md:col-span-3">
-        <label class="text-xs font-medium text-slate-600">Mã hành động</label>
+        <label class="text-xs font-medium text-slate-600">Hành động</label>
         <select
           class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none"
           :value="modelValue.actionCode"
@@ -102,7 +102,7 @@
             :key="c.code"
             :value="c.code"
           >
-            {{ c.label }} ({{ c.code }})
+            {{ c.label }}
           </option>
         </select>
       </div>

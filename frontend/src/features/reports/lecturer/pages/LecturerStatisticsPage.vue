@@ -9,6 +9,8 @@
           subtitle="Tổng quan nhân sự giảng dạy trong trường đại học"
           :show-export-pdf="true"
           :show-export-excel="true"
+          :export-pdf-disabled="Boolean(exporting)"
+          :export-excel-disabled="Boolean(exporting)"
           @exportPdfClicked="handleExport('pdf')"
           @exportExcelClicked="handleExport('excel')"
         />
@@ -46,12 +48,6 @@
         @pageSizeChanged="changePageSize"
       />
 
-      <div
-        v-if="notificationMessage"
-        class="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 shadow-sm"
-      >
-        {{ notificationMessage }}
-      </div>
     </div>
   </div>
 </template>
@@ -64,6 +60,7 @@ import LecturerSummaryCards from "../components/LecturerSummaryCards.vue";
 import LecturerChartSection from "../components/LecturerChartSection.vue";
 import LecturerStatisticsTable from "../components/LecturerStatisticsTable.vue";
 import { useUserStore } from "@/app/stores/userStore";
+import { useExportActionFeedback } from "@/shared/composables/useExportActionFeedback";
 import {
   exportLecturerReportExcel,
   exportLecturerReportPdf,
@@ -108,8 +105,7 @@ const pageSize = ref(12);
 
 const isLoading = ref(false);
 const errorMessage = ref("");
-const notificationMessage = ref("");
-const exporting = ref<"pdf" | "excel" | null>(null);
+const { exporting, runExport } = useExportActionFeedback();
 
 const filterOptions = ref<LecturerReportFiltersResponse>({
   faculties: [],
@@ -268,41 +264,19 @@ function changePageSize(nextPageSize: number) {
   void loadReport();
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  window.URL.revokeObjectURL(url);
-}
-
 async function handleExport(type: "pdf" | "excel") {
-  if (exporting.value) return;
-  exporting.value = type;
-
-  try {
+  await runExport(type, async () => {
     const params = buildExportParams();
-    const result =
+    return (
       type === "excel"
         ? isFacultyScope.value
           ? await exportFacultyLecturerReportExcel(params)
           : await exportLecturerReportExcel(params)
         : isFacultyScope.value
           ? await exportFacultyLecturerReportPdf(params)
-          : await exportLecturerReportPdf(params);
-    downloadBlob(result.blob, result.filename);
-    notificationMessage.value = "Xuất báo cáo thành công.";
-  } catch (error) {
-    console.error(error);
-    notificationMessage.value =
-      "Không thể xuất báo cáo. Vui lòng thử lại.";
-  } finally {
-    exporting.value = null;
-    window.setTimeout(() => {
-      notificationMessage.value = "";
-    }, 2500);
-  }
+          : await exportLecturerReportPdf(params)
+    );
+  });
 }
 
 onMounted(async () => {

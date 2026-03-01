@@ -54,7 +54,7 @@ class FacultyHoursApprovalSeeder extends Seeder
 
         $facultyBoardUser = User::updateOrCreate(
             ['email' => 'faculty.board@local.test'],
-            ['name' => 'Nguyễn Văn A', 'password' => Hash::make('Password!123')]
+            ['name' => 'Đặng Thu Hà', 'password' => Hash::make('Password!123')]
         );
 
         if (is_null($facultyBoardUser->email_verified_at)) {
@@ -68,7 +68,7 @@ class FacultyHoursApprovalSeeder extends Seeder
             ['code' => 'DL-A01'],
             [
                 'user_id' => $facultyBoardUser->id,
-                'full_name' => 'Trưởng Khoa CNTT',
+                'full_name' => 'Đặng Thu Hà',
                 'email' => $facultyBoardUser->email,
                 'phone' => '0900000100',
                 'department_id' => $departmentA1,
@@ -89,20 +89,20 @@ class FacultyHoursApprovalSeeder extends Seeder
         }
 
         $lecturerIds = $this->seedLecturers($now, [
-            ['code' => 'GV-A01', 'name' => 'Nguyễn Văn A', 'email' => 'gv-a01@local.test', 'department_id' => $departmentA1],
-            ['code' => 'GV-A02', 'name' => 'Trần Thị B', 'email' => 'gv-a02@local.test', 'department_id' => $departmentA1],
-            ['code' => 'GV-A03', 'name' => 'Lê Quốc C', 'email' => 'gv-a03@local.test', 'department_id' => $departmentA2],
-            ['code' => 'GV-A04', 'name' => 'Phạm Mỹ D', 'email' => 'gv-a04@local.test', 'department_id' => $departmentA2],
-            ['code' => 'GV-A05', 'name' => 'Đoàn Minh E', 'email' => 'gv-a05@local.test', 'department_id' => $departmentA1],
-            ['code' => 'GV-A06', 'name' => 'Hoàng Anh F', 'email' => 'gv-a06@local.test', 'department_id' => $departmentA2],
-            ['code' => 'GV-B01', 'name' => 'Vũ Khoa G', 'email' => 'gv-b01@local.test', 'department_id' => $departmentB1],
-            ['code' => 'GV-B02', 'name' => 'Bùi An H', 'email' => 'gv-b02@local.test', 'department_id' => $departmentB1],
-            ['code' => 'GV-B03', 'name' => 'Nguyễn Hải I', 'email' => 'gv-b03@local.test', 'department_id' => $departmentB1],
+            ['code' => 'GV-A01', 'name' => 'Nguyễn Hữu Tài', 'email' => 'gv-a01@local.test', 'department_id' => $departmentA1],
+            ['code' => 'GV-A02', 'name' => 'Trần Bảo Ngọc', 'email' => 'gv-a02@local.test', 'department_id' => $departmentA1],
+            ['code' => 'GV-A03', 'name' => 'Lê Quang Huy', 'email' => 'gv-a03@local.test', 'department_id' => $departmentA2],
+            ['code' => 'GV-A04', 'name' => 'Phạm Thảo Vy', 'email' => 'gv-a04@local.test', 'department_id' => $departmentA2],
+            ['code' => 'GV-A05', 'name' => 'Vũ Đức Anh', 'email' => 'gv-a05@local.test', 'department_id' => $departmentA1],
+            ['code' => 'GV-A06', 'name' => 'Đỗ Minh Châu', 'email' => 'gv-a06@local.test', 'department_id' => $departmentA2],
+            ['code' => 'GV-B01', 'name' => 'Nguyễn Văn Phúc', 'email' => 'gv-b01@local.test', 'department_id' => $departmentB1],
+            ['code' => 'GV-B02', 'name' => 'Trần Khánh Linh', 'email' => 'gv-b02@local.test', 'department_id' => $departmentB1],
+            ['code' => 'GV-B03', 'name' => 'Phan Đức Duy', 'email' => 'gv-b03@local.test', 'department_id' => $departmentB1],
         ]);
 
         $pendingLecturerUser = User::updateOrCreate(
             ['email' => 'gv-a01@local.test'],
-            ['name' => 'Nguyễn Văn A', 'password' => Hash::make('Password!123')]
+            ['name' => 'Nguyễn Hữu Tài', 'password' => Hash::make('Password!123')]
         );
 
         if (is_null($pendingLecturerUser->email_verified_at)) {
@@ -120,36 +120,36 @@ class FacultyHoursApprovalSeeder extends Seeder
 
         $activities = [
             // Faculty A - pending
-            ['code' => 'HFA-A01-01', 'lecturer' => 'GV-A01', 'kind' => 'paper', 'type' => 'hdgsnn_900', 'title' => 'Ứng dụng AI trong giáo dục', 'hours' => 12, 'status' => 'pending', 'days_ago' => 3, 'year' => '2024-2025', 'members' => ['GV-A02']],
-            ['code' => 'HFA-A01-02', 'lecturer' => 'GV-A01', 'kind' => 'conference', 'type' => 'report', 'title' => 'Hội thảo giáo dục số 2025', 'hours' => 8, 'status' => 'pending', 'days_ago' => 6, 'year' => '2024-2025', 'members' => ['GV-A03']],
-            ['code' => 'HFA-A02-01', 'lecturer' => 'GV-A02', 'kind' => 'project', 'type' => 'bo', 'title' => 'Đề tài nâng cao chất lượng dạy học', 'hours' => 18, 'status' => 'pending', 'days_ago' => 5, 'year' => '2024-2025', 'members' => ['GV-A04']],
-            ['code' => 'HFA-A02-02', 'lecturer' => 'GV-A02', 'kind' => 'paper', 'type' => 'hdgsnn_600', 'title' => 'Khai thác dữ liệu học tập', 'hours' => 10, 'status' => 'pending', 'days_ago' => 9, 'year' => '2024-2025', 'members' => ['GV-A05']],
+            ['code' => 'HFA-A01-01', 'lecturer' => 'GV-A01', 'kind' => 'paper', 'type' => 'hdgsnn_900', 'title' => 'Ứng dụng AI trong đánh giá năng lực lập trình', 'hours' => 12, 'status' => 'pending', 'days_ago' => 3, 'year' => '2024-2025', 'members' => ['GV-A02']],
+            ['code' => 'HFA-A01-02', 'lecturer' => 'GV-A01', 'kind' => 'conference', 'type' => 'report', 'title' => 'Báo cáo tại Hội thảo giáo dục số 2025', 'hours' => 8, 'status' => 'pending', 'days_ago' => 6, 'year' => '2024-2025', 'members' => ['GV-A03']],
+            ['code' => 'HFA-A02-01', 'lecturer' => 'GV-A02', 'kind' => 'project', 'type' => 'bo', 'title' => 'Đề tài nâng cao chất lượng dạy học Tin học', 'hours' => 18, 'status' => 'pending', 'days_ago' => 5, 'year' => '2024-2025', 'members' => ['GV-A04']],
+            ['code' => 'HFA-A02-02', 'lecturer' => 'GV-A02', 'kind' => 'paper', 'type' => 'hdgsnn_600', 'title' => 'Khai thác dữ liệu học tập cho cố vấn học tập', 'hours' => 10, 'status' => 'pending', 'days_ago' => 9, 'year' => '2024-2025', 'members' => ['GV-A05']],
 
             // Faculty A - approved
-            ['code' => 'HFA-A03-01', 'lecturer' => 'GV-A03', 'kind' => 'book', 'type' => 'textbook', 'title' => 'Giáo trình phương pháp giảng dạy', 'hours' => 20, 'status' => 'approved', 'days_ago' => 20, 'year' => '2024-2025', 'members' => ['GV-A01']],
-            ['code' => 'HFA-A03-02', 'lecturer' => 'GV-A03', 'kind' => 'paper', 'type' => 'hdgsnn_900', 'title' => 'Học máy trong giáo dục', 'hours' => 15, 'status' => 'approved', 'days_ago' => 25, 'year' => '2024-2025', 'members' => ['GV-A02']],
+            ['code' => 'HFA-A03-01', 'lecturer' => 'GV-A03', 'kind' => 'book', 'type' => 'textbook', 'title' => 'Giáo trình Nhập môn Khoa học dữ liệu', 'hours' => 20, 'status' => 'approved', 'days_ago' => 20, 'year' => '2024-2025', 'members' => ['GV-A01']],
+            ['code' => 'HFA-A03-02', 'lecturer' => 'GV-A03', 'kind' => 'paper', 'type' => 'hdgsnn_900', 'title' => 'Mô hình học máy trong hỗ trợ dạy học', 'hours' => 15, 'status' => 'approved', 'days_ago' => 25, 'year' => '2024-2025', 'members' => ['GV-A02']],
 
             // Faculty A - rejected
-            ['code' => 'HFA-A04-01', 'lecturer' => 'GV-A04', 'kind' => 'conference', 'type' => 'report', 'title' => 'Báo cáo STEM 2024', 'hours' => 9, 'status' => 'rejected', 'days_ago' => 12, 'year' => '2024-2025', 'members' => ['GV-A03']],
-            ['code' => 'HFA-A04-02', 'lecturer' => 'GV-A04', 'kind' => 'paper', 'type' => 'hdgsnn_600', 'title' => 'Mô hình học tập kết hợp', 'hours' => 11, 'status' => 'rejected', 'days_ago' => 14, 'year' => '2024-2025', 'members' => ['GV-A06']],
+            ['code' => 'HFA-A04-01', 'lecturer' => 'GV-A04', 'kind' => 'conference', 'type' => 'report', 'title' => 'Báo cáo STEM trong đào tạo giáo viên 2024', 'hours' => 9, 'status' => 'rejected', 'days_ago' => 12, 'year' => '2024-2025', 'members' => ['GV-A03']],
+            ['code' => 'HFA-A04-02', 'lecturer' => 'GV-A04', 'kind' => 'paper', 'type' => 'hdgsnn_600', 'title' => 'Mô hình học tập kết hợp cho học phần cơ sở ngành', 'hours' => 11, 'status' => 'rejected', 'days_ago' => 14, 'year' => '2024-2025', 'members' => ['GV-A06']],
 
             // Faculty A - year 2023-2024
-            ['code' => 'HFA-A05-01', 'lecturer' => 'GV-A05', 'kind' => 'project', 'type' => 'bo', 'title' => 'Đề tài chuyển đổi số', 'hours' => 16, 'status' => 'approved', 'days_ago' => 40, 'year' => '2023-2024', 'members' => ['GV-A01']],
+            ['code' => 'HFA-A05-01', 'lecturer' => 'GV-A05', 'kind' => 'project', 'type' => 'bo', 'title' => 'Đề tài chuyển đổi số quản lý học vụ', 'hours' => 16, 'status' => 'approved', 'days_ago' => 40, 'year' => '2023-2024', 'members' => ['GV-A01']],
             ['code' => 'HFA-A05-02', 'lecturer' => 'GV-A05', 'kind' => 'paper', 'type' => 'hdgsnn_900', 'title' => 'Hệ thống gợi ý học tập', 'hours' => 13, 'status' => 'approved', 'days_ago' => 46, 'year' => '2023-2024', 'members' => ['GV-A02']],
-            ['code' => 'HFA-A05-03', 'lecturer' => 'GV-A05', 'kind' => 'conference', 'type' => 'report', 'title' => 'Hội thảo công nghệ giáo dục 2024', 'hours' => 7, 'status' => 'approved', 'days_ago' => 43, 'year' => '2023-2024', 'members' => ['GV-A03']],
+            ['code' => 'HFA-A05-03', 'lecturer' => 'GV-A05', 'kind' => 'conference', 'type' => 'report', 'title' => 'Hội thảo công nghệ giáo dục và đổi mới phương pháp 2024', 'hours' => 7, 'status' => 'approved', 'days_ago' => 43, 'year' => '2023-2024', 'members' => ['GV-A03']],
 
             // Faculty A - extra pending
             ['code' => 'HFA-A06-01', 'lecturer' => 'GV-A06', 'kind' => 'paper', 'type' => 'hdgsnn_600', 'title' => 'Đánh giá năng lực học tập', 'hours' => 9, 'status' => 'pending', 'days_ago' => 2, 'year' => '2024-2025', 'members' => ['GV-A05']],
-            ['code' => 'HFA-A06-02', 'lecturer' => 'GV-A06', 'kind' => 'book', 'type' => 'textbook', 'title' => 'Tài liệu hướng dẫn giảng dạy', 'hours' => 12, 'status' => 'pending', 'days_ago' => 4, 'year' => '2024-2025', 'members' => ['GV-A04']],
-            ['code' => 'HFA-A06-03', 'lecturer' => 'GV-A06', 'kind' => 'conference', 'type' => 'report', 'title' => 'Báo cáo đào tạo 2025', 'hours' => 6, 'status' => 'pending', 'days_ago' => 8, 'year' => '2024-2025', 'members' => ['GV-A02']],
+            ['code' => 'HFA-A06-02', 'lecturer' => 'GV-A06', 'kind' => 'book', 'type' => 'textbook', 'title' => 'Tài liệu hướng dẫn thực hành phân tích dữ liệu', 'hours' => 12, 'status' => 'pending', 'days_ago' => 4, 'year' => '2024-2025', 'members' => ['GV-A04']],
+            ['code' => 'HFA-A06-03', 'lecturer' => 'GV-A06', 'kind' => 'conference', 'type' => 'report', 'title' => 'Báo cáo đào tạo giáo viên số 2025', 'hours' => 6, 'status' => 'pending', 'days_ago' => 8, 'year' => '2024-2025', 'members' => ['GV-A02']],
 
             // Faculty B - pending (should be hidden for faculty A)
-            ['code' => 'HFB-B01-01', 'lecturer' => 'GV-B01', 'kind' => 'paper', 'type' => 'hdgsnn_900', 'title' => 'Nghiên cứu xã hội học', 'hours' => 14, 'status' => 'pending', 'days_ago' => 5, 'year' => '2024-2025', 'members' => ['GV-B02']],
-            ['code' => 'HFB-B01-02', 'lecturer' => 'GV-B01', 'kind' => 'conference', 'type' => 'report', 'title' => 'Hội thảo xã hội 2025', 'hours' => 8, 'status' => 'pending', 'days_ago' => 9, 'year' => '2024-2025', 'members' => ['GV-B03']],
+            ['code' => 'HFB-B01-01', 'lecturer' => 'GV-B01', 'kind' => 'paper', 'type' => 'hdgsnn_900', 'title' => 'Nghiên cứu mô hình toán cho tối ưu thời khóa biểu', 'hours' => 14, 'status' => 'pending', 'days_ago' => 5, 'year' => '2024-2025', 'members' => ['GV-B02']],
+            ['code' => 'HFB-B01-02', 'lecturer' => 'GV-B01', 'kind' => 'conference', 'type' => 'report', 'title' => 'Hội thảo Toán ứng dụng trong khoa học dữ liệu 2025', 'hours' => 8, 'status' => 'pending', 'days_ago' => 9, 'year' => '2024-2025', 'members' => ['GV-B03']],
 
             // Faculty B - approved/rejected
-            ['code' => 'HFB-B02-01', 'lecturer' => 'GV-B02', 'kind' => 'project', 'type' => 'bo', 'title' => 'Đề tài văn hóa số', 'hours' => 17, 'status' => 'approved', 'days_ago' => 22, 'year' => '2024-2025', 'members' => ['GV-B01']],
-            ['code' => 'HFB-B03-01', 'lecturer' => 'GV-B03', 'kind' => 'book', 'type' => 'textbook', 'title' => 'Giáo trình nghiên cứu xã hội', 'hours' => 19, 'status' => 'rejected', 'days_ago' => 18, 'year' => '2024-2025', 'members' => ['GV-B02']],
+            ['code' => 'HFB-B02-01', 'lecturer' => 'GV-B02', 'kind' => 'project', 'type' => 'bo', 'title' => 'Đề tài mô phỏng số trong dạy học toán', 'hours' => 17, 'status' => 'approved', 'days_ago' => 22, 'year' => '2024-2025', 'members' => ['GV-B01']],
+            ['code' => 'HFB-B03-01', 'lecturer' => 'GV-B03', 'kind' => 'book', 'type' => 'textbook', 'title' => 'Giáo trình Đại số tuyến tính ứng dụng', 'hours' => 19, 'status' => 'rejected', 'days_ago' => 18, 'year' => '2024-2025', 'members' => ['GV-B02']],
         ];
 
         foreach ($activities as $activity) {

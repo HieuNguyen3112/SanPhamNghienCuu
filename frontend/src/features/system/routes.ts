@@ -8,6 +8,7 @@ import UniversityAuditLogPage from "@/features/system/audit-log/pages/University
 
 import WorkCatalogManagementPage from "@/features/system/master-data/work-catalog-management/pages/WorkCatalogManagementPage.vue";
 import ResearchHoursCatalogPage from "@/features/system/master-data/research-hours-catalog/pages/ResearchHoursCatalogPage.vue";
+import BackupManagementPage from "@/features/system/backups/pages/BackupManagementPage.vue";
 
 export const UserManagerRoutes: RouteRecordRaw[] = [
   // Users
@@ -50,5 +51,11 @@ export const UserManagerRoutes: RouteRecordRaw[] = [
     name: "masterdata.hours_catalog",
     component: ResearchHoursCatalogPage,
     meta: { roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"] },
+  },
+  {
+    path: "system/backups",
+    name: "system.backups",
+    component: BackupManagementPage,
+    meta: { roles: ["SCIENCE_OFFICE"] },
   },
 ];

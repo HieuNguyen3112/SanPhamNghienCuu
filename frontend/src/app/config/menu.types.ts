@@ -72,6 +72,7 @@ export type AppRouteName =
   // =========================
   | "masterdata.work_catalog"
   | "masterdata.hours_catalog"
+  | "system.backups"
 
   // =========================
   // SYSTEM / GLOBAL / REPORTS
