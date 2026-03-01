@@ -40,6 +40,7 @@
             <th class="px-4 py-3">Tên tạp chí</th>
             <th class="w-36 px-4 py-3">ISSN/ISBN</th>
             <th class="w-[260px] px-4 py-3">Nguồn uy tín</th>
+            <th class="w-[220px] px-4 py-3">Cơ quan xuất bản</th>
             <th class="w-32 px-4 py-3">Điểm</th>
             <th class="w-40 px-4 py-3">Xếp loại</th>
             <th class="w-28 px-4 py-3 text-right">Giờ NCKH</th>
@@ -68,6 +69,12 @@
             <td class="px-4 py-3 text-slate-700">
               <div class="line-clamp-2 whitespace-pre-wrap">
                 {{ row.sourceName ?? "—" }}
+              </div>
+            </td>
+
+            <td class="px-4 py-3 text-slate-700">
+              <div class="line-clamp-2 whitespace-pre-wrap">
+                {{ row.publisher ?? "—" }}
               </div>
             </td>
 
@@ -115,7 +122,7 @@
 
           <tr v-if="rows.length === 0">
             <td
-              colspan="9"
+              colspan="10"
               class="px-4 py-10 text-center text-sm text-slate-500"
             >
               Không có dữ liệu phù hợp.
@@ -192,6 +199,26 @@
               </label>
             </div>
           </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-slate-600"
+            >Cơ quan xuất bản</label
+          >
+          <input
+            :value="localForm.publisher ?? ''"
+            @input="
+              patchForm({
+                publisher: ($event.target as HTMLInputElement).value,
+              })
+            "
+            type="text"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+            placeholder="Ví dụ: Elsevier, Springer, IEEE"
+          />
+          <p v-if="errors.publisher" class="mt-1 text-xs text-rose-600">
+            {{ errors.publisher }}
+          </p>
         </div>
 
         <div>
@@ -293,8 +320,8 @@
             </div>
 
             <div class="mt-2 text-slate-600">
-              Quy tắc: max điểm >= 2 → 900h; max điểm >= 1 → 600h; nếu thấp
-              hơn nhưng có ISSN/ISBN → 300h.
+              Xếp loại theo điểm/ISSN. Giờ NCKH khi lưu sẽ lấy theo cấu hình
+              Quy đổi giờ theo công trình (paper: HDGSNN 900/600/300) hiện hành.
             </div>
           </div>
         </div>
@@ -368,6 +395,7 @@ export interface JournalRow {
   address?: string | null;
   country?: string | null;
   sourceName?: string | null;
+  publisher?: string | null;
   pointMin?: number | null;
   pointMax?: number | null;
   classification?: DerivedCategory;
@@ -381,6 +409,7 @@ export interface JournalFormModel {
   address: string;
   country: string;
   notes: string;
+  publisher: string;
   isActive: boolean;
   sourceName: string;
   pointMin: number | null;
@@ -394,6 +423,7 @@ type JournalFormErrors = Partial<
     | "country"
     | "issn"
     | "notes"
+    | "publisher"
     | "sourceName"
     | "pointMin"
     | "pointMax",
@@ -528,7 +558,11 @@ function resolveCategoryCode(row: JournalRow): DerivedCategory {
     return fromApi;
   }
 
-  return deriveCategory(row.issn ?? null, row.pointMin ?? null, row.pointMax ?? null);
+  return deriveCategory(
+    row.issn ?? null,
+    row.pointMin ?? null,
+    row.pointMax ?? null,
+  );
 }
 
 function resolveCategoryMeta(row: JournalRow) {
@@ -536,7 +570,10 @@ function resolveCategoryMeta(row: JournalRow) {
 }
 
 function resolveResearchHours(row: JournalRow): number {
-  if (typeof row.researchHours === "number" && Number.isFinite(row.researchHours)) {
+  if (
+    typeof row.researchHours === "number" &&
+    Number.isFinite(row.researchHours)
+  ) {
     return row.researchHours;
   }
 
@@ -551,13 +588,19 @@ const derivedCategoryValue = computed(() =>
   ),
 );
 
-const derivedHours = computed(() => CATEGORY_RULES[derivedCategoryValue.value].hours);
-const derivedLabel = computed(() => CATEGORY_RULES[derivedCategoryValue.value].label);
+const derivedHours = computed(
+  () => CATEGORY_RULES[derivedCategoryValue.value].hours,
+);
+const derivedLabel = computed(
+  () => CATEGORY_RULES[derivedCategoryValue.value].label,
+);
 const derivedBadgeClass = computed(
   () => CATEGORY_RULES[derivedCategoryValue.value].badgeClass,
 );
 const derivedRangeText = computed(() =>
-  formatPointRange(localForm.value.pointMin ?? null, localForm.value.pointMax ?? null),
+  formatPointRange(
+    localForm.value.pointMin ?? null,
+    localForm.value.pointMax ?? null,
+  ),
 );
 </script>
-

@@ -34,14 +34,22 @@ export function computeBookHours(
   model: BookDeclarationFormModel,
   ctx: {
     typeCodeById: Record<number, string>;
+    typeHoursById: Record<number, number>;
     lecturerNameById: Record<number, string>;
     memberRoleNameById: Record<number, string>;
     memberRoleCodeById: Record<number, string>;
     currentLecturerId: number;
-  }
+  },
 ): HoursComputationResult {
   const typeCode = model.typeId ? ctx.typeCodeById[model.typeId] : null;
-  const baseHours = typeCode ? bookBaseHoursByTypeCode[typeCode] ?? 0 : 0;
+  const byTypeConfig =
+    model.typeId && Number.isFinite(ctx.typeHoursById[model.typeId])
+      ? Number(ctx.typeHoursById[model.typeId])
+      : 0;
+  const byTypeFallback = typeCode
+    ? (bookBaseHoursByTypeCode[typeCode] ?? 0)
+    : 0;
+  const baseHours = byTypeConfig > 0 ? byTypeConfig : byTypeFallback;
 
   const participants = normalizeParticipantsForHours(model.members);
 
@@ -62,7 +70,7 @@ export function computeBookHours(
     totalMembers > 0 ? (baseHours * 4) / 5 / totalMembers : 0;
 
   const chiefEditorsCount = allWithRole.filter(
-    (p) => p.role_code === "chief_editor"
+    (p) => p.role_code === "chief_editor",
   ).length;
 
   const chiefExtra =

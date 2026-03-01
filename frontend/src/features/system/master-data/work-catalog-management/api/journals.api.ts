@@ -1,4 +1,4 @@
-import http from "@/lib/http";
+import http, { ensureCsrfCookie } from "@/lib/http";
 import type { ListResponseDTO } from "../contracts/pagination.contract";
 import type {
   JournalDTO,
@@ -17,6 +17,7 @@ export const journalsApi = {
   },
 
   async create(payload: Omit<JournalUpsertDTO, "id">) {
+    await ensureCsrfCookie();
     const res = await http.post<{ success: boolean; data: JournalDTO }>(
       base,
       payload,
@@ -25,6 +26,7 @@ export const journalsApi = {
   },
 
   async update(id: number, payload: Omit<JournalUpsertDTO, "id">) {
+    await ensureCsrfCookie();
     const res = await http.put<{ success: boolean; data: JournalDTO }>(
       `${base}/${id}`,
       payload,
@@ -33,6 +35,7 @@ export const journalsApi = {
   },
 
   async updateStatus(id: number, payload: { is_active: boolean }) {
+    await ensureCsrfCookie();
     const res = await http.patch<{ success: boolean; data: JournalDTO }>(
       `${base}/${id}/status`,
       payload,

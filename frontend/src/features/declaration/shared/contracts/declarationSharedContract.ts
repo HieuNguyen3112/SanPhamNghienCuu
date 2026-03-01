@@ -28,6 +28,8 @@ export type ActivityTypeDto = {
   kind_id: number;
   code: string;
   name: string;
+  research_hours?: number | null;
+  max_occurrences_per_year?: number | null;
 };
 
 export type ActivityStatusDto = {
@@ -108,7 +110,7 @@ export type HoursComputationResult = {
 };
 
 export function mapStatusCodeToUi(
-  code: ActivityStatusDto["code"]
+  code: ActivityStatusDto["code"],
 ): DeclarationStatusUi {
   switch (code) {
     case "draft":
@@ -129,7 +131,7 @@ export function mapStatusCodeToUi(
 }
 
 export function mapUiToStatusCode(
-  ui: DeclarationStatusUi
+  ui: DeclarationStatusUi,
 ): ActivityStatusDto["code"] {
   switch (ui) {
     case "DRAFT":

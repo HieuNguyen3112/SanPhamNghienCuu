@@ -6,7 +6,7 @@
         class="h-14 rounded-lg bg-[#0b5fa5] px-4 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm hover:brightness-110 focus:outline-none"
         @click="$emit('jump', 'search')"
       >
-        Tra cứu công trình
+        Bài Báo Khoa Học
       </button>
 
       <button
@@ -14,7 +14,7 @@
         class="h-14 rounded-lg bg-[#b0007a] px-4 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm hover:brightness-110 focus:outline-none"
         @click="$emit('jump', 'lecturer')"
       >
-        Theo giảng viên
+        Đề Tài Nghiên Cứu
       </button>
 
       <button
@@ -22,7 +22,7 @@
         class="h-14 rounded-lg bg-[#475569] px-4 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm hover:brightness-110 focus:outline-none"
         @click="$emit('jump', 'faculty')"
       >
-        Theo khoa
+        Sách - Giáo Trình
       </button>
 
       <button
@@ -30,7 +30,7 @@
         class="h-14 rounded-lg bg-[#1aa6a8] px-4 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm hover:brightness-110 focus:outline-none"
         @click="$emit('jump', 'year')"
       >
-        Theo năm học
+        Hội Thảo - Báo Cáo Khoa Học
       </button>
 
       <button

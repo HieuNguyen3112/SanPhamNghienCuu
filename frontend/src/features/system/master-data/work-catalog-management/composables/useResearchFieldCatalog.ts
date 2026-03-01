@@ -1,9 +1,8 @@
-import { computed, reactive, ref, watch } from "vue";
+import { computed, reactive, ref } from "vue";
 import { researchFieldService } from "../services/researchFields.service";
-import {
-  researchFieldFromDto,
-  type ResearchField,
-  type ResearchFieldUpsertDTO,
+import type {
+  ResearchField,
+  ResearchFieldUpsertDTO,
 } from "../contracts/researchFields.contract";
 
 type FormErrors<T extends Record<string, unknown>> = Partial<
@@ -27,15 +26,11 @@ export function useResearchFieldCatalog() {
     name: string;
     description: string;
     isActive: boolean;
-  }>({
-    id: 0,
-    code: "",
-    name: "",
-    description: "",
-    isActive: true,
-  });
+  }>({ id: 0, code: "", name: "", description: "", isActive: true });
 
-  const researchFieldErrors = reactive<FormErrors<typeof researchFieldForm>>({});
+  const researchFieldErrors = reactive<FormErrors<typeof researchFieldForm>>(
+    {},
+  );
 
   function clearErrors() {
     Object.keys(researchFieldErrors).forEach(
@@ -48,7 +43,6 @@ export function useResearchFieldCatalog() {
     if (value.length > max) return `Tối đa ${max} ký tự.`;
     return null;
   }
-
   function validateOptional(value: string, max: number): string | null {
     if (value.length > max) return `Tối đa ${max} ký tự.`;
     return null;
@@ -60,25 +54,16 @@ export function useResearchFieldCatalog() {
       page: pageResearchField.value,
       per_page: pageSizeResearchField.value,
     });
-
-    researchFields.value = res.items.map(researchFieldFromDto);
+    researchFields.value = res.items.map((item) => ({
+      ...item,
+      isActive: item.is_active ?? true,
+      updatedAt: item.updated_at ?? new Date().toISOString(),
+    }));
     researchFieldTotal.value = res.pagination.total;
   }
 
   const filteredResearchFields = computed(() => researchFields.value);
   const pagedResearchFields = computed(() => researchFields.value);
-
-  watch(qResearchField, () => {
-    if (pageResearchField.value !== 1) {
-      pageResearchField.value = 1;
-      return;
-    }
-    void load();
-  });
-
-  watch([pageResearchField, pageSizeResearchField], () => {
-    void load();
-  });
 
   function openCreateResearchField() {
     modalMode.value = "create";
@@ -123,27 +108,25 @@ export function useResearchFieldCatalog() {
       validateRequired(researchFieldForm.name, 255) ?? undefined;
     researchFieldErrors.description =
       validateOptional(researchFieldForm.description, 500) ?? undefined;
-
     if (
       researchFieldErrors.code ||
       researchFieldErrors.name ||
       researchFieldErrors.description
-    ) {
+    )
       return;
-    }
 
     const code = researchFieldForm.code.trim()
-      ? researchFieldForm.code.trim().toUpperCase()
+      ? researchFieldForm.code.trim()
       : null;
 
     const payload: ResearchFieldUpsertDTO = {
-      id: researchFieldForm.id,
       code,
       name: researchFieldForm.name.trim(),
       description: researchFieldForm.description.trim()
         ? researchFieldForm.description.trim()
         : null,
       is_active: researchFieldForm.isActive,
+      id: 0,
     };
 
     if (researchFieldForm.id === 0) {
@@ -151,7 +134,6 @@ export function useResearchFieldCatalog() {
     } else {
       await researchFieldService.update(researchFieldForm.id, payload);
     }
-
     modalResearchFieldOpen.value = false;
     await load();
   }
@@ -175,4 +157,3 @@ export function useResearchFieldCatalog() {
     onUpdateResearchFieldForm,
   };
 }
-

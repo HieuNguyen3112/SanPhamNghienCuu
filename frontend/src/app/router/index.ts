@@ -43,6 +43,54 @@ const routes: RouteRecordRaw[] = [
     meta: { initAuth: true },
   },
 
+  // ✅ PUBLIC SEARCH ROUTES (ALWAYS PUBLIC)
+  {
+    path: "/giang-vien",
+    name: "public-lecturer",
+    component: () => import("@/features/search/pages/PublicLecturerPage.vue"),
+    meta: { initAuth: true },
+  },
+  {
+    path: "/giang-vien/:lecturerCode",
+    name: "public-lecturer-detail",
+    component: () =>
+      import("@/features/search/pages/PublicLecturerDetailPage.vue"),
+    meta: { initAuth: true },
+  },
+  {
+    path: "/bai-bao-khoa-hoc",
+    name: "public-article",
+    component: () => import("@/features/search/pages/PublicSearchPage.vue"),
+    props: { preset: "article" },
+    meta: { initAuth: true },
+  },
+  {
+    path: "/de-tai-nghien-cuu",
+    name: "public-project",
+    component: () => import("@/features/search/pages/PublicSearchPage.vue"),
+    props: { preset: "project" },
+    meta: { initAuth: true },
+  },
+  {
+    path: "/sach-giao-trinh",
+    name: "public-book",
+    component: () => import("@/features/search/pages/PublicSearchPage.vue"),
+    props: { preset: "book" },
+    meta: { initAuth: true },
+  },
+  {
+    path: "/hoi-thao-bao-cao-khoa-hoc",
+    name: "public-conference",
+    component: () => import("@/features/search/pages/PublicSearchPage.vue"),
+    props: { preset: "conference" },
+    meta: { initAuth: true },
+  },
+  {
+    path: "/huong-dan-su-dung",
+    name: "public-guide",
+    component: () => import("@/features/search/pages/PublicGuidePage.vue"),
+    meta: { initAuth: true },
+  },
   /**
    * ✅ PRIVATE APP SHELL (AUTH REQUIRED)
    * - Giữ các route private như hiện tại
@@ -85,13 +133,13 @@ router.beforeEach(async (to) => {
   const userStore = useUserStore();
 
   const requiresAuth = to.matched.some(
-    (record) => record.meta.requiresAuth === true
+    (record) => record.meta.requiresAuth === true,
   );
   const isGuestOnly = to.matched.some(
-    (record) => record.meta.guestOnly === true
+    (record) => record.meta.guestOnly === true,
   );
   const needsInitAuth = to.matched.some(
-    (record) => (record.meta as any).initAuth === true
+    (record) => (record.meta as any).initAuth === true,
   );
 
   const requiredRoles = to.matched
