@@ -13,6 +13,7 @@ export type JournalDTO = {
   notes: string | null;
 
   source_name: string | null;
+  publisher: string | null;
   point_min: number | null;
   point_max: number | null;
 
@@ -33,6 +34,7 @@ export type JournalUpsertDTO = {
   notes: string | null;
 
   source_name: string | null;
+  publisher: string | null;
   point_min: number | null;
   point_max: number | null;
 
@@ -48,6 +50,7 @@ export type Journal = {
   notes: string | null;
 
   sourceName: string | null;
+  publisher: string | null;
   pointMin: number | null;
   pointMax: number | null;
 
@@ -68,6 +71,7 @@ export function journalFromDto(dto: JournalDTO): Journal {
     notes: dto.notes ?? null,
 
     sourceName: dto.source_name ?? null,
+    publisher: dto.publisher ?? null,
     pointMin: dto.point_min ?? null,
     pointMax: dto.point_max ?? null,
 

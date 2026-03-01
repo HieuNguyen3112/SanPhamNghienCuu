@@ -22,6 +22,7 @@ class AdminWorkCatalogController extends Controller
     ];
     private const JOURNAL_RANKS = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'OTHER'];
     private const CONFERENCE_LEVELS = ['FACULTY', 'UNIVERSITY', 'NATIONAL', 'INTERNATIONAL'];
+    private ?array $paperRuleHoursByTypeCode = null;
 
     // ===== WORK TYPES =====
     public function listWorkTypes(Request $request)
@@ -264,7 +265,8 @@ class AdminWorkCatalogController extends Controller
                 $q->where(function ($sub) use ($like) {
                     $sub->where('j.name', 'like', $like)
                         ->orWhere('j.issn', 'like', $like)
-                        ->orWhere('j.source_name', 'like', $like);
+                        ->orWhere('j.source_name', 'like', $like)
+                        ->orWhere('j.publisher', 'like', $like);
                 });
             })
             ->orderByDesc('j.updated_at');
@@ -283,8 +285,9 @@ class AdminWorkCatalogController extends Controller
             'country'           => ['nullable', 'string', 'max:100'],
             'notes'             => ['nullable', 'string', 'max:255'],
             'source_name'       => ['nullable', 'string', 'max:255'],
-            'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2'],
-            'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2', 'gte:point_min'],
+            'publisher'         => ['nullable', 'string', 'max:255'],
+            'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2'],
+            'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2', 'gte:point_min'],
             'classification'    => ['nullable', 'string', 'max:30'],
             'research_hours'    => ['nullable', 'integer', 'min:0', 'max:65535'],
             'is_active'         => ['required', 'boolean'],
@@ -301,6 +304,7 @@ class AdminWorkCatalogController extends Controller
             'country'        => $data['country'] ?? null,
             'notes'          => $data['notes'] ?? null,
             'source_name'    => $data['source_name'] ?? null,
+            'publisher'      => $data['publisher'] ?? null,
             'point_min'      => $data['point_min'] ?? null,
             'point_max'      => $data['point_max'] ?? null,
             'classification' => $derived['classification'],
@@ -332,8 +336,9 @@ class AdminWorkCatalogController extends Controller
             'country'           => ['nullable', 'string', 'max:100'],
             'notes'             => ['nullable', 'string', 'max:255'],
             'source_name'       => ['nullable', 'string', 'max:255'],
-            'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2'],
-            'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:2', 'gte:point_min'],
+            'publisher'         => ['nullable', 'string', 'max:255'],
+            'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2'],
+            'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2', 'gte:point_min'],
             'classification'    => ['nullable', 'string', 'max:30'],
             'research_hours'    => ['nullable', 'integer', 'min:0', 'max:65535'],
             'is_active'         => ['required', 'boolean'],
@@ -350,6 +355,7 @@ class AdminWorkCatalogController extends Controller
                 'country'        => $data['country'] ?? null,
                 'notes'          => $data['notes'] ?? null,
                 'source_name'    => $data['source_name'] ?? null,
+                'publisher'      => $data['publisher'] ?? null,
                 'point_min'      => $data['point_min'] ?? null,
                 'point_max'      => $data['point_max'] ?? null,
                 'classification' => $derived['classification'],
@@ -729,38 +735,116 @@ class AdminWorkCatalogController extends Controller
         $providedHours = isset($data['research_hours']) ? (int) $data['research_hours'] : null;
 
         $classification = 'OTHER';
-        $hours = 0;
 
         if ($maxPoint !== null && $maxPoint >= 2) {
             $classification = 'POINT_GE_2';
-            $hours = 900;
         } elseif ($maxPoint !== null && $maxPoint >= 1) {
             $classification = 'POINT_GE_1';
-            $hours = 600;
         } elseif ($issn !== '') {
             $classification = 'ISSN_ISBN';
-            $hours = 300;
         }
 
         if ($providedClassification !== null) {
             $classification = $providedClassification;
         }
 
+        $hours = $this->defaultJournalHoursByClassification($classification);
+
         if ($providedHours !== null) {
             $hours = max(0, $providedHours);
         } else {
-            $hours = match ($classification) {
-                'POINT_GE_2' => 900,
-                'POINT_GE_1' => 600,
-                'ISSN_ISBN' => 300,
-                default => $hours,
-            };
+            $resolvedHours = $this->resolveJournalHoursFromRules($classification);
+            if ($resolvedHours !== null) {
+                $hours = $resolvedHours;
+            }
         }
 
         return [
             'classification' => $classification,
             'research_hours' => $hours,
         ];
+    }
+
+    private function defaultJournalHoursByClassification(string $classification): int
+    {
+        return match ($classification) {
+            'POINT_GE_2' => 900,
+            'POINT_GE_1' => 600,
+            'ISSN_ISBN' => 300,
+            default => 0,
+        };
+    }
+
+    private function resolveJournalHoursFromRules(string $classification): ?int
+    {
+        $typeCodesByClassification = [
+            'POINT_GE_2' => ['hdgsnn_900'],
+            'POINT_GE_1' => ['hdgsnn_600'],
+            'ISSN_ISBN' => ['hdgsnn_300'],
+        ];
+
+        $targetTypeCodes = $typeCodesByClassification[$classification] ?? null;
+        if (! is_array($targetTypeCodes) || $targetTypeCodes === []) {
+            return null;
+        }
+
+        $rulesByTypeCode = $this->loadPaperRuleHoursByTypeCode();
+        foreach ($targetTypeCodes as $typeCode) {
+            if (isset($rulesByTypeCode[$typeCode])) {
+                return max(0, (int) round((float) $rulesByTypeCode[$typeCode]));
+            }
+        }
+
+        return null;
+    }
+
+    private function loadPaperRuleHoursByTypeCode(): array
+    {
+        if (is_array($this->paperRuleHoursByTypeCode)) {
+            return $this->paperRuleHoursByTypeCode;
+        }
+
+        $today = Carbon::now()->toDateString();
+
+        $rows = DB::table('hour_rules as hr')
+            ->join('activity_kinds as ak', 'ak.id', '=', 'hr.kind_id')
+            ->join('activity_types as at', 'at.id', '=', 'hr.type_id')
+            ->whereRaw('LOWER(ak.code) = ?', ['paper'])
+            ->where('hr.is_active', 1)
+            ->whereNotNull('hr.type_id')
+            ->whereDate('hr.effective_from', '<=', $today)
+            ->where(function ($query) use ($today) {
+                $query->whereNull('hr.effective_to')
+                    ->orWhereDate('hr.effective_to', '>=', $today);
+            })
+            ->orderByRaw('LOWER(at.code) asc')
+            ->orderByDesc('hr.effective_from')
+            ->orderByDesc('hr.version')
+            ->orderByDesc('hr.id')
+            ->get([
+                DB::raw('LOWER(at.code) as type_code'),
+                'hr.hours_total_per_activity',
+                'hr.hours_per_occurrence',
+            ]);
+
+        $byTypeCode = [];
+        foreach ($rows as $row) {
+            $typeCode = (string) ($row->type_code ?? '');
+            if ($typeCode === '' || isset($byTypeCode[$typeCode])) {
+                continue;
+            }
+
+            $hours = $row->hours_total_per_activity ?? $row->hours_per_occurrence;
+            if ($hours === null) {
+                continue;
+            }
+
+            $byTypeCode[$typeCode] = (float) $hours;
+        }
+
+        $this->paperRuleHoursByTypeCode = $byTypeCode;
+
+        return $this->paperRuleHoursByTypeCode;
     }
 
     private function normalizeJournalClassification(?string $classification): ?string
@@ -829,6 +913,7 @@ class AdminWorkCatalogController extends Controller
             'address' => $row->address,
             'issn' => $row->issn,
             'source_name' => $row->source_name,
+            'publisher' => $row->publisher,
             'point_min' => $row->point_min !== null ? (float) $row->point_min : null,
             'point_max' => $row->point_max !== null ? (float) $row->point_max : null,
             'classification' => $derived['classification'],

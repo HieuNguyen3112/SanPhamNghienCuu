@@ -138,7 +138,12 @@
                   @select="onJournalSelect"
                 />
               </div>
-
+              <div v-if="form.typeId" class="mt-2 text-xs text-slate-600">
+                Giờ NCKH lấy theo loại công trình trong cấu hình quy đổi:
+                <span class="font-semibold text-slate-900">{{
+                  baseHoursText
+                }}</span>
+              </div>
               <!-- Keywords -->
               <div class="md:col-span-2">
                 <label class="text-xs font-medium text-slate-600"
@@ -428,6 +433,7 @@ const form = reactive<ArticleDeclarationFormModel>({
   notes: "",
   journalId: null,
   journalName: "",
+  journalResearchHours: null,
   issn: "",
   doi: "",
   articleUrl: "",
@@ -493,6 +499,17 @@ const pendingEvidenceLinks = ref<any[]>([]);
 const typeCodeById = computed(() =>
   Object.fromEntries(types.value.map((t) => [t.id, t.code])),
 );
+const typeHoursById = computed(() =>
+  Object.fromEntries(
+    types.value.map((t) => [
+      t.id,
+      typeof t.research_hours === "number" ? t.research_hours : 0,
+    ]),
+  ),
+);
+const typeIdByCode = computed(() =>
+  Object.fromEntries(types.value.map((t) => [t.code, t.id])),
+);
 const lecturerNameById = computed(() =>
   Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name])),
 );
@@ -505,6 +522,7 @@ const ownerFacultyId = computed(
 const hours = computed(() =>
   computeArticleHours(form, {
     typeCodeById: typeCodeById.value,
+    typeHoursById: typeHoursById.value,
     lecturerNameById: lecturerNameById.value,
     memberRoleNameById: memberRoleNameById.value,
     currentLecturerId: currentLecturerId.value,
@@ -518,9 +536,15 @@ const hoursByLecturerId = computed(() => {
 });
 
 const baseHoursText = computed(() => {
+  const byTypeConfig =
+    form.typeId && Number.isFinite(typeHoursById.value[form.typeId])
+      ? Number(typeHoursById.value[form.typeId])
+      : 0;
+  if (byTypeConfig > 0) return `${byTypeConfig} giờ`;
+
   const code = form.typeId ? typeCodeById.value[form.typeId] : null;
-  const base = code ? (articleBaseHoursByTypeCode[code] ?? 0) : 0;
-  return `${base} giờ`;
+  const byType = code ? (articleBaseHoursByTypeCode[code] ?? 0) : 0;
+  return `${byType} giờ`;
 });
 
 const hoursNote = computed(() => {
@@ -693,10 +717,29 @@ function onJournalSelect(option: {
   id: number;
   name: string;
   issn: string | null;
+  classification?: string | null;
+  researchHours?: number;
 }) {
   form.journalId = option.id;
   form.journalName = option.name;
   form.issn = option.issn ?? "";
+  form.journalResearchHours =
+    typeof option.researchHours === "number" ? option.researchHours : null;
+
+  const normalizedClassification = String(option.classification ?? "").trim();
+  const typeCodeByClassification: Record<string, string> = {
+    POINT_GE_2: "hdgsnn_900",
+    POINT_GE_1: "hdgsnn_600",
+    ISSN_ISBN: "hdgsnn_300",
+  };
+  const mappedTypeCode = typeCodeByClassification[normalizedClassification];
+  const mappedTypeId = mappedTypeCode
+    ? typeIdByCode.value[mappedTypeCode]
+    : null;
+  if (mappedTypeId) {
+    form.typeId = mappedTypeId;
+  }
+
   clearFieldError("journalName");
 }
 
@@ -869,7 +912,9 @@ const shell = useDeclarationFormShell({
         submitNotice.value = null;
       }
 
-      return mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW";
+      return (
+        mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW"
+      );
     } catch (err) {
       const validation = applyValidationErrors(err);
       if (validation) throw new Error(validation);

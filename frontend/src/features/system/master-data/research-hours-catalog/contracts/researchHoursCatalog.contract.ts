@@ -122,6 +122,11 @@ export interface WorkConversionRow {
 
   // UI-only (schema missing)
   notes: string;
+
+  distributionStrategy: DistributionStrategyDTO;
+  memberPoolHours: number | null;
+  principalFraction: number | null;
+  othersFractionTotal: number | null;
 }
 
 export interface WorkConversionDraft {
@@ -129,6 +134,7 @@ export interface WorkConversionDraft {
   kindId: number;
   typeId: number | null;
   hours: number | null;
+  memberPoolHours: number | null;
   isActive: boolean;
   notes: string;
 }
@@ -211,7 +217,7 @@ export function getErrorMessage(e: unknown, fallback: string): string {
 
 export function hasErrors<T extends object>(errors: T): boolean {
   return Object.values(errors as Record<string, unknown>).some((v) =>
-    Boolean(v)
+    Boolean(v),
   );
 }
 
@@ -221,10 +227,10 @@ export function hasErrors<T extends object>(errors: T): boolean {
  */
 export function deriveAcademicYearFromEffectiveFrom(
   effectiveFrom: string,
-  years: AcademicYearDTO[]
+  years: AcademicYearDTO[],
 ): { academicYearId: number | null; academicYearCode: string } {
   const found = years.find(
-    (y) => effectiveFrom >= y.start_date && effectiveFrom <= y.end_date
+    (y) => effectiveFrom >= y.start_date && effectiveFrom <= y.end_date,
   );
   return found
     ? { academicYearId: found.id, academicYearCode: found.code }
@@ -235,7 +241,7 @@ export function workConversionRowFromDto(
   dto: HourRuleDerivedDTO,
   years: AcademicYearDTO[],
   kinds: ActivityKindDTO[],
-  types: ActivityTypeDTO[]
+  types: ActivityTypeDTO[],
 ): WorkConversionRow {
   const year = deriveAcademicYearFromEffectiveFrom(dto.effective_from, years);
 
@@ -251,7 +257,7 @@ export function workConversionRowFromDto(
     typeId: dto.type_id,
     typeName: type?.name ?? (dto.type_id ? `#${dto.type_id}` : "—"),
     hours: parseDecimalToNumber(
-      dto.hours_total_per_activity ?? dto.hours_per_occurrence
+      dto.hours_total_per_activity ?? dto.hours_per_occurrence,
     ),
     isActive: dto.is_active,
     isLocked: dto.is_locked,
@@ -260,11 +266,16 @@ export function workConversionRowFromDto(
 
     // UI-only (not persisted)
     notes: "",
+
+    distributionStrategy: dto.distribution_strategy,
+    memberPoolHours: parseDecimalToNumber(dto.hours_per_occurrence),
+    principalFraction: parseDecimalToNumber(dto.principal_fraction),
+    othersFractionTotal: parseDecimalToNumber(dto.others_fraction_total),
   };
 }
 
 export function validateWorkConversionDraft(
-  d: WorkConversionDraft
+  d: WorkConversionDraft,
 ): WorkConversionErrors {
   const e: WorkConversionErrors = {};
   if (!d.academicYearId) e.academicYearId = "Năm học là bắt buộc.";
@@ -272,8 +283,7 @@ export function validateWorkConversionDraft(
   // typeId can be null (schema allows type_id nullable) but spec wants select; keep optional
   if (d.hours === null || !Number.isFinite(d.hours) || d.hours <= 0)
     e.hours = "Số giờ phải > 0.";
-  if (d.notes.length > 500)
-    e.notes = "Ghi chú tối đa 500 ký tự.";
+  if (d.notes.length > 500) e.notes = "Ghi chú tối đa 500 ký tự.";
   return e;
 }
 
@@ -297,24 +307,55 @@ export interface UpsertHourRulePayloadDTO {
   type_id: number | null;
   distribution_strategy: DistributionStrategyDTO;
   hours_total_per_activity: string | null;
+  hours_per_occurrence: string | null;
+  principal_fraction: string | null;
+  others_fraction_total: string | null;
+  max_occurrences_per_year: number | null;
   effective_from: string;
   effective_to: string | null;
   is_active: boolean;
   version: number;
-
 }
 
 export function upsertHourRulePayloadFromDraft(
   draft: WorkConversionDraft,
-  academicYears: AcademicYearDTO[]
+  academicYears: AcademicYearDTO[],
+  options?: {
+    isProjectKind?: boolean;
+  },
 ): UpsertHourRulePayloadDTO {
   const year = academicYears.find((y) => y.id === draft.academicYearId) ?? null;
+  const isProjectKind = options?.isProjectKind === true;
+
+  const leaderHours = draft.hours;
+  const memberPoolHours = draft.memberPoolHours;
+  const roleBasedTotal = (leaderHours ?? 0) + (memberPoolHours ?? 0);
+  const principalFraction =
+    isProjectKind && roleBasedTotal > 0 && leaderHours !== null
+      ? leaderHours / roleBasedTotal
+      : null;
+  const othersFractionTotal =
+    isProjectKind && roleBasedTotal > 0 && memberPoolHours !== null
+      ? memberPoolHours / roleBasedTotal
+      : null;
 
   return {
     kind_id: draft.kindId,
     type_id: draft.typeId,
-    distribution_strategy: "equal_all_members",
-    hours_total_per_activity: numberToDecimalString(draft.hours),
+    distribution_strategy: isProjectKind
+      ? "principal_fraction_others_equal"
+      : "equal_all_members",
+    hours_total_per_activity: numberToDecimalString(leaderHours),
+    hours_per_occurrence: isProjectKind
+      ? numberToDecimalString(memberPoolHours)
+      : null,
+    principal_fraction: isProjectKind
+      ? numberToDecimalString(principalFraction)
+      : null,
+    others_fraction_total: isProjectKind
+      ? numberToDecimalString(othersFractionTotal)
+      : null,
+    max_occurrences_per_year: null,
     effective_from:
       year?.start_date ?? draft.academicYearId?.toString() ?? "1970-01-01",
     effective_to: year?.end_date ?? null,
