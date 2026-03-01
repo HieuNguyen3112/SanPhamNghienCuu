@@ -1,31 +1,31 @@
 <template>
   <div class="sticky top-0 z-40 bg-[#234a74] shadow-sm">
-    <div
-      class="mx-auto flex max-w-6xl items-center justify-between px-4 py-2 md:px-6"
-    >
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-2 md:px-6">
       <!-- Left menu -->
-      <nav class="flex items-center gap-2 text-xs font-bold uppercase tracking-wide">
-        <button
-          type="button"
-          class="h-9 rounded-md px-3 text-white hover:bg-white/10 focus:outline-none"
-          @click="$emit('go-home')"
-        >
-          TRANG CHỦ
-        </button>
+      <nav class="flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wide md:gap-2">
+        <RouterLink :to="{ path: '/' }" :class="navClass(isActiveExact('/'))">TRANG CHỦ</RouterLink>
 
-        <button
-          type="button"
-          class="h-9 rounded-md px-3 text-white hover:bg-white/10 focus:outline-none"
-          @click="$emit('go-search')"
-        >
-          TRA CỨU CÔNG TRÌNH
-        </button>
+        <RouterLink :to="{ path: '/giang-vien' }" :class="navClass(isActivePrefix('/giang-vien'))">GIẢNG VIÊN</RouterLink>
 
-        <span class="mx-1 hidden text-white/60 md:inline">|</span>
+        <RouterLink :to="{ path: '/bai-bao-khoa-hoc' }" :class="navClass(isActivePrefix('/bai-bao-khoa-hoc'))">
+          BÀI BÁO KHOA HỌC
+        </RouterLink>
 
-        <span class="hidden h-9 items-center rounded-md px-3 text-white/80 md:inline-flex">
-          NGÀNH
-        </span>
+        <RouterLink :to="{ path: '/de-tai-nghien-cuu' }" :class="navClass(isActivePrefix('/de-tai-nghien-cuu'))">
+          ĐỀ TÀI NGHIÊN CỨU
+        </RouterLink>
+
+        <RouterLink :to="{ path: '/sach-giao-trinh' }" :class="navClass(isActivePrefix('/sach-giao-trinh'))">
+          SÁCH - GIÁO TRÌNH
+        </RouterLink>
+
+        <RouterLink :to="{ path: '/hoi-thao-bao-cao-khoa-hoc' }" :class="navClass(isActivePrefix('/hoi-thao-bao-cao-khoa-hoc'))">
+          HỘI THẢO - BÁO CÁO KHOA HỌC
+        </RouterLink>
+
+        <RouterLink :to="{ path: '/huong-dan-su-dung' }" :class="navClass(isActivePrefix('/huong-dan-su-dung'))">
+          HƯỚNG DẪN SỬ DỤNG
+        </RouterLink>
       </nav>
 
       <!-- Right auth -->
@@ -50,9 +50,7 @@
             >
               {{ initials || "U" }}
             </span>
-            <span class="max-w-[240px] truncate">
-              {{ lecturerName || "Tài khoản" }}
-            </span>
+            <span class="max-w-[240px] truncate">{{ lecturerName || "Tài khoản" }}</span>
           </RouterLink>
 
           <button
@@ -69,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 defineProps<{
   isAuthenticated: boolean;
@@ -79,8 +77,21 @@ defineProps<{
 }>();
 
 defineEmits<{
-  (e: "go-home"): void;
-  (e: "go-search"): void;
   (e: "logout"): void;
 }>();
+
+const route = useRoute();
+
+function isActiveExact(path: string) {
+  return route.path === path;
+}
+function isActivePrefix(prefix: string) {
+  return route.path === prefix || route.path.startsWith(prefix + "/");
+}
+function navClass(active: boolean) {
+  return [
+    "h-9 rounded-md px-3 text-white hover:bg-white/10 focus:outline-none inline-flex items-center",
+    active ? "bg-white/15" : "",
+  ].join(" ");
+}
 </script>

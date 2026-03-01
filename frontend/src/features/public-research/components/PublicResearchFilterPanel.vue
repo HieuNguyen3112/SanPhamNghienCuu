@@ -5,6 +5,7 @@
         <div>
           <label class="text-xs font-medium text-slate-600">Tên giảng viên (tên/mã)</label>
           <input
+            ref="lecturerInputRef"
             :value="filterState.lecturerQuery"
             @input="onLecturerQueryInput"
             type="text"
@@ -26,7 +27,8 @@
           </select>
         </div>
 
-        <div>
+        <!-- ✅ Ẩn "Loại công trình" khi tab đã cố định loại -->
+        <div v-if="!hideWorkType">
           <label class="text-xs font-medium text-slate-600">Loại công trình</label>
           <select
             :value="filterState.workType ?? ''"
@@ -56,7 +58,7 @@
       <div class="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-[0.99]"
+          class="inline-flex items-center gap-2 rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-extrabold text-white shadow-sm hover:brightness-110 active:scale-[0.99]"
           @click="$emit('search')"
         >
           <Search class="h-4 w-4" />
@@ -77,40 +79,52 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick, onMounted, ref } from "vue";
 import type { PublicResearchFilterState, SelectOption } from "../models/publicResearchModels";
 import { RotateCcw, Search } from "lucide-vue-next";
 
-type PublicResearchFilterPanelProps = {
+type Props = {
   filterState: PublicResearchFilterState;
   facultyOptions: SelectOption<number | null>[];
   workTypeOptions: SelectOption<string | null>[];
   academicYearOptions: SelectOption<number | null>[];
+  hideWorkType?: boolean;
+  autoFocusLecturer?: boolean;
 };
 
-type PublicResearchFilterPanelEmits = {
+type Emits = {
   (e: "update-filter", next: Partial<PublicResearchFilterState>): void;
   (e: "search"): void;
   (e: "reset"): void;
 };
 
-const props = defineProps<PublicResearchFilterPanelProps>();
-const emit = defineEmits<PublicResearchFilterPanelEmits>();
+const props = withDefaults(defineProps<Props>(), {
+  hideWorkType: false,
+  autoFocusLecturer: false,
+});
+
+const emit = defineEmits<Emits>();
+
+const lecturerInputRef = ref<HTMLInputElement | null>(null);
+
+onMounted(async () => {
+  if (props.autoFocusLecturer) {
+    await nextTick();
+    lecturerInputRef.value?.focus();
+  }
+});
 
 function onLecturerQueryInput(event: Event) {
-  const value = (event.target as HTMLInputElement).value;
-  emit("update-filter", { lecturerQuery: value });
+  emit("update-filter", { lecturerQuery: (event.target as HTMLInputElement).value });
 }
-
 function onFacultyChange(event: Event) {
   const raw = (event.target as HTMLSelectElement).value;
   emit("update-filter", { facultyId: raw === "" ? null : Number(raw), page: 1 });
 }
-
 function onWorkTypeChange(event: Event) {
   const raw = (event.target as HTMLSelectElement).value;
   emit("update-filter", { workType: raw === "" ? null : (raw as any), page: 1 });
 }
-
 function onAcademicYearChange(event: Event) {
   const raw = (event.target as HTMLSelectElement).value;
   emit("update-filter", { academicYearId: raw === "" ? null : Number(raw), page: 1 });
