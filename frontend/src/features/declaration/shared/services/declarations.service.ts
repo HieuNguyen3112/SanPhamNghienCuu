@@ -107,7 +107,7 @@ function now_iso() {
 }
 
 export async function upsert_activity_base(
-  dto: UpsertActivityPayload,
+  dto: UpsertActivityPayload
 ): Promise<ResearchActivityDto> {
   if (!MOCK) {
     await ensureCsrfCookie();
@@ -126,14 +126,14 @@ export async function upsert_activity_base(
     if (!dto.id) {
       const { data } = await http.post<{ data: ResearchActivityDto }>(
         "/api/research-activities",
-        payload,
+        payload
       );
       return data.data;
     }
 
     const { data } = await http.put<{ data: ResearchActivityDto }>(
       `/api/research-activities/${dto.id}`,
-      payload,
+      payload
     );
     return data.data;
   }
@@ -188,7 +188,7 @@ export async function upsert_paper_details(dto: PaperDetailsDto) {
     await ensureCsrfCookie();
     const { data } = await http.put<{ data: PaperDetailsDto }>(
       `/api/research-activities/${dto.activity_id}/paper_details`,
-      dto,
+      dto
     );
     return data.data;
   }
@@ -201,7 +201,7 @@ export async function upsert_book_details(dto: BookDetailsDto) {
     await ensureCsrfCookie();
     const { data } = await http.put<{ data: BookDetailsDto }>(
       `/api/research-activities/${dto.activity_id}/book_details`,
-      dto,
+      dto
     );
     return data.data;
   }
@@ -214,7 +214,7 @@ export async function upsert_project_details(dto: ProjectDetailsDto) {
     await ensureCsrfCookie();
     const { data } = await http.put<{ data: ProjectDetailsDto }>(
       `/api/research-activities/${dto.activity_id}/project_details`,
-      dto,
+      dto
     );
     return data.data;
   }
@@ -227,7 +227,7 @@ export async function upsert_conference_details(dto: ConferenceDetailsDto) {
     await ensureCsrfCookie();
     const { data } = await http.put<{ data: ConferenceDetailsDto }>(
       `/api/research-activities/${dto.activity_id}/conference_details`,
-      dto,
+      dto
     );
     return data.data;
   }
@@ -237,13 +237,14 @@ export async function upsert_conference_details(dto: ConferenceDetailsDto) {
 
 export async function upsert_members(
   activity_id: number,
-  list: ResearchActivityMemberUpsertDto[],
+  list: ResearchActivityMemberUpsertDto[]
 ) {
   if (!MOCK) {
     await ensureCsrfCookie();
-    const { data } = await http.put<{
-      data: ResearchActivityMemberUpsertDto[];
-    }>(`/api/research-activities/${activity_id}/members`, { items: list });
+    const { data } = await http.put<{ data: ResearchActivityMemberUpsertDto[] }>(
+      `/api/research-activities/${activity_id}/members`,
+      { items: list }
+    );
     return data.data;
   }
   members.set(activity_id, list);
@@ -252,7 +253,7 @@ export async function upsert_members(
 
 export async function submit_activity(
   activity_id: number,
-  _submitted_status_id?: number,
+  _submitted_status_id?: number
 ): Promise<{
   message: string;
   data: ResearchActivityDto & { status_code?: string };
@@ -311,11 +312,11 @@ export async function submit_activity(
 }
 
 export async function list_evidence_files(
-  activity_id: number,
+  activity_id: number
 ): Promise<EvidenceFileDto[]> {
   if (!MOCK) {
     const { data } = await http.get<{ data: EvidenceFileDto[] }>(
-      `/api/research-activities/${activity_id}/evidence-files`,
+      `/api/research-activities/${activity_id}/evidence-files`
     );
     return data.data;
   }
@@ -387,28 +388,28 @@ export type ProjectHoursPreviewResponseDto = {
 };
 
 export async function fetch_activity(
-  activity_id: number,
+  activity_id: number
 ): Promise<ResearchActivityDetailResponse> {
   const { data } = await http.get<{ data: ResearchActivityDetailResponse }>(
-    `/api/research-activities/${activity_id}`,
+    `/api/research-activities/${activity_id}`
   );
   return data.data;
 }
 
 export async function fetch_current_lecturer_id(): Promise<number | null> {
   const { data } = await http.get<{ data: { lecturer?: { id?: number } } }>(
-    "/api/profile/me",
+    "/api/profile/me"
   );
   return data?.data?.lecturer?.id ?? null;
 }
 
 export async function preview_project_hours(
-  payload: ProjectHoursPreviewRequestDto,
+  payload: ProjectHoursPreviewRequestDto
 ): Promise<ProjectHoursPreviewResponseDto> {
   await ensureCsrfCookie();
   const { data } = await http.post<{ data: ProjectHoursPreviewResponseDto }>(
     "/api/lecturer/declarations/projects/preview-hours",
-    payload,
+    payload
   );
   return data.data;
 }

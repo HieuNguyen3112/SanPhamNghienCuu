@@ -1,5 +1,5 @@
 <template>
-  <div class="relative" ref="rootEl">
+  <div class="relative">
     <label v-if="label" class="text-xs font-medium text-slate-600">
       {{ label }}
       <span v-if="required" class="text-rose-600">*</span>
@@ -12,10 +12,11 @@
         error
           ? 'border-rose-300 ring-2 ring-rose-100'
           : open
-            ? 'border-slate-300 ring-2 ring-slate-200'
-            : 'border-slate-200',
+          ? 'border-slate-300 ring-2 ring-slate-200'
+          : 'border-slate-200',
       ]"
       @click="onContainerClick"
+      ref="rootEl"
     >
       <Search class="h-4 w-4 text-slate-500" />
 
@@ -108,11 +109,18 @@
               </div>
 
               <span
-                v-if="pointsLabel(it)"
-                class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700"
-                :title="pointsTitle(it)"
+                v-if="it.currentRank"
+                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                :class="rankBadgeClass(it.currentRank)"
               >
-                {{ pointsLabel(it) }}
+                {{ it.currentRank }}
+              </span>
+
+              <span
+                v-if="it.currentRankEffectiveFrom"
+                class="text-xs text-slate-500"
+              >
+                (từ {{ formatDate(it.currentRankEffectiveFrom) }})
               </span>
             </div>
 
@@ -124,12 +132,6 @@
               <span v-if="it.address" class="line-clamp-1">{{
                 it.address
               }}</span>
-              <span
-                v-if="(it.issn || it.address) && it.country"
-                class="text-slate-300"
-                >•</span
-              >
-              <span v-if="it.country">{{ it.country }}</span>
             </div>
 
             <div class="mt-0.5">
@@ -164,42 +166,38 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Check, ChevronDown, Search, X } from "lucide-vue-next";
+
+type JournalRank = "Q1" | "Q2" | "Q3" | "Q4" | "Q5" | "OTHER";
 
 type JournalOptionDto = {
   id: number;
   name: string;
+  address: string;
   issn: string | null;
-  address: string | null;
-  country: string | null;
-  notes: string | null;
-  source_name: string | null;
-  point_min: string | number | null;
-  point_max: string | number | null;
-  classification: string;
-  research_hours: number;
+  current_rank: JournalRank | null;
+  current_rank_effective_from: string | null; // YYYY-MM-DD hoặc ISO
   is_active: boolean;
 };
 
+/** UI model camelCase */
 type JournalOption = {
   id: number;
   name: string;
-  issn: string | null;
   address: string;
-  country: string | null;
-  notes: string | null;
-  sourceName: string | null;
-  pointMin: number | null;
-  pointMax: number | null;
-  classification: string;
-  researchHours: number;
+  issn: string | null;
+  currentRank: JournalRank | null;
+  currentRankEffectiveFrom: string | null;
   isActive: boolean;
 };
 
 const props = defineProps<{
+  /** journal_id (nếu có), có thể để null */
   modelValue: number | null;
+  /** snapshot journal_name đang lưu ở paper_details.journal_name */
   journalName: string;
+  /** snapshot issn đang lưu ở paper_details.issn */
   issn: string;
 
   disabled?: boolean;
@@ -209,8 +207,10 @@ const props = defineProps<{
   hint?: string;
   error?: string;
 
-  /** GET /api/lookups/journals?search=...&active=1 */
+  /** Hàm search async: GET /api/catalog/journals?query=...&active=1... */
   searchFn: (q: string) => Promise<JournalOptionDto[]>;
+
+  /** Debounce ms */
   debounceMs?: number;
 }>();
 
@@ -236,27 +236,15 @@ const inputEl = ref<HTMLInputElement | null>(null);
 
 const inputText = computed(() => props.journalName ?? "");
 
-function toNumberOrNull(v: string | number | null): number | null {
-  if (v == null) return null;
-  if (typeof v === "number") return Number.isFinite(v) ? v : null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
 function dtoToModel(dto: JournalOptionDto): JournalOption {
   return {
     id: dto.id,
     name: dto.name,
+    address: dto.address,
     issn: dto.issn,
-    address: dto.address ?? "",
-    country: dto.country,
-    notes: dto.notes,
-    sourceName: dto.source_name,
-    pointMin: toNumberOrNull(dto.point_min),
-    pointMax: toNumberOrNull(dto.point_max),
-    classification: dto.classification ?? "OTHER",
-    researchHours: dto.research_hours ?? 0,
-    isActive: !!dto.is_active,
+    currentRank: dto.current_rank,
+    currentRankEffectiveFrom: dto.current_rank_effective_from,
+    isActive: dto.is_active,
   };
 }
 
@@ -300,6 +288,7 @@ function onContainerClick() {
 
 function onInput(e: Event) {
   const v = (e.target as HTMLInputElement).value;
+  // User đang gõ tự do => coi như chưa chọn từ danh mục
   emit("update:journalName", v);
   emit("update:modelValue", null);
   // không tự động overwrite issn khi gõ
@@ -325,36 +314,7 @@ function clearSelection() {
   inputEl.value?.focus();
   openDropdown();
 }
-function formatPoint(n: number): string {
-  // 2 chữ số thập phân nhưng bỏ .00 cho gọn
-  const s = n.toFixed(2);
-  return s.endsWith(".00") ? s.slice(0, -3) : s.replace(/0$/, "");
-}
-function pointsLabel(it: {
-  pointMin: number | null;
-  pointMax: number | null;
-}): string | null {
-  const min = it.pointMin;
-  const max = it.pointMax;
-  if (min == null && max == null) return null;
-  if (min != null && max != null)
-    return `${formatPoint(min)}–${formatPoint(max)}`;
-  if (min != null) return `≥ ${formatPoint(min)}`;
-  return `≤ ${formatPoint(max!)}`;
-}
 
-function pointsTitle(it: {
-  pointMin: number | null;
-  pointMax: number | null;
-}): string {
-  const min = it.pointMin;
-  const max = it.pointMax;
-  if (min != null && max != null)
-    return `Khoảng điểm: ${formatPoint(min)} đến ${formatPoint(max)}`;
-  if (min != null) return `Điểm tối thiểu: ${formatPoint(min)}`;
-  if (max != null) return `Điểm tối đa: ${formatPoint(max)}`;
-  return "";
-}
 function move(delta: number) {
   if (!open.value) openDropdown();
   if (items.value.length === 0) return;
@@ -378,8 +338,30 @@ function onClickOutside(ev: MouseEvent) {
 }
 
 onMounted(() => window.addEventListener("mousedown", onClickOutside));
-onBeforeUnmount(() => {
-  window.removeEventListener("mousedown", onClickOutside);
-  if (timer) window.clearTimeout(timer);
-});
+onBeforeUnmount(() => window.removeEventListener("mousedown", onClickOutside));
+
+watch(
+  () => props.modelValue,
+  (v) => {
+    // Nếu đã có journal_id mà journalName rỗng (load từ backend), vẫn giữ behavior bình thường.
+    // Không auto fetch detail ở đây để tránh phụ thuộc endpoint /api/journals/{id}.
+    if (v == null) return;
+  }
+);
+
+function rankBadgeClass(rank: JournalRank): string {
+  if (rank === "Q1") return "bg-emerald-50 text-emerald-700";
+  if (rank === "Q2") return "bg-sky-50 text-sky-700";
+  if (rank === "Q3") return "bg-amber-50 text-amber-800";
+  if (rank === "Q4") return "bg-orange-50 text-orange-800";
+  if (rank === "Q5") return "bg-slate-900/5 text-slate-800";
+  return "bg-slate-100 text-slate-700";
+}
+
+function formatDate(value: string): string {
+  const d = new Date(value.length === 10 ? `${value}T00:00:00` : value);
+  if (Number.isNaN(d.getTime())) return value;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
 </script>

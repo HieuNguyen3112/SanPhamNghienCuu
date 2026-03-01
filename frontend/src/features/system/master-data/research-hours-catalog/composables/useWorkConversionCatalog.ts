@@ -48,7 +48,6 @@ export function useWorkConversionCatalog() {
     kindId: 1,
     typeId: null,
     hours: null,
-    memberPoolHours: null,
     isActive: true,
     notes: "",
   });
@@ -56,7 +55,7 @@ export function useWorkConversionCatalog() {
   const draftErrors = reactive<WorkConversionErrors>({});
 
   const kindOptions = computed(() =>
-    kinds.value.map((k) => ({ value: k.id, label: k.name, hint: k.code })),
+    kinds.value.map((k) => ({ value: k.id, label: k.name, hint: k.code }))
   );
 
   const academicYearOptions = computed(() =>
@@ -64,7 +63,7 @@ export function useWorkConversionCatalog() {
       value: y.id,
       label: y.code,
       hint: `${y.start_date} → ${y.end_date}`,
-    })),
+    }))
   );
 
   const typeOptions = computed(() => {
@@ -75,39 +74,6 @@ export function useWorkConversionCatalog() {
   });
 
   const filteredRows = computed(() => rows.value);
-
-  const projectKindId = computed<number | null>(() => {
-    const projectKind = kinds.value.find(
-      (kind) => kind.code.toLowerCase() === "project",
-    );
-    return projectKind?.id ?? null;
-  });
-
-  const isProjectDraft = computed<boolean>(() => {
-    return projectKindId.value !== null && draft.kindId === projectKindId.value;
-  });
-
-  const selectedTypeCode = computed<string | null>(() => {
-    if (!draft.typeId) return null;
-    const selectedType = types.value.find((type) => type.id === draft.typeId);
-    return selectedType?.code?.toLowerCase() ?? null;
-  });
-
-  function applyProjectTypeDefaults(typeCode: string | null) {
-    if (!isProjectDraft.value) return;
-    if (typeCode === "bo") {
-      draft.hours = 720;
-      draft.memberPoolHours = 480;
-      return;
-    }
-    if (typeCode === "coso") {
-      draft.hours = 600;
-      draft.memberPoolHours = 240;
-      return;
-    }
-    if (draft.hours === null) draft.hours = 0;
-    if (draft.memberPoolHours === null) draft.memberPoolHours = 0;
-  }
 
   function resetDraftErrors() {
     Object.assign(draftErrors, {});
@@ -126,12 +92,8 @@ export function useWorkConversionCatalog() {
     draft.kindId = kinds.value[0]?.id ?? 1;
     draft.typeId = null;
     draft.hours = null;
-    draft.memberPoolHours = null;
     draft.isActive = true;
     draft.notes = "";
-    if (isProjectDraft.value) {
-      applyProjectTypeDefaults(selectedTypeCode.value);
-    }
     resetDraftErrors();
   }
 
@@ -145,16 +107,8 @@ export function useWorkConversionCatalog() {
     draft.kindId = row.kindId;
     draft.typeId = row.typeId;
     draft.hours = row.hours;
-    draft.memberPoolHours = row.memberPoolHours;
     draft.isActive = row.isActive;
     draft.notes = row.notes; // schema missing; stays UI-only
-
-    if (row.kindId === projectKindId.value) {
-      if (row.distributionStrategy !== "principal_fraction_others_equal") {
-        applyProjectTypeDefaults(selectedTypeCode.value);
-      }
-    }
-
     resetDraftErrors();
   }
 
@@ -181,12 +135,7 @@ export function useWorkConversionCatalog() {
       });
 
       rows.value = res.items.map((dto) =>
-        workConversionRowFromDto(
-          dto,
-          academicYears.value,
-          kinds.value,
-          types.value,
-        ),
+        workConversionRowFromDto(dto, academicYears.value, kinds.value, types.value)
       );
       totalItems.value = res.pagination.total;
       totalPages.value = res.pagination.last_page;
@@ -199,34 +148,15 @@ export function useWorkConversionCatalog() {
 
   async function save() {
     const nextErrors = validateWorkConversionDraft(draft);
-    if (isProjectDraft.value) {
-      if (
-        draft.hours === null ||
-        !Number.isFinite(draft.hours) ||
-        draft.hours <= 0
-      ) {
-        nextErrors.hours = "Giờ chủ nhiệm phải > 0.";
-      }
-      if (
-        draft.memberPoolHours === null ||
-        !Number.isFinite(draft.memberPoolHours) ||
-        draft.memberPoolHours < 0
-      ) {
-        nextErrors.memberPoolHours = "Quỹ giờ thành viên phải >= 0.";
-      }
-    }
     Object.assign(draftErrors, nextErrors);
     if (hasErrors(nextErrors)) return;
 
     // safety: locked rule => disallow hours edit (allow only status change)
     if (modal.mode === "edit" && modal.isLocked) {
       const original = rows.value.find((r) => r.id === modal.editingId) ?? null;
-      const hoursChanged = original && original.hours !== draft.hours;
-      const memberPoolChanged =
-        original && original.memberPoolHours !== draft.memberPoolHours;
-      if (hoursChanged || memberPoolChanged) {
+      if (original && original.hours !== draft.hours) {
         draftErrors.hours =
-          "Cấu hình đã phát sinh tính giờ — không thể sửa giờ phân bổ. Chỉ được ngừng áp dụng.";
+          "Cấu hình đã phát sinh tính giờ — không thể sửa “Số giờ”. Chỉ được ngừng áp dụng.";
         return;
       }
     }
@@ -236,13 +166,12 @@ export function useWorkConversionCatalog() {
     try {
       const payload = upsertHourRulePayloadFromDraft(
         draft,
-        academicYears.value,
-        { isProjectKind: isProjectDraft.value },
+        academicYears.value
       );
       if (modal.mode === "edit") {
         await researchHoursCatalogService.updateHourRule(
           modal.editingId,
-          payload,
+          payload
         );
       } else {
         await researchHoursCatalogService.createHourRule(payload);
@@ -292,7 +221,7 @@ export function useWorkConversionCatalog() {
         page.value = 1;
         void fetch();
       }, 300);
-    },
+    }
   );
 
   watch(
@@ -300,33 +229,12 @@ export function useWorkConversionCatalog() {
     () => {
       page.value = 1;
       void fetch();
-    },
+    }
   );
 
   onBeforeUnmount(() => {
     if (searchTimer) window.clearTimeout(searchTimer);
   });
-
-  watch(
-    () => draft.kindId,
-    () => {
-      draft.typeId = null;
-      if (isProjectDraft.value) {
-        draft.memberPoolHours = null;
-        applyProjectTypeDefaults(selectedTypeCode.value);
-      } else {
-        draft.memberPoolHours = null;
-      }
-    },
-  );
-
-  watch(
-    () => draft.typeId,
-    () => {
-      if (!isProjectDraft.value) return;
-      applyProjectTypeDefaults(selectedTypeCode.value);
-    },
-  );
 
   return {
     loading,
@@ -352,7 +260,6 @@ export function useWorkConversionCatalog() {
     kindOptions,
     typeOptions,
     academicYearOptions,
-    isProjectDraft,
 
     fetch,
     setPage,

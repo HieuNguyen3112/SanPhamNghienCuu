@@ -258,7 +258,7 @@
           </select>
         </div>
 
-        <div v-if="!vm.isProjectDraft" class="md:col-span-2">
+        <div class="md:col-span-2">
           <label class="text-xs font-medium text-slate-600"
             >Số giờ NCKH *</label
           >
@@ -280,65 +280,6 @@
           </p>
           <p v-if="vm.draftErrors.hours" class="mt-1 text-xs text-rose-600">
             {{ vm.draftErrors.hours }}
-          </p>
-        </div>
-
-        <div
-          v-else
-          class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
-        >
-          <div class="grid gap-3 md:grid-cols-2">
-            <div>
-              <label class="text-xs font-medium text-slate-600"
-                >Giờ chủ nhiệm *</label
-              >
-              <input
-                v-model.number="vm.draft.hours"
-                type="number"
-                min="0"
-                step="0.25"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50"
-                :disabled="vm.modal.mode === 'edit' && vm.modal.isLocked"
-              />
-              <p v-if="vm.draftErrors.hours" class="mt-1 text-xs text-rose-600">
-                {{ vm.draftErrors.hours }}
-              </p>
-            </div>
-
-            <div>
-              <label class="text-xs font-medium text-slate-600"
-                >Quỹ giờ thành viên *</label
-              >
-              <input
-                v-model.number="vm.draft.memberPoolHours"
-                type="number"
-                min="0"
-                step="0.25"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50"
-                :disabled="vm.modal.mode === 'edit' && vm.modal.isLocked"
-              />
-              <p
-                v-if="vm.draftErrors.memberPoolHours"
-                class="mt-1 text-xs text-rose-600"
-              >
-                {{ vm.draftErrors.memberPoolHours }}
-              </p>
-            </div>
-          </div>
-
-          <p class="mt-2 text-xs text-slate-600">
-            Hệ thống tính theo vai trò: giờ chủ nhiệm chia đều cho nhóm chủ
-            nhiệm, quỹ giờ thành viên chia đều cho nhóm thành viên không phải
-            chủ nhiệm.
-          </p>
-
-          <p
-            v-if="vm.modal.mode === 'edit' && vm.modal.isLocked"
-            class="mt-1 text-xs text-slate-500"
-          >
-            <Lock class="mr-1 inline-block h-3.5 w-3.5" />
-            Cấu hình đã phát sinh tính giờ — không thể sửa giờ phân bổ. Chỉ có
-            thể ngừng áp dụng.
           </p>
         </div>
 
@@ -415,12 +356,10 @@ const props = defineProps<{
       kindId: number;
       typeId: number | null;
       hours: number | null;
-      memberPoolHours: number | null;
       isActive: boolean;
       notes: string;
     };
     draftErrors: WorkConversionErrors;
-    isProjectDraft: boolean;
 
     openCreate: () => void;
     openEdit: (row: WorkConversionRow) => void;

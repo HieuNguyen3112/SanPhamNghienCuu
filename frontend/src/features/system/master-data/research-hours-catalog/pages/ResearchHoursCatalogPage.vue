@@ -98,7 +98,6 @@ const workVm = computed(() => ({
   modal: work.modal,
   draft: work.draft,
   draftErrors: work.draftErrors,
-  isProjectDraft: work.isProjectDraft.value,
 
   openCreate: work.openCreate,
   openEdit: work.openEdit,

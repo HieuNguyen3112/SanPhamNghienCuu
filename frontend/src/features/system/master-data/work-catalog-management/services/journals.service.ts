@@ -28,7 +28,6 @@ export const journalService = {
       country: dto.country ?? null,
       notes: dto.notes ?? null,
       source_name: dto.source_name ?? null,
-      publisher: dto.publisher ?? null,
       point_min: dto.point_min ?? null,
       point_max: dto.point_max ?? null,
       is_active: dto.is_active,

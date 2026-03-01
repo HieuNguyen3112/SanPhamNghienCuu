@@ -79,14 +79,26 @@ export const researchHoursCatalogService = {
   },
 
   async createHourRule(payload: UpsertHourRulePayloadDTO): Promise<void> {
-    await createHourRuleApi(payload);
+    await createHourRuleApi({
+      ...payload,
+      hours_per_occurrence: null,
+      principal_fraction: null,
+      others_fraction_total: null,
+      max_occurrences_per_year: null,
+    });
   },
 
   async updateHourRule(
     id: number,
-    payload: UpsertHourRulePayloadDTO,
+    payload: UpsertHourRulePayloadDTO
   ): Promise<void> {
-    await updateHourRuleApi(id, payload);
+    await updateHourRuleApi(id, {
+      ...payload,
+      hours_per_occurrence: null,
+      principal_fraction: null,
+      others_fraction_total: null,
+      max_occurrences_per_year: null,
+    });
   },
 
   async setHourRuleActive(id: number, is_active: boolean): Promise<void> {
@@ -113,7 +125,7 @@ export const researchHoursCatalogService = {
 
   async updateWorkloadQuota(
     id: number,
-    payload: { required_hours: number; notes?: string | null },
+    payload: { required_hours: number; notes?: string | null }
   ): Promise<void> {
     await updateWorkloadQuotaApi(id, payload);
   },
@@ -138,12 +150,7 @@ export const researchHoursCatalogService = {
 
   async updateAcademicYear(
     id: number,
-    payload: {
-      code: string;
-      start_date: string;
-      end_date: string;
-      is_active: boolean;
-    },
+    payload: { code: string; start_date: string; end_date: string; is_active: boolean }
   ): Promise<void> {
     await updateAcademicYearApi(id, payload);
   },

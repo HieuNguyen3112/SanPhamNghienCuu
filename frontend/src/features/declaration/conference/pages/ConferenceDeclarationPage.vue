@@ -4,7 +4,7 @@
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <DeclarationFormShell
         title="Kê khai Hội nghị – Hội thảo"
-        description="Mỗi dòng = 1 lần tham gia. Giờ và số lần tối đa tính theo cấu hình Quy đổi giờ theo công trình."
+        description="Mỗi dòng = 1 lần tham gia. Báo cáo: 40 giờ/lần. Tham dự: 4 giờ/lần (tối đa 40 lần)."
         :icon="Users"
         :status="shell.status.value"
         :canSubmit="canSubmit"
@@ -23,11 +23,12 @@
             <div class="font-semibold text-slate-900">Cách kê khai</div>
             <ul class="mt-1 list-disc space-y-1 pl-5 text-slate-600">
               <li>Thêm 1 dòng = thêm 1 lần tham gia.</li>
-              <li>Giờ/lần và số lần tối đa được lấy từ cấu hình quy đổi.</li>
+              <li>Báo cáo: 40 giờ/lần.</li>
+              <li>Tham dự: 4 giờ/lần, tối đa 40 lần (160 giờ).</li>
               <li>Minh chứng: upload/link <b>theo từng dòng</b>.</li>
               <li class="text-amber-700">
-                Mỗi dòng sẽ được lưu thành một công trình hội thảo riêng để gửi
-                duyệt theo đúng quy trình hiện tại.
+                Mỗi dòng sẽ được lưu thành một công trình hội thảo riêng để
+                gửi duyệt theo đúng quy trình hiện tại.
               </li>
             </ul>
           </div>
@@ -65,7 +66,7 @@
                 <div class="flex flex-wrap gap-2">
                   <span>
                     <b>Báo cáo:</b> {{ hours.result.report_count }} lần ({{
-                      hours.result.report_hours_total
+                      hours.result.report_count * 40
                     }}
                     giờ)
                   </span>
@@ -73,7 +74,7 @@
                   <span>
                     <b>Tham dự:</b> {{ hours.result.valid_attend_count }} /
                     {{ hours.result.attend_count }} lần ({{
-                      hours.result.attend_hours_total
+                      hours.result.valid_attend_count * 4
                     }}
                     giờ)
                   </span>
@@ -351,24 +352,6 @@ const openEvidenceRowId = ref<string | null>(null);
 const typeCodeById = computed(() =>
   Object.fromEntries(conferenceTypesAll.value.map((t) => [t.id, t.code])),
 );
-const typeHoursById = computed(() =>
-  Object.fromEntries(
-    conferenceTypesAll.value.map((t) => [
-      t.id,
-      typeof t.research_hours === "number" ? t.research_hours : 0,
-    ]),
-  ),
-);
-const typeMaxOccurrencesById = computed(() =>
-  Object.fromEntries(
-    conferenceTypesAll.value.map((t) => [
-      t.id,
-      typeof t.max_occurrences_per_year === "number"
-        ? t.max_occurrences_per_year
-        : null,
-    ]),
-  ),
-);
 
 const conferenceTypes = computed(() =>
   conferenceTypesAll.value.filter(
@@ -381,8 +364,6 @@ const hours = computed(() =>
     currentLecturerId: currentLecturerId.value,
     currentLecturerName: currentLecturerName.value,
     typeCodeById: typeCodeById.value,
-    typeHoursById: typeHoursById.value,
-    typeMaxOccurrencesById: typeMaxOccurrencesById.value,
   }),
 );
 
@@ -409,15 +390,8 @@ function rowNameError(
 function hoursHintByTypeId(typeId: number | null): string {
   if (!typeId) return "";
   const code = typeCodeById.value[typeId];
-  const hoursPerOccurrence = Number(typeHoursById.value[typeId] ?? 0);
-  if (code === "report") return `${hoursPerOccurrence} giờ / lần`;
-  if (code === "attend") {
-    const maxOccurrences = typeMaxOccurrencesById.value[typeId];
-    if (typeof maxOccurrences === "number" && maxOccurrences > 0) {
-      return `${hoursPerOccurrence} giờ / lần (tối đa ${maxOccurrences} lần tính giờ)`;
-    }
-    return `${hoursPerOccurrence} giờ / lần`;
-  }
+  if (code === "report") return "40 giờ / lần";
+  if (code === "attend") return "4 giờ / lần (tối đa 40 lần tính giờ)";
   return "";
 }
 
@@ -601,10 +575,7 @@ const shell = useDeclarationFormShell({
 
       const existingActivityId = form.activityIds[index] ?? null;
       const activity = await upsert_activity_base({
-        id:
-          typeof existingActivityId === "number"
-            ? existingActivityId
-            : undefined,
+        id: typeof existingActivityId === "number" ? existingActivityId : undefined,
         kind_id: kindId.value,
         type_id: row.typeId,
         academic_year_id: form.academicYearId,

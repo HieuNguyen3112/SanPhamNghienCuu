@@ -310,31 +310,23 @@ const pendingEvidenceFiles = ref<any[]>([]);
 const pendingEvidenceLinks = ref<any[]>([]);
 
 const typeCodeById = computed(() =>
-  Object.fromEntries(types.value.map((t) => [t.id, t.code])),
-);
-const typeHoursById = computed(() =>
-  Object.fromEntries(
-    types.value.map((t) => [
-      t.id,
-      typeof t.research_hours === "number" ? t.research_hours : 0,
-    ]),
-  ),
+  Object.fromEntries(types.value.map((t) => [t.id, t.code]))
 );
 const lecturerNameById = computed(() =>
-  Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name])),
+  Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name]))
 );
 const ownerFacultyId = computed(
   () =>
     lecturers.value.find((l) => l.id === currentLecturerId.value)?.faculty_id ??
-    null,
+    null
 );
 
 const memberRoleCodeById = computed(() =>
-  Object.fromEntries(memberRoles.value.map((r) => [r.id, r.code])),
+  Object.fromEntries(memberRoles.value.map((r) => [r.id, r.code]))
 );
 const filteredMemberRoles = computed(() => {
   const allowed = new Set<string>(
-    bookAllowedMemberRoleCodes as readonly string[],
+    bookAllowedMemberRoleCodes as readonly string[]
   );
   const list = memberRoles.value.filter((r) => allowed.has(r.code));
   return list.length > 0 ? list : memberRoles.value; // fallback nếu backend chưa seed đủ
@@ -366,12 +358,11 @@ const externalMembers = computed(() => {
 const hours = computed(() =>
   computeBookHours(form, {
     typeCodeById: typeCodeById.value,
-    typeHoursById: typeHoursById.value,
     lecturerNameById: lecturerNameById.value,
     memberRoleNameById: memberRoleNameById.value,
     memberRoleCodeById: memberRoleCodeById.value,
     currentLecturerId: currentLecturerId.value,
-  }),
+  })
 );
 
 const hoursByLecturerId = computed(() => {
@@ -381,16 +372,8 @@ const hoursByLecturerId = computed(() => {
 });
 
 const baseHoursText = computed(() => {
-  const byTypeConfig =
-    form.typeId && Number.isFinite(typeHoursById.value[form.typeId])
-      ? Number(typeHoursById.value[form.typeId])
-      : 0;
-  if (byTypeConfig > 0) {
-    return `Giờ chuẩn: ${byTypeConfig} giờ (theo quy đổi công trình)`;
-  }
-
   const code = form.typeId ? typeCodeById.value[form.typeId] : null;
-  const base = code ? (bookBaseHoursByTypeCode[code] ?? 0) : 0;
+  const base = code ? bookBaseHoursByTypeCode[code] ?? 0 : 0;
   return `Giờ chuẩn: ${base} giờ`;
 });
 
@@ -414,12 +397,12 @@ const canSubmit = computed(() => {
   if (!form.publisher.trim()) return false; // book_details.publisher required
   const validMembers = form.members.filter(
     (m) =>
-      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number",
+      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number"
   );
   if (validMembers.length === 0) return false;
   if (chiefEditorWarning.value) return false;
   const invalidPending = pendingEvidenceFiles.value.some(
-    (p: any) => !p.file_type_id,
+    (p: any) => !p.file_type_id
   );
   if (invalidPending) return false;
   return true;
@@ -541,7 +524,7 @@ const shell = useDeclarationFormShell({
       .filter(
         (m) =>
           typeof m.lecturer_id === "number" &&
-          typeof m.member_role_id === "number",
+          typeof m.member_role_id === "number"
       )
       .map((m) => ({
         lecturer_id: m.lecturer_id as number,
@@ -568,9 +551,7 @@ const shell = useDeclarationFormShell({
         submitResult?.workflow?.status_code ??
         submitResult?.data?.status_code ??
         "pending_faculty_review";
-      return (
-        mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW"
-      );
+      return mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW";
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const code = error.response?.data?.code;

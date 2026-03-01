@@ -24,7 +24,6 @@ export function useJournalCatalog() {
     address: string;
     country: string;
     notes: string;
-    publisher: string;
     isActive: boolean;
     sourceName: string;
     pointMin: number | null;
@@ -36,7 +35,6 @@ export function useJournalCatalog() {
     address: "",
     country: "",
     notes: "",
-    publisher: "",
     isActive: true,
     sourceName: "",
     pointMin: null,
@@ -96,7 +94,6 @@ export function useJournalCatalog() {
     journalForm.address = "";
     journalForm.country = "";
     journalForm.notes = "";
-    journalForm.publisher = "";
     journalForm.isActive = true;
     journalForm.sourceName = "";
     journalForm.pointMin = null;
@@ -112,7 +109,6 @@ export function useJournalCatalog() {
     journalForm.address = item.address ?? "";
     journalForm.country = item.country ?? "";
     journalForm.notes = item.notes ?? "";
-    journalForm.publisher = item.publisher ?? "";
     journalForm.isActive = item.isActive;
     journalForm.sourceName = item.sourceName ?? "";
     journalForm.pointMin = item.pointMin ?? null;
@@ -127,7 +123,6 @@ export function useJournalCatalog() {
     address: string;
     country: string;
     notes: string;
-    publisher: string;
     isActive: boolean;
     sourceName: string;
     pointMin: number | null;
@@ -139,7 +134,6 @@ export function useJournalCatalog() {
     journalForm.address = v.address;
     journalForm.country = v.country;
     journalForm.notes = v.notes;
-    journalForm.publisher = v.publisher;
     journalForm.isActive = v.isActive;
     journalForm.sourceName = v.sourceName;
     journalForm.pointMin = v.pointMin;
@@ -156,8 +150,6 @@ export function useJournalCatalog() {
     journalErrors.country =
       validateOptional(journalForm.country, 100) ?? undefined;
     journalErrors.notes = validateOptional(journalForm.notes, 255) ?? undefined;
-    journalErrors.publisher =
-      validateOptional(journalForm.publisher, 255) ?? undefined;
     journalErrors.sourceName =
       validateOptional(journalForm.sourceName, 255) ?? undefined;
 
@@ -167,7 +159,6 @@ export function useJournalCatalog() {
       journalErrors.address ||
       journalErrors.country ||
       journalErrors.notes ||
-      journalErrors.publisher ||
       journalErrors.sourceName
     ) {
       return;
@@ -180,9 +171,6 @@ export function useJournalCatalog() {
       address: journalForm.address.trim() ? journalForm.address.trim() : null,
       country: journalForm.country.trim() ? journalForm.country.trim() : null,
       notes: journalForm.notes.trim() ? journalForm.notes.trim() : null,
-      publisher: journalForm.publisher.trim()
-        ? journalForm.publisher.trim()
-        : null,
       source_name: journalForm.sourceName.trim()
         ? journalForm.sourceName.trim()
         : null,
@@ -215,3 +203,4 @@ export function useJournalCatalog() {
     onUpdateJournalForm,
   };
 }
+

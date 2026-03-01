@@ -17,7 +17,6 @@ export type ArticleDeclarationFormModel = {
 
   journalId: number | null;
   journalName: string;
-  journalResearchHours: number | null;
   issn: string;
   doi: string;
   articleUrl: string;
@@ -44,21 +43,13 @@ export function computeArticleHours(
   model: ArticleDeclarationFormModel,
   ctx: {
     typeCodeById: Record<number, string>;
-    typeHoursById: Record<number, number>;
     lecturerNameById: Record<number, string>;
     memberRoleNameById: Record<number, string>;
     currentLecturerId: number;
-  },
+  }
 ): HoursComputationResult {
   const typeCode = model.typeId ? ctx.typeCodeById[model.typeId] : null;
-  const byTypeConfig =
-    model.typeId && Number.isFinite(ctx.typeHoursById[model.typeId])
-      ? Number(ctx.typeHoursById[model.typeId])
-      : 0;
-  const byTypeFallback = typeCode
-    ? (articleBaseHoursByTypeCode[typeCode] ?? 0)
-    : 0;
-  const baseHours = byTypeConfig > 0 ? byTypeConfig : byTypeFallback;
+  const baseHours = typeCode ? articleBaseHoursByTypeCode[typeCode] ?? 0 : 0;
 
   const participants = normalizeParticipantsForHours(model.members);
 

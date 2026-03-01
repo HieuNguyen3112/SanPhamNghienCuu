@@ -81,41 +81,8 @@
                   </option>
                 </select>
                 <div class="mt-1 text-xs text-slate-500">
-                  Cấp đề tài quyết định phần giờ Chủ nhiệm và quỹ giờ thành
-                  viên.
+                  Cấp đề tài quyết định phần giờ Chủ nhiệm và quỹ giờ thành viên.
                 </div>
-              </div>
-            </div>
-
-            <div
-              v-if="selectedTypeRoleRule"
-              class="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3"
-            >
-              <div class="text-xs font-semibold text-sky-900">
-                Quy định giờ theo vai trò ({{
-                  selectedTypeRoleRule.levelLabel
-                }})
-              </div>
-              <div class="mt-2 grid gap-2 md:grid-cols-2">
-                <div
-                  class="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm"
-                >
-                  <div class="text-slate-600">Chủ nhiệm</div>
-                  <div class="font-semibold text-slate-900">
-                    {{ selectedTypeRoleRule.leaderHours.toFixed(2) }} giờ
-                  </div>
-                </div>
-                <div
-                  class="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm"
-                >
-                  <div class="text-slate-600">Quỹ giờ thành viên</div>
-                  <div class="font-semibold text-slate-900">
-                    {{ selectedTypeRoleRule.memberPoolHours.toFixed(2) }} giờ
-                  </div>
-                </div>
-              </div>
-              <div class="mt-2 text-xs text-slate-600">
-                Giờ mỗi thành viên = quỹ giờ thành viên / số thành viên thực tế.
               </div>
             </div>
           </div>
@@ -315,9 +282,7 @@
               Đang cập nhật công thức từ hệ thống...
             </div>
 
-            <div
-              class="mt-4 overflow-hidden rounded-xl border border-slate-200"
-            >
+            <div class="mt-4 overflow-hidden rounded-xl border border-slate-200">
               <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50">
                   <tr>
@@ -351,10 +316,7 @@
                     </td>
                   </tr>
                   <tr v-if="hours.formula_rows.length === 0">
-                    <td
-                      colspan="3"
-                      class="px-4 py-6 text-center text-slate-500"
-                    >
+                    <td colspan="3" class="px-4 py-6 text-center text-slate-500">
                       Chưa có đủ dữ liệu để xác định công thức.
                     </td>
                   </tr>
@@ -362,9 +324,7 @@
               </table>
             </div>
 
-            <div
-              class="mt-4 overflow-hidden rounded-xl border border-slate-200"
-            >
+            <div class="mt-4 overflow-hidden rounded-xl border border-slate-200">
               <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50">
                   <tr>
@@ -401,10 +361,7 @@
                     </td>
                   </tr>
                   <tr v-if="hours.distribution.length === 0">
-                    <td
-                      colspan="3"
-                      class="px-4 py-6 text-center text-slate-500"
-                    >
+                    <td colspan="3" class="px-4 py-6 text-center text-slate-500">
                       Chưa có dữ liệu phân bổ cho nhóm hiện tại.
                     </td>
                   </tr>
@@ -491,7 +448,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   university: "Đề tài cấp Trường (1 năm)",
 };
 const ALLOWED_PROJECT_TYPE_CODES = new Set(
-  Object.keys(PROJECT_TYPE_LABELS).map((code) => code.toLowerCase()),
+  Object.keys(PROJECT_TYPE_LABELS).map((code) => code.toLowerCase())
 );
 
 const academicYears = ref<AcademicYearDto[]>([]);
@@ -525,19 +482,19 @@ const pendingEvidenceFiles = ref<any[]>([]);
 const pendingEvidenceLinks = ref<any[]>([]);
 
 const typeCodeById = computed(() =>
-  Object.fromEntries(types.value.map((t) => [t.id, t.code])),
+  Object.fromEntries(types.value.map((t) => [t.id, t.code]))
 );
 const lecturerNameById = computed(() =>
-  Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name])),
+  Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name]))
 );
 const ownerFacultyId = computed(
   () =>
     lecturers.value.find((l) => l.id === currentLecturerId.value)?.faculty_id ??
-    null,
+    null
 );
 
 const memberRoleCodeById = computed(() =>
-  Object.fromEntries(memberRoles.value.map((r) => [r.id, r.code])),
+  Object.fromEntries(memberRoles.value.map((r) => [r.id, r.code]))
 );
 const memberRoleNameById: ComputedRef<Record<number, string>> = computed(() => {
   const map: Record<number, string> = {};
@@ -570,7 +527,7 @@ const localHours = computed(() =>
     memberRoleNameById: memberRoleNameById.value,
     memberRoleCodeById: memberRoleCodeById.value,
     currentLecturerId: currentLecturerId.value,
-  }),
+  })
 );
 
 const serverProjectPreview = ref<ProjectHoursComputationResult | null>(null);
@@ -583,21 +540,8 @@ const selectedTypeName = computed(() => {
   return selectedType?.name ?? null;
 });
 
-const selectedTypeRoleRule = computed(() => {
-  if (!form.typeId) return null;
-
-  const source = serverProjectPreview.value ?? localHours.value;
-  if (!source || source.leader_hours <= 0) return null;
-
-  return {
-    levelLabel: source.rule_label ?? selectedTypeName.value ?? "Đề tài",
-    leaderHours: source.leader_hours,
-    memberPoolHours: source.member_pool_hours,
-  };
-});
-
 function normalizeServerPreview(
-  preview: ProjectHoursPreviewResponseDto,
+  preview: ProjectHoursPreviewResponseDto
 ): ProjectHoursComputationResult {
   return {
     total_hours: preview.formula.total_hours_allocated ?? 0,
@@ -618,33 +562,34 @@ function normalizeServerPreview(
     member_pool_hours: preview.formula.member_pool_hours ?? 0,
     member_pool_count: preview.formula.member_pool_count ?? 0,
     member_pool_each: preview.formula.member_pool_each ?? 0,
-    formula_rows: preview.formula_rows?.map((row) => ({
-      role_label: row.role_label,
-      total_hours: row.total_hours ?? 0,
-      formula_text: row.formula_text,
-    })) ?? [
-      {
-        role_label: "Chủ nhiệm",
-        total_hours: preview.formula.leader_hours ?? 0,
-        formula_text: `${(preview.formula.leader_hours ?? 0).toFixed(
-          2,
-        )} giờ (100%)`,
-      },
-      {
-        role_label: "Nhóm thành viên",
-        total_hours: preview.formula.member_pool_hours ?? 0,
-        formula_text:
-          (preview.formula.member_pool_count ?? 0) > 0
-            ? `${(preview.formula.member_pool_hours ?? 0).toFixed(2)} / ${
-                preview.formula.member_pool_count
-              } = ${(preview.formula.member_pool_each ?? 0).toFixed(
-                2,
-              )} giờ/người`
-            : `${(preview.formula.member_pool_hours ?? 0).toFixed(
-                2,
-              )} / 0 = 0 giờ/người (chưa có thành viên)`,
-      },
-    ],
+    formula_rows:
+      preview.formula_rows?.map((row) => ({
+        role_label: row.role_label,
+        total_hours: row.total_hours ?? 0,
+        formula_text: row.formula_text,
+      })) ?? [
+        {
+          role_label: "Chủ nhiệm",
+          total_hours: preview.formula.leader_hours ?? 0,
+          formula_text: `${(preview.formula.leader_hours ?? 0).toFixed(
+            2
+          )} giờ (100%)`,
+        },
+        {
+          role_label: "Nhóm thành viên",
+          total_hours: preview.formula.member_pool_hours ?? 0,
+          formula_text:
+            (preview.formula.member_pool_count ?? 0) > 0
+              ? `${(preview.formula.member_pool_hours ?? 0).toFixed(2)} / ${
+                  preview.formula.member_pool_count
+                } = ${(preview.formula.member_pool_each ?? 0).toFixed(
+                  2
+                )} giờ/người`
+              : `${(preview.formula.member_pool_hours ?? 0).toFixed(
+                  2
+                )} / 0 = 0 giờ/người (chưa có thành viên)`,
+        },
+      ],
     progress_note: preview.formula.progress_note,
   };
 }
@@ -661,7 +606,7 @@ async function requestServerProjectHoursPreview() {
       (member) =>
         !member.is_external &&
         typeof member.lecturer_id === "number" &&
-        typeof member.member_role_id === "number",
+        typeof member.member_role_id === "number"
     )
     .map((member) => ({
       lecturer_id: member.lecturer_id as number,
@@ -709,7 +654,7 @@ watch(
   () => {
     scheduleProjectPreviewRefresh();
   },
-  { deep: true },
+  { deep: true }
 );
 
 const hours = computed<ProjectHoursComputationResult>(() => {
@@ -739,19 +684,19 @@ const canSubmit = computed(() => {
   // members must be valid
   const validMembers = form.members.filter(
     (m) =>
-      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number",
+      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number"
   );
   if (validMembers.length === 0) return false;
   // evidence pending files should have file_type_id selected (if any)
   const invalidPending = pendingEvidenceFiles.value.some(
-    (p: any) => !p.file_type_id,
+    (p: any) => !p.file_type_id
   );
   if (invalidPending) return false;
   return true;
 });
 const filteredMemberRoles = computed(() => {
   const allowed = new Set<string>(
-    projectAllowedMemberRoleCodes as readonly string[],
+    projectAllowedMemberRoleCodes as readonly string[]
   );
   const list = memberRoles.value.filter((r) => allowed.has(r.code));
 
@@ -821,11 +766,7 @@ function dateToYear(value: string | null | undefined): number | null {
   if (!normalized) return null;
 
   const directYear = Number(normalized.slice(0, 4));
-  if (
-    Number.isInteger(directYear) &&
-    directYear >= 1900 &&
-    directYear <= 2100
-  ) {
+  if (Number.isInteger(directYear) && directYear >= 1900 && directYear <= 2100) {
     return directYear;
   }
 
@@ -922,7 +863,7 @@ const shell = useDeclarationFormShell({
       .filter(
         (m) =>
           typeof m.lecturer_id === "number" &&
-          typeof m.member_role_id === "number",
+          typeof m.member_role_id === "number"
       )
       .map((m) => ({
         lecturer_id: m.lecturer_id as number,
@@ -950,9 +891,7 @@ const shell = useDeclarationFormShell({
         submitResult?.workflow?.status_code ??
         submitResult?.data?.status_code ??
         "pending_faculty_review";
-      return (
-        mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW"
-      );
+      return mapStatusCodeToUi(nextStatusCode as any) ?? "PENDING_FACULTY_REVIEW";
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const code = error.response?.data?.code;

@@ -106,61 +106,7 @@ class LookupController extends Controller
             $query->where('kind_id', $request->input('kind_id'));
         }
 
-        $types = $query->orderBy('name')->get();
-
-        $typeIds = $types
-            ->pluck('id')
-            ->map(fn($id) => (int) $id)
-            ->all();
-
-        $researchHoursByTypeId = [];
-        $maxOccurrencesByTypeId = [];
-        if (! empty($typeIds)) {
-            $today = Carbon::now()->toDateString();
-
-            $rules = DB::table('hour_rules')
-                ->whereIn('type_id', $typeIds)
-                ->where('is_active', 1)
-                ->whereDate('effective_from', '<=', $today)
-                ->where(function ($query) use ($today) {
-                    $query->whereNull('effective_to')
-                        ->orWhereDate('effective_to', '>=', $today);
-                })
-                ->orderByDesc('effective_from')
-                ->orderByDesc('version')
-                ->orderByDesc('id')
-                ->get(['type_id', 'hours_total_per_activity', 'hours_per_occurrence', 'max_occurrences_per_year']);
-
-            foreach ($rules as $rule) {
-                $typeId = (int) ($rule->type_id ?? 0);
-                if ($typeId <= 0 || array_key_exists($typeId, $researchHoursByTypeId)) {
-                    continue;
-                }
-
-                $hours = $rule->hours_total_per_activity ?? $rule->hours_per_occurrence;
-                if ($hours === null) {
-                    continue;
-                }
-
-                $researchHoursByTypeId[$typeId] = (float) $hours;
-                $maxOccurrencesByTypeId[$typeId] = $rule->max_occurrences_per_year !== null
-                    ? (int) $rule->max_occurrences_per_year
-                    : null;
-            }
-        }
-
-        $data = $types->map(function ($row) use ($researchHoursByTypeId, $maxOccurrencesByTypeId) {
-            $typeId = (int) $row->id;
-
-            return [
-                'id' => $typeId,
-                'kind_id' => (int) $row->kind_id,
-                'code' => $row->code,
-                'name' => $row->name,
-                'research_hours' => $researchHoursByTypeId[$typeId] ?? null,
-                'max_occurrences_per_year' => $maxOccurrencesByTypeId[$typeId] ?? null,
-            ];
-        });
+        $data = $query->orderBy('name')->get();
 
         return response()->json(['data' => $data], Response::HTTP_OK);
     }
@@ -231,22 +177,30 @@ class LookupController extends Controller
         $search = trim((string) $request->input('search', ''));
         $activeOnly = $request->boolean('active', true);
 
+        $today = Carbon::now()->toDateString();
+        $latestRanking = DB::table('journal_rankings')
+            ->select('journal_id', DB::raw('MAX(effective_from) as effective_from'))
+            ->where('effective_from', '<=', $today)
+            ->groupBy('journal_id');
+
         $query = DB::table('journals as j')
+            ->leftJoinSub($latestRanking, 'lr', 'lr.journal_id', '=', 'j.id')
+            ->leftJoin('journal_rankings as jr', function ($join) {
+                $join->on('jr.journal_id', '=', 'j.id')
+                    ->on('jr.effective_from', '=', 'lr.effective_from');
+            })
             ->select([
                 'j.id',
                 'j.name',
                 'j.address',
                 'j.issn',
-                'j.country',
-                'j.notes',
-                'j.source_name',
-                'j.point_min',
-                'j.point_max',
-                'j.classification',
-                'j.research_hours',
                 'j.is_active',
+                'jr.rank as current_rank',
+                'jr.effective_from as current_rank_effective_from',
             ])
-            ->when($activeOnly, fn($q) => $q->where('j.is_active', 1))
+            ->when($activeOnly, function ($q) {
+                $q->where('j.is_active', 1);
+            })
             ->when($search !== '', function ($q) use ($search) {
                 $like = '%' . $search . '%';
                 $q->where(function ($sub) use ($like) {
@@ -257,6 +211,8 @@ class LookupController extends Controller
             ->orderBy('j.name')
             ->limit(50);
 
-        return response()->json(['data' => $query->get()], Response::HTTP_OK);
+        $data = $query->get();
+
+        return response()->json(['data' => $data], Response::HTTP_OK);
     }
 }
