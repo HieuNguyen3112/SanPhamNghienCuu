@@ -1,5 +1,12 @@
 import type { MenuItem } from "@/app/config/menu.types";
-import { Users, Network, ScrollText, BookCopy, Timer } from "lucide-vue-next";
+import {
+  Users,
+  Network,
+  ScrollText,
+  BookCopy,
+  Timer,
+  Database,
+} from "lucide-vue-next";
 
 export const UserManagerMenuGroup: MenuItem = {
   id: "user-manager",
@@ -48,6 +55,13 @@ export const UserManagerMenuItems: MenuItem[] = [
     label: "Danh mục giờ NCKH",
     routeName: "masterdata.hours_catalog",
     icon: Timer,
+    roles: ["SCIENCE_OFFICE"],
+  },
+  {
+    id: "system-backups",
+    label: "Sao lưu & khôi phục",
+    routeName: "system.backups",
+    icon: Database,
     roles: ["SCIENCE_OFFICE"],
   },
 ];

@@ -39,7 +39,7 @@ class NotificationIconDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-001',
                 'event_key' => 'participation_accepted',
                 'title' => 'Đồng nghiệp đã xác nhận tham gia',
-                'message' => 'Giảng viên Trần Thị B đã xác nhận tham gia công trình "Giáo trình Thị giác máy tính".',
+                'message' => 'Giảng viên Trần Thị Thu Hằng đã xác nhận tham gia công trình "Giáo trình Thị giác máy tính".',
                 'target_url' => '/declarations/participatier',
                 'extra' => [
                     'activity_id' => 41,
@@ -50,7 +50,7 @@ class NotificationIconDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-001',
                 'event_key' => 'participation_rejected',
                 'title' => 'Đồng nghiệp đã từ chối tham gia',
-                'message' => 'Giảng viên Phạm Quốc C đã từ chối tham gia công trình "Giáo trình Thị giác máy tính".',
+                'message' => 'Giảng viên Phạm Quốc Đạt đã từ chối tham gia công trình "Giáo trình Thị giác máy tính".',
                 'target_url' => '/declarations/participatier',
                 'extra' => [
                     'activity_id' => 41,
@@ -61,7 +61,7 @@ class NotificationIconDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-001',
                 'event_key' => 'work_revision_requested',
                 'title' => 'Công trình cần bổ sung hồ sơ',
-                'message' => 'Công trình "Nghiên cứu ứng dụng AI trong giáo dục" đã được trả lại để bổ sung minh chứng.',
+                'message' => 'Công trình "Ứng dụng mô hình ngôn ngữ lớn hỗ trợ phản hồi bài tập lập trình" đã được trả lại để bổ sung minh chứng.',
                 'target_url' => '/works/personal?activity_id=55',
                 'extra' => [
                     'activity_id' => 55,
@@ -72,7 +72,7 @@ class NotificationIconDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-001',
                 'event_key' => 'work_approved',
                 'title' => 'Công trình đã được duyệt',
-                'message' => 'Công trình "Nghiên cứu ứng dụng AI trong giáo dục" đã được khoa duyệt.',
+                'message' => 'Công trình "Ứng dụng mô hình ngôn ngữ lớn hỗ trợ phản hồi bài tập lập trình" đã được khoa duyệt.',
                 'target_url' => '/works/personal?activity_id=55',
                 'extra' => [
                     'activity_id' => 55,
@@ -83,7 +83,7 @@ class NotificationIconDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-001',
                 'event_key' => 'hours_approved',
                 'title' => 'Giờ NCKH đã được duyệt',
-                'message' => 'Công trình "Nghiên cứu ứng dụng AI trong giáo dục" đã được duyệt giờ: 48 giờ.',
+                'message' => 'Công trình "Ứng dụng mô hình ngôn ngữ lớn hỗ trợ phản hồi bài tập lập trình" đã được duyệt giờ: 48 giờ.',
                 'target_url' => '/hours/personal',
                 'extra' => [
                     'activity_id' => 55,
@@ -132,7 +132,7 @@ class NotificationIconDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-002',
                 'event_key' => 'hours_approved',
                 'title' => 'Giờ NCKH đã được duyệt',
-                'message' => 'Công trình "Báo cáo hội thảo STEM 2025" đã được duyệt giờ: 25 giờ.',
+                'message' => 'Công trình "Báo cáo hội thảo STEM trong đào tạo giáo viên 2025" đã được duyệt giờ: 25 giờ.',
                 'target_url' => '/hours/personal',
                 'extra' => [
                     'activity_id' => 76,

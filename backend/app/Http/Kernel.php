@@ -70,5 +70,6 @@ class Kernel extends HttpKernel
         'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
         'auto.rotate.sanctum' => \App\Http\Middleware\AutoRotateSanctumToken::class,
         'force.json' => \App\Http\Middleware\ForceJsonResponse::class,
+        'audit.export' => \App\Http\Middleware\AuditExportAction::class,
     ];
 }

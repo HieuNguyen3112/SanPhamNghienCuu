@@ -82,14 +82,14 @@ class LecturerHourApprovalDemoSeeder extends Seeder
             return;
         }
 
-                        $lecturerSeed = [
-            ['code' => 'GV-001', 'full_name' => 'Nguyễn Văn A', 'email' => 'gv-001@local.test', 'phone' => '0900000001', 'department_code' => 'BM-KTPM'],
-            ['code' => 'DL-001', 'full_name' => 'Duyệt', 'email' => 'dl-001@local.test', 'phone' => '0900000002', 'department_code' => 'BM-TT'],
-            ['code' => 'QL-001', 'full_name' => 'Quản Lý', 'email' => 'ql-001@local.test', 'phone' => '0900000003', 'department_code' => 'BM-TT'],
-            ['code' => 'GV-002', 'full_name' => 'Trần Thị B', 'email' => 'gv-002@local.test', 'phone' => '0900000004', 'department_code' => 'BM-KTPM'],
-            ['code' => 'GV-003', 'full_name' => 'Phạm Quốc C', 'email' => 'gv-003@local.test', 'phone' => '0900000005', 'department_code' => 'BM-KTPM'],
-            ['code' => 'GV-004', 'full_name' => 'Lê Thị D', 'email' => 'gv-004@local.test', 'phone' => '0900000006', 'department_code' => 'BM-TT'],
-        ];
+        $lecturerSeed = [
+            ['code' => 'GV-001', 'full_name' => 'Nguyễn Minh Tuấn', 'email' => 'gv-001@local.test', 'phone' => '0900000001', 'department_code' => 'BM-KTPM'],
+            ['code' => 'DL-001', 'full_name' => 'Đặng Thu Hà', 'email' => 'dl-001@local.test', 'phone' => '0900000002', 'department_code' => 'TT-DL'],
+            ['code' => 'QL-001', 'full_name' => 'Nguyễn Thành Nam', 'email' => 'ql-001@local.test', 'phone' => '0900000003', 'department_code' => 'BM-TT'],
+            ['code' => 'GV-002', 'full_name' => 'Trần Thị Thu Hằng', 'email' => 'gv-002@local.test', 'phone' => '0900000004', 'department_code' => 'BM-KTPM'],
+            ['code' => 'GV-003', 'full_name' => 'Phạm Quốc Đạt', 'email' => 'gv-003@local.test', 'phone' => '0900000005', 'department_code' => 'TT-DL'],
+            ['code' => 'GV-004', 'full_name' => 'Lê Hoàng Anh', 'email' => 'gv-004@local.test', 'phone' => '0900000006', 'department_code' => 'BM-TT'],
+        ];
 
         $lecturerIds = [];
         foreach ($lecturerSeed as $seed) {
@@ -139,7 +139,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-001',
                 'kind_code' => 'paper',
                 'type_code' => 'hdgsnn_900',
-                'title' => 'Ứng dụng AI trong giáo dục',
+                'title' => 'Ứng dụng AI trong phản hồi bài tập lập trình',
                 'hours_assigned' => 55,
                 'approval_status' => 'pending',
                 'days_ago' => 2,
@@ -149,7 +149,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-001',
                 'kind_code' => 'conference',
                 'type_code' => 'report',
-                'title' => 'Hội thảo công nghệ giáo dục 2025',
+                'title' => 'Báo cáo tại Hội thảo Công nghệ giáo dục 2025',
                 'hours_assigned' => 20,
                 'approval_status' => 'approved',
                 'days_ago' => 6,
@@ -159,7 +159,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                 'lecturer_code' => 'DL-001',
                 'kind_code' => 'project',
                 'type_code' => 'bo',
-                'title' => 'Dự án nâng cao chất lượng đào tạo',
+                'title' => 'Đề tài nâng cao chất lượng đào tạo giáo viên',
                 'hours_assigned' => 40,
                 'approval_status' => 'rejected',
                 'days_ago' => 3,
@@ -169,7 +169,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                 'lecturer_code' => 'QL-001',
                 'kind_code' => 'book',
                 'type_code' => 'textbook',
-                'title' => 'Giáo trình quản lý giáo dục',
+                'title' => 'Giáo trình Quản lý giáo dục đại học',
                 'hours_assigned' => 50,
                 'approval_status' => 'approved',
                 'days_ago' => 4,
@@ -179,7 +179,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-002',
                 'kind_code' => 'paper',
                 'type_code' => 'hdgsnn_600',
-                'title' => 'Nghiên cứu dữ liệu giáo dục mở',
+                'title' => 'Nghiên cứu dữ liệu học tập mở',
                 'hours_assigned' => 35,
                 'approval_status' => 'pending',
                 'days_ago' => 1,
@@ -189,7 +189,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-003',
                 'kind_code' => 'conference',
                 'type_code' => 'report',
-                'title' => 'Báo cáo hội thảo STEM 2025',
+                'title' => 'Báo cáo hội thảo STEM trong đào tạo giáo viên 2025',
                 'hours_assigned' => 25,
                 'approval_status' => 'rejected',
                 'days_ago' => 8,
@@ -199,7 +199,7 @@ class LecturerHourApprovalDemoSeeder extends Seeder
                 'lecturer_code' => 'GV-004',
                 'kind_code' => 'book',
                 'type_code' => 'textbook',
-                'title' => 'Giáo trình phương pháp giảng dạy',
+                'title' => 'Giáo trình Phương pháp giảng dạy Tin học',
                 'hours_assigned' => 45,
                 'approval_status' => 'approved',
                 'days_ago' => 9,

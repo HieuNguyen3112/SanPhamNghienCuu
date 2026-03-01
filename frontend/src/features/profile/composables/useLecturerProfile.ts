@@ -3,6 +3,8 @@ import {
   fetchAcademicRanks,
   fetchDegrees,
   fetchScientificProfile,
+  fetchTrainingHistories,
+  syncTrainingHistories,
   updateAcademicTitles,
   updateLanguages,
   updateProfileContact,
@@ -12,6 +14,7 @@ import {
   type LookupItemDTO,
   type ResearchAreaDTO,
   type ResearchWorkItemDTO,
+  type SyncTrainingHistoriesPayload,
   type ScientificProfilePayload,
 } from "../services/lecturerProfileService";
 
@@ -165,6 +168,37 @@ function parseYear(value?: string | number | null): number | null {
   if (str.length < 4) return null;
   const year = Number(str.slice(0, 4));
   return Number.isFinite(year) ? year : null;
+}
+
+function normalizeOptionalText(value?: string | null): string | null {
+  const normalized = (value ?? "").trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function yearToDateString(value: number | null): string | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const year = Math.floor(value);
+  if (year < 1000 || year > 9999) return null;
+  return `${year}-01-01`;
+}
+
+function toTrainingHistorySyncItem(item: EducationDTO) {
+  return {
+    id: item.id,
+    degree_id: item.degree_id ?? null,
+    degree_title: item.degree_title ?? null,
+    major: item.major ?? null,
+    institution: item.institution ?? null,
+    country: item.country ?? null,
+    city: item.city ?? null,
+    start_date: item.start_date ?? null,
+    end_date: item.end_date ?? null,
+    is_current: item.is_current ?? null,
+    training_form: item.training_form ?? null,
+    funding_source: item.funding_source ?? null,
+    certificate_no: item.certificate_no ?? null,
+    notes: item.notes ?? null,
+  };
 }
 
 function parseResearchAreaString(value?: string | null): string[] {
@@ -375,11 +409,62 @@ export function useLecturerProfile() {
     ...emptyAcademicProfile,
   });
   const works = ref<ResearchWorkItem[]>([]);
+  const degreeOptions = ref<LookupItemDTO[]>([]);
+  const rankOptions = ref<LookupItemDTO[]>([]);
+
+  async function syncLatestEducation(
+    next: LecturerAcademicProfile,
+    degreeIdToPersist?: number | null,
+    fallbackDegreeId?: number | null
+  ) {
+    const histories = await fetchTrainingHistories();
+    const items: SyncTrainingHistoriesPayload["items"] = histories.map((item) =>
+      toTrainingHistorySyncItem(item)
+    );
+    for (const item of items) {
+      if (!item.institution || !item.institution.trim()) {
+        item.institution = "Chưa cập nhật";
+      }
+    }
+    const resolvedDegreeId =
+      degreeIdToPersist !== undefined ? degreeIdToPersist : fallbackDegreeId;
+
+    if (items.length === 0) {
+      items.push({
+        degree_id: resolvedDegreeId ?? null,
+        degree_title: normalizeOptionalText(next.highestQualification),
+        major: normalizeOptionalText(next.major),
+        institution: "Chưa cập nhật",
+        end_date: yearToDateString(next.degreeYear),
+      });
+    } else {
+      const latest = items[0];
+      if (latest) {
+        if (!latest.institution || !latest.institution.trim()) {
+          latest.institution = "Chưa cập nhật";
+        }
+        if (degreeIdToPersist !== undefined) {
+          latest.degree_id = resolvedDegreeId ?? null;
+        }
+        latest.degree_title = normalizeOptionalText(next.highestQualification);
+        latest.major = normalizeOptionalText(next.major);
+        latest.end_date = yearToDateString(next.degreeYear);
+      }
+    }
+
+    await syncTrainingHistories({ items });
+  }
 
   async function loadProfile() {
     loading.value = true;
     try {
-      const payload = await fetchScientificProfile();
+      const [payload, degrees, ranks] = await Promise.all([
+        fetchScientificProfile(),
+        fetchDegrees(),
+        fetchAcademicRanks(),
+      ]);
+      degreeOptions.value = degrees;
+      rankOptions.value = ranks;
       applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
     } catch (error) {
       throw new Error(resolveErrorMessage(error, "Unable to load profile"));
@@ -432,33 +517,41 @@ export function useLecturerProfile() {
       const rankInput = next.academicRank.trim();
       const degreeChanged = degreeInput !== prev.academicDegree.trim();
       const rankChanged = rankInput !== prev.academicRank.trim();
+      const [degrees, ranks] = await Promise.all([
+        degreeOptions.value.length > 0 ? Promise.resolve(degreeOptions.value) : fetchDegrees(),
+        rankOptions.value.length > 0
+          ? Promise.resolve(rankOptions.value)
+          : fetchAcademicRanks(),
+      ]);
+      degreeOptions.value = degrees;
+      rankOptions.value = ranks;
+      const matchedDegreeId = degreeInput ? matchLookupId(degreeInput, degrees) : null;
+      const matchedRankId = rankInput ? matchLookupId(rankInput, ranks) : null;
+
+      if (degreeChanged && degreeInput && !matchedDegreeId) {
+        throw new Error("Khong tim thay hoc vi trong danh muc.");
+      }
+      if (rankChanged && rankInput && !matchedRankId) {
+        throw new Error("Khong tim thay hoc ham trong danh muc.");
+      }
 
       if (degreeChanged || rankChanged) {
-        const [degrees, ranks] = await Promise.all([
-          fetchDegrees(),
-          fetchAcademicRanks(),
-        ]);
-
-        const degreeId = degreeInput ? matchLookupId(degreeInput, degrees) : null;
-        const rankId = rankInput ? matchLookupId(rankInput, ranks) : null;
-
-        if (degreeInput && !degreeId) {
-          throw new Error("Khong tim thay hoc vi trong danh muc.");
-        }
-        if (rankInput && !rankId) {
-          throw new Error("Khong tim thay hoc ham trong danh muc.");
-        }
-
         const payload = await updateAcademicTitles({
           items: [
             {
-              degree_id: degreeId ?? null,
-              academic_rank_id: rankId ?? null,
+              degree_id: matchedDegreeId ?? null,
+              academic_rank_id: matchedRankId ?? null,
             },
           ],
         });
         applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
       }
+
+      await syncLatestEducation(
+        next,
+        degreeChanged ? (matchedDegreeId ?? null) : undefined,
+        matchedDegreeId
+      );
 
       const researchItems = buildResearchAreaItems(next);
       const payload = await updateResearchAreas({ items: researchItems });
@@ -489,6 +582,8 @@ export function useLecturerProfile() {
     contactInfo,
     academicProfile,
     works,
+    degreeOptions,
+    rankOptions,
 
     loadProfile,
     updatePersonalInfo,

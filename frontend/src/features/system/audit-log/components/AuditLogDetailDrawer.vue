@@ -103,13 +103,6 @@
             </h3>
 
             <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
-              <div class="text-xs font-medium text-slate-500">Action code</div>
-              <div class="mt-1 text-sm font-semibold text-slate-900">
-                {{ entry.actionCode }}
-              </div>
-            </div>
-
-            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
               <div class="text-xs font-medium text-slate-500">Mô tả</div>
               <div class="mt-1 text-sm font-semibold text-slate-900">
                 {{ entry.actionLabel }}
@@ -119,7 +112,7 @@
             <div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
               <div class="text-xs font-medium text-slate-500">Đối tượng</div>
               <div class="mt-1 text-sm font-semibold text-slate-900">
-                {{ entry.target.display ?? "-" }}
+                {{ entry.objectDisplay }}
               </div>
             </div>
 

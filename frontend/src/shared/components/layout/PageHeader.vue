@@ -17,6 +17,7 @@
         v-if="showExportPdf"
         type="button"
         class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+        :disabled="exportPdfDisabled"
         @click="emit('exportPdfClicked')"
       >
         <FileText class="h-4 w-4" />
@@ -27,6 +28,7 @@
         v-if="showExportExcel"
         type="button"
         class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+        :disabled="exportExcelDisabled"
         @click="emit('exportExcelClicked')"
       >
         <Sheet class="h-4 w-4" />
@@ -45,6 +47,8 @@ interface PageHeaderProps {
 
   showExportPdf?: boolean;
   showExportExcel?: boolean;
+  exportPdfDisabled?: boolean;
+  exportExcelDisabled?: boolean;
 
   exportPdfLabel?: string;
   exportExcelLabel?: string;
@@ -54,6 +58,8 @@ withDefaults(defineProps<PageHeaderProps>(), {
   subtitle: "",
   showExportPdf: true,
   showExportExcel: true,
+  exportPdfDisabled: false,
+  exportExcelDisabled: false,
   exportPdfLabel: "Xuất PDF",
   exportExcelLabel: "Xuất Excel",
 });

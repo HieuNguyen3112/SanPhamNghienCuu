@@ -9,6 +9,7 @@ use App\Models\Lecturer;
 use App\Models\LecturerProfile;
 use App\Models\LecturerTrainingHistory;
 use App\Models\LecturerWorkHistory;
+use App\Support\AuditLogger;
 use App\Support\RoleMapper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -157,6 +158,17 @@ class LecturerProfileController extends Controller
         $profile->fill(collect($data)->only($profileFields)->toArray());
         $profile->save();
 
+        AuditLogger::log($request, [
+            'action_group' => 'lecturer',
+            'action_code' => 'LECTURER_PROFILE_UPDATED',
+            'action_label' => 'Cập nhật hồ sơ cá nhân',
+            'target_type' => 'lecturer_profile',
+            'target_id' => $lecturer->id,
+            'target_display' => $lecturer->full_name,
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_OK,
+        ], $user);
+
         return response()->json([
             'message' => 'profile contact updated',
             'data' => $this->buildProfilePayload($user, $lecturer),
@@ -209,6 +221,17 @@ class LecturerProfileController extends Controller
             $lecturer->save();
         }
 
+        AuditLogger::log($request, [
+            'action_group' => 'lecturer',
+            'action_code' => 'LECTURER_ACADEMIC_TITLES_UPDATED',
+            'action_label' => 'Cập nhật học hàm, học vị',
+            'target_type' => 'lecturer_profile',
+            'target_id' => $lecturer->id,
+            'target_display' => $lecturer->full_name,
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_OK,
+        ], $user);
+
         return response()->json([
             'message' => 'academic titles updated',
             'data' => $this->buildProfilePayload($user, $lecturer),
@@ -242,6 +265,17 @@ class LecturerProfileController extends Controller
         }
 
         $profile->save();
+
+        AuditLogger::log($request, [
+            'action_group' => 'lecturer',
+            'action_code' => 'LECTURER_RESEARCH_AREAS_UPDATED',
+            'action_label' => 'Cập nhật lĩnh vực nghiên cứu',
+            'target_type' => 'lecturer_profile',
+            'target_id' => $lecturer->id,
+            'target_display' => $lecturer->full_name,
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_OK,
+        ], $user);
 
         return response()->json([
             'message' => 'research areas updated',
@@ -300,6 +334,18 @@ class LecturerProfileController extends Controller
 
             return $lecturer->languageProficiencies()->get();
         });
+
+        AuditLogger::log($request, [
+            'action_group' => 'lecturer',
+            'action_code' => 'LECTURER_LANGUAGES_SYNCED',
+            'action_label' => 'Cập nhật ngoại ngữ',
+            'target_type' => 'lecturer_profile',
+            'target_id' => $lecturer->id,
+            'target_display' => $lecturer->full_name,
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_OK,
+            'note' => 'languages_count:' . count($synced),
+        ], $user);
 
         return response()->json([
             'message' => 'languages synced',
@@ -476,6 +522,18 @@ class LecturerProfileController extends Controller
 
             return $lecturer->trainingHistories()->with('degree')->get();
         });
+
+        AuditLogger::log($request, [
+            'action_group' => 'lecturer',
+            'action_code' => 'LECTURER_EDUCATIONS_SYNCED',
+            'action_label' => 'Cập nhật quá trình đào tạo',
+            'target_type' => 'lecturer_profile',
+            'target_id' => $lecturer->id,
+            'target_display' => $lecturer->full_name,
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_OK,
+            'note' => 'educations_count:' . count($synced),
+        ], $user);
 
         return response()->json([
             'message' => 'educations synced',
