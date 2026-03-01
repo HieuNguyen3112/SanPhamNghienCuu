@@ -1,4 +1,4 @@
-﻿import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import type {
   ResearchWorkApprovalEntry,
   ResearchWorkApprovalUiConfiguration,
@@ -16,6 +16,7 @@ import {
   type FacultyApprovalDetailResponse,
   type FacultyApprovalListItem,
 } from "../../shared/services/facultyApproval.service";
+import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
 export function useFacultyResearchWorkApprovalProvider() {
   const uiConfiguration = ref<ResearchWorkApprovalUiConfiguration>({
@@ -55,8 +56,10 @@ export function useFacultyResearchWorkApprovalProvider() {
   const academicYearIdByCode = ref<Record<string, number>>({});
   const facultyIdentifierById = ref<Record<number, string>>({});
 
-  const toastMessage = ref<string | null>(null);
-  let toastTimer: number | null = null;
+  const {
+    showSuccessModal,
+    showErrorModal,
+  } = useActionResultModal();
 
   const totalPendingResearchWorkCount = computed<number>(() => {
     const pendingValue = displayMapping.getPendingApprovalStatusValue();
@@ -72,13 +75,12 @@ export function useFacultyResearchWorkApprovalProvider() {
     () => `Chờ duyệt: ${totalPendingResearchWorkCount.value} công trình`
   );
 
-  function showToast(message: string): void {
-    toastMessage.value = message;
-    if (toastTimer != null) window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => {
-      toastMessage.value = null;
-      toastTimer = null;
-    }, 3500);
+  function showActionSuccess(message: string): void {
+    showSuccessModal(message);
+  }
+
+  function showActionError(message: string, details?: unknown): void {
+    showErrorModal(message, "Có lỗi xảy ra", details);
   }
 
   function openResearchWorkDetailDrawer(
@@ -137,19 +139,30 @@ export function useFacultyResearchWorkApprovalProvider() {
   }
 
   function mapAuthors(item: FacultyApprovalListItem, submitterId: number) {
+    const ownerFacultyId = item.lecturer.faculty_id ?? null;
     return item.authors.map((author) => {
       const isPrimary =
         author.member_role_code === "principal" ||
         author.member_role_code === "corresponding_author" ||
         author.member_role_code === "chief_editor";
+      const memberFacultyId = author.member_faculty_id ?? null;
+      const isOutsideFaculty =
+        author.is_outside_faculty ??
+        (ownerFacultyId !== null &&
+          memberFacultyId !== null &&
+          ownerFacultyId !== memberFacultyId);
       return {
         authorIdentifier: author.lecturer_id,
         authorDisplayName: `${author.lecturer_full_name} (${author.lecturer_code})`,
         authorFacultyIdentifier:
-          facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
+          facultyIdentifierById.value[memberFacultyId ?? 0] ??
+          facultyIdentifierById.value[ownerFacultyId ?? 0] ??
           "ALL_DEPARTMENTS",
         authorFacultyDisplayName:
           author.faculty_name ?? author.department_name ?? "",
+        authorFacultyId: memberFacultyId,
+        ownerFacultyId,
+        isOutsideFaculty,
         isPrimaryAuthor: isPrimary,
         isSubmittingLecturer: author.lecturer_id === submitterId,
       };
@@ -218,13 +231,24 @@ export function useFacultyResearchWorkApprovalProvider() {
         member.member_role_code === "chief_editor";
       const computedMemberHours =
         member.computed_member_hours ?? member.declared_hours ?? member.hours_assigned ?? null;
+      const ownerFacultyId = member.owner_faculty_id ?? item.lecturer.faculty_id ?? null;
+      const memberFacultyId = member.member_faculty_id ?? null;
+      const isOutsideFaculty =
+        member.is_outside_faculty ??
+        (ownerFacultyId !== null &&
+          memberFacultyId !== null &&
+          ownerFacultyId !== memberFacultyId);
       return {
         authorIdentifier: member.lecturer_id,
         authorDisplayName: `${member.lecturer_full_name} (${member.lecturer_code})`,
         authorFacultyIdentifier:
-          facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
+          facultyIdentifierById.value[memberFacultyId ?? 0] ??
+          facultyIdentifierById.value[ownerFacultyId ?? 0] ??
           "ALL_DEPARTMENTS",
-        authorFacultyDisplayName: member.faculty_name ?? "",
+        authorFacultyDisplayName: member.faculty_name ?? member.department_name ?? "",
+        authorFacultyId: memberFacultyId,
+        ownerFacultyId,
+        isOutsideFaculty,
         isPrimaryAuthor: isPrimary,
         isSubmittingLecturer: member.lecturer_id === item.lecturer.id,
         authorRoleDisplayName:
@@ -285,6 +309,9 @@ export function useFacultyResearchWorkApprovalProvider() {
       lecturerDeclaredResearchHours: item.declared_hours ?? 0,
       recommendedResearchHoursByPolicy: item.computed_total_hours ?? 0,
       officialResearchHours: item.official_hours ?? 0,
+      ruleResolved: item.rule_resolved ?? false,
+      ruleSummary: item.rule_summary ?? null,
+      hoursResolutionNote: item.hours_resolution_note ?? null,
 
       approvalStatus: item.approval_status as any,
 
@@ -352,7 +379,7 @@ export function useFacultyResearchWorkApprovalProvider() {
       selectedResearchWorkApprovalEntry.value = mapDetailEntry(detail);
     } catch (error) {
       console.error(error);
-      showToast("Không tải được chi tiết. Vui lòng thử lại.");
+      showActionError("Không tải được chi tiết. Vui lòng thử lại.");
     }
   }
 
@@ -363,12 +390,12 @@ export function useFacultyResearchWorkApprovalProvider() {
   }): Promise<void> {
     try {
       await approveFacultyApproval(payload.researchWorkIdentifier);
-      showToast("Đã duyệt công trình.");
+      showActionSuccess("Đã duyệt công trình.");
       await loadList();
       closeResearchWorkDetailDrawer();
     } catch (error) {
       console.error(error);
-      showToast("Không thể duyệt công trình. Vui lòng thử lại.");
+      showActionError("Không thể duyệt công trình. Vui lòng thử lại.");
     }
   }
 
@@ -382,19 +409,19 @@ export function useFacultyResearchWorkApprovalProvider() {
         reason_type: payload.rejectionReasonType,
         reason_detail: payload.rejectionReasonDetail,
       });
-      showToast("Đã từ chối công trình.");
+      showActionSuccess("Đã từ chối công trình.");
       await loadList();
       closeResearchWorkDetailDrawer();
     } catch (error) {
       console.error(error);
-      showToast("Không thể từ chối công trình. Vui lòng thử lại.");
+      showActionError("Không thể từ chối công trình. Vui lòng thử lại.");
     }
   }
 
   onMounted(() => {
     loadLookups().then(loadList).catch((error) => {
       console.error(error);
-      showToast("Không tải được dữ liệu. Vui lòng thử lại.");
+      showActionError("Không tải được dữ liệu. Vui lòng thử lại.");
     });
   });
 
@@ -410,7 +437,7 @@ export function useFacultyResearchWorkApprovalProvider() {
       if (!lookupReady.value) return;
       loadList().catch((error) => {
         console.error(error);
-        showToast("Không tải được dữ liệu. Vui lòng thử lại.");
+        showActionError("Không tải được dữ liệu. Vui lòng thử lại.");
       });
     }
   );
@@ -421,9 +448,6 @@ export function useFacultyResearchWorkApprovalProvider() {
     pageTitle: computed(() => uiConfiguration.value.pageTitle),
     pageSubtitle: computed(() => uiConfiguration.value.pageSubtitle),
     pendingBadgeText,
-
-    toastMessage,
-
     filterPanelHelperText: computed(
       () =>
         "Không có bộ lọc khoa vì phạm vi đã cố định theo khoa đăng nhập. Mặc định hiển thị tất cả năm học."

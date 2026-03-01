@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ResearchHoursCatalogSeeder extends Seeder
 {
@@ -41,24 +42,28 @@ class ResearchHoursCatalogSeeder extends Seeder
             [
                 'kind' => 'paper',
                 'type' => 'hdgsnn_900',
+                'type_aliases' => ['hdgsnn_900'],
                 'distribution_strategy' => 'equal_all_members',
                 'hours_total_per_activity' => 900,
             ],
             [
                 'kind' => 'paper',
                 'type' => 'hdgsnn_600',
+                'type_aliases' => ['hdgsnn_600'],
                 'distribution_strategy' => 'equal_all_members',
                 'hours_total_per_activity' => 600,
             ],
             [
                 'kind' => 'paper',
                 'type' => 'hdgsnn_300',
+                'type_aliases' => ['hdgsnn_300', 'issn_isbn'],
                 'distribution_strategy' => 'equal_all_members',
                 'hours_total_per_activity' => 300,
             ],
             [
                 'kind' => 'book',
                 'type' => 'textbook',
+                'type_aliases' => ['textbook', 'giao_trinh', 'book_textbook'],
                 'distribution_strategy' => 'principal_fraction_others_equal',
                 'hours_total_per_activity' => 900,
                 'principal_fraction' => 0.2,
@@ -67,6 +72,7 @@ class ResearchHoursCatalogSeeder extends Seeder
             [
                 'kind' => 'book',
                 'type' => 'reference',
+                'type_aliases' => ['reference', 'tai_lieu', 'tham_khao', 'book_reference'],
                 'distribution_strategy' => 'principal_fraction_others_equal',
                 'hours_total_per_activity' => 600,
                 'principal_fraction' => 0.2,
@@ -75,12 +81,14 @@ class ResearchHoursCatalogSeeder extends Seeder
             [
                 'kind' => 'conference',
                 'type' => 'report',
+                'type_aliases' => ['report', 'bao_cao', 'conference_report', 'presentation'],
                 'distribution_strategy' => 'per_lecturer_fixed',
                 'hours_per_occurrence' => 40,
             ],
             [
                 'kind' => 'conference',
                 'type' => 'attend',
+                'type_aliases' => ['attend', 'tham_du', 'conference_attend'],
                 'distribution_strategy' => 'per_lecturer_fixed',
                 'hours_per_occurrence' => 4,
                 'max_occurrences_per_year' => 40,
@@ -88,6 +96,7 @@ class ResearchHoursCatalogSeeder extends Seeder
             [
                 'kind' => 'project',
                 'type' => 'bo',
+                'type_aliases' => ['bo', 'ministry', 'cap_bo', 'project_bo'],
                 'distribution_strategy' => 'principal_fraction_others_equal',
                 // Quy tắc đề tài cấp Bộ: Chủ nhiệm 720h + quỹ giờ thành viên 480h.
                 'hours_total_per_activity' => 720,
@@ -96,6 +105,7 @@ class ResearchHoursCatalogSeeder extends Seeder
             [
                 'kind' => 'project',
                 'type' => 'coso',
+                'type_aliases' => ['coso', 'co_so', 'university', 'cap_truong', 'project_university'],
                 'distribution_strategy' => 'principal_fraction_others_equal',
                 // Quy tắc đề tài cấp Trường: Chủ nhiệm 600h + quỹ giờ thành viên 240h.
                 'hours_total_per_activity' => 600,
@@ -106,7 +116,12 @@ class ResearchHoursCatalogSeeder extends Seeder
         foreach ($years as $year) {
             foreach ($ruleTemplates as $rule) {
                 $kindId = $kindIds[$rule['kind']] ?? null;
-                $typeId = $typeIds[$rule['type']] ?? null;
+                $typeId = $this->resolveTypeId(
+                    $typeIds,
+                    (int) $kindId,
+                    array_merge([$rule['type']], $rule['type_aliases'] ?? [])
+                );
+
                 if (! $kindId || ! $typeId) {
                     continue;
                 }
@@ -139,11 +154,60 @@ class ResearchHoursCatalogSeeder extends Seeder
                 ['academic_year_id' => $year->id],
                 [
                     'required_hours' => 600,
-                    'notes' => 'Định mức chuẩn',
+                    'notes' => 'Định mức mặc định',
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]
             );
         }
+    }
+
+    private function resolveTypeId(array $typeIds, int $kindId, array $aliases): ?int
+    {
+        if ($kindId <= 0) {
+            return null;
+        }
+
+        foreach ($aliases as $alias) {
+            $alias = trim((string) $alias);
+            if ($alias !== '' && isset($typeIds[$alias])) {
+                return (int) $typeIds[$alias];
+            }
+        }
+
+        $normalizedAliases = collect($aliases)
+            ->map(fn ($alias) => $this->normalizeToken((string) $alias))
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($normalizedAliases === []) {
+            return null;
+        }
+
+        $row = DB::table('activity_types')
+            ->where('kind_id', $kindId)
+            ->select(['id', 'code'])
+            ->get()
+            ->first(function ($type) use ($normalizedAliases) {
+                $code = $this->normalizeToken((string) $type->code);
+                foreach ($normalizedAliases as $alias) {
+                    if ($alias === $code || str_contains($code, $alias) || str_contains($alias, $code)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+
+        return $row ? (int) $row->id : null;
+    }
+
+    private function normalizeToken(string $value): string
+    {
+        $ascii = Str::lower(Str::ascii($value));
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $ascii);
+
+        return trim((string) $normalized, '_');
     }
 }

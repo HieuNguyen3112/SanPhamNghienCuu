@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
     <div class="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
       <!-- Năm học -->

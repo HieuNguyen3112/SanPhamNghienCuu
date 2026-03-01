@@ -11,6 +11,8 @@ use App\Http\Controllers\LecturerPersonalWorkController;
 use App\Http\Controllers\LecturerHoursCalculateController;
 use App\Http\Controllers\LecturerPersonalHoursController;
 use App\Http\Controllers\LecturerHoursWarningController;
+use App\Http\Controllers\LecturerNotificationController;
+use App\Http\Controllers\FacultyNotificationController;
 use App\Http\Controllers\LecturerResearchWorkSearchController;
 use App\Http\Controllers\LookupController;
 use App\Http\Controllers\ResearchActivityController;
@@ -160,6 +162,28 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LE
         Route::patch('/{warningId}/resolved', [LecturerHoursWarningController::class, 'markResolved']);
     });
 
+// LECTURER NOTIFICATIONS (bell dropdown)
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LECTURER'])
+    ->prefix('lecturer/notifications')
+    ->group(function () {
+        Route::get('/', [LecturerNotificationController::class, 'index']);
+        Route::delete('/delete-read', [LecturerNotificationController::class, 'destroyRead']);
+        Route::delete('/{notificationId}', [LecturerNotificationController::class, 'destroy']);
+        Route::patch('/read-all', [LecturerNotificationController::class, 'markAllRead']);
+        Route::patch('/{notificationId}/read', [LecturerNotificationController::class, 'markRead']);
+    });
+
+// FACULTY NOTIFICATIONS (bell dropdown)
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DEPARTMENT_BOARD'])
+    ->prefix('faculty/notifications')
+    ->group(function () {
+        Route::get('/', [FacultyNotificationController::class, 'index']);
+        Route::delete('/delete-read', [FacultyNotificationController::class, 'destroyRead']);
+        Route::delete('/{notificationId}', [FacultyNotificationController::class, 'destroy']);
+        Route::patch('/read-all', [FacultyNotificationController::class, 'markAllRead']);
+        Route::patch('/{notificationId}/read', [FacultyNotificationController::class, 'markRead']);
+    });
+
 // LOOKUPS (read-only)
 Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])
     ->prefix('lookups')
@@ -230,6 +254,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LE
     ->prefix('lecturer/declarations')
     ->group(function () {
         Route::get('/drafts', [LecturerDeclarationDraftController::class, 'index']);
+        Route::post('/projects/preview-hours', [ResearchActivityController::class, 'previewProjectHours']);
     });
 
 // FACULTY HOURS (Department Board)

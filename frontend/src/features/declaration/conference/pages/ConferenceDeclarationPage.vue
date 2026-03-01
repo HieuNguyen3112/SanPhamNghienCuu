@@ -10,8 +10,11 @@
         :canSubmit="canSubmit"
         :pending="shell.pending.value"
         :errorMessage="shell.error_message.value"
+        :successVisible="shell.success_visible.value"
+        :successMessage="shell.success_message.value"
         @save-draft="shell.save_draft"
         @submit="shell.submit_for_approval"
+        @close-success="shell.close_success_modal"
       >
         <template #intro>
           <div
@@ -286,6 +289,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { Users, Plus, Trash2 } from "lucide-vue-next";
 
 import DeclarationFormShell from "../../shared/components/DeclarationFormShell.vue";
@@ -308,6 +312,7 @@ import {
   fetch_member_roles,
 } from "../../shared/services/catalogs.service";
 import {
+  fetch_activity,
   fetch_current_lecturer_id,
   list_evidence_files,
   submit_activity,
@@ -322,6 +327,9 @@ import {
   type ConferenceDeclarationFormModel,
   type ConferenceOccurrenceFormItem,
 } from "../ConferenceDeclarationContract";
+
+const route = useRoute();
+const router = useRouter();
 
 const academicYears = ref<AcademicYearDto[]>([]);
 const evidenceFileTypes = ref<EvidenceFileTypeDto[]>([]);
@@ -428,6 +436,45 @@ function onRemoveRowExistingEvidence(rowId: string, fileId: number) {
   );
 }
 
+async function loadDraftFromQuery() {
+  const raw = route.query.activity_id;
+  const rawValue = Array.isArray(raw) ? raw[0] : raw;
+  const activityId = rawValue ? Number(rawValue) : null;
+
+  if (!activityId || Number.isNaN(activityId)) return;
+
+  const data = await fetch_activity(activityId);
+  const activity = data.activity;
+  if (!activity) return;
+
+  form.activityIds = [activity.id];
+  form.academicYearId = activity.academic_year_id ?? null;
+  form.kindId = activity.kind_id ?? form.kindId;
+
+  const detail =
+    data.detail_kind === "conference_details" && data.detail
+      ? (data.detail as any)
+      : null;
+
+  form.items = [
+    {
+      rowId: createConferenceRowId(),
+      typeId: activity.type_id ?? null,
+      conferenceName: detail?.conference_name ?? activity.title ?? "",
+      location: detail?.location ?? "",
+      heldOn: detail?.held_on ?? activity.start_date ?? null,
+      notes: activity.notes ?? "",
+      existingEvidenceFiles: data.evidence_files ?? [],
+      pendingEvidenceFiles: [],
+      pendingEvidenceLinks: [],
+    },
+  ];
+  openEvidenceRowId.value = null;
+
+  const statusCode = (activity.status_code ?? "draft") as any;
+  shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
+}
+
 const canSubmit = computed(() => {
   if (!form.academicYearId) return false;
   if (form.items.length === 0) return false;
@@ -521,12 +568,14 @@ const shell = useDeclarationFormShell({
     const memberRoleId = resolveDefaultMemberRoleId();
     const createdIds: number[] = [];
 
-    for (const row of form.items) {
+    for (const [index, row] of form.items.entries()) {
       if (!row.typeId || !row.conferenceName.trim()) {
         continue;
       }
 
+      const existingActivityId = form.activityIds[index] ?? null;
       const activity = await upsert_activity_base({
+        id: typeof existingActivityId === "number" ? existingActivityId : undefined,
         kind_id: kindId.value,
         type_id: row.typeId,
         academic_year_id: form.academicYearId,
@@ -558,9 +607,14 @@ const shell = useDeclarationFormShell({
     }
 
     form.activityIds = createdIds;
+    if (createdIds.length === 1) {
+      await router.replace({
+        query: { ...route.query, activity_id: String(createdIds[0]) },
+      });
+    }
   },
   on_submit: async () => {
-    await shell.save_draft();
+    await shell.save_draft({ silent_success: true });
     if (form.activityIds.length === 0) {
       throw new Error("Không có dòng hội thảo hợp lệ để gửi duyệt.");
     }
@@ -582,5 +636,8 @@ const shell = useDeclarationFormShell({
   },
 });
 
-onMounted(loadCatalogs);
+onMounted(async () => {
+  await loadCatalogs();
+  await loadDraftFromQuery();
+});
 </script>

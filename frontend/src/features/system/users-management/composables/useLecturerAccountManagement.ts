@@ -1,4 +1,4 @@
-﻿import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import type {
   AssignRolesPayload,
   LecturerAccount,
@@ -18,18 +18,14 @@ import {
 } from "../contracts/lecturerAccountManagement.contract";
 import type { LecturerAccountManagementService } from "../services/lecturerAccountManagementService";
 import { createLecturerAccountManagementService } from "../services/lecturerAccountManagementService";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 export interface UseLecturerAccountManagementOptions {
   scope?: LecturerAccountScope;
-  /**
-   * For FACULTY scope only: fixed unit id for the board.
-   * TODO: derive from /me or auth context.
-   */
   faculty_unit_id?: number;
-  /**
-   * Allow injecting a custom service (real API) instead of mock.
-   * Useful for tests.
-   */
   service?: LecturerAccountManagementService;
 }
 
@@ -43,15 +39,11 @@ export function useLecturerAccountManagement(
       scope,
       faculty_unit_id: options?.faculty_unit_id,
     });
+  const { runWithFeedback } = useActionFeedback();
 
-  // filter state
   const filter = ref<LecturerAccountFilterState>(defaultFilterState());
-
-  // options
   const unitOptions = ref<UnitOptionDTO[]>([]);
   const roleOptions = ref<RoleOption[]>(DEFAULT_ROLE_OPTIONS);
-
-  // data
   const rowsDto = ref<LecturerAccountDTO[]>([]);
   const rows = computed<LecturerAccount[]>(() =>
     rowsDto.value.map(lecturerAccountFromDto)
@@ -60,20 +52,13 @@ export function useLecturerAccountManagement(
   const currentPageNumber = ref(1);
   const pageSize = ref(12);
   const totalItems = ref(0);
-
   const loading = ref(false);
   const error = ref<string | null>(null);
   const resultCount = computed(() => totalItems.value);
 
-  // toast
-  const toastMessage = ref<string | null>(null);
-  let toastTimer: number | null = null;
-
-  // modal states
   const editOpen = ref(false);
   const rolesOpen = ref(false);
   const deactivateOpen = ref(false);
-
   const selectedAccountId = ref<number | null>(null);
   const selectedAccount = computed(() =>
     selectedAccountId.value == null
@@ -86,17 +71,11 @@ export function useLecturerAccountManagement(
   const savingDeactivate = ref(false);
   const savingError = ref<string | null>(null);
 
-  function showToast(message: string) {
-    toastMessage.value = message;
-    if (toastTimer != null) window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => {
-      toastMessage.value = null;
-      toastTimer = null;
-    }, 2500);
+  function resolveFriendlyErrorMessage(error: unknown, fallback: string) {
+    return resolveApiErrorMessage(error, fallback);
   }
 
   function updateFilter(next: LecturerAccountFilterState) {
-    // Faculty scope: unit filter is locked (but we still keep it in state for UI consistency)
     if (scope === "FACULTY") {
       filter.value = {
         ...next,
@@ -111,23 +90,6 @@ export function useLecturerAccountManagement(
     filter.value = defaultFilterState();
     if (scope === "FACULTY") {
       filter.value.unitId = "ALL";
-    }
-  }
-
-  async function bootstrap() {
-    loading.value = true;
-    error.value = null;
-    try {
-      const lookups = await service.getLookupsDTO();
-      unitOptions.value = lookups.units;
-      roleOptions.value = lookups.roles.length
-        ? lookups.roles
-        : DEFAULT_ROLE_OPTIONS;
-      await search({ resetPage: true });
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : "Không tải được dữ liệu.";
-    } finally {
-      loading.value = false;
     }
   }
 
@@ -149,8 +111,30 @@ export function useLecturerAccountManagement(
     try {
       await fetchList();
     } catch (e) {
-      error.value =
-        e instanceof Error ? e.message : "Không tải được danh sách.";
+      error.value = resolveFriendlyErrorMessage(
+        e,
+        "Không tải được danh sách tài khoản."
+      );
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function bootstrap() {
+    loading.value = true;
+    error.value = null;
+    try {
+      const lookups = await service.getLookupsDTO();
+      unitOptions.value = lookups.units;
+      roleOptions.value = lookups.roles.length
+        ? lookups.roles
+        : DEFAULT_ROLE_OPTIONS;
+      await search({ resetPage: true });
+    } catch (e) {
+      error.value = resolveFriendlyErrorMessage(
+        e,
+        "Không tải được dữ liệu khởi tạo."
+      );
     } finally {
       loading.value = false;
     }
@@ -165,7 +149,6 @@ export function useLecturerAccountManagement(
     pageSize.value = nextPageSize;
   }
 
-  // modal open/close
   function openEdit(id: number) {
     selectedAccountId.value = id;
     editOpen.value = true;
@@ -201,13 +184,31 @@ export function useLecturerAccountManagement(
     savingEdit.value = true;
     savingError.value = null;
     try {
-      await service.updateLecturerAccountDTO(payload);
-      showToast("Đã cập nhật thông tin giảng viên.");
-      closeAllModals();
-      await search({ resetPage: false });
+      await runWithFeedback(
+        async () => {
+          await service.updateLecturerAccountDTO(payload);
+          closeAllModals();
+          await search({ resetPage: false });
+        },
+        {
+          loading: {
+            title: "Đang cập nhật",
+            message: "Hệ thống đang lưu thông tin giảng viên...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã cập nhật thông tin giảng viên.",
+          },
+          error: {
+            title: "Cập nhật thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(error, "Không thể lưu thông tin."),
+          },
+          rethrow: false,
+        }
+      );
     } catch (e) {
-      savingError.value =
-        e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value = resolveFriendlyErrorMessage(e, "Không thể lưu thông tin.");
     } finally {
       savingEdit.value = false;
     }
@@ -217,13 +218,31 @@ export function useLecturerAccountManagement(
     savingRoles.value = true;
     savingError.value = null;
     try {
-      await service.assignRolesDTO(payload);
-      showToast("Đã lưu phân quyền.");
-      closeAllModals();
-      await search({ resetPage: false });
+      await runWithFeedback(
+        async () => {
+          await service.assignRolesDTO(payload);
+          closeAllModals();
+          await search({ resetPage: false });
+        },
+        {
+          loading: {
+            title: "Đang lưu phân quyền",
+            message: "Hệ thống đang cập nhật vai trò...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã lưu phân quyền.",
+          },
+          error: {
+            title: "Lưu phân quyền thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(error, "Không thể lưu phân quyền."),
+          },
+          rethrow: false,
+        }
+      );
     } catch (e) {
-      savingError.value =
-        e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value = resolveFriendlyErrorMessage(e, "Không thể lưu phân quyền.");
     } finally {
       savingRoles.value = false;
     }
@@ -233,39 +252,53 @@ export function useLecturerAccountManagement(
     savingDeactivate.value = true;
     savingError.value = null;
     try {
-      await service.toggleAccountStatusDTO(payload);
-      showToast("Đã cập nhật trạng thái tài khoản.");
-      closeAllModals();
-      await search({ resetPage: false });
+      await runWithFeedback(
+        async () => {
+          await service.toggleAccountStatusDTO(payload);
+          closeAllModals();
+          await search({ resetPage: false });
+        },
+        {
+          loading: {
+            title: "Đang cập nhật trạng thái",
+            message: "Vui lòng đợi hệ thống xử lý...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã cập nhật trạng thái tài khoản.",
+          },
+          error: {
+            title: "Cập nhật thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(
+                error,
+                "Không thể cập nhật trạng thái tài khoản."
+              ),
+          },
+          rethrow: false,
+        }
+      );
     } catch (e) {
-      savingError.value =
-        e instanceof Error ? e.message : "Không thể lưu.";
+      savingError.value = resolveFriendlyErrorMessage(
+        e,
+        "Không thể cập nhật trạng thái tài khoản."
+      );
     } finally {
       savingDeactivate.value = false;
     }
   }
 
-  const unitOptionsUi = computed(() =>
-    unitOptions.value.map(unitOptionFromDto)
-  );
+  const unitOptionsUi = computed(() => unitOptions.value.map(unitOptionFromDto));
 
   onMounted(() => {
     void bootstrap();
   });
 
-  onBeforeUnmount(() => {
-    if (toastTimer != null) window.clearTimeout(toastTimer);
-  });
-
   return {
     scope,
-
-    // filter + options
     filter,
     unitOptions: unitOptionsUi,
     roleOptions,
-
-    // table data
     rows,
     loading,
     error,
@@ -273,34 +306,23 @@ export function useLecturerAccountManagement(
     currentPageNumber,
     pageSize,
     totalItems,
-
-    // toast
-    toastMessage,
-
-    // modal state
     editOpen,
     rolesOpen,
     deactivateOpen,
     selectedAccount,
-
-    // saving state
     savingEdit,
     savingRoles,
     savingDeactivate,
     savingError,
-
-    // actions
     updateFilter,
     resetFilter,
     search,
     updatePage,
     updatePageSize,
-
     openEdit,
     openRoles,
     openDeactivate,
     closeAllModals,
-
     saveEdit,
     saveRoles,
     confirmToggleStatus,

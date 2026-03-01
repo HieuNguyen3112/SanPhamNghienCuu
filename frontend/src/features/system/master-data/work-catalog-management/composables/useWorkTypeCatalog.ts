@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import type {
   WorkType,
   WorkTypeUpsertDTO,
@@ -45,6 +45,7 @@ export function useWorkTypeCatalog() {
     if (value.length > max) return `Tối đa ${max} ký tự.`;
     return null;
   }
+
   function validateOptional(value: string, max: number): string | null {
     if (value.length > max) return `Tối đa ${max} ký tự.`;
     return null;
@@ -56,12 +57,25 @@ export function useWorkTypeCatalog() {
       page: pageWorkType.value,
       per_page: pageSizeWorkType.value,
     });
+
     workTypes.value = res.items;
     workTypeTotal.value = res.pagination.total;
   }
 
   const filteredWorkTypes = computed(() => workTypes.value);
   const pagedWorkTypes = computed(() => workTypes.value);
+
+  watch(qWorkType, () => {
+    if (pageWorkType.value !== 1) {
+      pageWorkType.value = 1;
+      return;
+    }
+    void load();
+  });
+
+  watch([pageWorkType, pageSizeWorkType], () => {
+    void load();
+  });
 
   function openCreateWorkType() {
     modalMode.value = "create";
@@ -99,6 +113,7 @@ export function useWorkTypeCatalog() {
     workTypeErrors.name = validateRequired(workTypeForm.name, 255) ?? undefined;
     workTypeErrors.description =
       validateOptional(workTypeForm.description, 500) ?? undefined;
+
     if (workTypeErrors.name || workTypeErrors.description) return;
 
     const payload: WorkTypeUpsertDTO = {
@@ -134,3 +149,4 @@ export function useWorkTypeCatalog() {
     onUpdateWorkTypeForm,
   };
 }
+

@@ -1,4 +1,8 @@
-export type JournalClassificationDTO = string;
+export type JournalClassificationDTO =
+  | "POINT_GE_2"
+  | "POINT_GE_1"
+  | "ISSN_ISBN"
+  | "OTHER";
 
 export type JournalDTO = {
   id: number;

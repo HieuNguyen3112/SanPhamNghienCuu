@@ -21,8 +21,11 @@
         :canSubmit="canSubmit"
         :pending="shell.pending.value"
         :errorMessage="shell.error_message.value"
+        :successVisible="shell.success_visible.value"
+        :successMessage="shell.success_message.value"
         @save-draft="handleSaveDraft"
         @submit="handleSubmit"
+        @close-success="shell.close_success_modal"
       >
         <template #intro>
           <div
@@ -301,6 +304,7 @@
             :memberRoles="articleMemberRoles"
             :readOnly="readOnly"
             :currentLecturerId="currentLecturerId"
+            :ownerFacultyId="ownerFacultyId"
             :hoursByLecturerId="hoursByLecturerId"
             @request-search="onSearchLecturers"
           />
@@ -328,64 +332,14 @@
     </div>
   </div>
 
-  <div
-    v-if="missingModalOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
-  >
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div class="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-        <div
-          class="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50 p-3"
-        >
-          <div
-            class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600"
-            aria-hidden="true"
-          >
-            <AlertTriangle class="h-4 w-4" />
-          </div>
-          <div class="min-w-0">
-            <h3 class="text-base font-semibold text-rose-700">
-              Thiếu thông tin
-            </h3>
-            <p class="mt-1 text-sm text-rose-700/80">
-              Vui lòng bổ sung các trường bắt buộc sau:
-            </p>
-          </div>
-        </div>
-
-        <ul class="mt-4 space-y-1 text-sm text-rose-700">
-          <li
-            v-for="field in missingFields"
-            :key="field"
-            class="flex items-start gap-2"
-          >
-            <span
-              class="mt-1 h-1.5 w-1.5 rounded-full bg-rose-500"
-              aria-hidden="true"
-            />
-            <span>{{ field }}</span>
-          </li>
-        </ul>
-
-        <div class="mt-5 flex justify-end">
-          <button
-            type="button"
-            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            @click="closeMissingModal"
-          >
-            Đã hiểu
-          </button>
-        </div>
-      </div>
-    </Transition>
-  </div>
+  <ActionResultModal
+    :open="missingModalOpen"
+    type="warning"
+    title="Thiếu thông tin"
+    :message="missingModalMessage"
+    close-label="Đã hiểu"
+    @close="closeMissingModal"
+  />
 </template>
 
 <script setup lang="ts">
@@ -399,7 +353,8 @@ import {
   type ComputedRef,
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { AlertTriangle, FileText } from "lucide-vue-next";
+import { FileText } from "lucide-vue-next";
+import ActionResultModal from "@/shared/components/ActionResultModal.vue";
 import JournalSelect from "../../shared/components/JournalSelect.vue";
 
 import DeclarationFormShell from "../../shared/components/DeclarationFormShell.vue";
@@ -500,6 +455,12 @@ const formErrors = reactive<{
 
 const missingFields = ref<string[]>([]);
 const missingModalOpen = ref(false);
+const missingModalMessage = computed(() => {
+  if (missingFields.value.length === 0) {
+    return "Vui lòng bổ sung các trường bắt buộc.";
+  }
+  return `Vui lòng bổ sung các trường bắt buộc sau:\n• ${missingFields.value.join("\n• ")}`;
+});
 const submitNotice = ref<string | null>(null);
 const submitNoticeTone = ref<"info" | "success">("info");
 
@@ -534,6 +495,11 @@ const typeCodeById = computed(() =>
 );
 const lecturerNameById = computed(() =>
   Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name])),
+);
+const ownerFacultyId = computed(
+  () =>
+    lecturers.value.find((l) => l.id === currentLecturerId.value)?.faculty_id ??
+    null,
 );
 
 const hours = computed(() =>
@@ -883,7 +849,7 @@ const shell = useDeclarationFormShell({
     resetErrors();
     try {
       if (!form.activityId) {
-        await shell.save_draft();
+        await shell.save_draft({ silent_success: true });
       }
       if (!form.activityId) return;
       const submitResponse = await submit_activity(form.activityId);
@@ -979,4 +945,3 @@ async function searchJournals(q: string) {
   })) as JournalSelectOptionDto[];
 }
 </script>
-

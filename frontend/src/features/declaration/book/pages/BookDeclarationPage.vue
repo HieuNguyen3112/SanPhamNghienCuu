@@ -9,8 +9,11 @@
         :canSubmit="canSubmit"
         :pending="shell.pending.value"
         :errorMessage="shell.error_message.value"
+        :successVisible="shell.success_visible.value"
+        :successMessage="shell.success_message.value"
         @save-draft="shell.save_draft"
         @submit="shell.submit_for_approval"
+        @close-success="shell.close_success_modal"
       >
         <template #intro>
           <div
@@ -189,6 +192,7 @@
               :memberRoles="filteredMemberRoles"
               :readOnly="readOnly"
               :currentLecturerId="currentLecturerId"
+              :ownerFacultyId="ownerFacultyId"
               :hoursByLecturerId="hoursByLecturerId"
               @request-search="onSearchLecturers"
             />
@@ -230,6 +234,7 @@
 <script setup lang="ts">
 import axios from "axios";
 import { computed, onMounted, reactive, ref, type ComputedRef } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { BookOpen } from "lucide-vue-next";
 
 import DeclarationFormShell from "../../shared/components/DeclarationFormShell.vue";
@@ -256,6 +261,7 @@ import {
   search_lecturer_options,
 } from "../../shared/services/catalogs.service";
 import {
+  fetch_activity,
   fetch_current_lecturer_id,
   submit_activity,
   upsert_activity_base,
@@ -269,6 +275,9 @@ import {
   bookBaseHoursByTypeCode,
   bookAllowedMemberRoleCodes,
 } from "../BookDeclarationContract";
+
+const route = useRoute();
+const router = useRouter();
 
 // const academicYears = ref(await Promise.resolve([] as any[]));
 const academicYears = ref<AcademicYearDto[]>([]);
@@ -305,6 +314,11 @@ const typeCodeById = computed(() =>
 );
 const lecturerNameById = computed(() =>
   Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name]))
+);
+const ownerFacultyId = computed(
+  () =>
+    lecturers.value.find((l) => l.id === currentLecturerId.value)?.faculty_id ??
+    null
 );
 
 const memberRoleCodeById = computed(() =>
@@ -430,6 +444,46 @@ async function onRemoveExistingEvidence(_id: number) {
   existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
 }
 
+async function loadDraftFromQuery() {
+  const raw = route.query.activity_id;
+  const rawValue = Array.isArray(raw) ? raw[0] : raw;
+  const activityId = rawValue ? Number(rawValue) : null;
+
+  if (!activityId || Number.isNaN(activityId)) return;
+
+  const data = await fetch_activity(activityId);
+  const activity = data.activity;
+  if (!activity) return;
+
+  form.activityId = activity.id;
+  form.academicYearId = activity.academic_year_id ?? null;
+  form.kindId = activity.kind_id ?? form.kindId;
+  form.typeId = activity.type_id ?? null;
+  form.title = activity.title ?? "";
+  form.notes = activity.notes ?? "";
+
+  if (data.detail_kind === "book_details" && data.detail) {
+    const detail = data.detail as any;
+    form.publisher = detail.publisher ?? "";
+    form.approvalDecisionNo = detail.approval_decision_no ?? "";
+    form.approvalDecisionDate = detail.approval_decision_date ?? null;
+    form.isbn = detail.isbn ?? "";
+    form.pages = detail.pages ?? null;
+    form.year = detail.year ?? null;
+  }
+
+  form.members = (data.members ?? []).map((member) => ({
+    lecturer_id: member.lecturer_id,
+    member_role_id: member.member_role_id,
+    member_role_code: member.member_role_code ?? null,
+  }));
+
+  existingEvidence.value = data.evidence_files ?? [];
+
+  const statusCode = (activity.status_code ?? "draft") as any;
+  shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
+}
+
 const shell = useDeclarationFormShell({
   initial_status: "DRAFT",
   on_save_draft: async () => {
@@ -452,6 +506,9 @@ const shell = useDeclarationFormShell({
     } as any);
 
     form.activityId = saved.id;
+    await router.replace({
+      query: { ...route.query, activity_id: String(saved.id) },
+    });
 
     await upsert_book_details({
       activity_id: saved.id,
@@ -486,7 +543,7 @@ const shell = useDeclarationFormShell({
   on_submit: async () => {
     try {
       if (!form.activityId) {
-        await shell.save_draft();
+        await shell.save_draft({ silent_success: true });
       }
       if (!form.activityId) return;
       const submitResult = await submit_activity(form.activityId);
@@ -507,5 +564,8 @@ const shell = useDeclarationFormShell({
   },
 });
 
-onMounted(loadCatalogs);
+onMounted(async () => {
+  await loadCatalogs();
+  await loadDraftFromQuery();
+});
 </script>

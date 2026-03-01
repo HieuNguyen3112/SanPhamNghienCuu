@@ -15,14 +15,6 @@
         </div>
       </div>
 
-      <!-- Toast -->
-      <div
-        v-if="toastMessage"
-        class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-      >
-        {{ toastMessage }}
-      </div>
-
       <!-- Filter -->
       <LecturerAccountFilterBar
         :filter="filter"
@@ -40,9 +32,14 @@
         :rows="rows"
         :loading="loading"
         :error="error"
+        :current-page-number="currentPageNumber"
+        :page-size="pageSize"
+        :total-item-count="totalItems"
         @edit="openEdit"
         @roles="openRoles"
         @toggle-status="openDeactivate"
+        @update:currentPageNumber="updatePage"
+        @update:pageSize="updatePageSize"
       />
 
       <!-- Modals -->
@@ -95,8 +92,9 @@ const {
   loading,
   error,
   resultCount,
-
-  toastMessage,
+  currentPageNumber,
+  pageSize,
+  totalItems,
 
   editOpen,
   rolesOpen,
@@ -112,6 +110,8 @@ const {
   updateFilter,
   resetFilter,
   search,
+  updatePage,
+  updatePageSize,
 
   openEdit,
   openRoles,

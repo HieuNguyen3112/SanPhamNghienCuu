@@ -62,6 +62,8 @@ export type LecturerOptionDto = {
   department_id: number;
   // derived/read-only (join)
   department_name?: string;
+  faculty_id?: number | null;
+  faculty_name?: string | null;
 };
 
 export type ResearchActivityMemberUpsertDto = {

@@ -5,7 +5,7 @@
     <div class="flex items-center gap-2">
       <List class="h-4 w-4 text-slate-700" />
       <div class="text-sm font-semibold text-slate-900">
-        Các đợt yêu cầu xét duyệt giờ NCKH
+        {{ labels.sectionTitle }}
       </div>
     </div>
 
@@ -13,7 +13,7 @@
       v-if="loading"
       class="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"
     >
-      Đang tải lịch sử...
+      {{ labels.loading }}
     </div>
 
     <div
@@ -24,7 +24,7 @@
     </div>
 
     <div v-else-if="batches.length === 0" class="mt-4 text-sm text-slate-600">
-      Chưa có đợt xét duyệt nào.
+      {{ labels.empty }}
     </div>
 
     <div v-else class="mt-4 overflow-hidden rounded-xl border border-slate-200">
@@ -34,18 +34,12 @@
             class="bg-slate-50 text-xs font-semibold uppercase text-slate-600"
           >
             <tr>
-              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">Đợt</th>
-              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">Năm học</th>
-              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
-                Trạng thái
-              </th>
-              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">Ngày gửi</th>
-              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
-                Ngày duyệt
-              </th>
-              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">
-                Tổng giờ
-              </th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">{{ labels.colBatch }}</th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">{{ labels.colYear }}</th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">{{ labels.colStatus }}</th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">{{ labels.colSubmitted }}</th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">{{ labels.colDecided }}</th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">{{ labels.colTotal }}</th>
             </tr>
           </thead>
 
@@ -60,7 +54,7 @@
                 {{ batch.batchName }}
               </td>
               <td class="px-4 py-3 text-slate-700">
-                {{ batch.academicYearCode }}
+                {{ batch.academicYearCode || labels.fallback }}
               </td>
               <td class="px-4 py-3">
                 <span
@@ -74,7 +68,7 @@
                 {{ formatDate(batch.submittedAt) }}
               </td>
               <td class="px-4 py-3 text-slate-700">
-                {{ batch.decidedAt ? formatDate(batch.decidedAt) : "—" }}
+                {{ batch.decidedAt ? formatDate(batch.decidedAt) : labels.fallback }}
               </td>
               <td
                 class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900"
@@ -106,6 +100,20 @@ import type {
   HoursBatchStatus,
 } from "../contracts/HoursOverviewContracts";
 
+const labels = {
+  sectionTitle:
+    "\u0043\u00e1c \u0111\u1ee3t y\u00eau c\u1ea7u x\u00e9t duy\u1ec7t gi\u1edd NCKH",
+  loading: "\u0110ang t\u1ea3i l\u1ecbch s\u1eed...",
+  empty: "Ch\u01b0a c\u00f3 \u0111\u1ee3t x\u00e9t duy\u1ec7t n\u00e0o.",
+  colBatch: "\u0110\u1ee3t",
+  colYear: "N\u0103m h\u1ecdc",
+  colStatus: "Tr\u1ea1ng th\u00e1i",
+  colSubmitted: "Ng\u00e0y g\u1eedi",
+  colDecided: "Ng\u00e0y duy\u1ec7t",
+  colTotal: "T\u1ed5ng gi\u1edd",
+  fallback: "-",
+};
+
 defineProps<{
   batches: HoursApprovalBatchSummary[];
   loading: boolean;
@@ -129,9 +137,9 @@ function formatDate(value: string): string {
 }
 
 function statusLabel(status: HoursBatchStatus): string {
-  if (status === "approved") return "Đã duyệt";
-  if (status === "pending") return "Chờ duyệt";
-  return "Từ chối";
+  if (status === "approved") return "\u0110\u00e3 duy\u1ec7t";
+  if (status === "pending") return "Ch\u1edd duy\u1ec7t";
+  return "T\u1eeb ch\u1ed1i";
 }
 
 function statusBadgeClass(status: HoursBatchStatus): string {

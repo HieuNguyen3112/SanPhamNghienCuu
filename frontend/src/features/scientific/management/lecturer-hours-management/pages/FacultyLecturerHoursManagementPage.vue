@@ -1,9 +1,7 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
-      <div
-        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
-      >
+      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
         <PageHeader
           title="Quản lý giờ nghiên cứu khoa học theo giảng viên"
           subtitle="Theo dõi tình hình thực hiện giờ NCKH của giảng viên trong khoa"
@@ -14,6 +12,7 @@
           @exportExcelClicked="onExportExcel"
         />
       </div>
+
       <div class="mt-4">
         <HoursFilterPanel
           :filter="filter"
@@ -72,32 +71,28 @@ import {
   exportFacultyHoursPdf,
 } from "@/features/scientific/management/lecturer-hours-management/services/facultyLecturerHoursExport.service";
 import { facultyLecturerHoursService } from "@/features/scientific/management/lecturer-hours-management/services/facultyLecturerHoursService";
+import { useExportActionFeedback } from "@/shared/composables/useExportActionFeedback";
+
+const { runExport } = useExportActionFeedback();
 
 const {
   filter,
   overview,
-
   yearOptions,
-
   selectedLecturerOverview,
   drawerOpen,
   detailRows,
-
   totalLecturers,
   hitCount,
   missCount,
   hitRate,
-
   currentPageNumber,
   pageSize,
   totalItemCount,
-
   loadingOverview,
   loadingDetail,
-
   errorOverview,
   errorDetail,
-
   loadOverview,
   applyFilter,
   resetFilter,
@@ -123,38 +118,15 @@ function buildExportParams() {
   };
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-}
-
 async function onExportExcel() {
-  try {
-    const result = await exportFacultyHoursExcel(buildExportParams());
-    downloadBlob(result.blob, result.filename);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(error);
-  }
+  await runExport("excel", () => exportFacultyHoursExcel(buildExportParams()));
 }
 
 async function onExportPdf() {
-  try {
-    const result = await exportFacultyHoursPdf(buildExportParams());
-    downloadBlob(result.blob, result.filename);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(error);
-  }
+  await runExport("pdf", () => exportFacultyHoursPdf(buildExportParams()));
 }
 
 onMounted(() => {
-  loadOverview();
+  void loadOverview();
 });
 </script>

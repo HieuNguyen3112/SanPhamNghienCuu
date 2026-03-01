@@ -1,13 +1,12 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
-      <!-- Header -->
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
         <PageHeader
           title="Danh mục công trình"
-          subtitle="Quản lý các danh mục nền phục vụ kê khai và xét duyệt công trình nghiên cứu khoa học"
+          subtitle="Quản lý danh mục phục vụ kê khai và xét duyệt công trình nghiên cứu khoa học"
           :show-export-pdf="false"
           :show-export-excel="false"
           @exportPdfClicked="() => {}"
@@ -15,14 +14,12 @@
         />
       </div>
 
-      <!-- Tabs -->
       <CatalogTabs
         :model-value="activeTab"
         :tabs="tabs"
         @update:model-value="setActiveTab"
       />
 
-      <!-- Content Card -->
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
@@ -49,7 +46,7 @@
             :format-date-time="formatDateTime"
             :modal-open="modalWorkTypeOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeWorkType === 'create'
                 ? 'Thêm loại công trình'
                 : 'Chỉnh sửa loại công trình'
             "
@@ -62,7 +59,7 @@
             @create="openCreateWorkType"
             @edit="onEditWorkType"
             @close-modal="modalWorkTypeOpen = false"
-            @submit="saveWorkType"
+            @submit="handleSaveWorkType"
             @update:form="onUpdateWorkTypeForm"
           />
 
@@ -76,7 +73,7 @@
             :page-size="pageSizeWorkLevel"
             :modal-open="modalWorkLevelOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeWorkLevel === 'create'
                 ? 'Thêm cấp công trình'
                 : 'Chỉnh sửa cấp công trình'
             "
@@ -89,7 +86,7 @@
             @create="openCreateWorkLevel"
             @edit="onEditWorkLevel"
             @close-modal="modalWorkLevelOpen = false"
-            @submit="saveWorkLevel"
+            @submit="handleSaveWorkLevel"
             @update:form="onUpdateWorkLevelForm"
           />
 
@@ -103,7 +100,7 @@
             :page-size="pageSizeJournal"
             :modal-open="modalJournalOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeJournal === 'create'
                 ? 'Thêm tạp chí khoa học'
                 : 'Chỉnh sửa tạp chí khoa học'
             "
@@ -116,7 +113,7 @@
             @create="openCreateJournal"
             @edit="onEditJournal"
             @close-modal="modalJournalOpen = false"
-            @submit="saveJournal"
+            @submit="handleSaveJournal"
             @update:form="onUpdateJournalForm"
           />
 
@@ -130,7 +127,7 @@
             :page-size="pageSizeConference"
             :modal-open="modalConferenceOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeConference === 'create'
                 ? 'Thêm hội nghị khoa học'
                 : 'Chỉnh sửa hội nghị khoa học'
             "
@@ -143,7 +140,7 @@
             @create="openCreateConference"
             @edit="onEditConference"
             @close-modal="modalConferenceOpen = false"
-            @submit="saveConference"
+            @submit="handleSaveConference"
             @update:form="onUpdateConferenceForm"
           />
 
@@ -157,7 +154,7 @@
             :page-size="pageSizeResearchField"
             :modal-open="modalResearchFieldOpen"
             :modal-title="
-              modalMode === 'create'
+              modalModeResearchField === 'create'
                 ? 'Thêm lĩnh vực nghiên cứu'
                 : 'Chỉnh sửa lĩnh vực nghiên cứu'
             "
@@ -170,7 +167,7 @@
             @create="openCreateResearchField"
             @edit="onEditResearchField"
             @close-modal="modalResearchFieldOpen = false"
-            @submit="saveResearchField"
+            @submit="handleSaveResearchField"
             @update:form="onUpdateResearchFieldForm"
           />
         </template>
@@ -192,10 +189,13 @@ import ResearchFieldCatalogSection from "../components/ResearchFieldCatalogSecti
 
 import type { WorkCatalogTabKey } from "../contracts/workCatalogTabs.contract";
 import { useWorkCatalogs } from "../composables/useWorkCatalogs";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
-// tabs config
 const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
   { key: "work_type", label: "Loại công trình", icon: Layers },
   { key: "work_level", label: "Cấp công trình", icon: Flag },
@@ -207,28 +207,24 @@ const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
 const wc = useWorkCatalogs();
 
 const {
-  // global
   activeTab,
   loading,
   errorMessage,
   loadActiveTab,
   formatDateTime,
 
-  // data stores
   workTypes,
   workLevels,
   journals,
   conferences,
   researchFields,
 
-  // search
   qWorkType,
   qWorkLevel,
   qJournal,
   qConference,
   qResearchField,
 
-  // pagination
   pageWorkType,
   pageWorkLevel,
   pageJournal,
@@ -240,7 +236,6 @@ const {
   pageSizeConference,
   pageSizeResearchField,
 
-  // computed rows
   pagedWorkTypes,
   pagedWorkLevels,
   pagedJournals,
@@ -252,15 +247,18 @@ const {
   conferenceTotal,
   researchFieldTotal,
 
-  // modal mode + open states
-  modalMode,
+  modalModeWorkType,
+  modalModeWorkLevel,
+  modalModeJournal,
+  modalModeConference,
+  modalModeResearchField,
+
   modalWorkTypeOpen,
   modalWorkLevelOpen,
   modalJournalOpen,
   modalConferenceOpen,
   modalResearchFieldOpen,
 
-  // forms + errors
   workTypeForm,
   workTypeErrors,
   workLevelForm,
@@ -272,7 +270,6 @@ const {
   researchFieldForm,
   researchFieldErrors,
 
-  // actions
   openCreateWorkType,
   openEditWorkType,
   saveWorkType,
@@ -298,6 +295,7 @@ const {
   saveResearchField,
   onUpdateResearchFieldForm,
 } = wc;
+const { runWithFeedback } = useActionFeedback();
 
 const setActiveTab = (tab: WorkCatalogTabKey) => {
   activeTab.value = tab;
@@ -312,20 +310,112 @@ function onEditWorkType(id: number) {
   const item = workTypes.value.find((x: any) => x.id === id);
   if (item) openEditWorkType(item);
 }
+
 function onEditWorkLevel(id: number) {
   const item = workLevels.value.find((x: any) => x.id === id);
   if (item) openEditWorkLevel(item);
 }
+
 function onEditJournal(id: number) {
   const item = journals.value.find((x: any) => x.id === id);
   if (item) openEditJournal(item);
 }
+
 function onEditConference(id: number) {
   const item = conferences.value.find((x: any) => x.id === id);
   if (item) openEditConference(item);
 }
+
 function onEditResearchField(id: number) {
   const item = researchFields.value.find((x: any) => x.id === id);
   if (item) openEditResearchField(item);
 }
+
+function resolveActionErrorMessage(error: unknown, fallback: string) {
+  return resolveApiErrorMessage(error, fallback);
+}
+
+function buildStatusActionText(
+  mode: "create" | "edit",
+  isActive: boolean,
+  createText: string,
+  updateText: string
+) {
+  if (mode === "create") return createText;
+  if (!isActive) return "Ngừng sử dụng thành công.";
+  return updateText;
+}
+
+async function runCatalogAction(
+  action: () => Promise<void>,
+  successMessage: string
+) {
+  await runWithFeedback(action, {
+    loading: {
+      title: "Đang xử lý",
+      message: "Hệ thống đang cập nhật danh mục...",
+    },
+    success: {
+      title: "Thành công",
+      message: successMessage,
+    },
+    error: {
+      title: "Có lỗi xảy ra",
+      message: (error) =>
+        resolveActionErrorMessage(error, "Thao tác thất bại. Vui lòng thử lại."),
+    },
+    rethrow: false,
+  });
+}
+
+async function handleSaveWorkType() {
+  const successMessage = buildStatusActionText(
+    modalModeWorkType.value,
+    workTypeForm.isActive,
+    "Thêm loại công trình thành công.",
+    "Cập nhật loại công trình thành công."
+  );
+  await runCatalogAction(() => saveWorkType(), successMessage);
+}
+
+async function handleSaveWorkLevel() {
+  const successMessage = buildStatusActionText(
+    modalModeWorkLevel.value,
+    workLevelForm.isActive,
+    "Thêm cấp công trình thành công.",
+    "Cập nhật cấp công trình thành công."
+  );
+  await runCatalogAction(() => saveWorkLevel(), successMessage);
+}
+
+async function handleSaveJournal() {
+  const successMessage = buildStatusActionText(
+    modalModeJournal.value,
+    journalForm.isActive,
+    "Thêm tạp chí khoa học thành công.",
+    "Cập nhật tạp chí khoa học thành công."
+  );
+  await runCatalogAction(() => saveJournal(), successMessage);
+}
+
+async function handleSaveConference() {
+  const successMessage = buildStatusActionText(
+    modalModeConference.value,
+    conferenceForm.isActive,
+    "Thêm hội nghị khoa học thành công.",
+    "Cập nhật hội nghị khoa học thành công."
+  );
+  await runCatalogAction(() => saveConference(), successMessage);
+}
+
+async function handleSaveResearchField() {
+  const successMessage = buildStatusActionText(
+    modalModeResearchField.value,
+    researchFieldForm.isActive,
+    "Thêm lĩnh vực nghiên cứu thành công.",
+    "Cập nhật lĩnh vực nghiên cứu thành công."
+  );
+  await runCatalogAction(() => saveResearchField(), successMessage);
+}
 </script>
+

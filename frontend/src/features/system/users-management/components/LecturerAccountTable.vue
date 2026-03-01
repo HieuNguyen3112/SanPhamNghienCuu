@@ -1,4 +1,4 @@
-﻿<!-- File: src/features/lecturer-account-management/components/LecturerAccountTable.vue -->
+<!-- File: src/features/lecturer-account-management/components/LecturerAccountTable.vue -->
 <template>
   <div
     class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"

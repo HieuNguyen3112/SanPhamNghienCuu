@@ -32,6 +32,7 @@ class LecturerDeclarationDraftController extends Controller
                 'ra.updated_at',
                 'ak.code as kind_code',
                 'ak.name as kind_name',
+                'at.code as type_code',
                 'at.name as type_name',
             ]);
 
@@ -52,7 +53,12 @@ class LecturerDeclarationDraftController extends Controller
                 return [
                     'id' => (int) $row->id,
                     'title' => $row->title,
-                    'type_label' => $this->buildTypeLabel($row->kind_name, $row->type_name),
+                    'type_label' => $this->buildTypeLabel(
+                        $row->kind_code,
+                        $row->kind_name,
+                        $row->type_code,
+                        $row->type_name
+                    ),
                     'updated_at' => $this->normalizeDateTime($row->updated_at),
                     'to' => $route,
                 ];
@@ -93,13 +99,60 @@ class LecturerDeclarationDraftController extends Controller
         return $base . '?activity_id=' . $activityId;
     }
 
-    private function buildTypeLabel(?string $kindName, ?string $typeName): string
+    private function buildTypeLabel(
+        ?string $kindCode,
+        ?string $kindName,
+        ?string $typeCode,
+        ?string $typeName
+    ): string
     {
-        if ($typeName) {
-            return $kindName ? ($kindName . ' - ' . $typeName) : $typeName;
+        $resolvedKindName = $this->mapKindName($kindCode, $kindName);
+        $resolvedTypeName = $this->mapTypeName($typeCode, $typeName);
+
+        if ($resolvedTypeName) {
+            return $resolvedKindName ? ($resolvedKindName . ' - ' . $resolvedTypeName) : $resolvedTypeName;
         }
 
-        return $kindName ?: '-';
+        return $resolvedKindName ?: '-';
+    }
+
+    private function mapKindName(?string $code, ?string $fallback): ?string
+    {
+        if (! $code) {
+            return $fallback;
+        }
+
+        $mapped = match (strtolower($code)) {
+            'paper' => 'Bài báo khoa học',
+            'book' => 'Sách, giáo trình',
+            'project' => 'Đề tài KH&CN',
+            'conference' => 'Hội nghị, hội thảo',
+            default => null,
+        };
+
+        return $mapped ?? $fallback ?? $code;
+    }
+
+    private function mapTypeName(?string $code, ?string $fallback): ?string
+    {
+        if (! $code) {
+            return $fallback;
+        }
+
+        $mapped = match (strtolower($code)) {
+            'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)',
+            'hdgsnn_600' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)',
+            'hdgsnn_300' => 'Bài báo có ISSN/ISBN (300 giờ)',
+            'textbook' => 'Giáo trình',
+            'reference' => 'Tài liệu tham khảo',
+            'bo', 'ministry' => 'Đề tài cấp Bộ (2 năm)',
+            'coso', 'university' => 'Đề tài cấp Trường (1 năm)',
+            'report' => 'Báo cáo hội thảo',
+            'attend' => 'Tham dự hội thảo',
+            default => null,
+        };
+
+        return $mapped ?? $fallback ?? $code;
     }
 
     private function normalizeDateTime($value): ?string

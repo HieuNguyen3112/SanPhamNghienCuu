@@ -99,6 +99,15 @@
                   <CheckCircle2 class="h-4 w-4" />
                   Đánh dấu đã xem
                 </button>
+                <button
+                  v-else
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  @click="emit('delete-alert', alert.id)"
+                >
+                  <Trash2 class="h-4 w-4" />
+                  Xóa cảnh báo
+                </button>
               </div>
 
               <div class="flex items-center gap-2">
@@ -150,6 +159,7 @@ import {
   CheckCircle2,
   Clock,
   Info,
+  Trash2,
 } from "lucide-vue-next";
 
 defineProps<{
@@ -159,7 +169,8 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "mark-seen", alertId: number): void;
+  (e: "mark-seen", alertId: string): void;
+  (e: "delete-alert", alertId: string): void;
 }>();
 
 function iconComponent(alert: HoursAlertItem) {
@@ -170,8 +181,9 @@ function iconComponent(alert: HoursAlertItem) {
 
 function iconToneClass(alert: HoursAlertItem) {
   if (alert.level === "danger") return "bg-rose-50 text-rose-700 ring-rose-200";
-  if (alert.level === "warning")
+  if (alert.level === "warning") {
     return "bg-amber-50 text-amber-700 ring-amber-200";
+  }
   return "bg-slate-50 text-slate-700 ring-slate-200";
 }
 

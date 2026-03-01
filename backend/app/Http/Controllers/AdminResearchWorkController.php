@@ -60,11 +60,19 @@ class AdminResearchWorkController extends Controller
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
             ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
             ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
-            ->where('ra.owner_lecturer_id', $lecturer)
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturer) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturer);
+            })
+            ->where(function ($query) use ($lecturer) {
+                $query->where('ra.owner_lecturer_id', '=', $lecturer)
+                    ->orWhereNotNull('ram.lecturer_id');
+            })
             ->where('ast.code', 'approved')
             ->when($academicYearId, function ($query, $academicYearId) {
                 $query->where('ra.academic_year_id', $academicYearId);
             })
+            ->distinct()
             ->orderByDesc('ra.approved_at')
             ->orderByDesc('ra.id')
             ->select([
@@ -202,14 +210,18 @@ class AdminResearchWorkController extends Controller
             $statusMode = 'pending';
         }
 
-        $activityAgg = DB::table('research_activities as ra')
+        $activityLecturers = $this->activityLecturerSubquery();
+
+        $activityAgg = DB::query()
+            ->fromSub($activityLecturers, 'al')
+            ->join('research_activities as ra', 'al.activity_id', '=', 'ra.id')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
             ->when($academicYearId, function ($query, $academicYearId) {
                 $query->where('ra.academic_year_id', $academicYearId);
             })
-            ->groupBy('ra.owner_lecturer_id')
+            ->groupBy('al.lecturer_id')
             ->select([
-                'ra.owner_lecturer_id as lecturer_id',
+                'al.lecturer_id as lecturer_id',
                 DB::raw('COUNT(*) as total_declared_research_work_count'),
                 DB::raw("SUM(CASE WHEN ast.code = 'approved' THEN 1 ELSE 0 END) as approved_research_work_count"),
                 DB::raw("SUM(CASE WHEN ast.code = 'submitted' THEN 1 ELSE 0 END) as pending_research_work_count"),
@@ -293,6 +305,21 @@ class AdminResearchWorkController extends Controller
                 'status_mode' => $statusMode,
             ],
         ];
+    }
+
+    private function activityLecturerSubquery()
+    {
+        $members = DB::table('research_activity_members')
+            ->select(['activity_id', 'lecturer_id']);
+
+        $owners = DB::table('research_activities')
+            ->whereNotNull('owner_lecturer_id')
+            ->select([
+                'id as activity_id',
+                'owner_lecturer_id as lecturer_id',
+            ]);
+
+        return $members->union($owners);
     }
 
     private function buildSummaryPdf(array $rows, array $filters): string

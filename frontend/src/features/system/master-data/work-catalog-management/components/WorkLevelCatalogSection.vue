@@ -94,16 +94,6 @@
       </table>
     </div>
 
-    <div class="flex items-center justify-end">
-      <!-- <SharedPaginationControls
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        @update:page="emit('update:page', $event)"
-        @update:page-size="emit('update:pageSize', $event)"
-      /> -->
-    </div>
-
     <CatalogUpsertModal
       :open="modalOpen"
       :title="modalTitle"
@@ -207,7 +197,6 @@
 import { Pencil, Plus } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
 import type { WorkLevel } from "../contracts/workLevels.contract";
-import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 defineProps<{
   rows: WorkLevel[];
@@ -250,3 +239,4 @@ const emit = defineEmits<{
   ): void;
 }>();
 </script>
+

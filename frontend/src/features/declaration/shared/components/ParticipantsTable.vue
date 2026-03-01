@@ -203,9 +203,17 @@
                     />
                   </template>
                   <template v-else>
-                    <span class="block pt-2">
-                      {{ lecturerDepartmentName(row.lecturer_id) || "—" }}
-                    </span>
+                    <div class="pt-2">
+                      <div class="block">
+                        {{ lecturerDepartmentName(row.lecturer_id) || "—" }}
+                      </div>
+                      <span
+                        v-if="isOutsideFaculty(row)"
+                        class="mt-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                      >
+                        Ngoài khoa
+                      </span>
+                    </div>
                   </template>
                 </td>
 
@@ -415,6 +423,12 @@
                   >
                     {{ lecturerDepartmentName(row.lecturer_id) || "—" }}
                   </div>
+                  <span
+                    v-if="isOutsideFaculty(row)"
+                    class="mt-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                  >
+                    Ngoài khoa
+                  </span>
                 </template>
               </div>
             </div>
@@ -508,6 +522,7 @@ const props = defineProps<{
   readOnly: boolean;
   currentLecturerId: number | null;
   hoursByLecturerId: Record<number, number>;
+  ownerFacultyId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -596,6 +611,19 @@ function lecturerDepartmentName(lecturer_id: number | null) {
   return (
     props.lecturers.find((l) => l.id === lecturer_id)?.department_name ?? null
   );
+}
+
+function lecturerFacultyId(lecturer_id: number | null) {
+  if (!lecturer_id) return null;
+  return props.lecturers.find((l) => l.id === lecturer_id)?.faculty_id ?? null;
+}
+
+function isOutsideFaculty(row: ParticipantRowModel): boolean {
+  if (row.is_external) return false;
+  if (!props.ownerFacultyId) return false;
+  const memberFacultyId = lecturerFacultyId(row.lecturer_id);
+  if (!memberFacultyId) return false;
+  return Number(memberFacultyId) !== Number(props.ownerFacultyId);
 }
 
 function formatHours(v: number) {

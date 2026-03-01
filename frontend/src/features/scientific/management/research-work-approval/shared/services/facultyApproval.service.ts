@@ -52,6 +52,9 @@ export type FacultyApprovalListItem = {
     member_role_name: string | null;
     department_name: string | null;
     faculty_name: string | null;
+    member_faculty_id?: number | null;
+    owner_faculty_id?: number | null;
+    is_outside_faculty?: boolean;
   }[];
 };
 
@@ -62,6 +65,9 @@ export type FacultyApprovalDetailResponse = {
     hours_value_label?: string | null;
     hours_request_state?: string | null;
     hours_request_status_raw?: string | null;
+    rule_resolved?: boolean;
+    rule_summary?: string | null;
+    hours_resolution_note?: string | null;
   };
   members: {
     lecturer_id: number;
@@ -78,6 +84,9 @@ export type FacultyApprovalDetailResponse = {
     official_hours: number | null;
     department_name: string | null;
     faculty_name: string | null;
+    owner_faculty_id?: number | null;
+    member_faculty_id?: number | null;
+    is_outside_faculty?: boolean;
   }[];
   evidence_files: {
     id: number;

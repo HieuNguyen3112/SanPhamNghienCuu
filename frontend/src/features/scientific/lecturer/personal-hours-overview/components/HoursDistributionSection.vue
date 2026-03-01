@@ -28,25 +28,25 @@
         </div>
 
         <div v-else class="flex items-center justify-center">
-          <svg viewBox="0 0 120 120" class="h-60 w-60">
+          <svg viewBox="0 0 160 160" class="h-72 w-72 max-w-full">
             <circle
-              cx="60"
-              cy="60"
-              r="42"
+              cx="80"
+              cy="80"
+              r="52"
               fill="none"
               class="stroke-slate-200"
-              stroke-width="16"
+              stroke-width="18"
             />
-            <g transform="rotate(-90 60 60)">
+            <g transform="rotate(-90 80 80)">
               <circle
                 v-for="slice in donutSlices"
                 :key="slice.key"
-                cx="60"
-                cy="60"
-                r="42"
+                cx="80"
+                cy="80"
+                r="52"
                 fill="none"
                 stroke-linecap="butt"
-                stroke-width="16"
+                stroke-width="18"
                 :class="slice.strokeClass"
                 :stroke-dasharray="slice.dashArray"
                 :stroke-dashoffset="slice.dashOffset"
@@ -54,22 +54,31 @@
             </g>
 
             <text
-              x="60"
-              y="56"
+              x="80"
+              y="74"
               text-anchor="middle"
-              class="fill-slate-900"
-              style="font-size: 10px; font-weight: 600"
+              class="fill-slate-600"
+              style="font-size: 11px; font-weight: 600"
             >
               Đã được tính
             </text>
             <text
-              x="60"
-              y="72"
+              x="80"
+              y="94"
               text-anchor="middle"
               class="fill-slate-900"
-              style="font-size: 16px; font-weight: 700"
+              style="font-size: 20px; font-weight: 700"
             >
-              {{ approvedHoursText }}
+              {{ approvedHoursValueText }}
+            </text>
+            <text
+              x="80"
+              y="110"
+              text-anchor="middle"
+              class="fill-slate-500"
+              style="font-size: 11px; font-weight: 600"
+            >
+              giờ
             </text>
           </svg>
         </div>
@@ -100,7 +109,7 @@
 
             <div class="shrink-0 text-right">
               <div class="text-sm font-semibold text-slate-900">
-                {{ item.hours }} giờ
+                {{ formatHours(item.hours) }} giờ
               </div>
               <div class="text-xs text-slate-500">{{ item.percentage }}%</div>
             </div>
@@ -130,9 +139,9 @@ const props = defineProps<{
   error: string | null;
 }>();
 
-const approvedHoursText = computed(() => {
-  if (!props.overview) return "—";
-  return `${props.overview.approvedHours} giờ`;
+const approvedHoursValueText = computed(() => {
+  if (!props.overview) return "--";
+  return formatHours(props.overview.approvedHours);
 });
 
 const paletteStroke = [
@@ -151,12 +160,18 @@ const paletteDot = [
   "bg-slate-500",
 ] as const;
 
+function formatHours(value: number): string {
+  return new Intl.NumberFormat("vi-VN", {
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 function dotClass(index: number): string {
   return paletteDot[index % paletteDot.length]!;
 }
 
 const donutSlices = computed(() => {
-  const r = 42;
+  const r = 52;
   const circumference = 2 * Math.PI * r;
 
   let offsetAcc = 0;

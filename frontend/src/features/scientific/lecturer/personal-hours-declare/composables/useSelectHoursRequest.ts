@@ -24,6 +24,10 @@ import {
   submitHoursApprovalRequestDTO,
   uploadHoursEvidenceDTO,
 } from "../services/selectHoursRequestService";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 export function useSelectHoursRequest() {
   const works = ref<ApprovedWorkRow[]>([]);
@@ -52,7 +56,7 @@ export function useSelectHoursRequest() {
 
   const submitting = ref(false);
   const submitError = ref<string | null>(null);
-  const toastMessage = ref<string | null>(null);
+  const { runWithFeedback } = useActionFeedback();
 
   const evidenceFiles = ref<EvidenceFile[]>([]);
   const evidenceFileTypes = ref<EvidenceFileType[]>([]);
@@ -67,6 +71,10 @@ export function useSelectHoursRequest() {
   const uploadingEvidence = ref(false);
   const deletingEvidenceId = ref<number | null>(null);
   const loadingAcademicYears = ref(false);
+
+  function resolveFriendlyErrorMessage(error: unknown, fallback: string) {
+    return resolveApiErrorMessage(error, fallback);
+  }
 
   const contentApprovedWorks = computed(() => works.value);
   const filteredWorks = computed(() => works.value);
@@ -293,26 +301,50 @@ export function useSelectHoursRequest() {
   }
 
   async function submitRequest() {
+    if (submitting.value) return;
+
     submitError.value = null;
-    toastMessage.value = null;
 
     if (selectedWorkIdSet.value.size === 0) {
-      submitError.value = "Bạn chưa chọn công trình nào.";
+      const message = "Bạn chưa chọn công trình nào.";
+      submitError.value = message;
       return;
     }
 
     submitting.value = true;
     try {
-      const activityIds = [...selectedWorkIdSet.value];
-      await submitHoursApprovalRequestDTO({ activity_ids: activityIds });
-
-      selectedWorkIdSet.value = new Set();
-      await loadApprovedWorks();
-
-      toastMessage.value = "Đã gửi duyệt giờ lên khoa.";
-      window.setTimeout(() => (toastMessage.value = null), 2500);
+      await runWithFeedback(
+        async () => {
+          const activityIds = [...selectedWorkIdSet.value];
+          await submitHoursApprovalRequestDTO({ activity_ids: activityIds });
+          selectedWorkIdSet.value = new Set();
+          await loadApprovedWorks();
+        },
+        {
+          loading: {
+            title: "Đang gửi duyệt",
+            message: "Đang gửi yêu cầu duyệt giờ lên khoa...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã gửi duyệt giờ lên khoa thành công.",
+          },
+          error: {
+            title: "Gửi duyệt thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(
+                error,
+                "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại."
+              ),
+          },
+        }
+      );
     } catch (e) {
-      submitError.value = e instanceof Error ? e.message : String(e);
+      const message = resolveFriendlyErrorMessage(
+        e,
+        "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại."
+      );
+      submitError.value = message;
     } finally {
       submitting.value = false;
     }
@@ -329,8 +361,11 @@ export function useSelectHoursRequest() {
   }
 
   async function uploadEvidence() {
+    if (uploadingEvidence.value) return;
+
     if (!workDetail.value || !selectedEvidenceFile.value || !selectedEvidenceTypeId.value) {
-      uploadEvidenceError.value = "Bạn cần chọn loại minh chứng và tệp trước khi tải lên.";
+      const message = "Bạn cần chọn loại minh chứng và tệp trước khi tải lên.";
+      uploadEvidenceError.value = message;
       return;
     }
 
@@ -338,21 +373,44 @@ export function useSelectHoursRequest() {
     uploadEvidenceError.value = null;
 
     try {
-      await uploadHoursEvidenceDTO({
-        activityId: workDetail.value.activityId,
-        fileTypeId: selectedEvidenceTypeId.value,
-        file: selectedEvidenceFile.value,
-      });
-
-      selectedEvidenceFile.value = null;
-      await Promise.all([
-        loadEvidence(workDetail.value.activityId),
-        loadApprovedWorks(),
-      ]);
-      toastMessage.value = "Đã tải lên minh chứng.";
-      window.setTimeout(() => (toastMessage.value = null), 2500);
+      await runWithFeedback(
+        async () => {
+          await uploadHoursEvidenceDTO({
+            activityId: workDetail.value!.activityId,
+            fileTypeId: selectedEvidenceTypeId.value!,
+            file: selectedEvidenceFile.value!,
+          });
+          selectedEvidenceFile.value = null;
+          await Promise.all([
+            loadEvidence(workDetail.value!.activityId),
+            loadApprovedWorks(),
+          ]);
+        },
+        {
+          loading: {
+            title: "Đang tải minh chứng",
+            message: "Vui lòng đợi hệ thống xử lý tệp đính kèm...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã tải lên minh chứng thành công.",
+          },
+          error: {
+            title: "Tải lên thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(
+                error,
+                "Không thể tải lên minh chứng. Vui lòng thử lại."
+              ),
+          },
+        }
+      );
     } catch (e) {
-      uploadEvidenceError.value = e instanceof Error ? e.message : String(e);
+      const message = resolveFriendlyErrorMessage(
+        e,
+        "Không thể tải lên minh chứng. Vui lòng thử lại."
+      );
+      uploadEvidenceError.value = message;
     } finally {
       uploadingEvidence.value = false;
     }
@@ -360,20 +418,45 @@ export function useSelectHoursRequest() {
 
   async function deleteEvidence(evidenceId: number) {
     if (!workDetail.value) return;
+    if (deletingEvidenceId.value !== null) return;
 
     deletingEvidenceId.value = evidenceId;
     uploadEvidenceError.value = null;
 
     try {
-      await deleteHoursEvidenceDTO(evidenceId);
-      await Promise.all([
-        loadEvidence(workDetail.value.activityId),
-        loadApprovedWorks(),
-      ]);
-      toastMessage.value = "Đã xóa minh chứng.";
-      window.setTimeout(() => (toastMessage.value = null), 2500);
+      await runWithFeedback(
+        async () => {
+          await deleteHoursEvidenceDTO(evidenceId);
+          await Promise.all([
+            loadEvidence(workDetail.value!.activityId),
+            loadApprovedWorks(),
+          ]);
+        },
+        {
+          loading: {
+            title: "Đang xóa minh chứng",
+            message: "Đang cập nhật dữ liệu...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã xóa minh chứng thành công.",
+          },
+          error: {
+            title: "Xóa minh chứng thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(
+                error,
+                "Không thể xóa minh chứng. Vui lòng thử lại."
+              ),
+          },
+        }
+      );
     } catch (e) {
-      uploadEvidenceError.value = e instanceof Error ? e.message : String(e);
+      const message = resolveFriendlyErrorMessage(
+        e,
+        "Không thể xóa minh chứng. Vui lòng thử lại."
+      );
+      uploadEvidenceError.value = message;
     } finally {
       deletingEvidenceId.value = null;
     }
@@ -409,7 +492,6 @@ export function useSelectHoursRequest() {
 
     submitting,
     submitError,
-    toastMessage,
 
     totalApprovedCount,
     currentPageNumber,
@@ -446,3 +528,4 @@ export function useSelectHoursRequest() {
     deleteEvidence,
   };
 }
+

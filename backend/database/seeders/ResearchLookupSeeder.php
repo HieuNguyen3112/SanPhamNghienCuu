@@ -52,8 +52,8 @@ class ResearchLookupSeeder extends Seeder
             ['code' => 'hdgsnn_300', 'name' => 'Bài báo có ISSN/ISBN (300 giờ)', 'kind_code' => 'paper'],
             ['code' => 'textbook', 'name' => 'Giáo trình', 'kind_code' => 'book'],
             ['code' => 'reference', 'name' => 'Tài liệu tham khảo', 'kind_code' => 'book'],
-            ['code' => 'bo', 'name' => 'Đề tài cấp Bộ', 'kind_code' => 'project'],
-            ['code' => 'coso', 'name' => 'Đề tài cấp Trường', 'kind_code' => 'project'],
+            ['code' => 'bo', 'name' => 'Đề tài cấp Bộ (2 năm)', 'kind_code' => 'project'],
+            ['code' => 'coso', 'name' => 'Đề tài cấp Trường (1 năm)', 'kind_code' => 'project'],
             ['code' => 'report', 'name' => 'Báo cáo hội thảo', 'kind_code' => 'conference'],
             ['code' => 'attend', 'name' => 'Tham dự hội thảo', 'kind_code' => 'conference'],
         ];
@@ -75,8 +75,26 @@ class ResearchLookupSeeder extends Seeder
             );
         }
 
+        // Tương thích dữ liệu cũ: giữ code cũ nếu đã tồn tại, chỉ Việt hóa nhãn.
+        $legacyTypeLabels = [
+            'ministry' => 'Đề tài cấp Bộ (2 năm)',
+            'university' => 'Đề tài cấp Trường (1 năm)',
+            'province' => 'Đề tài cấp Tỉnh',
+            'faculty' => 'Đề tài cấp Khoa',
+            'other' => 'Khác',
+        ];
+
+        foreach ($legacyTypeLabels as $legacyCode => $label) {
+            DB::table('activity_types')
+                ->where('code', $legacyCode)
+                ->update([
+                    'name' => $label,
+                    'updated_at' => $now,
+                ]);
+        }
+
         $statuses = [
-            ['code' => 'draft', 'name' => 'Nháp'],
+            ['code' => 'draft', 'name' => 'Bản nháp'],
             ['code' => 'pending_member_confirm', 'name' => 'Chờ thành viên xác nhận'],
             ['code' => 'member_rejected', 'name' => 'Thành viên từ chối'],
             ['code' => 'pending_faculty_review', 'name' => 'Chờ khoa duyệt'],

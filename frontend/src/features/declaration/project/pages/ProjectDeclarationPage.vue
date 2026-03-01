@@ -9,8 +9,11 @@
         :canSubmit="canSubmit"
         :pending="shell.pending.value"
         :errorMessage="shell.error_message.value"
+        :successVisible="shell.success_visible.value"
+        :successMessage="shell.success_message.value"
         @save-draft="shell.save_draft"
         @submit="shell.submit_for_approval"
+        @close-success="shell.close_success_modal"
       >
         <template #intro>
           <div class="space-y-2 text-sm text-slate-700">
@@ -19,10 +22,13 @@
                 Nguyên tắc tính giờ
               </div>
               <ul class="mt-1 list-disc space-y-1 pl-5 text-slate-600">
-                <li>Chọn cấp đề tài để xác định giờ chuẩn (baseHours).</li>
                 <li>
-                  Phân bổ theo vai trò: Chủ nhiệm / Thư ký / Thành viên
-                  (real-time).
+                  Chọn cấp đề tài để áp dụng quy tắc giờ: cấp Bộ (720 + 480)
+                  hoặc cấp Trường (600 + 240).
+                </li>
+                <li>
+                  Chủ nhiệm nhận 100% phần chủ nhiệm, nhóm thành viên chia đều
+                  quỹ giờ thành viên.
                 </li>
                 <li>Giảng viên không nhập giờ thủ công.</li>
               </ul>
@@ -75,7 +81,7 @@
                   </option>
                 </select>
                 <div class="mt-1 text-xs text-slate-500">
-                  Cấp đề tài sẽ quyết định giờ chuẩn và cách phân bổ.
+                  Cấp đề tài quyết định phần giờ Chủ nhiệm và quỹ giờ thành viên.
                 </div>
               </div>
             </div>
@@ -233,6 +239,7 @@
             :memberRoles="filteredMemberRoles"
             :readOnly="readOnly"
             :currentLecturerId="currentLecturerId"
+            :ownerFacultyId="ownerFacultyId"
             :hoursByLecturerId="hoursByLecturerId"
             @request-search="onSearchLecturers"
           />
@@ -248,6 +255,122 @@
           />
 
           <!-- Section E -->
+          <div
+            class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-semibold text-slate-900">
+                  Công thức tính giờ
+                </h3>
+                <p class="mt-1 text-xs text-slate-500">
+                  Hiển thị theo cấp đề tài và vai trò trong nhóm tham gia.
+                </p>
+              </div>
+              <span
+                v-if="selectedTypeName"
+                class="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+              >
+                {{ selectedTypeName }}
+              </span>
+            </div>
+
+            <div
+              v-if="previewLoading"
+              class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+            >
+              Đang cập nhật công thức từ hệ thống...
+            </div>
+
+            <div class="mt-4 overflow-hidden rounded-xl border border-slate-200">
+              <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th
+                      class="px-4 py-3 text-left text-xs font-semibold text-slate-600"
+                    >
+                      Vai trò
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-semibold text-slate-600"
+                    >
+                      Tổng giờ
+                    </th>
+                    <th
+                      class="px-4 py-3 text-left text-xs font-semibold text-slate-600"
+                    >
+                      Cách tính
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                  <tr v-for="row in hours.formula_rows" :key="row.role_label">
+                    <td class="px-4 py-3 font-medium text-slate-900">
+                      {{ row.role_label }}
+                    </td>
+                    <td class="px-4 py-3 text-right font-medium text-slate-900">
+                      {{ row.total_hours.toFixed(2) }} giờ
+                    </td>
+                    <td class="px-4 py-3 text-slate-700">
+                      {{ row.formula_text }}
+                    </td>
+                  </tr>
+                  <tr v-if="hours.formula_rows.length === 0">
+                    <td colspan="3" class="px-4 py-6 text-center text-slate-500">
+                      Chưa có đủ dữ liệu để xác định công thức.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mt-4 overflow-hidden rounded-xl border border-slate-200">
+              <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th
+                      class="px-4 py-3 text-left text-xs font-semibold text-slate-600"
+                    >
+                      Thành viên
+                    </th>
+                    <th
+                      class="px-4 py-3 text-left text-xs font-semibold text-slate-600"
+                    >
+                      Vai trò
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-semibold text-slate-600"
+                    >
+                      Giờ dự kiến
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                  <tr
+                    v-for="member in hours.distribution"
+                    :key="`split-${member.lecturer_id}`"
+                  >
+                    <td class="px-4 py-3 font-medium text-slate-900">
+                      {{ member.lecturer_name }}
+                    </td>
+                    <td class="px-4 py-3 text-slate-700">
+                      {{ member.member_role_name }}
+                    </td>
+                    <td class="px-4 py-3 text-right font-medium text-slate-900">
+                      {{ member.hours.toFixed(2) }} giờ
+                    </td>
+                  </tr>
+                  <tr v-if="hours.distribution.length === 0">
+                    <td colspan="3" class="px-4 py-6 text-center text-slate-500">
+                      Chưa có dữ liệu phân bổ cho nhóm hiện tại.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Section F -->
           <HoursSummaryPanel
             :total-hours="hours.total_hours"
             :current-lecturer-hours="hours.current_lecturer_hours"
@@ -263,7 +386,15 @@
 
 <script setup lang="ts">
 import axios from "axios";
-import { computed, onMounted, reactive, ref, type ComputedRef } from "vue";
+import {
+  computed,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+  type ComputedRef,
+} from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { FolderKanban } from "lucide-vue-next";
 
 import DeclarationFormShell from "../../shared/components/DeclarationFormShell.vue";
@@ -290,18 +421,35 @@ import {
   search_lecturer_options,
 } from "../../shared/services/catalogs.service";
 import {
+  fetch_activity,
   fetch_current_lecturer_id,
   submit_activity,
   upsert_activity_base,
   upsert_members,
   upsert_project_details,
   list_evidence_files,
+  preview_project_hours,
+  type ProjectHoursPreviewResponseDto,
 } from "../../shared/services/declarations.service";
 import {
   computeProjectHours,
+  type ProjectHoursComputationResult,
   type ProjectDeclarationFormModel,
   projectAllowedMemberRoleCodes,
 } from "../ProjectDeclarationContract";
+
+const route = useRoute();
+const router = useRouter();
+
+const PROJECT_TYPE_LABELS: Record<string, string> = {
+  bo: "Đề tài cấp Bộ (2 năm)",
+  ministry: "Đề tài cấp Bộ (2 năm)",
+  coso: "Đề tài cấp Trường (1 năm)",
+  university: "Đề tài cấp Trường (1 năm)",
+};
+const ALLOWED_PROJECT_TYPE_CODES = new Set(
+  Object.keys(PROJECT_TYPE_LABELS).map((code) => code.toLowerCase())
+);
 
 const academicYears = ref<AcademicYearDto[]>([]);
 const memberRoles = ref<MemberRoleDto[]>([]);
@@ -339,6 +487,11 @@ const typeCodeById = computed(() =>
 const lecturerNameById = computed(() =>
   Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name]))
 );
+const ownerFacultyId = computed(
+  () =>
+    lecturers.value.find((l) => l.id === currentLecturerId.value)?.faculty_id ??
+    null
+);
 
 const memberRoleCodeById = computed(() =>
   Object.fromEntries(memberRoles.value.map((r) => [r.id, r.code]))
@@ -367,7 +520,7 @@ const externalMembers = computed(() => {
     ];
   });
 });
-const hours = computed(() =>
+const localHours = computed(() =>
   computeProjectHours(form, {
     typeCodeById: typeCodeById.value,
     lecturerNameById: lecturerNameById.value,
@@ -377,6 +530,137 @@ const hours = computed(() =>
   })
 );
 
+const serverProjectPreview = ref<ProjectHoursComputationResult | null>(null);
+const previewLoading = ref(false);
+const previewError = ref<string | null>(null);
+let previewDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+const selectedTypeName = computed(() => {
+  const selectedType = types.value.find((type) => type.id === form.typeId);
+  return selectedType?.name ?? null;
+});
+
+function normalizeServerPreview(
+  preview: ProjectHoursPreviewResponseDto
+): ProjectHoursComputationResult {
+  return {
+    total_hours: preview.formula.total_hours_allocated ?? 0,
+    current_lecturer_hours: preview.current_lecturer_hours ?? 0,
+    distribution: (preview.members ?? []).map((member) => ({
+      lecturer_id: member.lecturer_id,
+      lecturer_name: member.lecturer_full_name,
+      member_role_id:
+        memberRoles.value.find((role) => role.code === member.member_role_code)
+          ?.id ?? 0,
+      member_role_name: member.member_role_name ?? "—",
+      hours: member.hours_assigned ?? 0,
+    })),
+    has_rule: !!preview.distribution_strategy,
+    rule_type_code: preview.type_code,
+    rule_label: preview.level_label ?? preview.type_name,
+    leader_hours: preview.formula.leader_hours ?? 0,
+    member_pool_hours: preview.formula.member_pool_hours ?? 0,
+    member_pool_count: preview.formula.member_pool_count ?? 0,
+    member_pool_each: preview.formula.member_pool_each ?? 0,
+    formula_rows:
+      preview.formula_rows?.map((row) => ({
+        role_label: row.role_label,
+        total_hours: row.total_hours ?? 0,
+        formula_text: row.formula_text,
+      })) ?? [
+        {
+          role_label: "Chủ nhiệm",
+          total_hours: preview.formula.leader_hours ?? 0,
+          formula_text: `${(preview.formula.leader_hours ?? 0).toFixed(
+            2
+          )} giờ (100%)`,
+        },
+        {
+          role_label: "Nhóm thành viên",
+          total_hours: preview.formula.member_pool_hours ?? 0,
+          formula_text:
+            (preview.formula.member_pool_count ?? 0) > 0
+              ? `${(preview.formula.member_pool_hours ?? 0).toFixed(2)} / ${
+                  preview.formula.member_pool_count
+                } = ${(preview.formula.member_pool_each ?? 0).toFixed(
+                  2
+                )} giờ/người`
+              : `${(preview.formula.member_pool_hours ?? 0).toFixed(
+                  2
+                )} / 0 = 0 giờ/người (chưa có thành viên)`,
+        },
+      ],
+    progress_note: preview.formula.progress_note,
+  };
+}
+
+async function requestServerProjectHoursPreview() {
+  if (!form.typeId) {
+    serverProjectPreview.value = null;
+    previewError.value = null;
+    return;
+  }
+
+  const membersPayload = form.members
+    .filter(
+      (member) =>
+        !member.is_external &&
+        typeof member.lecturer_id === "number" &&
+        typeof member.member_role_id === "number"
+    )
+    .map((member) => ({
+      lecturer_id: member.lecturer_id as number,
+      member_role_id: member.member_role_id as number,
+    }));
+
+  previewLoading.value = true;
+  previewError.value = null;
+  try {
+    const response = await preview_project_hours({
+      academic_year_id: form.academicYearId ?? null,
+      type_id: form.typeId ?? null,
+      quantity: 1,
+      members: membersPayload,
+    });
+    serverProjectPreview.value = normalizeServerPreview(response);
+  } catch (_error) {
+    serverProjectPreview.value = null;
+    previewError.value =
+      "Không thể tải công thức từ hệ thống. Đang hiển thị bản tạm tính cục bộ.";
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
+function scheduleProjectPreviewRefresh() {
+  if (previewDebounceTimer) {
+    clearTimeout(previewDebounceTimer);
+  }
+  previewDebounceTimer = setTimeout(() => {
+    void requestServerProjectHoursPreview();
+  }, 250);
+}
+
+watch(
+  () => ({
+    academicYearId: form.academicYearId,
+    typeId: form.typeId,
+    members: form.members.map((member) => ({
+      lecturer_id: member.lecturer_id ?? null,
+      member_role_id: member.member_role_id ?? null,
+      is_external: !!member.is_external,
+    })),
+  }),
+  () => {
+    scheduleProjectPreviewRefresh();
+  },
+  { deep: true }
+);
+
+const hours = computed<ProjectHoursComputationResult>(() => {
+  return serverProjectPreview.value ?? localHours.value;
+});
+
 const hoursByLecturerId = computed(() => {
   const map: Record<number, number> = {};
   for (const d of hours.value.distribution) map[d.lecturer_id] = d.hours;
@@ -384,10 +668,13 @@ const hoursByLecturerId = computed(() => {
 });
 
 const hoursNote = computed(() => {
-  if (!form.typeId) return "Chọn cấp đề tài để xác định giờ chuẩn.";
+  if (!form.typeId) return "Chọn cấp đề tài để xác định công thức chia giờ.";
+  if (!hours.value.has_rule)
+    return "Chưa có quy tắc quy đổi cho loại đề tài này. Vui lòng liên hệ Phòng Quản lý khoa học.";
   if (hours.value.distribution.length === 0)
-    return "Cần chọn danh sách người tham gia để phân bổ giờ.";
-  return null;
+    return "Cần thêm thành viên để hiển thị phân bổ giờ dự kiến.";
+  if (previewError.value) return previewError.value;
+  return hours.value.progress_note;
 });
 
 const canSubmit = computed(() => {
@@ -431,7 +718,18 @@ async function loadCatalogs() {
   kindId.value = kinds.find((k) => k.code === "project")?.id ?? 0;
   form.kindId = kindId.value;
 
-  types.value = await fetch_activity_types_by_kind(kindId.value);
+  const fetchedProjectTypes = await fetch_activity_types_by_kind(kindId.value);
+  types.value = fetchedProjectTypes
+    .filter((type) => ALLOWED_PROJECT_TYPE_CODES.has(type.code.toLowerCase()))
+    .map((type) => ({
+      ...type,
+      name: PROJECT_TYPE_LABELS[type.code.toLowerCase()] ?? type.name,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "vi"));
+
+  if (form.typeId && !types.value.some((type) => type.id === form.typeId)) {
+    form.typeId = null;
+  }
 
   lecturers.value = await search_lecturer_options("");
   // default add current lecturer as member
@@ -443,6 +741,8 @@ async function loadCatalogs() {
       member_role_code: principalRole?.code ?? null,
     });
   }
+
+  scheduleProjectPreviewRefresh();
 }
 
 async function onSearchLecturers(q: string) {
@@ -458,6 +758,66 @@ async function onRemoveExistingEvidence(_id: number) {
 function yearToDate(year: number | null): string | null {
   if (!year) return null;
   return `${year}-01-01`;
+}
+
+function dateToYear(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+
+  const directYear = Number(normalized.slice(0, 4));
+  if (Number.isInteger(directYear) && directYear >= 1900 && directYear <= 2100) {
+    return directYear;
+  }
+
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.getFullYear();
+  }
+
+  return null;
+}
+
+async function loadDraftFromQuery() {
+  const raw = route.query.activity_id;
+  const rawValue = Array.isArray(raw) ? raw[0] : raw;
+  const activityId = rawValue ? Number(rawValue) : null;
+
+  if (!activityId || Number.isNaN(activityId)) return;
+
+  const data = await fetch_activity(activityId);
+  const activity = data.activity;
+  if (!activity) return;
+
+  form.activityId = activity.id;
+  form.academicYearId = activity.academic_year_id ?? null;
+  form.kindId = activity.kind_id ?? form.kindId;
+  form.typeId = activity.type_id ?? null;
+  form.title = activity.title ?? "";
+  form.notes = activity.notes ?? "";
+  form.startYear = dateToYear(activity.start_date);
+  form.endYear = dateToYear(activity.end_date);
+
+  if (data.detail_kind === "project_details" && data.detail) {
+    const detail = data.detail as any;
+    form.projectCode = detail.project_code ?? "";
+    form.decisionNo = detail.decision_no ?? "";
+    form.decisionDate = detail.decision_date ?? null;
+    form.funding = detail.funding ?? null;
+    form.startYear = dateToYear(detail.start_month ?? activity.start_date);
+    form.endYear = dateToYear(detail.end_month ?? activity.end_date);
+  }
+
+  form.members = (data.members ?? []).map((member) => ({
+    lecturer_id: member.lecturer_id,
+    member_role_id: member.member_role_id,
+    member_role_code: member.member_role_code ?? null,
+  }));
+
+  existingEvidence.value = data.evidence_files ?? [];
+
+  const statusCode = (activity.status_code ?? "draft") as any;
+  shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
 }
 
 const shell = useDeclarationFormShell({
@@ -483,6 +843,9 @@ const shell = useDeclarationFormShell({
     } as any);
 
     form.activityId = saved.id;
+    await router.replace({
+      query: { ...route.query, activity_id: String(saved.id) },
+    });
 
     // upsert details
     await upsert_project_details({
@@ -520,7 +883,7 @@ const shell = useDeclarationFormShell({
   on_submit: async () => {
     try {
       if (!form.activityId) {
-        await shell.save_draft();
+        await shell.save_draft({ silent_success: true });
       }
       if (!form.activityId) return;
       const submitResult = await submit_activity(form.activityId);
@@ -541,5 +904,8 @@ const shell = useDeclarationFormShell({
   },
 });
 
-onMounted(loadCatalogs);
+onMounted(async () => {
+  await loadCatalogs();
+  await loadDraftFromQuery();
+});
 </script>

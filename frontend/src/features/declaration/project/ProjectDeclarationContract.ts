@@ -1,55 +1,87 @@
-import type { HoursComputationResult } from "../shared/contracts/declarationSharedContract";
+import type { HoursDistributionItem } from "../shared/contracts/declarationSharedContract";
 import type { ParticipantRowModel } from "../shared/components/ParticipantsTable.vue";
 import {
   normalizeParticipantsForHours,
   round2,
 } from "../shared/contracts/participantHours.util";
+
 export type ProjectDeclarationFormModel = {
   activityId: number | null;
-
   academicYearId: number | null;
-  kindId: number; // fixed (project)
-  typeId: number | null; // project level (activity_types.id)
-
+  kindId: number;
+  typeId: number | null;
   title: string;
   notes: string;
-
-  // UI-only year fields (mapped to research_activities.start_date/end_date)
   startYear: number | null;
   endYear: number | null;
-
   projectCode: string;
   decisionNo: string;
-  decisionDate: string | null; // DATE
+  decisionDate: string | null;
   funding: number | null;
-
   members: ParticipantRowModel[];
 };
 
-export type ProjectHoursRule = {
-  // base hours by activity_types.code (P0: backend should source from hour_rules or seeded activity_types)
-  baseHoursByTypeCode: Record<string, number>;
-  // fractions (Assumption for mock): principal 0.5, secretary 0.2, members share rest equally
-  principalFraction: number;
-  secretaryFraction: number;
+export type ProjectFormulaRow = {
+  role_label: string;
+  total_hours: number;
+  formula_text: string;
 };
+
+export type ProjectHoursComputationResult = {
+  total_hours: number;
+  current_lecturer_hours: number;
+  distribution: HoursDistributionItem[];
+  has_rule: boolean;
+  rule_type_code: string | null;
+  rule_label: string | null;
+  leader_hours: number;
+  member_pool_hours: number;
+  member_pool_count: number;
+  member_pool_each: number;
+  formula_rows: ProjectFormulaRow[];
+  progress_note: string | null;
+};
+
+type ProjectSplitRule = {
+  type_codes: readonly string[];
+  rule_label: string;
+  leader_hours: number;
+  member_pool_hours: number;
+};
+
+const PROJECT_SPLIT_RULES: readonly ProjectSplitRule[] = [
+  {
+    type_codes: ["bo", "ministry"],
+    rule_label: "Đề tài cấp Bộ (2 năm)",
+    leader_hours: 720,
+    member_pool_hours: 480,
+  },
+  {
+    type_codes: ["coso", "university"],
+    rule_label: "Đề tài cấp Trường (1 năm)",
+    leader_hours: 600,
+    member_pool_hours: 240,
+  },
+];
+
 export const projectAllowedMemberRoleCodes = [
-  "principal", // chủ nhiệm
-  "secretary", // thư ký
-  "member", // thành viên
+  "principal",
+  "secretary",
+  "member",
 ] as const;
 
-export const projectHoursRule: ProjectHoursRule = {
-  baseHoursByTypeCode: {
-    ministry: 900,
-    province: 600,
-    university: 300,
-    faculty: 200,
-    other: 100,
-  },
-  principalFraction: 0.5,
-  secretaryFraction: 0.2,
-};
+function getRuleByTypeCode(typeCode: string | null): ProjectSplitRule | null {
+  if (!typeCode) return null;
+  const normalized = typeCode.trim().toLowerCase();
+  return (
+    PROJECT_SPLIT_RULES.find((rule) => rule.type_codes.includes(normalized)) ??
+    null
+  );
+}
+
+function isLeaderRole(roleCode: string): boolean {
+  return roleCode === "principal";
+}
 
 export function computeProjectHours(
   model: ProjectDeclarationFormModel,
@@ -60,69 +92,102 @@ export function computeProjectHours(
     memberRoleCodeById: Record<number, string>;
     currentLecturerId: number;
   }
-): HoursComputationResult {
-  const typeCode = model.typeId ? ctx.typeCodeById[model.typeId] : null;
-  const baseHours = typeCode
-    ? projectHoursRule.baseHoursByTypeCode[typeCode] ?? 0
-    : 0;
-
+): ProjectHoursComputationResult {
+  const typeCode = model.typeId ? ctx.typeCodeById[model.typeId] ?? null : null;
+  const rule = getRuleByTypeCode(typeCode);
   const participants = normalizeParticipantsForHours(model.members);
 
-  const allWithRole = participants.all.map((p) => ({
-    ...p,
-    role_code: ctx.memberRoleCodeById[p.member_role_id] ?? "",
-  }));
-  const internalWithRole = participants.internal.map((p) => ({
-    ...p,
-    role_code: ctx.memberRoleCodeById[p.member_role_id] ?? "",
-  }));
-
-  // ✅ giữ logic cũ: pick 1 principal + 1 secretary, nhưng xét trên ALL (có thể external)
-  const principalExists = allWithRole.some((p) => p.role_code === "principal");
-  const secretaryExists = allWithRole.some((p) => p.role_code === "secretary");
-
-  const principalHours = principalExists
-    ? baseHours * projectHoursRule.principalFraction
-    : 0;
-  const secretaryHours = secretaryExists
-    ? baseHours * projectHoursRule.secretaryFraction
-    : 0;
-
-  const remaining = Math.max(0, baseHours - principalHours - secretaryHours);
-
-  // ✅ “others” mẫu số = số người còn lại (bao gồm external)
-  const othersCount = allWithRole.filter(
-    (p) => p.role_code !== "principal" && p.role_code !== "secretary"
-  ).length;
-
-  const hoursPerOther = othersCount > 0 ? remaining / othersCount : 0;
-
-  const distribution = internalWithRole.map((p) => {
-    let hours = 0;
-
-    if (p.role_code === "principal") hours = principalHours;
-    else if (p.role_code === "secretary") hours = secretaryHours;
-    else hours = hoursPerOther;
-
+  const internal = participants.internal.map((participant) => {
+    const roleCode =
+      ctx.memberRoleCodeById[participant.member_role_id]?.toLowerCase() ?? "";
     return {
-      lecturer_id: p.lecturer_id,
-      lecturer_name:
-        ctx.lecturerNameById[p.lecturer_id] ?? `lecturer_id=${p.lecturer_id}`,
-      member_role_id: p.member_role_id,
+      lecturer_id: participant.lecturer_id,
+      member_role_id: participant.member_role_id,
+      member_role_code: roleCode,
       member_role_name:
-        ctx.memberRoleNameById[p.member_role_id] ??
-        `member_role_id=${p.member_role_id}`,
+        ctx.memberRoleNameById[participant.member_role_id] ??
+        `member_role_id=${participant.member_role_id}`,
+      lecturer_name:
+        ctx.lecturerNameById[participant.lecturer_id] ??
+        `lecturer_id=${participant.lecturer_id}`,
+    };
+  });
+
+  const leaderHours = rule?.leader_hours ?? 0;
+  const memberPoolHours = rule?.member_pool_hours ?? 0;
+
+  const explicitLeader = internal.find((member) =>
+    isLeaderRole(member.member_role_code)
+  );
+  const fallbackLeader =
+    explicitLeader ??
+    internal.find((member) => member.lecturer_id === ctx.currentLecturerId) ??
+    internal[0] ??
+    null;
+
+  const poolMembers = internal.filter(
+    (member) => member.lecturer_id !== fallbackLeader?.lecturer_id
+  );
+
+  const memberPoolCount = poolMembers.length;
+  const memberPoolEach =
+    memberPoolCount > 0 ? round2(memberPoolHours / memberPoolCount) : 0;
+  const totalHours = round2(
+    leaderHours + (memberPoolCount > 0 ? memberPoolHours : 0)
+  );
+
+  const distribution: HoursDistributionItem[] = internal.map((member) => {
+    const hours =
+      member.lecturer_id === fallbackLeader?.lecturer_id
+        ? leaderHours
+        : memberPoolCount > 0
+          ? memberPoolEach
+          : 0;
+    return {
+      lecturer_id: member.lecturer_id,
+      lecturer_name: member.lecturer_name,
+      member_role_id: member.member_role_id,
+      member_role_name: member.member_role_name,
       hours: round2(hours),
     };
   });
 
   const currentLecturerHours =
-    distribution.find((d) => d.lecturer_id === ctx.currentLecturerId)?.hours ??
-    0;
+    distribution.find((member) => member.lecturer_id === ctx.currentLecturerId)
+      ?.hours ?? 0;
+
+  const formulaRows: ProjectFormulaRow[] = rule
+    ? [
+        {
+          role_label: "Chủ nhiệm",
+          total_hours: rule.leader_hours,
+          formula_text: `${rule.leader_hours} giờ (100%)`,
+        },
+        {
+          role_label: "Nhóm thành viên",
+          total_hours: rule.member_pool_hours,
+          formula_text:
+            memberPoolCount > 0
+              ? `${rule.member_pool_hours} / ${memberPoolCount} = ${memberPoolEach.toFixed(
+                  2
+                )} giờ/người`
+              : `${rule.member_pool_hours} / 0 = 0 giờ/người (chưa có thành viên)`,
+        },
+      ]
+    : [];
 
   return {
-    total_hours: round2(baseHours),
+    total_hours: totalHours,
     current_lecturer_hours: round2(currentLecturerHours),
     distribution,
+    has_rule: rule !== null,
+    rule_type_code: typeCode,
+    rule_label: rule?.rule_label ?? null,
+    leader_hours: leaderHours,
+    member_pool_hours: memberPoolHours,
+    member_pool_count: memberPoolCount,
+    member_pool_each: memberPoolEach,
+    formula_rows: formulaRows,
+    progress_note: "Chưa áp dụng % tiến độ do chưa có trường dữ liệu trong hệ thống.",
   };
 }

@@ -1,11 +1,7 @@
-// File: src/features/lecturer/profile/pages/LecturerProfilePage.vue
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
-      <!-- Header card -->
-      <div
-        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
-      >
+      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
         <PageHeader
           title="Hồ sơ khoa học & Công trình NCKH"
           subtitle="Xem và cập nhật thông tin cá nhân, hồ sơ khoa học; tổng hợp công trình đã duyệt."
@@ -16,32 +12,6 @@
         />
       </div>
 
-      <!-- Toast -->
-      <Transition
-        enter-active-class="transition duration-150"
-        enter-from-class="translate-y-2 opacity-0"
-        enter-to-class="translate-y-0 opacity-100"
-        leave-active-class="transition duration-150"
-        leave-from-class="translate-y-0 opacity-100"
-        leave-to-class="translate-y-2 opacity-0"
-      >
-        <div
-          v-if="toast"
-          class="fixed bottom-4 right-4 z-50 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-lg"
-        >
-          <div
-            class="font-semibold"
-            :class="
-              toast.type === 'success' ? 'text-emerald-700' : 'text-rose-700'
-            "
-          >
-            {{ toast.type === "success" ? "Thành công" : "Có lỗi" }}
-          </div>
-          <div class="mt-0.5 text-slate-700">{{ toast.message }}</div>
-        </div>
-      </Transition>
-
-      <!-- ONE COLUMN: mỗi dòng 1 khung -->
       <div class="space-y-4">
         <LecturerPersonalInfoCard
           :profile="personalInfo"
@@ -67,7 +37,7 @@
         <LecturerResearchWorksCard
           :loading="loading"
           :works-by-kind="worksByKind"
-          @request-toast="showToast"
+          @request-toast="showCardResult"
         />
       </div>
     </div>
@@ -75,8 +45,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
 
 import LecturerPersonalInfoCard from "../components/LecturerPersonalInfoCard.vue";
 import LecturerContactInfoCard from "../components/LecturerContactInfoCard.vue";
@@ -91,18 +65,43 @@ import {
   useLecturerProfile,
 } from "../composables/useLecturerProfile";
 
-type ToastState = { type: "success" | "error"; message: string } | null;
+const { runWithFeedback } = useActionFeedback();
 
-const toast = ref<ToastState>(null);
-let toastTimer: number | null = null;
+function normalizeProfileError(error: unknown) {
+  const raw = resolveApiErrorMessage(
+    error,
+    "Không thể cập nhật thông tin. Vui lòng thử lại."
+  );
+  if (raw === "Khong tim thay hoc vi trong danh muc.") {
+    return "Không tìm thấy học vị trong danh mục. Vui lòng chọn lại.";
+  }
+  if (raw === "Khong tim thay hoc ham trong danh muc.") {
+    return "Không tìm thấy học hàm trong danh mục. Vui lòng chọn lại.";
+  }
+  if (/Unable to update|Unable to load/i.test(raw)) {
+    return "Không thể cập nhật thông tin. Vui lòng thử lại.";
+  }
+  return raw;
+}
 
-function showToast(payload: ToastState) {
-  toast.value = payload;
-  if (toastTimer) window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => {
-    toast.value = null;
-    toastTimer = null;
-  }, 2200);
+function showCardResult(payload: { type: "success" | "error"; message: string }) {
+  void runWithFeedback(
+    async () => undefined,
+    {
+      loading: { enabled: false },
+      success: {
+        enabled: payload.type === "success",
+        title: "Thành công",
+        message: payload.message,
+      },
+      error: {
+        enabled: payload.type === "error",
+        title: "Có lỗi xảy ra",
+        message: payload.message,
+      },
+      rethrow: false,
+    }
+  );
 }
 
 const saving = reactive({ personal: false, contact: false, academic: false });
@@ -135,10 +134,25 @@ const worksByKind = computed<Record<ResearchWorkKind, typeof works.value>>(
 async function onUpdatePersonal(next: LecturerPersonalInfo) {
   saving.personal = true;
   try {
-    await updatePersonalInfo(next);
-    showToast({ type: "success", message: "Đã cập nhật thông tin cá nhân." });
-  } catch (e) {
-    showToast({ type: "error", message: (e as Error).message });
+    await runWithFeedback(
+      async () => {
+        await updatePersonalInfo(next);
+      },
+      {
+        loading: {
+          title: "Đang cập nhật",
+          message: "Đang lưu thông tin cá nhân...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Cập nhật thông tin thành công.",
+        },
+        error: {
+          title: "Cập nhật thất bại",
+          message: (error) => normalizeProfileError(error),
+        },
+      }
+    );
   } finally {
     saving.personal = false;
   }
@@ -147,10 +161,25 @@ async function onUpdatePersonal(next: LecturerPersonalInfo) {
 async function onUpdateContact(next: LecturerContactInfo) {
   saving.contact = true;
   try {
-    await updateContactInfo(next);
-    showToast({ type: "success", message: "Đã cập nhật thông tin liên hệ." });
-  } catch (e) {
-    showToast({ type: "error", message: (e as Error).message });
+    await runWithFeedback(
+      async () => {
+        await updateContactInfo(next);
+      },
+      {
+        loading: {
+          title: "Đang cập nhật",
+          message: "Đang lưu thông tin liên hệ...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Cập nhật thông tin thành công.",
+        },
+        error: {
+          title: "Cập nhật thất bại",
+          message: (error) => normalizeProfileError(error),
+        },
+      }
+    );
   } finally {
     saving.contact = false;
   }
@@ -159,10 +188,25 @@ async function onUpdateContact(next: LecturerContactInfo) {
 async function onUpdateAcademic(next: LecturerAcademicProfile) {
   saving.academic = true;
   try {
-    await updateAcademicProfile(next);
-    showToast({ type: "success", message: "Đã cập nhật hồ sơ khoa học." });
-  } catch (e) {
-    showToast({ type: "error", message: (e as Error).message });
+    await runWithFeedback(
+      async () => {
+        await updateAcademicProfile(next);
+      },
+      {
+        loading: {
+          title: "Đang cập nhật",
+          message: "Đang lưu thông tin học hàm, học vị...",
+        },
+        success: {
+          title: "Thành công",
+          message: "Cập nhật thông tin thành công.",
+        },
+        error: {
+          title: "Cập nhật thất bại",
+          message: (error) => normalizeProfileError(error),
+        },
+      }
+    );
   } finally {
     saving.academic = false;
   }
@@ -170,9 +214,24 @@ async function onUpdateAcademic(next: LecturerAcademicProfile) {
 
 onMounted(async () => {
   try {
-    await loadProfile();
-  } catch (e) {
-    showToast({ type: "error", message: (e as Error).message });
+    await runWithFeedback(
+      async () => {
+        await loadProfile();
+      },
+      {
+        loading: {
+          title: "Đang tải hồ sơ",
+          message: "Vui lòng đợi trong giây lát...",
+        },
+        success: { enabled: false },
+        error: {
+          title: "Không thể tải hồ sơ",
+          message: (error) => normalizeProfileError(error),
+        },
+      }
+    );
+  } catch {
+    // Error modal đã hiển thị.
   }
 });
 </script>

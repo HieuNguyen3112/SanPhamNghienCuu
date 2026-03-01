@@ -205,6 +205,20 @@
                 </div>
 
                 <div
+                  v-if="selectedResearchWorkApprovalEntry?.ruleSummary"
+                  class="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
+                >
+                  {{ selectedResearchWorkApprovalEntry.ruleSummary }}
+                </div>
+
+                <div
+                  v-if="selectedResearchWorkApprovalEntry?.hoursResolutionNote"
+                  class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                >
+                  {{ selectedResearchWorkApprovalEntry.hoursResolutionNote }}
+                </div>
+
+                <div
                   class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white"
                 >
                   <div
@@ -280,8 +294,16 @@
                             </span>
                           </td>
 
-                          <td class="px-3 py-2 text-slate-700">
-                            {{ a.authorFacultyDisplayName }}
+                          <td class="px-3 py-2">
+                            <div class="text-slate-700">
+                              {{ a.authorFacultyDisplayName || "—" }}
+                            </div>
+                            <span
+                              v-if="a.isOutsideFaculty"
+                              class="mt-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                            >
+                              Ngoài khoa
+                            </span>
                           </td>
 
                           <td class="px-3 py-2">
@@ -455,6 +477,7 @@ import type {
   ResearchWorkRejectionReasonType,
 } from "../models/researchWorkApprovalModels";
 import { useResearchWorkApprovalDisplayMapping } from "../composables/useResearchWorkApprovalDisplayMapping";
+import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
 const props = defineProps<{
   approvalScopeIdentifier: ResearchWorkApprovalScopeIdentifier;
@@ -527,6 +550,7 @@ const {
   formatIntegerValue,
   formatDateTimeDisplayValue,
 } = displayMapping;
+const { openActionResultModal } = useActionResultModal();
 
 // chỉ cấp trường mới được chốt giờ
 const canFinalizeHours = computed(() => {
@@ -689,16 +713,9 @@ function approveSelectedResearchWork(): void {
     if (!isOfficialHoursValid.value) return;
   }
 
-  const ok = window.confirm(
-    canFinalizeHours.value
-      ? "Xác nhận duyệt & chốt giờ?"
-      : "Xác nhận hồ sơ hợp lệ và duyệt công trình?",
-  );
-  if (!ok) return;
-
-  emit("approve", {
+  const approvalPayload = {
     researchWorkIdentifier: entry.researchWorkIdentifier,
-    // tạm thời giữ API cũ: chốt = tổng giờ; khoa = null
+    // giu API cu: cap truong gui tong gio, cap khoa gui null.
     officialResearchHours: canFinalizeHours.value
       ? Math.round(totalOfficialHours.value)
       : null,
@@ -708,6 +725,19 @@ function approveSelectedResearchWork(): void {
         officialHoursDraftByAuthorId.value[row.authorIdentifier] ?? 0,
       ),
     })),
+  };
+
+  openActionResultModal({
+    type: "warning",
+    title: "Xác nhận",
+    message: canFinalizeHours.value
+      ? "Xác nhận duyệt và chốt giờ NCKH cho công trình này?"
+      : "Xác nhận hồ sơ hợp lệ và duyệt công trình?",
+    closeLabel: "Hủy",
+    secondaryLabel: "Duyệt",
+    onSecondary: () => {
+      emit("approve", approvalPayload);
+    },
   });
 }
 
@@ -728,17 +758,26 @@ async function onRejectActionButtonClicked(): Promise<void> {
   shouldShowRejectionValidationHint.value = true;
   if (!isRejectionFormValid.value || !selectedRejectionReasonType.value) return;
 
-  if (!window.confirm("Xác nhận từ chối công trình này? (Demo UI)")) return;
-
-  emit("reject", {
+  const rejectionPayload = {
     researchWorkIdentifier: entry.researchWorkIdentifier,
     rejectionReasonType: selectedRejectionReasonType.value,
     rejectionReasonDetail:
       selectedRejectionReasonType.value === "OTHER"
         ? rejectionReasonDetail.value.trim()
         : null,
-  });
+  };
 
-  resetRejectionFlowState();
+  openActionResultModal({
+    type: "warning",
+    title: "Xác nhận",
+    message: "Xác nhận từ chối công trình này?",
+    closeLabel: "Hủy",
+    secondaryLabel: "Từ chối",
+    onSecondary: () => {
+      emit("reject", rejectionPayload);
+      resetRejectionFlowState();
+    },
+  });
 }
 </script>
+

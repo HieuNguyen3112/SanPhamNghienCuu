@@ -10,7 +10,11 @@ import {
   hoursAlertItemFromDto,
   hoursAlertsSummaryFromDto,
 } from "../contracts/hoursWarning.contract";
-import { fetchHoursWarnings, markHoursWarningSeen } from "../services/hoursWarningService";
+import {
+  deleteHoursWarning,
+  fetchHoursWarnings,
+  markHoursWarningSeen,
+} from "../services/hoursWarningService";
 
 const defaultCounts = { all: 0, danger: 0, warning: 0, done: 0 };
 
@@ -80,9 +84,18 @@ export function useHoursWarning() {
     loadAlerts();
   }
 
-  async function markAsSeen(alertId: number) {
+  async function markAsSeen(alertId: string) {
     try {
       await markHoursWarningSeen(alertId);
+      await loadAlerts();
+    } catch (e) {
+      errorAlerts.value = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function deleteAlert(alertId: string) {
+    try {
+      await deleteHoursWarning(alertId);
       await loadAlerts();
     } catch (e) {
       errorAlerts.value = e instanceof Error ? e.message : String(e);
@@ -108,5 +121,6 @@ export function useHoursWarning() {
     loadAlerts,
     changeFilter,
     markAsSeen,
+    deleteAlert,
   };
 }

@@ -19,13 +19,6 @@
 
       <GuidanceAlert />
 
-      <div
-        v-if="toastMessage"
-        class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-      >
-        {{ toastMessage }}
-      </div>
-
       <HoursSummaryCard
         :total-approved-count="totalApprovedCount"
         :selected-count="selectedCount"
@@ -131,7 +124,6 @@ const {
 
   submitting,
   submitError,
-  toastMessage,
 
   totalApprovedCount,
   selectedCount,

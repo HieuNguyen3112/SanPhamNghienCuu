@@ -17,13 +17,6 @@
         :missing-evidence-count="worksMissingEvidence.length"
       />
 
-      <div
-        v-if="toastMessage"
-        class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-      >
-        {{ toastMessage }}
-      </div>
-
       <div class="rounded-2xl border border-slate-200 bg-white p-4">
         <div class="text-sm font-semibold text-slate-900">
           Công trình chưa có minh chứng: {{ worksMissingEvidence.length }}
@@ -98,7 +91,6 @@ const {
   errorList,
   loadingDetail,
   errorDetail,
-  toastMessage,
   evidenceFiles,
   evidenceFileTypes,
   selectedEvidenceTypeId,

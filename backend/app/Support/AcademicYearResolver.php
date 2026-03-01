@@ -20,6 +20,15 @@ class AcademicYearResolver
 
     public static function current(?CarbonInterface $asOf = null): ?object
     {
+        $active = DB::table('academic_years')
+            ->where('is_active', 1)
+            ->orderByDesc('start_date')
+            ->first();
+
+        if ($active) {
+            return $active;
+        }
+
         $date = ($asOf ?? now())->toDateString();
 
         $inWindow = DB::table('academic_years')
@@ -30,15 +39,6 @@ class AcademicYearResolver
 
         if ($inWindow) {
             return $inWindow;
-        }
-
-        $active = DB::table('academic_years')
-            ->where('is_active', 1)
-            ->orderByDesc('start_date')
-            ->first();
-
-        if ($active) {
-            return $active;
         }
 
         return DB::table('academic_years')

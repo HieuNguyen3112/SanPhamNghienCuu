@@ -31,6 +31,7 @@
         :loading="loadingAlerts"
         :error="errorAlerts"
         @mark-seen="markAsSeen"
+        @delete-alert="deleteAlert"
       />
 
       <AlertsActionPanel
@@ -69,6 +70,7 @@ const {
   loadAlerts,
   changeFilter,
   markAsSeen,
+  deleteAlert,
 } = useHoursWarning();
 
 onMounted(() => {

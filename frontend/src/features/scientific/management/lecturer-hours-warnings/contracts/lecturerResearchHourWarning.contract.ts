@@ -1,4 +1,4 @@
-﻿export type FacultyIdentifier = string;
+export type FacultyIdentifier = string;
 export type AcademicYearIdentifier = string;
 
 export type ResearchHourShortfallSeverity = "MILD" | "MODERATE" | "SEVERE";

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <div
@@ -12,14 +12,6 @@
           @exportPdfClicked="() => {}"
           @exportExcelClicked="() => {}"
         />
-      </div>
-
-      <!-- Toast -->
-      <div
-        v-if="toastMessage"
-        class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-      >
-        {{ toastMessage }}
       </div>
 
       <!-- Filter -->
@@ -110,8 +102,6 @@ const {
   currentPageNumber,
   pageSize,
   totalItems,
-
-  toastMessage,
 
   editOpen,
   rolesOpen,

@@ -6,6 +6,7 @@ use App\Http\Requests\Faculty\FacultyLecturerHourApprovalListRequest;
 use App\Http\Requests\Faculty\FacultyLecturerHourApprovalRejectRequest;
 use App\Support\AuditLogger;
 use App\Support\AcademicYearResolver;
+use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -433,6 +434,32 @@ class FacultyLecturerHourApprovalController extends Controller
             ],
         ], $request->user());
 
+        $approvedHours = 0.0;
+        if (! empty($approvedActivityIds)) {
+            $approvedHours = (float) DB::table('research_activity_members')
+                ->whereIn('activity_id', $approvedActivityIds)
+                ->where('lecturer_id', $requestId)
+                ->sum(DB::raw('COALESCE(hours_assigned, 0)'));
+        }
+
+        WorkflowNotification::notifyLecturer(
+            $requestId,
+            WorkflowNotification::makePayload(
+                'hours_approved',
+                'Giờ NCKH đã được duyệt',
+                $approvedHours > 0
+                    ? ('Công trình của bạn đã được duyệt giờ: ' . round($approvedHours, 2) . ' giờ.')
+                    : 'Yêu cầu duyệt giờ NCKH của bạn đã được khoa phê duyệt.',
+                '/hours/personal',
+                [
+                    'lecturer_id' => (int) $requestId,
+                    'approved_activity_ids' => $approvedActivityIds,
+                    'hours_value' => round($approvedHours, 2),
+                    'academic_year' => $context['academic_year_code'] ?? null,
+                ]
+            )
+        );
+
         return $this->show($request, $requestId);
     }
 
@@ -554,6 +581,30 @@ class FacultyLecturerHourApprovalController extends Controller
                 'rejected_count' => count($rejectedActivityIds),
             ],
         ], $request->user());
+
+        $rejectionReason = trim((string) ($validated['reason_detail'] ?? ''));
+        if ($rejectionReason === '') {
+            $rejectionReason = trim((string) ($validated['reason_code'] ?? ''));
+        }
+
+        WorkflowNotification::notifyLecturer(
+            $requestId,
+            WorkflowNotification::makePayload(
+                'hours_rejected',
+                'Giờ NCKH bị từ chối',
+                $rejectionReason !== ''
+                    ? ('Khoa đã từ chối yêu cầu duyệt giờ NCKH. Lý do: ' . $rejectionReason . '.')
+                    : 'Khoa đã từ chối yêu cầu duyệt giờ NCKH của bạn.',
+                '/hours/calculate',
+                [
+                    'lecturer_id' => (int) $requestId,
+                    'rejected_activity_ids' => $rejectedActivityIds,
+                    'reason_code' => $validated['reason_code'] ?? null,
+                    'reason_detail' => $validated['reason_detail'] ?? null,
+                    'academic_year' => $context['academic_year_code'] ?? null,
+                ]
+            )
+        );
 
         return $this->show($request, $requestId);
     }

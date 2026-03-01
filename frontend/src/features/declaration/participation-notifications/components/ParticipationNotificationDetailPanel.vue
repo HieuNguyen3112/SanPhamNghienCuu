@@ -283,6 +283,7 @@
                   <button
                     type="button"
                     class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                    :disabled="props.processing"
                     @click="cancelReject"
                   >
                     Hủy
@@ -290,10 +291,11 @@
                   <button
                     type="button"
                     class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-xs font-medium text-white shadow-sm hover:bg-rose-700"
+                    :disabled="props.processing"
                     @click="confirmReject"
                   >
                     <XCircle class="h-4 w-4" />
-                    Xác nhận từ chối
+                    {{ props.processing ? "Đang xử lý..." : "Xác nhận từ chối" }}
                   </button>
                 </div>
               </div>
@@ -309,21 +311,21 @@
               <button
                 type="button"
                 class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-50"
-                :disabled="isRejecting"
+                :disabled="isRejecting || props.processing"
                 @click="startReject"
               >
                 <X class="h-4 w-4" />
-                Từ chối tham gia
+                {{ props.processing ? "Đang xử lý..." : "Từ chối tham gia" }}
               </button>
 
               <button
                 type="button"
                 class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
-                :disabled="isRejecting"
+                :disabled="isRejecting || props.processing"
                 @click="emit('accept')"
               >
                 <Check class="h-4 w-4" />
-                Xác nhận tham gia
+                {{ props.processing ? "Đang xử lý..." : "Xác nhận tham gia" }}
               </button>
             </div>
 
@@ -447,6 +449,7 @@ interface ParticipationNotification {
 const props = defineProps<{
   open: boolean;
   notification: ParticipationNotification | null;
+  processing?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -511,6 +514,7 @@ function formatDateTime(iso: string) {
 }
 
 function startReject() {
+  if (props.processing) return;
   rejectError.value = null;
   isRejecting.value = true;
   rejectReason.value = "";
@@ -523,6 +527,7 @@ function cancelReject() {
 }
 
 function confirmReject() {
+  if (props.processing) return;
   const reason = rejectReason.value.trim();
   if (!reason) {
     rejectError.value = "Vui lòng nhập lý do từ chối.";

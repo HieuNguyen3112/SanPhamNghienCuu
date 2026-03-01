@@ -24,38 +24,41 @@ class LecturerPersonalHoursController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
+        $filters = $request->validated();
         $hoursStageId = $this->resolveStageId('hours');
-        $academicYear = $this->resolveAcademicYear(
+        $scope = $this->resolveHoursScope(
             (int) $lecturer->id,
             $hoursStageId,
-            $request->validated()['academic_year_id'] ?? null
+            $filters
         );
-        if (! $academicYear) {
-            return response()->json(['message' => 'academic year not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if (! $scope) {
+            return response()->json(['message' => 'Không tìm thấy năm học.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         if (! $hoursStageId) {
             return response()->json([
                 'success' => true,
                 'message' => 'ok',
-                'data' => $this->emptyOverviewPayload($academicYear),
+                'data' => $this->emptyOverviewPayload($scope),
             ], Response::HTTP_OK);
         }
 
-        $this->backfillComputedHoursForLecturer((int) $lecturer->id, (int) $academicYear->id);
+        $scopeAcademicYearId = $scope['academic_year'] ? (int) $scope['academic_year']->id : null;
+        $this->backfillComputedHoursForLecturer((int) $lecturer->id, $scopeAcademicYearId);
 
-        $totals = $this->summaryTotals($lecturer->id, (int) $academicYear->id, $hoursStageId);
-        $requiredHours = $this->requiredHours((int) $academicYear->id);
+        $totals = $this->summaryTotals((int) $lecturer->id, $scopeAcademicYearId, $hoursStageId);
+        $requiredHours = $this->requiredHoursByScope($scope);
 
         return response()->json([
             'success' => true,
             'message' => 'ok',
             'data' => [
-                'academic_year_id' => (int) $academicYear->id,
-                'academic_year_code' => $academicYear->code,
+                'mode' => $scope['mode'],
+                'academic_year_id' => $scopeAcademicYearId,
+                'academic_year_code' => $scope['label'],
                 'required_hours' => $requiredHours,
                 'approved_hours' => $totals['approved_hours'],
                 'pending_hours' => $totals['pending_hours'],
@@ -63,22 +66,22 @@ class LecturerPersonalHoursController extends Controller
             ],
         ], Response::HTTP_OK);
     }
-
     public function distribution(LecturerPersonalHoursRequest $request)
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
+        $filters = $request->validated();
         $hoursStageId = $this->resolveStageId('hours');
-        $academicYear = $this->resolveAcademicYear(
+        $scope = $this->resolveHoursScope(
             (int) $lecturer->id,
             $hoursStageId,
-            $request->validated()['academic_year_id'] ?? null
+            $filters
         );
-        if (! $academicYear) {
-            return response()->json(['message' => 'academic year not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if (! $scope) {
+            return response()->json(['message' => 'Không tìm thấy năm học.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         if (! $hoursStageId) {
@@ -86,22 +89,25 @@ class LecturerPersonalHoursController extends Controller
                 'success' => true,
                 'message' => 'ok',
                 'data' => [
-                    'academic_year_id' => (int) $academicYear->id,
-                    'academic_year_code' => $academicYear->code,
+                    'mode' => $scope['mode'],
+                    'academic_year_id' => $scope['academic_year'] ? (int) $scope['academic_year']->id : null,
+                    'academic_year_code' => $scope['label'],
                     'total_approved_hours' => 0,
                     'items' => [],
                 ],
             ], Response::HTTP_OK);
         }
 
-        $this->backfillComputedHoursForLecturer((int) $lecturer->id, (int) $academicYear->id);
+        $scopeAcademicYearId = $scope['academic_year'] ? (int) $scope['academic_year']->id : null;
+        $this->backfillComputedHoursForLecturer((int) $lecturer->id, $scopeAcademicYearId);
 
-        $baseQuery = $this->hoursApprovalQuery($lecturer->id, (int) $academicYear->id, $hoursStageId);
+        $baseQuery = $this->hoursApprovalQuery((int) $lecturer->id, $scopeAcademicYearId, $hoursStageId);
         $rows = $baseQuery
             ->where('aa.status', 'approved')
-            ->groupBy('ak.id', 'ak.name')
+            ->groupBy('ak.id', 'ak.code', 'ak.name')
             ->select([
                 'ak.id as kind_id',
+                'ak.code as kind_code',
                 'ak.name as kind_name',
                 DB::raw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as hours_total'),
             ])
@@ -116,9 +122,10 @@ class LecturerPersonalHoursController extends Controller
             $percentage = $totalApproved > 0
                 ? (int) round(($hours / $totalApproved) * 100)
                 : 0;
+
             return [
                 'kind_id' => (int) $row->kind_id,
-                'label' => $row->kind_name,
+                'label' => $this->mapKindName($row->kind_code ?? null, $row->kind_name ?? null),
                 'hours' => $hours,
                 'percentage' => $percentage,
             ];
@@ -128,39 +135,43 @@ class LecturerPersonalHoursController extends Controller
             'success' => true,
             'message' => 'ok',
             'data' => [
-                'academic_year_id' => (int) $academicYear->id,
-                'academic_year_code' => $academicYear->code,
+                'mode' => $scope['mode'],
+                'academic_year_id' => $scopeAcademicYearId,
+                'academic_year_code' => $scope['label'],
                 'total_approved_hours' => $totalApproved,
                 'items' => $items,
             ],
         ], Response::HTTP_OK);
     }
-
     public function batches(LecturerPersonalHoursRequest $request)
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
+        $filters = $request->validated();
         $hoursStageId = $this->resolveStageId('hours');
-        $academicYear = $this->resolveAcademicYear(
+        $scope = $this->resolveHoursScope(
             (int) $lecturer->id,
             $hoursStageId,
-            $request->validated()['academic_year_id'] ?? null
+            $filters
         );
-        if (! $academicYear) {
-            return response()->json(['message' => 'academic year not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        if (! $scope) {
+            return response()->json(['message' => 'Không tìm thấy năm học.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $page = max(1, (int) ($request->validated()['page'] ?? 1));
-        $perPage = max(1, min(100, (int) ($request->validated()['per_page'] ?? 12)));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $perPage = max(1, min(100, (int) ($filters['per_page'] ?? 12)));
 
         if (! $hoursStageId) {
             return response()->json([
                 'success' => true,
                 'message' => 'ok',
                 'data' => [
+                    'mode' => $scope['mode'],
+                    'academic_year_id' => $scope['academic_year'] ? (int) $scope['academic_year']->id : null,
+                    'academic_year_code' => $scope['label'],
                     'items' => [],
                     'pagination' => [
                         'page' => $page,
@@ -172,7 +183,8 @@ class LecturerPersonalHoursController extends Controller
             ], Response::HTTP_OK);
         }
 
-        $this->backfillComputedHoursForLecturer((int) $lecturer->id, (int) $academicYear->id);
+        $scopeAcademicYearId = $scope['academic_year'] ? (int) $scope['academic_year']->id : null;
+        $this->backfillComputedHoursForLecturer((int) $lecturer->id, $scopeAcademicYearId);
 
         $statusCase = "CASE
             WHEN SUM(CASE WHEN aa.status = 'pending' THEN 1 ELSE 0 END) > 0 THEN 'pending'
@@ -180,7 +192,7 @@ class LecturerPersonalHoursController extends Controller
             ELSE 'approved'
         END";
 
-        $batchQuery = $this->hoursApprovalQuery($lecturer->id, (int) $academicYear->id, $hoursStageId)
+        $batchQuery = $this->hoursApprovalQuery((int) $lecturer->id, $scopeAcademicYearId, $hoursStageId)
             ->select([
                 DB::raw('UNIX_TIMESTAMP(aa.created_at) as batch_id'),
                 'ay.id as academic_year_id',
@@ -202,7 +214,7 @@ class LecturerPersonalHoursController extends Controller
             return [
                 'batch_id' => (int) $row->batch_id,
                 'batch_name' => $this->formatBatchName($submittedAt),
-                'academic_year_id' => (int) $row->academic_year_id,
+                'academic_year_id' => $row->academic_year_id !== null ? (int) $row->academic_year_id : null,
                 'academic_year_code' => $row->academic_year_code,
                 'status' => $statusCode,
                 'status_label' => $this->statusLabel($statusCode),
@@ -216,6 +228,9 @@ class LecturerPersonalHoursController extends Controller
             'success' => true,
             'message' => 'ok',
             'data' => [
+                'mode' => $scope['mode'],
+                'academic_year_id' => $scopeAcademicYearId,
+                'academic_year_code' => $scope['label'],
                 'items' => $items,
                 'pagination' => [
                     'page' => $paginator->currentPage(),
@@ -226,17 +241,16 @@ class LecturerPersonalHoursController extends Controller
             ],
         ], Response::HTTP_OK);
     }
-
     public function batchDetail(Request $request, int $batchId)
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $hoursStageId = $this->resolveStageId('hours');
         if (! $hoursStageId) {
-            return response()->json(['message' => 'hours approval stage not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json(['message' => 'Chưa cấu hình bước duyệt giờ NCKH.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $this->backfillComputedHoursForLecturer((int) $lecturer->id, null);
@@ -246,6 +260,7 @@ class LecturerPersonalHoursController extends Controller
             ->select([
                 'ra.id as activity_id',
                 'ra.title as activity_title',
+                'ak.code as kind_code',
                 'ak.name as kind_name',
                 'ram.hours_assigned as hours_assigned',
                 'aa.status as approval_status',
@@ -258,7 +273,7 @@ class LecturerPersonalHoursController extends Controller
             ->get();
 
         if ($items->isEmpty()) {
-            return response()->json(['message' => 'batch not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy đợt xét duyệt.'], Response::HTTP_NOT_FOUND);
         }
 
         $statusCode = $this->aggregateStatus($items->pluck('approval_status')->all());
@@ -274,7 +289,7 @@ class LecturerPersonalHoursController extends Controller
             return [
                 'activity_id' => (int) $row->activity_id,
                 'title' => $row->activity_title,
-                'kind_name' => $row->kind_name,
+                'kind_name' => $this->mapKindName($row->kind_code ?? null, $row->kind_name ?? null),
                 'lecturer_hours' => $row->hours_assigned !== null ? (float) $row->hours_assigned : 0.0,
                 'status' => $row->approval_status,
             ];
@@ -307,13 +322,48 @@ class LecturerPersonalHoursController extends Controller
     private function resolveStageId(string $code): ?int
     {
         $id = DB::table('approval_stages')->where('code', $code)->value('id');
-        return $id ? (int) $id : null;
+        if ($id) {
+            return (int) $id;
+        }
+
+        $codeAliases = match ($code) {
+            'hours' => ['hours', 'hours_approval', 'duyet_gio', 'xet_duyet_gio'],
+            default => [$code],
+        };
+
+        $id = DB::table('approval_stages')
+            ->whereIn('code', $codeAliases)
+            ->value('id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $nameAliases = match ($code) {
+            'hours' => ['Hours Approval', 'Duyệt giờ', 'Xét duyệt giờ', 'Duyệt giờ NCKH'],
+            default => [],
+        };
+
+        if ($nameAliases !== []) {
+            $id = DB::table('approval_stages')
+                ->whereIn('name', $nameAliases)
+                ->value('id');
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
+        return null;
     }
 
     private function resolveAcademicYear(int $lecturerId, ?int $hoursStageId, ?int $academicYearId)
     {
         if ($academicYearId) {
             return AcademicYearResolver::resolve($academicYearId);
+        }
+
+        $currentAcademicYear = AcademicYearResolver::current();
+        if ($currentAcademicYear) {
+            return $currentAcademicYear;
         }
 
         if ($hoursStageId) {
@@ -335,14 +385,53 @@ class LecturerPersonalHoursController extends Controller
                 ->value('ra.academic_year_id');
 
             if ($yearIdWithData) {
-                $resolved = AcademicYearResolver::resolve((int) $yearIdWithData);
-                if ($resolved) {
-                    return $resolved;
-                }
+                return AcademicYearResolver::resolve((int) $yearIdWithData);
             }
         }
 
-        return AcademicYearResolver::current();
+        return null;
+    }
+
+    private function resolveHoursScope(int $lecturerId, ?int $hoursStageId, array $filters): ?array
+    {
+        $mode = strtolower(trim((string) ($filters['mode'] ?? 'year')));
+        $isOverallMode = $mode === 'overall';
+
+        if ($isOverallMode) {
+            $allAcademicYearIds = DB::table('academic_years')
+                ->orderByDesc('start_date')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if ($allAcademicYearIds === []) {
+                return null;
+            }
+
+            return [
+                'mode' => 'overall',
+                'academic_year' => null,
+                'year_ids' => $allAcademicYearIds,
+                'label' => 'Tổng thể',
+            ];
+        }
+
+        $academicYear = $this->resolveAcademicYear(
+            $lecturerId,
+            $hoursStageId,
+            isset($filters['academic_year_id']) ? (int) $filters['academic_year_id'] : null
+        );
+
+        if (! $academicYear) {
+            return null;
+        }
+
+        return [
+            'mode' => 'year',
+            'academic_year' => $academicYear,
+            'year_ids' => [(int) $academicYear->id],
+            'label' => (string) $academicYear->code,
+        ];
     }
 
     private function requiredHours(int $academicYearId): float
@@ -354,11 +443,49 @@ class LecturerPersonalHoursController extends Controller
         return $value !== null ? (float) $value : 0.0;
     }
 
+    private function requiredHoursByScope(array $scope): float
+    {
+        if (($scope['mode'] ?? 'year') !== 'overall') {
+            $academicYear = $scope['academic_year'] ?? null;
+            if (! $academicYear) {
+                return 0.0;
+            }
+
+            return $this->requiredHours((int) $academicYear->id);
+        }
+
+        $yearIds = is_array($scope['year_ids'] ?? null) ? $scope['year_ids'] : [];
+        return $this->requiredHoursForAcademicYears($yearIds);
+    }
+
+    private function requiredHoursForAcademicYears(array $academicYearIds): float
+    {
+        $academicYearIds = array_values(array_unique(array_map(
+            static fn ($id) => (int) $id,
+            array_filter($academicYearIds, static fn ($id) => (int) $id > 0)
+        )));
+
+        if ($academicYearIds === []) {
+            return 0.0;
+        }
+
+        $rows = DB::table('workload_quotas')
+            ->whereIn('academic_year_id', $academicYearIds)
+            ->select([
+                'academic_year_id',
+                DB::raw('MAX(required_hours) as required_hours'),
+            ])
+            ->groupBy('academic_year_id')
+            ->get();
+
+        return (float) $rows->sum(function ($row) {
+            return (float) ($row->required_hours ?? 0);
+        });
+    }
+
     private function backfillComputedHoursForLecturer(int $lecturerId, ?int $academicYearId): void
     {
-        $approvedStatusId = (int) (DB::table('activity_statuses')
-            ->where('code', 'approved')
-            ->value('id') ?? 0);
+        $approvedStatusId = (int) ($this->resolveStatusId('approved') ?? 0);
 
         if ($approvedStatusId <= 0) {
             return;
@@ -371,19 +498,58 @@ class LecturerPersonalHoursController extends Controller
         );
     }
 
-    private function emptyOverviewPayload(object $academicYear): array
+    private function resolveStatusId(string $code): ?int
     {
+        $id = DB::table('activity_statuses')->where('code', $code)->value('id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $codeAliases = match ($code) {
+            'approved' => ['approved', 'da_duyet', 'khoa_duyet'],
+            default => [$code],
+        };
+
+        $id = DB::table('activity_statuses')
+            ->whereIn('code', $codeAliases)
+            ->value('id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $nameAliases = match ($code) {
+            'approved' => ['Đã duyệt', 'Khoa duyệt', 'Approved'],
+            default => [],
+        };
+
+        if ($nameAliases !== []) {
+            $id = DB::table('activity_statuses')
+                ->whereIn('name', $nameAliases)
+                ->value('id');
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
+        return null;
+    }
+
+    private function emptyOverviewPayload(array $scope): array
+    {
+        $scopeAcademicYearId = $scope['academic_year'] ? (int) $scope['academic_year']->id : null;
+
         return [
-            'academic_year_id' => (int) $academicYear->id,
-            'academic_year_code' => $academicYear->code,
-            'required_hours' => $this->requiredHours((int) $academicYear->id),
+            'mode' => $scope['mode'],
+            'academic_year_id' => $scopeAcademicYearId,
+            'academic_year_code' => $scope['label'],
+            'required_hours' => $this->requiredHoursByScope($scope),
             'approved_hours' => 0.0,
             'pending_hours' => 0.0,
             'rejected_hours' => 0.0,
         ];
     }
 
-    private function summaryTotals(int $lecturerId, int $academicYearId, int $hoursStageId): array
+    private function summaryTotals(int $lecturerId, ?int $academicYearId, int $hoursStageId): array
     {
         $row = $this->hoursApprovalQuery($lecturerId, $academicYearId, $hoursStageId)
             ->selectRaw("COALESCE(SUM(CASE WHEN aa.status = 'approved' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as approved_hours")
@@ -441,9 +607,26 @@ class LecturerPersonalHoursController extends Controller
     private function formatBatchName(?string $submittedAt): string
     {
         if (! $submittedAt) {
-            return 'Đợt';
+            return "\u{0110}\u{1EE3}t";
         }
 
-        return 'Đợt ' . Carbon::parse($submittedAt)->format('d/m/Y');
+        return "\u{0110}\u{1EE3}t " . Carbon::parse($submittedAt)->format('d/m/Y');
+    }
+
+    private function mapKindName(?string $code, ?string $fallback): ?string
+    {
+        if (! $code) {
+            return $fallback;
+        }
+
+        $mapped = match (strtolower($code)) {
+            'paper' => 'Bài báo',
+            'book' => 'Sách/Giáo trình',
+            'project' => 'Đề tài KH&CN',
+            'conference' => 'Hội nghị/Hội thảo',
+            default => null,
+        };
+
+        return $mapped ?? $fallback ?? $code;
     }
 }

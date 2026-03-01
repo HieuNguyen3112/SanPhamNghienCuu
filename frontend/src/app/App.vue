@@ -1,9 +1,9 @@
-<!-- src/app/App.vue -->
 <template>
-  <!-- layout chính / auth sẽ được quyết định bởi router -->
   <RouterView />
+  <GlobalActionResultModal />
 </template>
 
 <script setup lang="ts">
 import { RouterView } from "vue-router";
+import GlobalActionResultModal from "@/shared/components/GlobalActionResultModal.vue";
 </script>

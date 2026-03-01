@@ -4,10 +4,10 @@
 
     <div class="absolute inset-0 flex items-center justify-center p-4">
       <div
-        class="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-lg"
+        class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg"
       >
         <div
-          class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
+          class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
         >
           <div class="min-w-0">
             <div class="truncate text-sm font-semibold text-slate-900">
@@ -28,12 +28,12 @@
           </button>
         </div>
 
-        <div class="px-4 py-4">
+        <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <slot />
         </div>
 
         <div
-          class="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3"
+          class="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-4 py-3"
         >
           <button
             type="button"
@@ -72,3 +72,5 @@ const emit = defineEmits<{
   (e: "submit"): void;
 }>();
 </script>
+
+

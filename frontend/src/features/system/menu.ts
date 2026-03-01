@@ -3,7 +3,7 @@ import { Users, Network, ScrollText, BookCopy, Timer } from "lucide-vue-next";
 
 export const UserManagerMenuGroup: MenuItem = {
   id: "user-manager",
-  label: "Quản lý hệ thống ",
+  label: "Quản lý hệ thống",
   roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
 };
 
@@ -22,8 +22,6 @@ export const UserManagerMenuItems: MenuItem[] = [
     icon: Network,
     roles: ["DEPARTMENT_BOARD", "SCIENCE_OFFICE"],
   },
-
-  // Audit log
   {
     id: "audit-logs-faculty",
     label: "Nhật ký hệ thống (Khoa)",
@@ -38,8 +36,6 @@ export const UserManagerMenuItems: MenuItem[] = [
     icon: ScrollText,
     roles: ["SCIENCE_OFFICE"],
   },
-
-  // Master data
   {
     id: "masterdata-work-catalog",
     label: "Danh mục công trình",
@@ -55,3 +51,4 @@ export const UserManagerMenuItems: MenuItem[] = [
     roles: ["SCIENCE_OFFICE"],
   },
 ];
+
