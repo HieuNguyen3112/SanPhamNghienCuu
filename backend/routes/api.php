@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\TokenAuthController;
+use App\Http\Controllers\PublicLecturerController;
 use App\Http\Controllers\Auth\AuthMeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LecturerProfileController;
@@ -482,4 +483,11 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DE
         Route::get('/', [FacultyResearchHoursReportController::class, 'index']);
         Route::get('/export/excel', [FacultyResearchHoursReportController::class, 'exportExcel'])->middleware('audit.export');
         Route::get('/export/pdf', [FacultyResearchHoursReportController::class, 'exportPdf'])->middleware('audit.export');
+    });
+
+    Route::middleware(['force.json'])
+    ->prefix('public')
+    ->group(function () {
+        Route::get('/lecturers', [PublicLecturerController::class, 'index']);
+        Route::get('/lecturers/{lecturer:code}', [PublicLecturerController::class, 'show']);
     });
