@@ -37,6 +37,8 @@
   - `php artisan spnc:backup:run --trigger=manual`
 - Dọn snapshot cũ theo retention:
   - `php artisan spnc:backup:prune --trigger=manual`
+- Chẩn đoán môi trường backup (doctor):
+  - `php artisan spnc:backup:doctor --snapshot-limit=10`
 
 ## 5) Lịch tự động
 
@@ -51,4 +53,19 @@
 - Mặc định khôi phục vào vùng staging (`target=staging`).
 - Khôi phục trực tiếp (`target=current`) chỉ khi:
   - `SPNC_BACKUP_ALLOW_LIVE_RESTORE=true`
-  - truyền đúng cụm từ xác nhận `SPNC_BACKUP_RESTORE_CONFIRM_PHRASE`.
+  - truyền đúng cụm từ xác nhận `SPNC_BACKUP_RESTORE_CONFIRM_PHRASE` (mặc định `RESTORE`).
+  - production chỉ được phép nếu `SPNC_BACKUP_ALLOW_LIVE_RESTORE_IN_PRODUCTION=true`.
+
+## 7) Cache danh sách snapshot (UI nhanh)
+
+- Danh sách `/api/admin/backups` đọc từ cache snapshot để tránh chạy `restic snapshots` mỗi request.
+- Làm mới thủ công: `POST /api/admin/backups/refresh`
+- Command nền: `php artisan spnc:backup:snapshots:refresh`
+
+## 8) API Doctor (School-only)
+
+- Endpoint: `GET /api/admin/backups/doctor`
+- Quyền truy cập: `SCIENCE_OFFICE`
+- Mục tiêu:
+  - So sánh runtime UI và CLI (env, binary path, RCLONE_CONFIG, proxy, DNS, smoke test).
+  - Không trả secrets (không lộ password/token).

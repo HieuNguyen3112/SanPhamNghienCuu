@@ -429,12 +429,21 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SC
     ->prefix('admin/backups')
     ->group(function () {
         Route::get('/', [AdminBackupController::class, 'index']);
+        Route::get('/exports-info', [AdminBackupController::class, 'exportsInfo']);
+        Route::get('/doctor', [AdminBackupController::class, 'doctor']);
+        Route::post('/refresh', [AdminBackupController::class, 'refresh']);
         Route::post('/run', [AdminBackupController::class, 'run']);
         Route::post('/prune', [AdminBackupController::class, 'prune']);
+        Route::post('/forget', [AdminBackupController::class, 'forget']);
+        Route::post('/unlock-stale', [AdminBackupController::class, 'unlockStaleLock']);
         Route::get('/runs/{runId}', [AdminBackupController::class, 'runStatus']);
         Route::get('/{snapshotId}/manifest', [AdminBackupController::class, 'downloadManifest']);
         Route::get('/{snapshotId}/database-dump', [AdminBackupController::class, 'downloadDatabaseDump']);
+        Route::get('/{snapshotId}/export/metadata', [AdminBackupController::class, 'exportMetadata']);
+        Route::get('/{snapshotId}/export/download', [AdminBackupController::class, 'downloadExport']);
+        Route::get('/{snapshotId}/export', [AdminBackupController::class, 'downloadExport']);
         Route::post('/{snapshotId}/restore', [AdminBackupController::class, 'restore']);
+        Route::get('/{snapshotId}', [AdminBackupController::class, 'show']);
     });
 
 // SCIENCE_OFFICE audit logs
@@ -483,3 +492,4 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DE
         Route::get('/export/excel', [FacultyResearchHoursReportController::class, 'exportExcel'])->middleware('audit.export');
         Route::get('/export/pdf', [FacultyResearchHoursReportController::class, 'exportPdf'])->middleware('audit.export');
     });
+

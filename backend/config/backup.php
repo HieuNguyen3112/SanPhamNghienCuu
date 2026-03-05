@@ -55,10 +55,34 @@ return [
         'workspace_dir' => env('SPNC_BACKUP_WORKSPACE_DIR', 'backup-workspace'),
         'restore_dir' => env('SPNC_BACKUP_RESTORE_DIR', 'backup-restores'),
         'download_dir' => env('SPNC_BACKUP_DOWNLOAD_DIR', 'backup-downloads'),
+        'snapshot_cache_file' => env('SPNC_BACKUP_SNAPSHOT_CACHE_FILE', 'backup-snapshots/cache.json'),
+    ],
+
+    'exports' => [
+        'enabled' => filter_var(env('SPNC_BACKUP_EXPORT_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'sync_to_drive' => filter_var(env('SPNC_BACKUP_EXPORT_SYNC_TO_DRIVE', true), FILTER_VALIDATE_BOOL),
+        'folder_name' => env('SPNC_BACKUP_EXPORT_FOLDER_NAME', 'exports'),
+        // Cho phép override đích export. Ví dụ:
+        // - rclone:drive:spnc-backups/exports
+        // - C:\\mount\\spnc-backups\\exports
+        // Để trống -> tự suy ra từ SPNC_BACKUP_REPOSITORY.
+        'target' => env('SPNC_BACKUP_EXPORT_TARGET', ''),
+        'local_dir' => env('SPNC_BACKUP_EXPORT_LOCAL_DIR', 'backup-exports/items'),
+        'index_file' => env('SPNC_BACKUP_EXPORT_INDEX_FILE', 'backup-exports/index.json'),
+    ],
+
+    'snapshot_cache' => [
+        // Danh sach snapshot duoc cache de API list khong goi restic moi request.
+        'max_items' => max(10, (int) env('SPNC_BACKUP_SNAPSHOT_CACHE_MAX_ITEMS', 200)),
+        'stale_after_seconds' => max(30, (int) env('SPNC_BACKUP_SNAPSHOT_CACHE_STALE_SECONDS', 900)),
+        'refresh_timeout_seconds' => max(60, (int) env('SPNC_BACKUP_SNAPSHOT_REFRESH_TIMEOUT_SECONDS', 900)),
+        'auto_refresh' => filter_var(env('SPNC_BACKUP_SNAPSHOT_AUTO_REFRESH', true), FILTER_VALIDATE_BOOL),
+        'refresh_interval_minutes' => min(59, max(5, (int) env('SPNC_BACKUP_SNAPSHOT_REFRESH_INTERVAL_MINUTES', 10))),
     ],
 
     'schedule' => [
-        // 1: Monday, 4: Thursday (Carbon dayOfWeek format)
+        // Carbon dayOfWeek: 0=CN, 1=T2, ... 6=T7.
+        // Mặc định giữ cadence cố định ban đầu: Thứ 2 + Thứ 5.
         'days' => array_values(array_filter(array_map(
             static function ($value): int {
                 return (int) trim((string) $value);
@@ -77,7 +101,31 @@ return [
     ],
 
     'restore' => [
-        'confirm_phrase' => env('SPNC_BACKUP_RESTORE_CONFIRM_PHRASE', 'KHOI_PHUC_DU_LIEU'),
+        'confirm_phrase' => env('SPNC_BACKUP_RESTORE_CONFIRM_PHRASE', 'RESTORE'),
+        'legacy_confirm_phrase' => env('SPNC_BACKUP_RESTORE_CONFIRM_PHRASE_LEGACY', 'KHOI_PHUC_DU_LIEU'),
         'allow_live_restore' => filter_var(env('SPNC_BACKUP_ALLOW_LIVE_RESTORE', false), FILTER_VALIDATE_BOOL),
+        'allow_live_restore_in_production' => filter_var(
+            env('SPNC_BACKUP_ALLOW_LIVE_RESTORE_IN_PRODUCTION', false),
+            FILTER_VALIDATE_BOOL
+        ),
+    ],
+
+    'runs' => [
+        'log_max_lines' => max(10, (int) env('SPNC_BACKUP_RUN_LOG_MAX_LINES', 80)),
+        'log_max_chars' => max(80, (int) env('SPNC_BACKUP_RUN_LOG_MAX_CHARS', 500)),
+        'queue_stale_after_seconds' => max(30, (int) env('SPNC_BACKUP_RUN_QUEUE_STALE_SECONDS', 300)),
+        'running_stale_after_seconds' => max(120, (int) env('SPNC_BACKUP_RUN_RUNNING_STALE_SECONDS', 14400)),
+        'stale_grace_seconds' => max(0, (int) env('SPNC_BACKUP_RUN_STALE_GRACE_SECONDS', 30)),
+        'queue_stale_after_by_operation' => [
+            'snapshot_refresh' => max(30, (int) env('SPNC_BACKUP_SNAPSHOT_QUEUE_STALE_SECONDS', 180)),
+            'forget' => max(30, (int) env('SPNC_BACKUP_FORGET_QUEUE_STALE_SECONDS', 90)),
+        ],
+        'running_stale_after_by_operation' => [
+            'snapshot_refresh' => max(60, (int) env('SPNC_BACKUP_SNAPSHOT_REFRESH_TIMEOUT_SECONDS', 900)),
+            'forget' => max(120, (int) env('SPNC_BACKUP_FORGET_RUNNING_STALE_SECONDS', 1800)),
+            'backup' => max(300, (int) env('SPNC_BACKUP_BACKUP_RUNNING_STALE_SECONDS', 3600)),
+            'prune' => max(300, (int) env('SPNC_BACKUP_PRUNE_RUNNING_STALE_SECONDS', 7200)),
+            'restore' => max(300, (int) env('SPNC_BACKUP_RESTORE_RUNNING_STALE_SECONDS', 7200)),
+        ],
     ],
 ];

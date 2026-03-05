@@ -110,7 +110,10 @@ class AdminResearchHoursReportController extends Controller
 
     private function baseQuery(array $filters)
     {
-        $query = DB::table('lecturer_yearly_hours as lyh')
+        $hoursSource = $this->resolveHoursSourceQuery($filters);
+
+        $query = DB::query()
+            ->fromSub($hoursSource, 'lyh')
             ->join('lecturers as l', 'lyh.lecturer_id', '=', 'l.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
@@ -279,6 +282,109 @@ class AdminResearchHoursReportController extends Controller
         if ($status === 'not_met') {
             $query->whereRaw("{$hoursExpr} < {$requiredExpr}");
         }
+    }
+
+    private function resolveHoursSourceQuery(array $filters)
+    {
+        if ($this->hasYearlyHoursRows($filters)) {
+            return DB::table('lecturer_yearly_hours as lyh')
+                ->select([
+                    'lyh.lecturer_id',
+                    'lyh.academic_year_id',
+                    DB::raw('COALESCE(lyh.hours_total, 0) as hours_total'),
+                ]);
+        }
+
+        if ($this->hasApprovedHoursRows($filters)) {
+            return $this->approvedHoursByLecturerYearQuery($filters);
+        }
+
+        return $this->approvedActivityHoursByLecturerYearQuery($filters);
+    }
+
+    private function hasYearlyHoursRows(array $filters): bool
+    {
+        $query = DB::table('lecturer_yearly_hours as lyh')
+            ->join('lecturers as l', 'lyh.lecturer_id', '=', 'l.id')
+            ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
+            ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id');
+
+        if (! empty($filters['faculty_id'])) {
+            $query->where('f.id', $filters['faculty_id']);
+        }
+
+        if (! empty($filters['academic_year_id'])) {
+            $query->where('lyh.academic_year_id', $filters['academic_year_id']);
+        }
+
+        return $query->exists();
+    }
+
+    private function hasApprovedHoursRows(array $filters): bool
+    {
+        return $this->approvedHoursByLecturerYearQuery($filters)->exists();
+    }
+
+    private function approvedHoursByLecturerYearQuery(array $filters)
+    {
+        $query = DB::table('activity_approvals as aa')
+            ->join('approval_stages as st', 'aa.stage_id', '=', 'st.id')
+            ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+            ->join('research_activity_members as ram', 'ram.activity_id', '=', 'ra.id')
+            ->join('lecturers as l2', 'ram.lecturer_id', '=', 'l2.id')
+            ->leftJoin('departments as d2', 'l2.department_id', '=', 'd2.id')
+            ->leftJoin('faculties as f2', 'd2.faculty_id', '=', 'f2.id')
+            ->where('st.code', 'hours')
+            ->where('aa.status', 'approved')
+            ->whereNotNull('ra.academic_year_id')
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
+            ->selectRaw('ram.lecturer_id as lecturer_id')
+            ->selectRaw('ra.academic_year_id as academic_year_id')
+            ->selectRaw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as hours_total')
+            ->groupBy('ram.lecturer_id', 'ra.academic_year_id');
+
+        if (! empty($filters['faculty_id'])) {
+            $query->where('f2.id', $filters['faculty_id']);
+        }
+
+        if (! empty($filters['academic_year_id'])) {
+            $query->where('ra.academic_year_id', $filters['academic_year_id']);
+        }
+
+        return $query;
+    }
+
+    private function approvedActivityHoursByLecturerYearQuery(array $filters)
+    {
+        $query = DB::table('research_activities as ra')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->join('research_activity_members as ram', 'ram.activity_id', '=', 'ra.id')
+            ->join('lecturers as l2', 'ram.lecturer_id', '=', 'l2.id')
+            ->leftJoin('departments as d2', 'l2.department_id', '=', 'd2.id')
+            ->leftJoin('faculties as f2', 'd2.faculty_id', '=', 'f2.id')
+            ->where('ast.code', 'approved')
+            ->whereNotNull('ra.academic_year_id')
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
+            ->selectRaw('ram.lecturer_id as lecturer_id')
+            ->selectRaw('ra.academic_year_id as academic_year_id')
+            ->selectRaw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as hours_total')
+            ->groupBy('ram.lecturer_id', 'ra.academic_year_id');
+
+        if (! empty($filters['faculty_id'])) {
+            $query->where('f2.id', $filters['faculty_id']);
+        }
+
+        if (! empty($filters['academic_year_id'])) {
+            $query->where('ra.academic_year_id', $filters['academic_year_id']);
+        }
+
+        return $query;
     }
 
     private function loadFaculties(): array

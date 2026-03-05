@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Services\Backup\BackupRunLauncher;
 use App\Services\Backup\BackupRunStateStore;
 use App\Services\Backup\BackupRuntimeException;
+use App\Services\Backup\BackupSnapshotStore;
 use App\Services\Backup\ResticBackupManager;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -17,53 +19,204 @@ class AdminBackupController extends Controller
     private ResticBackupManager $backupManager;
     private BackupRunStateStore $stateStore;
     private BackupRunLauncher $launcher;
+    private BackupSnapshotStore $snapshotStore;
 
     public function __construct(
         ResticBackupManager $backupManager,
         BackupRunStateStore $stateStore,
-        BackupRunLauncher $launcher
+        BackupRunLauncher $launcher,
+        BackupSnapshotStore $snapshotStore
     ) {
         $this->backupManager = $backupManager;
         $this->stateStore = $stateStore;
         $this->launcher = $launcher;
+        $this->snapshotStore = $snapshotStore;
     }
 
     public function index(Request $request)
     {
+        $startedAt = microtime(true);
         $validated = $request->validate([
-            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'status' => ['nullable', 'string', 'in:queued,running,success,failed,unknown'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+            'refresh' => ['nullable', 'boolean'],
         ]);
 
         try {
-            $limit = (int) ($validated['limit'] ?? 30);
-            $runs = $this->stateStore->listRecent(50);
-            $schedule = $this->backupManager->buildScheduleMeta();
-            $retention = $this->backupManager->buildRetentionMeta();
-            $snapshots = [];
-            $repositoryError = null;
+            $filters = [
+                'page' => (int) ($validated['page'] ?? 1),
+                'per_page' => (int) ($validated['per_page'] ?? 20),
+                'status' => $validated['status'] ?? null,
+                'from' => ! empty($validated['from'])
+                    ? Carbon::parse((string) $validated['from'])->startOfDay()->toIso8601String()
+                    : null,
+                'to' => ! empty($validated['to'])
+                    ? Carbon::parse((string) $validated['to'])->endOfDay()->toIso8601String()
+                    : null,
+            ];
 
-            try {
-                $snapshots = $this->backupManager->listSnapshots($limit);
-            } catch (\Throwable $exception) {
-                $repositoryError = $exception->getMessage();
+            $list = $this->snapshotStore->filterAndPaginate($filters);
+            $cacheMeta = $this->snapshotStore->cacheMeta();
+            $systemActiveRun = $this->stateStore->latestActive([
+                'backup',
+                'prune',
+                'restore',
+                'snapshot_refresh',
+                'forget',
+            ]);
+            $activeRun = $this->toUiActiveRun($systemActiveRun);
+            $schedule = $this->backupManager->buildScheduleMeta();
+            $scheduleRuntime = $this->latestScheduleRunSummary();
+            $retention = $this->backupManager->buildRetentionMeta();
+            $exportOverview = $this->backupManager->buildExportOverview();
+            $lastSuccess = $this->stateStore->latestSuccessfulBackup();
+
+            $refreshRequested = (bool) ($validated['refresh'] ?? false);
+            $refreshRun = null;
+
+            if ($refreshRequested) {
+                $refreshRun = $this->startSnapshotRefresh($request, 'manual_refresh');
+                if ($refreshRun !== null) {
+                    $cacheMeta = $this->snapshotStore->cacheMeta();
+                }
             }
 
-            $lastSuccess = collect($runs)->first(function ($run) {
-                return ($run['status'] ?? null) === 'success';
-            });
+            $cacheRefreshState = null;
+            $cacheRefreshRunId = trim((string) ($cacheMeta['refresh_run_id'] ?? ''));
+            if ($cacheRefreshRunId !== '') {
+                $cacheRefreshState = $this->stateStore->get($cacheRefreshRunId);
+            }
+            $cacheRefreshOperation = Str::lower(trim((string) ($cacheRefreshState['operation'] ?? '')));
+            $cacheRefreshStatus = Str::lower(trim((string) ($cacheRefreshState['status'] ?? '')));
+            $cacheRefreshTrigger = Str::lower(trim((string) ($cacheRefreshState['trigger'] ?? '')));
+
+            if ((bool) ($cacheMeta['refreshing'] ?? false)) {
+                $isActiveSnapshotRefresh = $cacheRefreshOperation === 'snapshot_refresh'
+                    && in_array($cacheRefreshStatus, ['queued', 'running'], true);
+
+                if (! $isActiveSnapshotRefresh) {
+                    if ($cacheRefreshOperation === 'snapshot_refresh' && $cacheRefreshStatus === 'failed') {
+                        $refreshErrorMessage = trim((string) (
+                            $cacheRefreshState['message']
+                            ?? $cacheRefreshState['error_message']
+                            ?? ''
+                        ));
+                        $refreshError = $this->toPublicErrorPayload($refreshErrorMessage, 'snapshot_refresh', 'failed');
+                        $cacheMeta = $this->snapshotStore->markRefreshFailed(
+                            $refreshError['user_message'] ?? 'Đồng bộ danh sách snapshot thất bại. Vui lòng thử lại.',
+                            $cacheRefreshRunId !== '' ? $cacheRefreshRunId : null
+                        );
+                    } else {
+                        $cacheMeta = $this->snapshotStore->markIdle();
+                    }
+
+                    $cacheRefreshState = null;
+                    $cacheRefreshRunId = trim((string) ($cacheMeta['refresh_run_id'] ?? ''));
+                    $cacheRefreshOperation = '';
+                    $cacheRefreshStatus = '';
+                    $cacheRefreshTrigger = '';
+                    if ($cacheRefreshRunId !== '') {
+                        $cacheRefreshState = $this->stateStore->get($cacheRefreshRunId);
+                        $cacheRefreshOperation = Str::lower(trim((string) ($cacheRefreshState['operation'] ?? '')));
+                        $cacheRefreshStatus = Str::lower(trim((string) ($cacheRefreshState['status'] ?? '')));
+                        $cacheRefreshTrigger = Str::lower(trim((string) ($cacheRefreshState['trigger'] ?? '')));
+                    }
+                }
+            }
+
+            if (! $activeRun && ! empty($refreshRun['run_id'])) {
+                $activeRun = [
+                    'run_id' => $refreshRun['run_id'],
+                    'operation' => 'snapshot_refresh',
+                    'status' => 'queued',
+                    'message' => 'Đã xếp lịch làm mới danh sách snapshot.',
+                ];
+            }
+
+            if (! $activeRun && ! empty($cacheMeta['refresh_run_id'])) {
+                $refreshState = $cacheRefreshState ?: $this->stateStore->get((string) $cacheMeta['refresh_run_id']);
+                if (is_array($refreshState)) {
+                    $candidateRun = [
+                        'run_id' => $refreshState['run_id'] ?? null,
+                        'operation' => $refreshState['operation'] ?? 'snapshot_refresh',
+                        'status' => $refreshState['status'] ?? null,
+                        'trigger' => $refreshState['trigger'] ?? null,
+                        'step' => $refreshState['step'] ?? null,
+                        'message' => $refreshState['message'] ?? null,
+                        'requested_by_user_id' => $refreshState['requested_by_user_id'] ?? null,
+                        'requested_at' => $refreshState['requested_at'] ?? null,
+                        'started_at' => $refreshState['started_at'] ?? null,
+                        'finished_at' => $refreshState['finished_at'] ?? null,
+                        'error_message' => $refreshState['error_message'] ?? null,
+                        'snapshot_id' => $refreshState['snapshot_id'] ?? null,
+                    ];
+                    $activeRun = $this->toUiActiveRun($candidateRun);
+                }
+            }
+
+            $syncStatusSource = $systemActiveRun ?? $activeRun;
+            $activeOperation = Str::lower(trim((string) ($syncStatusSource['operation'] ?? '')));
+            $activeStatus = Str::lower(trim((string) ($syncStatusSource['status'] ?? '')));
+            $isSyncing = (
+                    (bool) ($cacheMeta['refreshing'] ?? false)
+                    && $cacheRefreshOperation === 'snapshot_refresh'
+                    && in_array($cacheRefreshStatus, ['queued', 'running'], true)
+                )
+                || $refreshRun !== null
+                || (
+                    $activeOperation === 'snapshot_refresh'
+                    && in_array($activeStatus, ['queued', 'running'], true)
+                );
+
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+            $activeRun = $this->toPublicRunState($activeRun);
+            $systemActiveRun = $this->toPublicRunState($systemActiveRun);
+            $cacheLastError = $this->toPublicErrorPayload(
+                (string) ($cacheMeta['last_error'] ?? ''),
+                'snapshot_refresh',
+                'failed'
+            );
 
             return response()->json([
                 'success' => true,
                 'message' => 'ok',
                 'data' => [
                     'engine' => 'restic',
-                    'repository_configured' => $repositoryError === null,
-                    'repository_error' => $repositoryError,
-                    'snapshots' => $snapshots,
-                    'runs' => $runs,
+                    'items' => $list['items'],
+                    'snapshots' => $list['items'], // compatibility
+                    'pagination' => $list['pagination'],
+                    'is_syncing' => $isSyncing,
+                    'last_sync_at' => $cacheMeta['refreshed_at'] ?? null,
+                    'active_run' => $activeRun,
+                    'system_active_run' => $systemActiveRun,
+                    'runs' => $activeRun ? [$activeRun] : [],
+                    'cache' => array_merge($cacheMeta, [
+                        'last_error' => $cacheLastError['user_message'],
+                        'last_error_code' => $cacheLastError['error_code'],
+                        'refresh_queued' => $refreshRun !== null,
+                        'refresh_run_id' => $refreshRun['run_id'] ?? ($cacheMeta['refresh_run_id'] ?? null),
+                        'refresh_operation' => $cacheRefreshOperation !== '' ? $cacheRefreshOperation : null,
+                        'refresh_status' => $cacheRefreshStatus !== '' ? $cacheRefreshStatus : null,
+                        'refresh_trigger' => $cacheRefreshTrigger !== '' ? $cacheRefreshTrigger : null,
+                    ]),
                     'schedule' => $schedule,
+                    'schedule_runtime' => $scheduleRuntime,
                     'retention' => $retention,
+                    'export_overview' => $exportOverview,
+                    'friendly_messages' => [
+                        'safe' => 'Hệ thống đã sao lưu an toàn.',
+                        'drive' => 'Bạn có thể mở thư mục Backup trên Google Drive để xem bản sao lưu dễ đọc.',
+                        'restore' => 'Khi cần khôi phục, vui lòng dùng chức năng Khôi phục trong hệ thống.',
+                    ],
                     'last_successful_backup_at' => $lastSuccess['finished_at'] ?? null,
+                    'repository_configured' => true,
+                    'repository_error' => $cacheLastError['user_message'],
+                    'performance' => [
+                        'served_in_ms' => $durationMs,
+                    ],
                 ],
             ], Response::HTTP_OK);
         } catch (\Throwable $exception) {
@@ -72,43 +225,79 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể tải danh sách backup. Vui lòng kiểm tra cấu hình hệ thống.',
+                'message' => 'Không thể tải danh sách backup. Vui lòng thử lại sau.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+    public function exportsInfo(Request $request)
+    {
+        try {
+            $overview = $this->backupManager->buildExportOverview();
+            $openUrl = trim((string) config('backup.exports.open_url', ''));
 
+            return response()->json([
+                'success' => true,
+                'message' => 'ok',
+                'data' => [
+                    'exports_root_path' => $overview['export_root'] ?? null,
+                    'exports_drive_path' => $overview['export_root'] ?? null,
+                    'exports_folder_name' => $overview['export_folder_name'] ?? 'exports',
+                    'repository_type' => $overview['repository_type'] ?? null,
+                    'open_url' => $openUrl !== '' ? $openUrl : null,
+                    'note' => $overview['note'] ?? null,
+                ],
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            Log::error('backup.exports_info_failed', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể tải thông tin thư mục exports backup.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
     public function run(Request $request)
     {
+        $conflict = $this->rejectWhenConflictingRunActive(['backup', 'prune', 'forget', 'restore']);
+        if ($conflict !== null) {
+            return $conflict;
+        }
+
         $runId = $this->stateStore->generateRunId();
         $user = $request->user();
 
         $this->stateStore->initialize($runId, [
             'status' => 'queued',
+            'operation' => 'backup',
             'trigger' => 'manual',
             'requested_by_user_id' => $user ? (int) $user->id : null,
             'requested_at' => now()->toIso8601String(),
             'message' => 'Đã xếp lịch chạy backup.',
         ]);
 
-        $launchMode = 'detached';
         try {
-            $this->launcher->launch($runId, (int) ($user?->id ?? 0), 'manual');
+            $this->launcher->launchBackup($runId, (int) ($user?->id ?? 0), 'manual');
         } catch (\Throwable $exception) {
-            // Fallback: chạy sync nếu không thể detach ở môi trường hiện tại.
-            Log::warning('backup.launch_detached_failed', [
+            $this->stateStore->update($runId, [
+                'status' => 'failed',
+                'operation' => 'backup',
+                'step' => 'failed',
+                'message' => 'Không thể khởi chạy tiến trình backup nền.',
+                'finished_at' => now()->toIso8601String(),
+                'error_message' => $exception->getMessage(),
+            ]);
+            $this->stateStore->appendLog($runId, 'Không thể khởi chạy tác vụ nền: ' . $exception->getMessage(), 'error');
+
+            Log::error('backup.launch_failed', [
                 'run_id' => $runId,
                 'message' => $exception->getMessage(),
             ]);
-            $launchMode = 'sync';
-            Artisan::call('spnc:backup:run', [
-                '--run-id' => $runId,
-                '--trigger' => 'manual',
-                '--initiated-by' => (int) ($user?->id ?? 0),
-                '--no-interaction' => true,
-            ]);
-        }
 
-        $state = $this->stateStore->get($runId);
+            return response()->json([
+                'message' => 'Không thể khởi chạy backup nền. Vui lòng kiểm tra cấu hình máy chủ.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
 
         AuditLogger::log($request, [
             'action_group' => 'security',
@@ -118,23 +307,91 @@ class AdminBackupController extends Controller
             'target_id' => $runId,
             'target_display' => 'Backup run ' . $runId,
             'result_status' => 'success',
-            'note' => 'launch_mode=' . $launchMode,
         ], $user);
 
         return response()->json([
             'success' => true,
-            'message' => 'Đã kích hoạt sao lưu thủ công.',
+            'message' => 'Đã tiếp nhận yêu cầu sao lưu.',
             'data' => [
                 'run_id' => $runId,
-                'launch_mode' => $launchMode,
-                'status' => $state['status'] ?? 'queued',
+                'operation' => 'backup',
+                'status' => 'queued',
+                'user_message' => 'Đã tiếp nhận yêu cầu sao lưu.',
+                'error_code' => null,
                 'status_url' => '/api/admin/backups/runs/' . $runId,
             ],
-        ], $launchMode === 'detached' ? Response::HTTP_ACCEPTED : Response::HTTP_OK);
+        ], Response::HTTP_ACCEPTED);
+    }
+
+    public function refresh(Request $request)
+    {
+        $conflict = $this->rejectWhenConflictingRunActive(['backup', 'prune', 'forget', 'restore']);
+        if ($conflict !== null) {
+            return $conflict;
+        }
+
+        $run = $this->startSnapshotRefresh($request, 'manual_refresh');
+        if ($run === null) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Danh sách bản sao lưu đang được làm mới.',
+                'data' => [
+                    'run_id' => $this->snapshotStore->cacheMeta()['refresh_run_id'] ?? null,
+                    'status' => 'queued',
+                    'user_message' => 'Danh sách bản sao lưu đang được làm mới.',
+                    'error_code' => null,
+                    'status_url' => null,
+                ],
+            ], Response::HTTP_ACCEPTED);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
+            'data' => [
+                'run_id' => $run['run_id'],
+                'operation' => 'snapshot_refresh',
+                'status' => 'queued',
+                'user_message' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
+                'error_code' => null,
+                'status_url' => '/api/admin/backups/runs/' . $run['run_id'],
+            ],
+        ], Response::HTTP_ACCEPTED);
+    }
+
+    public function doctor(Request $request)
+    {
+        $validated = $request->validate([
+            'snapshot_limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        try {
+            $snapshotLimit = (int) ($validated['snapshot_limit'] ?? 10);
+            $report = $this->backupManager->buildDoctorReport($snapshotLimit);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'ok',
+                'data' => $report,
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            Log::error('backup.doctor_failed', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể thu thập chẩn đoán backup. Vui lòng kiểm tra log hệ thống.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     public function runStatus(Request $request, string $runId)
     {
+        $validated = $request->validate([
+            'include_technical' => ['nullable', 'boolean'],
+        ]);
+        $includeTechnical = (bool) ($validated['include_technical'] ?? false);
+
         try {
             $this->stateStore->assertValidRunId($runId);
         } catch (\Throwable $exception) {
@@ -153,51 +410,121 @@ class AdminBackupController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'ok',
-            'data' => $state,
+            'data' => $this->toPublicRunState($state, $includeTechnical),
         ], Response::HTTP_OK);
     }
 
-    public function prune(Request $request)
+    public function show(Request $request, string $snapshotId)
     {
         try {
-            $result = $this->backupManager->pruneBackups();
-
-            AuditLogger::log($request, [
-                'action_group' => 'security',
-                'action_code' => 'BACKUP_PRUNE',
-                'action_label' => 'Dọn snapshot backup cũ',
-                'target_type' => 'backup_repository',
-                'target_display' => 'Kho sao lưu SPNC',
-                'result_status' => 'success',
-            ], $request->user());
+            $this->backupManager->assertValidSnapshotId($snapshotId);
+            $snapshotHint = $this->snapshotStore->findBySnapshotId($snapshotId);
+            $detail = $this->backupManager->getSnapshotDetails($snapshotId, $snapshotHint);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Đã dọn snapshot cũ theo chính sách lưu trữ.',
-                'data' => $result,
+                'message' => 'ok',
+                'data' => $detail,
             ], Response::HTTP_OK);
         } catch (\Throwable $exception) {
-            Log::error('backup.prune_api_failed', [
-                'message' => $exception->getMessage(),
-            ]);
-            AuditLogger::log($request, [
-                'action_group' => 'security',
-                'action_code' => 'BACKUP_PRUNE_FAILED',
-                'action_label' => 'Dọn snapshot backup thất bại',
-                'target_type' => 'backup_repository',
-                'target_display' => 'Kho sao lưu SPNC',
-                'result_status' => 'failure',
-                'result_error_message' => $exception->getMessage(),
-            ], $request->user());
+            $normalized = Str::lower((string) $exception->getMessage());
+            $status = Response::HTTP_UNPROCESSABLE_ENTITY;
+            if (
+                $exception instanceof BackupRuntimeException
+                && (
+                    str_contains($normalized, 'không tìm thấy snapshot')
+                    || str_contains($normalized, 'khong tim thay snapshot')
+                )
+            ) {
+                $status = Response::HTTP_NOT_FOUND;
+            }
 
             return response()->json([
-                'message' => 'Không thể dọn snapshot backup. Vui lòng kiểm tra cấu hình hệ thống.',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'message' => $exception->getMessage() ?: 'Không thể tải chi tiết bản sao lưu.',
+            ], $status);
         }
+    }
+    public function prune(Request $request)
+    {
+        $conflict = $this->rejectWhenConflictingRunActive(['backup', 'prune', 'forget', 'restore']);
+        if ($conflict !== null) {
+            return $conflict;
+        }
+
+        $runId = $this->stateStore->generateRunId();
+        $user = $request->user();
+
+        $this->stateStore->initialize($runId, [
+            'status' => 'queued',
+            'operation' => 'prune',
+            'trigger' => 'manual',
+            'requested_by_user_id' => $user ? (int) $user->id : null,
+            'requested_at' => now()->toIso8601String(),
+            'message' => 'Đã xếp lịch dọn snapshot cũ.',
+        ]);
+
+        try {
+            $this->launcher->launchPrune($runId, (int) ($user?->id ?? 0), 'manual');
+        } catch (\Throwable $exception) {
+            $this->stateStore->update($runId, [
+                'status' => 'failed',
+                'operation' => 'prune',
+                'step' => 'failed',
+                'message' => 'Không thể khởi chạy tiến trình prune nền.',
+                'finished_at' => now()->toIso8601String(),
+                'error_message' => $exception->getMessage(),
+            ]);
+            $this->stateStore->appendLog($runId, 'Không thể khởi chạy tác vụ nền: ' . $exception->getMessage(), 'error');
+
+            Log::error('backup.prune_api_launch_failed', [
+                'run_id' => $runId,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể khởi chạy dọn snapshot nền. Vui lòng thử lại sau.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        AuditLogger::log($request, [
+            'action_group' => 'security',
+            'action_code' => 'BACKUP_PRUNE_TRIGGERED',
+            'action_label' => 'Kích hoạt dọn snapshot backup',
+            'target_type' => 'backup_run',
+            'target_id' => $runId,
+            'target_display' => 'Prune run ' . $runId,
+            'result_status' => 'success',
+        ], $request->user());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã kích hoạt dọn snapshot cũ.',
+            'data' => [
+                'run_id' => $runId,
+                'operation' => 'prune',
+                'status' => 'queued',
+                'user_message' => 'Đã tiếp nhận yêu cầu dọn bản sao lưu cũ.',
+                'error_code' => null,
+                'status_url' => '/api/admin/backups/runs/' . $runId,
+            ],
+        ], Response::HTTP_ACCEPTED);
     }
 
     public function restore(Request $request, string $snapshotId)
     {
+        try {
+            $this->backupManager->assertValidSnapshotId($snapshotId);
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'message' => 'Mã snapshot không hợp lệ.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $conflict = $this->rejectWhenConflictingRunActive(['backup', 'prune', 'forget', 'restore']);
+        if ($conflict !== null) {
+            return $conflict;
+        }
+
         $validated = $request->validate([
             'scope' => ['required', 'string', 'in:db_only,files_only,full'],
             'target' => ['required', 'string', 'in:staging,current'],
@@ -211,82 +538,93 @@ class AdminBackupController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $expectedPhrase = (string) config('backup.restore.confirm_phrase', 'KHOI_PHUC_DU_LIEU');
-        if (trim((string) $validated['confirm_phrase']) !== $expectedPhrase) {
+        $expectedPhrase = (string) config('backup.restore.confirm_phrase', 'RESTORE');
+        $legacyPhrase = (string) config('backup.restore.legacy_confirm_phrase', 'KHOI_PHUC_DU_LIEU');
+        $providedPhrase = trim((string) $validated['confirm_phrase']);
+        if ($providedPhrase !== $expectedPhrase && $providedPhrase !== $legacyPhrase) {
             return response()->json([
                 'message' => 'Cụm từ xác nhận khôi phục không chính xác.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $restoreRunId = $this->stateStore->generateRunId();
+        $runId = $this->stateStore->generateRunId();
+        $user = $request->user();
+        $this->stateStore->initialize($runId, [
+            'status' => 'queued',
+            'operation' => 'restore',
+            'trigger' => 'manual',
+            'requested_by_user_id' => $user ? (int) $user->id : null,
+            'requested_at' => now()->toIso8601String(),
+            'snapshot_id' => $snapshotId,
+            'scope' => (string) $validated['scope'],
+            'target' => (string) $validated['target'],
+            'message' => 'Đã xếp lịch khôi phục dữ liệu.',
+        ]);
+
         try {
-            $result = $this->backupManager->restoreSnapshot(
+            $this->launcher->launchRestore(
+                $runId,
+                (int) ($user?->id ?? 0),
                 $snapshotId,
                 (string) $validated['scope'],
                 (string) $validated['target'],
-                $restoreRunId
+                'manual'
             );
+        } catch (\Throwable $exception) {
+            $this->stateStore->update($runId, [
+                'status' => 'failed',
+                'operation' => 'restore',
+                'step' => 'failed',
+                'message' => 'Không thể khởi chạy tiến trình restore nền.',
+                'finished_at' => now()->toIso8601String(),
+                'error_message' => $exception->getMessage(),
+            ]);
+            $this->stateStore->appendLog($runId, 'Không thể khởi chạy tác vụ nền: ' . $exception->getMessage(), 'error');
 
-            AuditLogger::log($request, [
-                'action_group' => 'security',
-                'action_code' => 'BACKUP_RESTORE',
-                'action_label' => 'Khôi phục sao lưu hệ thống',
-                'target_type' => 'backup_snapshot',
-                'target_id' => $snapshotId,
-                'target_display' => 'Snapshot ' . $snapshotId,
-                'result_status' => 'success',
-                'changes' => [
-                    'scope' => $validated['scope'],
-                    'target' => $validated['target'],
-                ],
-            ], $request->user());
+            Log::error('backup.restore_launch_failed', [
+                'run_id' => $runId,
+                'snapshot_id' => $snapshotId,
+                'message' => $exception->getMessage(),
+            ]);
 
             return response()->json([
-                'success' => true,
-                'message' => 'Khôi phục dữ liệu hoàn tất.',
-                'data' => $result,
-            ], Response::HTTP_OK);
-        } catch (BackupRuntimeException $exception) {
-            Log::error('backup.restore_failed', [
-                'snapshot_id' => $snapshotId,
+                'message' => 'Không thể khởi chạy khôi phục nền. Vui lòng thử lại sau.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        AuditLogger::log($request, [
+            'action_group' => 'security',
+            'action_code' => 'BACKUP_RESTORE_TRIGGERED',
+            'action_label' => 'Kích hoạt khôi phục sao lưu hệ thống',
+            'target_type' => 'backup_snapshot',
+            'target_id' => $snapshotId,
+            'target_display' => 'Snapshot ' . $snapshotId,
+            'result_status' => 'success',
+            'changes' => [
                 'scope' => $validated['scope'],
                 'target' => $validated['target'],
-                'message' => $exception->getMessage(),
-            ]);
+                'run_id' => $runId,
+            ],
+        ], $request->user());
 
-            AuditLogger::log($request, [
-                'action_group' => 'security',
-                'action_code' => 'BACKUP_RESTORE_FAILED',
-                'action_label' => 'Khôi phục sao lưu thất bại',
-                'target_type' => 'backup_snapshot',
-                'target_id' => $snapshotId,
-                'target_display' => 'Snapshot ' . $snapshotId,
-                'result_status' => 'failure',
-                'result_error_message' => $exception->getMessage(),
-                'changes' => [
-                    'scope' => $validated['scope'],
-                    'target' => $validated['target'],
-                ],
-            ], $request->user());
-
-            return response()->json([
-                'message' => $exception->getMessage(),
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } catch (\Throwable $exception) {
-            Log::error('backup.restore_unexpected_failed', [
-                'snapshot_id' => $snapshotId,
-                'message' => $exception->getMessage(),
-            ]);
-
-            return response()->json([
-                'message' => 'Khôi phục dữ liệu thất bại. Vui lòng kiểm tra log hệ thống.',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã tiếp nhận yêu cầu khôi phục dữ liệu.',
+            'data' => [
+                'run_id' => $runId,
+                'operation' => 'restore',
+                'status' => 'queued',
+                'user_message' => 'Đã tiếp nhận yêu cầu khôi phục dữ liệu.',
+                'error_code' => null,
+                'status_url' => '/api/admin/backups/runs/' . $runId,
+            ],
+        ], Response::HTTP_ACCEPTED);
     }
 
     public function downloadManifest(Request $request, string $snapshotId)
     {
         try {
+            $this->backupManager->assertValidSnapshotId($snapshotId);
             $download = $this->backupManager->extractManifestFromSnapshot($snapshotId);
             $path = (string) ($download['absolute_path'] ?? '');
             if ($path === '') {
@@ -309,20 +647,19 @@ class AdminBackupController extends Controller
                 ['Content-Type' => 'application/json; charset=UTF-8']
             )->deleteFileAfterSend(true);
         } catch (\Throwable $exception) {
-            Log::error('backup.download_manifest_failed', [
-                'snapshot_id' => $snapshotId,
-                'message' => $exception->getMessage(),
-            ]);
-
-            return response()->json([
-                'message' => 'Không thể tải manifest backup.',
-            ], Response::HTTP_NOT_FOUND);
+            return $this->toDownloadErrorResponse(
+                'backup.download_manifest_failed',
+                $snapshotId,
+                $exception,
+                'Không thể tải manifest backup.'
+            );
         }
     }
 
     public function downloadDatabaseDump(Request $request, string $snapshotId)
     {
         try {
+            $this->backupManager->assertValidSnapshotId($snapshotId);
             $download = $this->backupManager->extractDatabaseDumpFromSnapshot($snapshotId);
             $path = (string) ($download['absolute_path'] ?? '');
             if ($path === '') {
@@ -345,14 +682,663 @@ class AdminBackupController extends Controller
                 ['Content-Type' => 'application/sql; charset=UTF-8']
             )->deleteFileAfterSend(true);
         } catch (\Throwable $exception) {
-            Log::error('backup.download_db_dump_failed', [
-                'snapshot_id' => $snapshotId,
+            return $this->toDownloadErrorResponse(
+                'backup.download_db_dump_failed',
+                $snapshotId,
+                $exception,
+                'Không thể tải DB dump backup.'
+            );
+        }
+    }
+
+    public function exportMetadata(Request $request, string $snapshotId)
+    {
+        try {
+            $this->backupManager->assertValidSnapshotId($snapshotId);
+            $data = $this->backupManager->getSnapshotExportMetadata($snapshotId);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'ok',
+                'data' => $data,
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            $normalized = Str::lower((string) $exception->getMessage());
+            $status = Response::HTTP_UNPROCESSABLE_ENTITY;
+            if (
+                $exception instanceof BackupRuntimeException
+                && (
+                    str_contains($normalized, 'không tìm thấy snapshot')
+                    || str_contains($normalized, 'khong tim thay snapshot')
+                    || str_contains($normalized, 'chưa có export')
+                    || str_contains($normalized, 'chua co export')
+                )
+            ) {
+                $status = Response::HTTP_NOT_FOUND;
+            }
+
+            return response()->json([
+                'message' => $exception->getMessage() ?: 'Không thể lấy thông tin export backup.',
+            ], $status);
+        }
+    }
+
+    public function downloadExport(Request $request, string $snapshotId)
+    {
+        try {
+            $this->backupManager->assertValidSnapshotId($snapshotId);
+            $download = $this->backupManager->prepareExportBundleDownload($snapshotId);
+            $path = (string) ($download['absolute_path'] ?? '');
+            if ($path === '') {
+                throw new BackupRuntimeException('Không tìm thấy tệp export.');
+            }
+
+            $filename = (string) ($download['filename'] ?? ('backup_export_' . $snapshotId . '.zip'));
+            AuditLogger::log($request, [
+                'action_group' => 'security',
+                'action_code' => 'BACKUP_DOWNLOAD_EXPORT',
+                'action_label' => 'Tải gói export backup',
+                'target_type' => 'backup_snapshot',
+                'target_id' => $snapshotId,
+                'target_display' => 'Snapshot ' . $snapshotId,
+                'result_status' => 'success',
+            ], $request->user());
+
+            return response()->download(
+                $path,
+                $filename,
+                ['Content-Type' => 'application/zip']
+            );
+        } catch (\Throwable $exception) {
+            return $this->toDownloadErrorResponse(
+                'backup.download_export_failed',
+                $snapshotId,
+                $exception,
+                'Không thể tải gói export backup.'
+            );
+        }
+    }
+
+    public function forget(Request $request)
+    {
+        $conflict = $this->rejectWhenConflictingRunActive(['backup', 'prune', 'forget', 'restore']);
+        if ($conflict !== null) {
+            return $conflict;
+        }
+
+        $validated = $request->validate([
+            'snapshot_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'snapshot_ids.*' => ['required', 'string', 'regex:/^[A-Fa-f0-9]{6,64}$/'],
+            'prune_after' => ['nullable', 'boolean'],
+        ]);
+
+        $snapshotIds = array_values(array_unique(array_map(
+            static fn ($id): string => Str::lower(trim((string) $id)),
+            (array) ($validated['snapshot_ids'] ?? [])
+        )));
+        $pruneAfter = (bool) ($validated['prune_after'] ?? false);
+
+        if ($pruneAfter) {
+            return response()->json([
+                'message' => 'Không hỗ trợ prune trong cùng request xóa. Vui lòng dùng hành động "Dọn bản sao lưu cũ".',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if ($snapshotIds === []) {
+            return response()->json([
+                'message' => 'Danh sách snapshot cần xóa không hợp lệ.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $runId = $this->stateStore->generateRunId();
+        $user = $request->user();
+        $this->stateStore->initialize($runId, [
+            'status' => 'queued',
+            'operation' => 'forget',
+            'trigger' => 'manual',
+            'requested_by_user_id' => $user ? (int) $user->id : null,
+            'requested_at' => now()->toIso8601String(),
+            'snapshot_ids' => $snapshotIds,
+            'message' => 'Đã xếp lịch xóa snapshot đã chọn.',
+        ]);
+
+        try {
+            $this->launcher->launchForget($runId, (int) ($user?->id ?? 0), $snapshotIds, 'manual');
+
+            AuditLogger::log($request, [
+                'action_group' => 'security',
+                'action_code' => 'BACKUP_SNAPSHOT_FORGET',
+                'action_label' => 'Xóa snapshot backup theo lựa chọn',
+                'target_type' => 'backup_snapshot',
+                'target_id' => implode(',', $snapshotIds),
+                'target_display' => 'Snapshots ' . implode(', ', $snapshotIds),
+                'result_status' => 'success',
+                'changes' => [
+                    'queued' => true,
+                    'snapshot_count' => count($snapshotIds),
+                ],
+            ], $request->user());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã tiếp nhận yêu cầu xóa bản sao lưu.',
+                'data' => [
+                    'accepted' => true,
+                    'run_id' => $runId,
+                    'operation' => 'forget',
+                    'status' => 'queued',
+                    'user_message' => 'Đã tiếp nhận yêu cầu xóa bản sao lưu.',
+                    'error_code' => null,
+                    'status_url' => '/api/admin/backups/runs/' . $runId,
+                    'snapshot_ids' => $snapshotIds,
+                    'prune_after' => false,
+                ],
+            ], Response::HTTP_ACCEPTED);
+        } catch (\Throwable $exception) {
+            $this->stateStore->update($runId, [
+                'status' => 'failed',
+                'operation' => 'forget',
+                'step' => 'failed',
+                'message' => 'Không thể khởi chạy tiến trình xóa snapshot nền.',
+                'finished_at' => now()->toIso8601String(),
+                'error_message' => $exception->getMessage(),
+            ]);
+            $this->stateStore->appendLog($runId, 'Không thể khởi chạy tác vụ nền: ' . $exception->getMessage(), 'error');
+
+            Log::error('backup.forget_launch_failed', [
+                'run_id' => $runId,
+                'snapshot_ids' => $snapshotIds,
                 'message' => $exception->getMessage(),
             ]);
 
             return response()->json([
-                'message' => 'Không thể tải DB dump backup.',
-            ], Response::HTTP_NOT_FOUND);
+                'message' => 'Không thể khởi chạy xóa snapshot nền. Vui lòng thử lại sau.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
     }
+
+    public function unlockStaleLock(Request $request)
+    {
+        $conflict = $this->rejectWhenConflictingRunActive(['backup', 'prune', 'forget', 'restore']);
+        if ($conflict !== null) {
+            return $conflict;
+        }
+
+        try {
+            $result = $this->backupManager->unlockStaleRepositoryLocks();
+            $this->snapshotStore->markIdle();
+
+            AuditLogger::log($request, [
+                'action_group' => 'security',
+                'action_code' => 'BACKUP_UNLOCK_STALE_LOCK',
+                'action_label' => 'Gỡ khóa stale repository backup',
+                'target_type' => 'backup_repository',
+                'target_id' => 'restic',
+                'target_display' => 'Restic repository',
+                'result_status' => 'success',
+            ], $request->user());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã gửi yêu cầu gỡ khóa sao lưu.',
+                'data' => [
+                    'unlocked' => true,
+                    'user_message' => 'Đã gửi yêu cầu gỡ khóa sao lưu.',
+                ],
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            Log::error('backup.unlock_stale_lock_failed', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể gỡ khóa sao lưu lúc này. Vui lòng thử lại.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+    }
+
+    private function rejectWhenConflictingRunActive(array $operations): ?\Illuminate\Http\JsonResponse
+    {
+        $activeRun = $this->stateStore->latestActive($operations);
+        if (! is_array($activeRun)) {
+            return null;
+        }
+
+        $operation = Str::lower(trim((string) ($activeRun['operation'] ?? '')));
+        $message = $this->conflictMessageForOperation($operation);
+
+        return response()->json([
+            'message' => $message,
+            'data' => [
+                'conflict_run' => $this->summarizeRunForConflict($activeRun),
+            ],
+        ], Response::HTTP_CONFLICT);
+    }
+
+    private function conflictMessageForOperation(string $operation): string
+    {
+        return match ($operation) {
+            'backup' => 'Đang có một bản sao lưu đang chạy. Vui lòng đợi hoàn tất.',
+            'prune' => 'Đang có tiến trình dọn bản sao lưu cũ. Vui lòng đợi hoàn tất.',
+            'forget' => 'Đang có tiến trình xóa snapshot đang chạy. Vui lòng đợi hoàn tất.',
+            'restore' => 'Đang có tiến trình khôi phục dữ liệu đang chạy. Vui lòng đợi hoàn tất.',
+            default => 'Đang có tiến trình nền đang chạy. Vui lòng đợi hoàn tất.',
+        };
+    }
+
+    private function summarizeRunForConflict(array $run): array
+    {
+        $safeRun = $this->toPublicRunState($run);
+        return [
+            'run_id' => $safeRun['run_id'] ?? null,
+            'operation' => $safeRun['operation'] ?? null,
+            'status' => $safeRun['status'] ?? null,
+            'message' => $safeRun['message'] ?? null,
+            'user_message' => $safeRun['user_message'] ?? null,
+            'error_code' => $safeRun['error_code'] ?? null,
+            'trigger' => $safeRun['trigger'] ?? null,
+            'requested_at' => $safeRun['requested_at'] ?? null,
+            'started_at' => $safeRun['started_at'] ?? null,
+        ];
+    }
+
+    private function latestScheduleRunSummary(): array
+    {
+        foreach ($this->stateStore->listRecent(240) as $run) {
+            if (! is_array($run)) {
+                continue;
+            }
+
+            $operation = Str::lower(trim((string) ($run['operation'] ?? '')));
+            $trigger = Str::lower(trim((string) ($run['trigger'] ?? '')));
+            if ($operation !== 'backup' || $trigger !== 'schedule') {
+                continue;
+            }
+
+            return [
+                'last_run_id' => $run['run_id'] ?? null,
+                'last_run_status' => $run['status'] ?? null,
+                'last_run_at' => $run['started_at'] ?? $run['requested_at'] ?? $run['updated_at'] ?? null,
+            ];
+        }
+
+        return [
+            'last_run_id' => null,
+            'last_run_status' => null,
+            'last_run_at' => null,
+        ];
+    }
+
+    private function toUiActiveRun(?array $run): ?array
+    {
+        if (! is_array($run)) {
+            return null;
+        }
+
+        $status = Str::lower(trim((string) ($run['status'] ?? '')));
+        if (! in_array($status, ['queued', 'running'], true)) {
+            return null;
+        }
+
+        $trigger = Str::lower(trim((string) ($run['trigger'] ?? '')));
+        if ($trigger === 'schedule') {
+            return null;
+        }
+
+        return $this->toPublicRunState($run);
+    }
+
+    private function toPublicRunState(?array $run, bool $includeTechnical = false): ?array
+    {
+        if (! is_array($run)) {
+            return null;
+        }
+
+        $operation = Str::lower(trim((string) ($run['operation'] ?? '')));
+        $status = Str::lower(trim((string) ($run['status'] ?? '')));
+        $rawMessage = trim((string) ($run['message'] ?? ''));
+        $rawError = trim((string) ($run['error_message'] ?? ''));
+        $errorCode = $this->detectErrorCode($rawMessage, $rawError);
+        $userMessage = $this->buildUserMessage($operation, $status, $errorCode, $rawMessage);
+
+        $payload = [
+            'run_id' => $run['run_id'] ?? null,
+            'operation' => $run['operation'] ?? null,
+            'status' => $run['status'] ?? null,
+            'trigger' => $run['trigger'] ?? null,
+            'step' => $run['step'] ?? null,
+            'message' => $userMessage,
+            'user_message' => $userMessage,
+            'error_code' => $errorCode,
+            'requested_by_user_id' => $run['requested_by_user_id'] ?? null,
+            'requested_at' => $run['requested_at'] ?? null,
+            'started_at' => $run['started_at'] ?? null,
+            'finished_at' => $run['finished_at'] ?? null,
+            'snapshot_id' => $run['snapshot_id'] ?? null,
+            'scope' => $run['scope'] ?? null,
+            'target' => $run['target'] ?? null,
+        ];
+
+        if ($includeTechnical) {
+            $payload['error_message'] = $rawError !== '' ? $rawError : null;
+            $payload['technical_message'] = $rawError !== '' ? $rawError : null;
+            if (is_array($run['logs'] ?? null)) {
+                $payload['logs'] = $run['logs'];
+            }
+            if (array_key_exists('result', $run)) {
+                $payload['result'] = $run['result'];
+            }
+        }
+
+        return $payload;
+    }
+
+    private function toPublicErrorPayload(
+        string $rawMessage,
+        string $operation = 'snapshot_refresh',
+        string $status = 'failed'
+    ): array {
+        $raw = trim($rawMessage);
+        if ($raw === '') {
+            return [
+                'user_message' => null,
+                'error_code' => null,
+            ];
+        }
+
+        $errorCode = $this->detectErrorCode($raw, $raw);
+        return [
+            'user_message' => $this->buildUserMessage($operation, $status, $errorCode, $raw),
+            'error_code' => $errorCode,
+        ];
+    }
+
+    private function buildUserMessage(
+        string $operation,
+        string $status,
+        ?string $errorCode,
+        string $fallbackMessage
+    ): string {
+        if ($status === 'queued') {
+            return match ($operation) {
+                'backup' => 'Đã tiếp nhận yêu cầu sao lưu.',
+                'prune' => 'Đã tiếp nhận yêu cầu dọn bản sao lưu cũ.',
+                'forget' => 'Đã tiếp nhận yêu cầu xóa bản sao lưu.',
+                'restore' => 'Đã tiếp nhận yêu cầu khôi phục dữ liệu.',
+                'snapshot_refresh' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
+                default => 'Đã tiếp nhận yêu cầu xử lý.',
+            };
+        }
+
+        if ($status === 'running') {
+            return match ($operation) {
+                'backup' => 'Đang sao lưu dữ liệu...',
+                'prune' => 'Đang dọn bản sao lưu cũ...',
+                'forget' => 'Đang xóa bản sao lưu...',
+                'restore' => 'Đang khôi phục dữ liệu...',
+                'snapshot_refresh' => 'Đang đồng bộ danh sách bản sao lưu...',
+                default => 'Đang xử lý dữ liệu...',
+            };
+        }
+
+        if ($status === 'success') {
+            return match ($operation) {
+                'backup' => 'Sao lưu dữ liệu hoàn tất.',
+                'prune' => 'Dọn bản sao lưu cũ hoàn tất.',
+                'forget' => 'Đã xóa bản sao lưu thành công.',
+                'restore' => 'Khôi phục dữ liệu hoàn tất.',
+                'snapshot_refresh' => 'Đồng bộ danh sách bản sao lưu hoàn tất.',
+                default => 'Xử lý hoàn tất.',
+            };
+        }
+
+        if ($status === 'failed') {
+            if ($errorCode === 'BACKUP_LOCKED') {
+                return 'Hệ thống đang có tiến trình khác giữ khóa sao lưu. Vui lòng đợi rồi thử lại.';
+            }
+
+            if ($errorCode === 'RUN_TIMEOUT') {
+                if ($fallbackMessage !== '' && ! $this->isTechnicalMessage($fallbackMessage)) {
+                    return $fallbackMessage;
+                }
+                return match ($operation) {
+                    'snapshot_refresh' => 'Đồng bộ danh sách bị quá thời gian. Vui lòng thử lại.',
+                    'forget' => 'Tiến trình xóa bản sao lưu bị quá thời gian. Vui lòng thử lại.',
+                    'prune' => 'Tiến trình dọn bản sao lưu cũ bị quá thời gian. Vui lòng thử lại.',
+                    'backup' => 'Tiến trình sao lưu bị quá thời gian. Vui lòng thử lại.',
+                    'restore' => 'Tiến trình khôi phục bị quá thời gian. Vui lòng thử lại.',
+                    default => 'Tiến trình xử lý bị quá thời gian. Vui lòng thử lại.',
+                };
+            }
+
+            if ($errorCode === 'SNAPSHOT_NOT_FOUND') {
+                return 'Không tìm thấy bản sao lưu. Vui lòng tải lại danh sách.';
+            }
+
+            if ($fallbackMessage !== '' && ! $this->isTechnicalMessage($fallbackMessage)) {
+                return $fallbackMessage;
+            }
+
+            return match ($operation) {
+                'backup' => 'Không thể sao lưu dữ liệu. Vui lòng thử lại.',
+                'prune' => 'Không thể dọn bản sao lưu cũ. Vui lòng thử lại.',
+                'forget' => 'Không thể xóa bản sao lưu. Vui lòng thử lại.',
+                'restore' => 'Không thể khôi phục dữ liệu. Vui lòng thử lại.',
+                'snapshot_refresh' => 'Không thể đồng bộ danh sách bản sao lưu. Vui lòng thử lại.',
+                default => 'Không thể xử lý yêu cầu. Vui lòng thử lại.',
+            };
+        }
+
+        if ($fallbackMessage !== '' && ! $this->isTechnicalMessage($fallbackMessage)) {
+            return $fallbackMessage;
+        }
+
+        return 'Hệ thống đang xử lý...';
+    }
+
+    private function detectErrorCode(string $rawMessage, string $rawError): ?string
+    {
+        $combined = Str::lower(trim($rawMessage . ' ' . $rawError));
+        if ($combined === '') {
+            return null;
+        }
+
+        if ($this->containsLockHint($combined)) {
+            return 'BACKUP_LOCKED';
+        }
+
+        if ($this->containsTimeoutHint($combined)) {
+            return 'RUN_TIMEOUT';
+        }
+
+        if (
+            Str::contains($combined, [
+                'không tìm thấy snapshot',
+                'khong tim thay snapshot',
+                'snapshot not found',
+            ])
+        ) {
+            return 'SNAPSHOT_NOT_FOUND';
+        }
+
+        return null;
+    }
+
+    private function containsLockHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'unable to create lock',
+            'repository is already locked',
+            'already locked by pid',
+            'the `unlock` command',
+            'đang bị khóa',
+            'dang bi khoa',
+            'stale lock',
+        ]);
+    }
+
+    private function containsTimeoutHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'timed out',
+            'timeout',
+            'exceeded the timeout',
+            'quá thời gian',
+            'qua thoi gian',
+        ]);
+    }
+
+    private function isTechnicalMessage(string $value): bool
+    {
+        $normalized = Str::lower(trim($value));
+        if ($normalized === '') {
+            return false;
+        }
+
+        return Str::contains($normalized, [
+            'restic',
+            'repository',
+            'rclone',
+            'pid',
+            'stdout',
+            'stderr',
+            'lock id',
+            'unable to create lock',
+            'run timed out after',
+            'exit status',
+        ]);
+    }
+
+    private function toDownloadErrorResponse(
+        string $logKey,
+        string $snapshotId,
+        \Throwable $exception,
+        string $fallbackMessage
+    ) {
+        $status = Response::HTTP_INTERNAL_SERVER_ERROR;
+        $message = $fallbackMessage;
+        $exceptionMessage = trim((string) $exception->getMessage());
+        $normalizedMessage = Str::lower($exceptionMessage);
+
+        if ($exception instanceof BackupRuntimeException) {
+            if (
+                str_contains($normalizedMessage, 'mã snapshot không hợp lệ')
+                || str_contains($normalizedMessage, 'ma snapshot khong hop le')
+            ) {
+                $status = Response::HTTP_UNPROCESSABLE_ENTITY;
+                $message = 'Mã snapshot không hợp lệ.';
+            } elseif (
+                str_contains($normalizedMessage, 'không tìm thấy snapshot')
+                || str_contains($normalizedMessage, 'khong tim thay snapshot')
+                || str_contains($normalizedMessage, 'không tìm thấy manifest')
+                || str_contains($normalizedMessage, 'khong tim thay manifest')
+                || str_contains($normalizedMessage, 'không tìm thấy db dump')
+                || str_contains($normalizedMessage, 'khong tim thay db dump')
+                || str_contains($normalizedMessage, 'snapshot chưa có export')
+                || str_contains($normalizedMessage, 'snapshot chua co export')
+                || str_contains($normalizedMessage, 'không tìm thấy tệp export')
+                || str_contains($normalizedMessage, 'khong tim thay tep export')
+                || str_contains($normalizedMessage, 'không tìm thấy tệp')
+                || str_contains($normalizedMessage, 'khong tim thay tep')
+            ) {
+                $status = Response::HTTP_NOT_FOUND;
+            }
+        }
+
+        Log::error($logKey, [
+            'snapshot_id' => $snapshotId,
+            'status' => $status,
+            'message' => $exceptionMessage,
+            'exception_class' => get_class($exception),
+        ]);
+
+        return response()->json([
+            'message' => $message,
+        ], $status);
+    }
+
+    private function startSnapshotRefresh(Request $request, string $trigger): ?array
+    {
+        $cacheMeta = $this->snapshotStore->cacheMeta();
+        $isRefreshing = (bool) ($cacheMeta['refreshing'] ?? false);
+        $refreshTimedOut = $isRefreshing && $this->snapshotStore->shouldStartRefresh();
+        if ($isRefreshing && ! $refreshTimedOut) {
+            return null;
+        }
+
+        if ($refreshTimedOut) {
+            $staleRunId = trim((string) ($cacheMeta['refresh_run_id'] ?? ''));
+            $message = 'Đồng bộ snapshot trước đó quá thời gian chờ và đã được đặt lại.';
+            $this->snapshotStore->markRefreshFailed($message, $staleRunId !== '' ? $staleRunId : null);
+
+            if ($staleRunId !== '') {
+                $staleState = $this->stateStore->get($staleRunId);
+                if (
+                    is_array($staleState)
+                    && in_array(Str::lower(trim((string) ($staleState['status'] ?? ''))), ['queued', 'running'], true)
+                ) {
+                    $this->stateStore->update($staleRunId, [
+                        'status' => 'failed',
+                        'operation' => 'snapshot_refresh',
+                        'step' => 'timeout',
+                        'message' => $message,
+                        'finished_at' => now()->toIso8601String(),
+                        'error_message' => $message,
+                    ]);
+                }
+            }
+
+            Log::warning('backup.snapshot_refresh_stale_reset', [
+                'stale_run_id' => $staleRunId !== '' ? $staleRunId : null,
+                'trigger' => $trigger,
+            ]);
+        }
+
+        if (! $this->snapshotStore->shouldStartRefresh() && $trigger !== 'manual_refresh') {
+            return null;
+        }
+
+        $runId = $this->stateStore->generateRunId();
+        $userId = (int) ($request->user()?->id ?? 0);
+        $this->snapshotStore->markRefreshing($runId);
+        $this->stateStore->initialize($runId, [
+            'status' => 'queued',
+            'operation' => 'snapshot_refresh',
+            'trigger' => $trigger,
+            'requested_by_user_id' => $userId > 0 ? $userId : null,
+            'requested_at' => now()->toIso8601String(),
+            'message' => 'Đã xếp lịch làm mới danh sách snapshot.',
+        ]);
+
+        try {
+            $this->launcher->launchSnapshotRefresh($runId, $userId, $trigger);
+        } catch (\Throwable $exception) {
+            $errorCode = $this->detectErrorCode($exception->getMessage(), $exception->getMessage());
+            $userMessage = $this->buildUserMessage('snapshot_refresh', 'failed', $errorCode, '');
+            $this->snapshotStore->markRefreshFailed($userMessage, $runId);
+            $this->stateStore->update($runId, [
+                'status' => 'failed',
+                'operation' => 'snapshot_refresh',
+                'step' => 'failed',
+                'message' => $userMessage,
+                'finished_at' => now()->toIso8601String(),
+                'error_message' => $exception->getMessage(),
+                'error_code' => $errorCode,
+            ]);
+            $this->stateStore->appendLog($runId, 'Không thể khởi chạy refresh snapshot: ' . $exception->getMessage(), 'error');
+
+            Log::warning('backup.snapshot_refresh_launch_failed', [
+                'run_id' => $runId,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        return ['run_id' => $runId];
+    }
 }
+
+
+
+
