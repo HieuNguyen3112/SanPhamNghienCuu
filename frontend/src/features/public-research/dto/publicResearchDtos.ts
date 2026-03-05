@@ -47,3 +47,21 @@ export type PublicResearchListResponseDto = {
   items: PublicResearchItemDto[];
   total: number;
 };
+
+export type PublicResearchParticipantDto = {
+  lecturer_id: number;
+  lecturer_code: string;
+  lecturer_name: string;
+  faculty_name: string;
+  role_name: string;
+};
+
+export type PublicResearchDetailDto = PublicResearchItemDto & {
+  activity_code: string;
+  participants: PublicResearchParticipantDto[];
+  evidence_files?: { label: string; url: string }[];
+};
+
+export type PublicResearchDetailResponseDto = {
+  item: PublicResearchDetailDto;
+};

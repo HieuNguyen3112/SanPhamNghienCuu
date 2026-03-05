@@ -13,7 +13,7 @@
     <main class="mx-auto max-w-6xl px-4 py-8 md:px-6">
       <div class="text-2xl font-extrabold text-slate-900">Giảng viên</div>
       <div class="mt-1 text-sm text-slate-600">
-        Tra cứu giảng viên theo tên/mã, khoa, năm học (dữ liệu từ backend thật).
+        Tra cứu giảng viên theo tên/mã, khoa, năm học .
       </div>
 
       <div class="mt-5 space-y-4">
@@ -159,6 +159,7 @@ import { useUserStore } from "@/app/stores/userStore";
 import PublicHomeTopHeader from "@/features/search/components/PublicHomeTopHeader.vue";
 import PublicHomeNavBar from "@/features/search/components/PublicHomeNavBar.vue";
 import PublicHomeFooter from "@/features/search/components/PublicHomeFooter.vue";
+import { fetchPublicResearchLookupsApi } from "@/features/public-research/api/publicResearchLookupsApi";
 
 import PublicLecturerGrid, {
   type LecturerCard,
@@ -231,6 +232,15 @@ async function fetchPublicLecturers(params: {
   return res.json();
 }
 
+const facultyOptionsLocal = ref<Array<{ value: number; label: string }>>([]);
+const academicYearOptionsLocal = ref<Array<{ value: number; label: string }>>([]);
+
+async function loadLookups() {
+  const lookups = await fetchPublicResearchLookupsApi();
+  facultyOptionsLocal.value = lookups.faculties.map((f) => ({ value: f.id, label: f.name }));
+  academicYearOptionsLocal.value = lookups.academic_years.map((y) => ({ value: y.id, label: y.code }));
+}
+
 /** layout */
 const router = useRouter();
 const route = useRoute();
@@ -278,15 +288,7 @@ const pagination = ref({ page: 1, per_page: 12, total: 0, last_page: 1 });
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-/** local select options (nếu bạn đã có lookups public thì replace) */
-const facultyOptionsLocal = computed(() => {
-  // Nếu bạn có options sẵn từ đâu đó thì map vào đây.
-  // Hiện để trống => dropdown chỉ có "Tất cả khoa"
-  return [] as Array<{ value: number; label: string }>;
-});
-const academicYearOptionsLocal = computed(() => {
-  return [] as Array<{ value: number; label: string }>;
-});
+
 
 /** init from query */
 function initFromQuery() {
@@ -343,6 +345,7 @@ async function load() {
 
 onMounted(async () => {
   initFromQuery();
+  await loadLookups();  
   await load();
 });
 
@@ -389,7 +392,7 @@ const lecturerCards = computed<LecturerCard[]>(() => {
     lecturerCode: it.code,
     lecturerName: it.full_name,
     facultyName: it.department_name ?? "",
-    lecturerQueryPretty: `${it.full_name} / ${it.code}`,
+    lecturerQueryPretty: it.full_name,
     counts: {
       ARTICLE: c.paper,
       BOOK: bookTotal,

@@ -1,5 +1,7 @@
 import type { PublicResearchItemDto } from "../dto/publicResearchDtos";
 import type { PublicResearchItem } from "@/features/public-research/models/publicResearchModels";
+import type { PublicResearchDetailDto } from "../dto/publicResearchDtos";
+import type { PublicResearchDetail } from "../models/publicResearchModels";
 
 export function mapPublicResearchItemDtoToModel(
   dto: PublicResearchItemDto
@@ -28,5 +30,22 @@ export function mapPublicResearchItemDtoToModel(
     pdfUrl: dto.pdf_url ?? null,
     coverUrl: dto.cover_url ?? null,
     keywords: Array.isArray(dto.keywords) ? dto.keywords : [],
+  };
+}
+
+export function mapPublicResearchDetailDtoToModel(dto: PublicResearchDetailDto): PublicResearchDetail {
+  const base = mapPublicResearchItemDtoToModel(dto);
+
+  return {
+    ...base,
+    activityCode: dto.activity_code ?? "",
+    participants: (dto.participants ?? []).map((p) => ({
+      lecturerId: p.lecturer_id,
+      lecturerCode: p.lecturer_code,
+      lecturerName: p.lecturer_name,
+      facultyName: p.faculty_name,
+      roleName: p.role_name,
+    })),
+    evidenceFiles: Array.isArray(dto.evidence_files) ? dto.evidence_files : [],
   };
 }

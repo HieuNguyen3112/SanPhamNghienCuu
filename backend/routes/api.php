@@ -41,6 +41,7 @@ use App\Http\Controllers\FacultyLecturerHourWarningController;
 use App\Http\Controllers\FacultyLecturerHoursController;
 use App\Http\Controllers\FacultyLecturerHourApprovalController;
 use App\Http\Controllers\FacultyOrgStructureController;
+use App\Http\Controllers\PublicResearchWorkController;
 
 // TOKEN-BASED (Sanctum Bearer)
 Route::prefix('auth')->group(function () {
@@ -490,4 +491,12 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DE
     ->group(function () {
         Route::get('/lecturers', [PublicLecturerController::class, 'index']);
         Route::get('/lecturers/{lecturer:code}', [PublicLecturerController::class, 'show']);
+    });
+
+    Route::middleware(['force.json'])
+    ->prefix('public')
+    ->group(function () {
+        Route::get('/research-works/lookups', [PublicResearchWorkController::class, 'lookups']);
+        Route::get('/research-works', [PublicResearchWorkController::class, 'index']);
+        Route::get('/research-works/{activityId}', [PublicResearchWorkController::class, 'show']);
     });
