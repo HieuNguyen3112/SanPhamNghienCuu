@@ -5,6 +5,10 @@ import type {
 import { fetchPublicResearchItemsApi } from "../api/publicResearchApi";
 import { mapPublicResearchItemDtoToModel } from "../mappers/publicResearchMappers";
 import type { PublicResearchItem } from "../models/publicResearchModels";
+import { fetchPublicResearchDetailApi } from "../api/publicResearchApi";
+import { mapPublicResearchDetailDtoToModel } from "../mappers/publicResearchMappers";
+import type { PublicResearchDetail } from "../models/publicResearchModels";
+import type { PublicResearchDetailResponseDto } from "../dto/publicResearchDtos";
 
 export type PublicResearchListResult = {
   items: PublicResearchItem[];
@@ -21,4 +25,8 @@ export async function loadPublicResearchItemsService(
     items: response.items.map(mapPublicResearchItemDtoToModel),
     total: response.total,
   };
+}
+export async function loadPublicResearchDetailService(activityId: number): Promise<PublicResearchDetail> {
+  const res: PublicResearchDetailResponseDto = await fetchPublicResearchDetailApi(activityId);
+  return mapPublicResearchDetailDtoToModel(res.item);
 }

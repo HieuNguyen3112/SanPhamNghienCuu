@@ -7,17 +7,15 @@ import type {
 } from "../models/publicResearchModels";
 import type { PublicResearchListQueryDto } from "../dto/publicResearchDtos";
 import { loadPublicResearchItemsService } from "../services/publicResearchService";
-import {
-  getPublicResearchStaticAcademicYears,
-  getPublicResearchStaticFaculties,
-  getPublicResearchStaticWorkTypes,
-} from "../mock-data/publicResearchMockData";
+import { fetchPublicResearchLookupsApi } from "../api/publicResearchLookupsApi";
 
 const DEFAULT_PAGE_SIZE = 10;
 
+const STATIC_WORK_TYPES = ["ARTICLE", "BOOK", "PROJECT", "CONFERENCE", "OTHER"] as const;
+
 export function usePublicResearch() {
-  // ===== Required State =====
   const publicResearchItems = ref<PublicResearchItem[]>([]);
+
   const filterState = reactive<PublicResearchFilterState>({
     lecturerQuery: "",
     facultyId: null,
@@ -33,28 +31,29 @@ export function usePublicResearch() {
   const loadingState = ref<LoadingState>("idle");
   const errorState = ref<string | null>(null);
 
-  // ===== Additional (needed for pagination) =====
   const totalItems = ref(0);
 
-  // ===== Options for selects (derived from mock seeds) =====
-  const facultyOptions = computed<SelectOption<number | null>[]>(() => {
-    const base = [{ value: null, label: "Tất cả khoa" }];
-    const rows = getPublicResearchStaticFaculties().map((f) => ({
-      value: f.id,
-      label: f.name,
-    }));
-    return [...base, ...rows];
-  });
+  // ✅ lookups state
+  const lookupsLoaded = ref(false);
+  const lookupsLoading = ref(false);
+
+  const facultyOptions = ref<SelectOption<number | null>[]>([
+    { value: null, label: "Tất cả khoa" },
+  ]);
+
+  const academicYearOptions = ref<SelectOption<number | null>[]>([
+    { value: null, label: "Tất cả năm học" },
+  ]);
 
   const workTypeOptions = computed<SelectOption<string | null>[]>(() => {
     const base = [{ value: null, label: "Tất cả loại công trình" }];
-    const rows = getPublicResearchStaticWorkTypes().map((t) => ({
+    const rows = STATIC_WORK_TYPES.map((t) => ({
       value: t,
       label:
         t === "ARTICLE"
           ? "Bài báo"
           : t === "BOOK"
-            ? "Sách"
+            ? "Sách - Giáo trình"
             : t === "PROJECT"
               ? "Đề tài"
               : t === "CONFERENCE"
@@ -64,25 +63,41 @@ export function usePublicResearch() {
     return [...base, ...rows];
   });
 
-  const academicYearOptions = computed<SelectOption<number | null>[]>(() => {
-    const base = [{ value: null, label: "Tất cả năm học" }];
-    const rows = getPublicResearchStaticAcademicYears().map((y) => ({
-      value: y.id,
-      label: y.code,
-    }));
-    return [...base, ...rows];
-  });
+  async function ensureLookupsLoaded() {
+    if (lookupsLoaded.value || lookupsLoading.value) return;
+
+    lookupsLoading.value = true;
+    try {
+      const lookups = await fetchPublicResearchLookupsApi();
+
+      facultyOptions.value = [
+        { value: null, label: "Tất cả khoa" },
+        ...lookups.faculties.map((f) => ({ value: f.id, label: f.name })),
+      ];
+
+      academicYearOptions.value = [
+        { value: null, label: "Tất cả năm học" },
+        ...lookups.academic_years.map((y) => ({ value: y.id, label: y.code })),
+      ];
+
+      lookupsLoaded.value = true;
+    } catch {
+      // fallback: vẫn giữ base option
+      lookupsLoaded.value = false;
+    } finally {
+      lookupsLoading.value = false;
+    }
+  }
 
   const selectedResearchItem = computed<PublicResearchItem | null>(() => {
     if (selectedResearchId.value === null) return null;
-    return (
-      publicResearchItems.value.find((x) => x.id === selectedResearchId.value) ??
-      null
-    );
+    return publicResearchItems.value.find((x) => x.id === selectedResearchId.value) ?? null;
   });
 
-  // ===== Required Actions =====
   async function loadPublicResearchItems() {
+    // ✅ đảm bảo dropdown khoa/năm học có data thật
+    await ensureLookupsLoaded();
+
     loadingState.value = "loading";
     errorState.value = null;
 
@@ -133,7 +148,6 @@ export function usePublicResearch() {
     selectedResearchId.value = null;
   }
 
-  // ===== Derived pagination helpers =====
   const totalPages = computed(() => {
     const size = Math.max(1, filterState.pageSize);
     return Math.max(1, Math.ceil(totalItems.value / size));
@@ -142,8 +156,10 @@ export function usePublicResearch() {
   const canGoPrev = computed(() => filterState.page > 1);
   const canGoNext = computed(() => filterState.page < totalPages.value);
 
+  // ✅ auto fire lookups để Home dropdown có data ngay
+  void ensureLookupsLoaded();
+
   return {
-    // Required State
     publicResearchItems,
     filterState,
     selectedResearchId,
@@ -151,7 +167,6 @@ export function usePublicResearch() {
     loadingState,
     errorState,
 
-    // Helpful extras for UI (pagination/options/selected item)
     totalItems,
     totalPages,
     canGoPrev,
@@ -161,7 +176,6 @@ export function usePublicResearch() {
     academicYearOptions,
     selectedResearchItem,
 
-    // Required Actions
     loadPublicResearchItems,
     updateFilterState,
     resetFilterState,
