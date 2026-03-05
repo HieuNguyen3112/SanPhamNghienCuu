@@ -906,18 +906,23 @@ class LecturerProfileController extends Controller
     private function buildApprovedResearchWorks(Lecturer $lecturer): array
     {
         $itemsByKind = [
-            'paper' => [],
-            'book' => [],
-            'project' => [],
-            'conference' => [],
-        ];
-        $countsByKind = [
-            'paper' => 0,
-            'book' => 0,
-            'project' => 0,
-            'conference' => 0,
-            'total' => 0,
-        ];
+    'paper' => [],
+    'book' => [],        // tổng sách + giáo trình (legacy)
+    'book_only' => [],   // ✅ chỉ sách
+    'textbook' => [],    // ✅ chỉ giáo trình
+    'project' => [],
+    'conference' => [],
+];
+
+$countsByKind = [
+    'paper' => 0,
+    'book' => 0,         // tổng sách + giáo trình (legacy)
+    'book_only' => 0,    // ✅ chỉ sách
+    'textbook' => 0,     // ✅ chỉ giáo trình
+    'project' => 0,
+    'conference' => 0,
+    'total' => 0,
+];
 
         $rows = DB::table('research_activities as ra')
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
@@ -982,17 +987,31 @@ class LecturerProfileController extends Controller
 
         foreach ($rows as $row) {
             $item = $this->formatResearchWorkRow($row);
-            $kindCode = $row->kind_code ?? 'other';
+$kindCode = $row->kind_code ?? 'other';
+$typeCode = strtolower((string) ($row->type_code ?? ''));
 
-            $items[] = $item;
+$items[] = $item;
 
-            if (! array_key_exists($kindCode, $itemsByKind)) {
-                $itemsByKind[$kindCode] = [];
-                $countsByKind[$kindCode] = 0;
-            }
+// đảm bảo key tồn tại
+if (! array_key_exists($kindCode, $itemsByKind)) {
+    $itemsByKind[$kindCode] = [];
+    $countsByKind[$kindCode] = 0;
+}
 
-            $itemsByKind[$kindCode][] = $item;
-            $countsByKind[$kindCode] = count($itemsByKind[$kindCode]);
+// luôn push theo kind (legacy)
+$itemsByKind[$kindCode][] = $item;
+$countsByKind[$kindCode] = count($itemsByKind[$kindCode]);
+
+// ✅ tách riêng nếu kind = book
+if ($kindCode === 'book') {
+    if ($typeCode === 'textbook') {
+        $itemsByKind['textbook'][] = $item;
+        $countsByKind['textbook'] = count($itemsByKind['textbook']);
+    } else {
+        $itemsByKind['book_only'][] = $item;
+        $countsByKind['book_only'] = count($itemsByKind['book_only']);
+    }
+}
         }
 
         $countsByKind['total'] = count($items);
