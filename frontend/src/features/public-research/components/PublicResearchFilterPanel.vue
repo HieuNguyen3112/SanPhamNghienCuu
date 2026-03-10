@@ -1,9 +1,13 @@
 <template>
-  <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+  <section
+    class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
+  >
     <div class="flex flex-col gap-4">
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div>
-          <label class="text-xs font-medium text-slate-600">Tên giảng viên (tên/mã)</label>
+          <label class="text-xs font-medium text-slate-600"
+            >Tên giảng viên (tên/mã)</label
+          >
           <input
             ref="lecturerInputRef"
             :value="filterState.lecturerQuery"
@@ -17,11 +21,15 @@
         <div>
           <label class="text-xs font-medium text-slate-600">Khoa</label>
           <select
-            :value="filterState.facultyId ?? ''"
+            :value="selectedFacultyValue"
             @change="onFacultyChange"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
           >
-            <option v-for="opt in facultyOptions" :key="String(opt.value)" :value="opt.value ?? ''">
+            <option
+              v-for="opt in normalizedFacultyOptions"
+              :key="String(opt.value)"
+              :value="opt.value"
+            >
               {{ opt.label }}
             </option>
           </select>
@@ -29,13 +37,19 @@
 
         <!-- ✅ Ẩn "Loại công trình" khi tab đã cố định loại -->
         <div v-if="!hideWorkType">
-          <label class="text-xs font-medium text-slate-600">Loại công trình</label>
+          <label class="text-xs font-medium text-slate-600"
+            >Loại công trình</label
+          >
           <select
             :value="filterState.workType ?? ''"
             @change="onWorkTypeChange"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
           >
-            <option v-for="opt in workTypeOptions" :key="String(opt.value)" :value="opt.value ?? ''">
+            <option
+              v-for="opt in workTypeOptions"
+              :key="String(opt.value)"
+              :value="opt.value ?? ''"
+            >
               {{ opt.label }}
             </option>
           </select>
@@ -44,11 +58,15 @@
         <div>
           <label class="text-xs font-medium text-slate-600">Năm học</label>
           <select
-            :value="filterState.academicYearId ?? ''"
+            :value="selectedAcademicYearValue"
             @change="onAcademicYearChange"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
           >
-            <option v-for="opt in academicYearOptions" :key="String(opt.value)" :value="opt.value ?? ''">
+            <option
+              v-for="opt in normalizedAcademicYearOptions"
+              :key="String(opt.value)"
+              :value="opt.value"
+            >
               {{ opt.label }}
             </option>
           </select>
@@ -79,9 +97,14 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";
-import type { PublicResearchFilterState, SelectOption } from "../models/publicResearchModels";
+import { computed, nextTick, onMounted, ref } from "vue";
+import type {
+  PublicResearchFilterState,
+  SelectOption,
+} from "../models/publicResearchModels";
 import { RotateCcw, Search } from "lucide-vue-next";
+
+const ALL_OPTION_VALUE = "ALL";
 
 type Props = {
   filterState: PublicResearchFilterState;
@@ -107,6 +130,54 @@ const emit = defineEmits<Emits>();
 
 const lecturerInputRef = ref<HTMLInputElement | null>(null);
 
+const normalizedFacultyOptions = computed(() => {
+  const hasAll = props.facultyOptions.some((opt) => opt.value === null);
+  if (hasAll) {
+    return props.facultyOptions.map((opt) => ({
+      value: opt.value === null ? ALL_OPTION_VALUE : String(opt.value),
+      label: opt.label,
+    }));
+  }
+
+  return [
+    { value: ALL_OPTION_VALUE, label: "Tất cả khoa" },
+    ...props.facultyOptions.map((opt) => ({
+      value: String(opt.value),
+      label: opt.label,
+    })),
+  ];
+});
+
+const normalizedAcademicYearOptions = computed(() => {
+  const hasAll = props.academicYearOptions.some((opt) => opt.value === null);
+  if (hasAll) {
+    return props.academicYearOptions.map((opt) => ({
+      value: opt.value === null ? ALL_OPTION_VALUE : String(opt.value),
+      label: opt.label,
+    }));
+  }
+
+  return [
+    { value: ALL_OPTION_VALUE, label: "Tất cả năm học" },
+    ...props.academicYearOptions.map((opt) => ({
+      value: String(opt.value),
+      label: opt.label,
+    })),
+  ];
+});
+
+const selectedFacultyValue = computed(() =>
+  props.filterState.facultyId == null
+    ? ALL_OPTION_VALUE
+    : String(props.filterState.facultyId),
+);
+
+const selectedAcademicYearValue = computed(() =>
+  props.filterState.academicYearId == null
+    ? ALL_OPTION_VALUE
+    : String(props.filterState.academicYearId),
+);
+
 onMounted(async () => {
   if (props.autoFocusLecturer) {
     await nextTick();
@@ -115,18 +186,29 @@ onMounted(async () => {
 });
 
 function onLecturerQueryInput(event: Event) {
-  emit("update-filter", { lecturerQuery: (event.target as HTMLInputElement).value });
+  emit("update-filter", {
+    lecturerQuery: (event.target as HTMLInputElement).value,
+  });
 }
 function onFacultyChange(event: Event) {
   const raw = (event.target as HTMLSelectElement).value;
-  emit("update-filter", { facultyId: raw === "" ? null : Number(raw), page: 1 });
+  emit("update-filter", {
+    facultyId: raw === ALL_OPTION_VALUE ? null : Number(raw),
+    page: 1,
+  });
 }
 function onWorkTypeChange(event: Event) {
   const raw = (event.target as HTMLSelectElement).value;
-  emit("update-filter", { workType: raw === "" ? null : (raw as any), page: 1 });
+  emit("update-filter", {
+    workType: raw === "" ? null : (raw as any),
+    page: 1,
+  });
 }
 function onAcademicYearChange(event: Event) {
   const raw = (event.target as HTMLSelectElement).value;
-  emit("update-filter", { academicYearId: raw === "" ? null : Number(raw), page: 1 });
+  emit("update-filter", {
+    academicYearId: raw === ALL_OPTION_VALUE ? null : Number(raw),
+    page: 1,
+  });
 }
 </script>

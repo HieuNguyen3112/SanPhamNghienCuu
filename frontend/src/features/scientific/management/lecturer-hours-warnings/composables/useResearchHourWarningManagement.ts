@@ -21,14 +21,14 @@ export interface ResearchHourWarningFilterState {
 }
 
 export function useResearchHourWarningManagement(
-  service: ResearchHourWarningService
+  service: ResearchHourWarningService,
 ) {
   const { runWithFeedback } = useActionFeedback();
   const overview = ref<LecturerResearchHourWarningOverview | null>(null);
 
   const filter = ref<ResearchHourWarningFilterState>({
     selectedFacultyIdentifier: "ALL_FACULTIES",
-    selectedAcademicYearIdentifier: "2024-2025",
+    selectedAcademicYearIdentifier: "",
     severityFilter: "ALL",
     notificationStateFilter: "ALL",
     keyword: "",
@@ -38,17 +38,19 @@ export function useResearchHourWarningManagement(
   const error = ref<string | null>(null);
   const detailOpen = ref(false);
   const selectedEntry = ref<LecturerResearchHourShortfallWarningEntry | null>(
-    null
+    null,
   );
   const submittingWarning = ref(false);
   const submitWarningError = ref<string | null>(null);
 
-  const facultyOptions = computed(() => overview.value?.facultyOptionList ?? []);
+  const facultyOptions = computed(
+    () => overview.value?.facultyOptionList ?? [],
+  );
   const academicYearOptions = computed(
-    () => overview.value?.academicYearOptionList ?? []
+    () => overview.value?.academicYearOptionList ?? [],
   );
   const summaryStatistics = computed(
-    () => overview.value?.summaryStatistics ?? null
+    () => overview.value?.summaryStatistics ?? null,
   );
   const entryList = computed(() => overview.value?.entryList ?? []);
   const isFacultyLocked = computed(() => facultyOptions.value.length === 1);
@@ -77,9 +79,15 @@ export function useResearchHourWarningManagement(
       const yearExists = overview.value.academicYearOptionList.some(
         (y) =>
           y.academicYearIdentifier ===
-          filter.value.selectedAcademicYearIdentifier
+          filter.value.selectedAcademicYearIdentifier,
       );
-      if (!yearExists && overview.value.academicYearOptionList[0]) {
+      const activeYearIdentifier =
+        overview.value.academicYearOptionList.find((year) => year.isActive)
+          ?.academicYearIdentifier ?? null;
+
+      if (!yearExists && activeYearIdentifier) {
+        filter.value.selectedAcademicYearIdentifier = activeYearIdentifier;
+      } else if (!yearExists && overview.value.academicYearOptionList[0]) {
         filter.value.selectedAcademicYearIdentifier =
           overview.value.academicYearOptionList[0].academicYearIdentifier;
       }
@@ -99,7 +107,7 @@ export function useResearchHourWarningManagement(
   function resetFilter() {
     filter.value = {
       selectedFacultyIdentifier: isFacultyLocked.value
-        ? facultyOptions.value[0]?.facultyIdentifier ?? "ALL_FACULTIES"
+        ? (facultyOptions.value[0]?.facultyIdentifier ?? "ALL_FACULTIES")
         : "ALL_FACULTIES",
       selectedAcademicYearIdentifier:
         filter.value.selectedAcademicYearIdentifier,
@@ -156,7 +164,7 @@ export function useResearchHourWarningManagement(
             title: "Có lỗi xảy ra",
             message: "Không thể gửi cảnh báo. Vui lòng thử lại.",
           },
-        }
+        },
       );
     } catch (e) {
       console.error(e);

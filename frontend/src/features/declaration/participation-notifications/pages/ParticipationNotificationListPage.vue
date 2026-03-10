@@ -83,7 +83,7 @@
               aria-label="Đặt lại bộ lọc"
             >
               <RotateCcw class="h-5 w-5 text-slate-700" />
-              <span class="hidden md:inline">Reset</span>
+              <span class="hidden md:inline">Đặt lại</span>
             </button>
           </div>
         </div>

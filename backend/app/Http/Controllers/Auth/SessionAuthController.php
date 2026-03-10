@@ -41,6 +41,7 @@ class SessionAuthController extends Controller
                     'id'    => $user->id,
                     'name'  => $user->name,
                     'email' => $user->email,
+                    'must_change_password' => (bool) $user->must_change_password,
                     'roles' => $user->getRoleNames()->values()->all(),
                     'backend_roles' => $user->getRoleNames()->values()->all(),
                 ] : null,
@@ -191,6 +192,7 @@ class SessionAuthController extends Controller
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
+                'must_change_password' => (bool) $user->must_change_password,
                 'roles' => $user->getRoleNames()->values()->all(),
                 'backend_roles' => $user->getRoleNames()->values()->all(),
             ],
@@ -260,7 +262,7 @@ class SessionAuthController extends Controller
             return false;
         }
 
-        if (collect($acceptedRoles)->contains(fn (string $roleName) => $user->hasRole($roleName, 'web'))) {
+        if (collect($acceptedRoles)->contains(fn(string $roleName) => $user->hasRole($roleName, 'web'))) {
             return true;
         }
 

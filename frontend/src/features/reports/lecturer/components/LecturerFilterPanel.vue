@@ -11,7 +11,9 @@
               class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100 disabled:bg-slate-50"
               :value="filters.facultyId"
               :disabled="isFacultyLocked"
-              @change="updateFacultyId(($event.target as HTMLSelectElement).value)"
+              @change="
+                updateFacultyId(($event.target as HTMLSelectElement).value)
+              "
             >
               <option v-if="!isFacultyLocked" value="ALL">Tất cả khoa</option>
               <option
@@ -34,7 +36,9 @@
             <select
               class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
               :value="filters.degreeId"
-              @change="updateDegreeId(($event.target as HTMLSelectElement).value)"
+              @change="
+                updateDegreeId(($event.target as HTMLSelectElement).value)
+              "
             >
               <option value="ALL">Tất cả</option>
               <option
@@ -99,19 +103,15 @@
           </div>
         </div>
 
-        <div class="ml-auto w-10">
-          <label class="block select-none text-xs font-medium text-transparent">
-            Đặt lại
-          </label>
-          <button
-            type="button"
-            class="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
-            title="Đặt lại bộ lọc"
-            @click="emitComponentEvent('resetRequested')"
-          >
-            <RotateCcw class="h-4 w-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          class="mt-1 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
+          title="Đặt lại bộ lọc"
+          @click="emitComponentEvent('resetRequested')"
+        >
+          <RotateCcw class="h-4 w-4" />
+          Xóa lọc
+        </button>
       </div>
     </div>
   </div>

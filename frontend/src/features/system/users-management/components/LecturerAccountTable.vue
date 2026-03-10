@@ -157,6 +157,7 @@
           </button>
 
           <button
+            v-if="props.canManageRoles !== false"
             type="button"
             class="flex w-full items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             @click="onRoles(activeRow.id)"
@@ -165,7 +166,10 @@
             Role
           </button>
 
-          <div class="h-px bg-slate-200" />
+          <div
+            v-if="props.canManageRoles !== false"
+            class="h-px bg-slate-200"
+          />
 
           <button
             type="button"
@@ -209,6 +213,7 @@ const props = defineProps<{
   currentPageNumber: number;
   pageSize: number;
   totalItemCount: number;
+  canManageRoles?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -224,7 +229,7 @@ watch(
   () => {
     closeMenu();
   },
-  { deep: true }
+  { deep: true },
 );
 
 /** Teleport menu */

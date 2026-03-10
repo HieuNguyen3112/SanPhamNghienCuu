@@ -10,7 +10,7 @@
         :author-role-options="authorRoleOptions"
         :status-options="statusOptions"
         :management-level-options="managementLevelOptions"
-        :year-options="years"
+        :academic-year-options="years"
         :lecturer-suggestions="lecturerSuggestions"
         :result-count-text="resultCountText"
         @update:filter="onUpdateFilter"

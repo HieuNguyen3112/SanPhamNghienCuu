@@ -70,7 +70,7 @@
               update(
                 'status',
                 ($event.target as HTMLSelectElement)
-                  .value as LecturerAccountFilterState['status']
+                  .value as LecturerAccountFilterState['status'],
               )
             "
           >
@@ -192,7 +192,7 @@
           @click="emit('reset')"
         >
           <RotateCcw class="h-4 w-4" />
-          Reset
+          Xóa lọc
         </button>
 
         <button
@@ -246,7 +246,7 @@ const selectedRoleSet = computed(() => new Set(props.filter.roleKeys));
 
 function update<K extends keyof LecturerAccountFilterState>(
   key: K,
-  value: LecturerAccountFilterState[K]
+  value: LecturerAccountFilterState[K],
 ) {
   emit("update:filter", { ...props.filter, [key]: value });
 }

@@ -12,7 +12,7 @@
               :value="selectedFacultyValue"
               @change="
                 updateSelectedFacultyId(
-                  ($event.target as HTMLSelectElement).value
+                  ($event.target as HTMLSelectElement).value,
                 )
               "
             >
@@ -39,7 +39,7 @@
               :value="selectedAcademicYearValue"
               @change="
                 updateSelectedAcademicYearId(
-                  ($event.target as HTMLSelectElement).value
+                  ($event.target as HTMLSelectElement).value,
                 )
               "
             >
@@ -67,9 +67,7 @@
               class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
               :value="selectedStatusValue"
               @change="
-                updateSelectedStatus(
-                  ($event.target as HTMLSelectElement).value
-                )
+                updateSelectedStatus(($event.target as HTMLSelectElement).value)
               "
             >
               <option
@@ -86,20 +84,15 @@
           </div>
         </div>
 
-        <div class="ml-auto w-10">
-          <label class="block text-xs font-medium text-transparent select-none">
-            Đặt lại
-          </label>
-
-          <button
-            type="button"
-            class="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
-            title="Đặt lại bộ lọc"
-            @click="resetFilters"
-          >
-            <RotateCcw class="h-4 w-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          class="mt-1 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
+          title="Đặt lại bộ lọc"
+          @click="resetFilters"
+        >
+          <RotateCcw class="h-4 w-4" />
+          Xóa lọc
+        </button>
       </div>
     </div>
   </section>
@@ -126,21 +119,27 @@ const componentProperties = defineProps<{
 
 const componentEvents = defineEmits<{
   (eventName: "update:selectedFacultyId", facultyId: number | "ALL"): void;
-  (eventName: "update:selectedAcademicYearId", academicYearId: number | "ALL"): void;
-  (eventName: "update:selectedStatus", status: HourResearchStatusCode | "ALL"): void;
+  (
+    eventName: "update:selectedAcademicYearId",
+    academicYearId: number | "ALL",
+  ): void;
+  (
+    eventName: "update:selectedStatus",
+    status: HourResearchStatusCode | "ALL",
+  ): void;
   (eventName: "resetFilters"): void;
 }>();
 
 const selectedFacultyValue = computed(() =>
   componentProperties.selectedFacultyId === "ALL"
     ? "ALL"
-    : String(componentProperties.selectedFacultyId)
+    : String(componentProperties.selectedFacultyId),
 );
 
 const selectedAcademicYearValue = computed(() =>
   componentProperties.selectedAcademicYearId === "ALL"
     ? "ALL"
-    : String(componentProperties.selectedAcademicYearId)
+    : String(componentProperties.selectedAcademicYearId),
 );
 
 const selectedStatusValue = computed(() => componentProperties.selectedStatus);
@@ -154,7 +153,7 @@ function updateSelectedFacultyId(value: string): void {
   const parsed = Number(value);
   componentEvents(
     "update:selectedFacultyId",
-    Number.isNaN(parsed) ? "ALL" : parsed
+    Number.isNaN(parsed) ? "ALL" : parsed,
   );
 }
 
@@ -167,7 +166,7 @@ function updateSelectedAcademicYearId(value: string): void {
   const parsed = Number(value);
   componentEvents(
     "update:selectedAcademicYearId",
-    Number.isNaN(parsed) ? "ALL" : parsed
+    Number.isNaN(parsed) ? "ALL" : parsed,
   );
 }
 

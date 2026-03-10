@@ -176,27 +176,19 @@
           </Teleport>
         </div>
 
-        <div class="ml-auto w-10">
-          <label
-            class="mb-1 block select-none text-xs font-medium text-transparent"
-          >
-            Reset
-          </label>
-
-          <button
-            type="button"
-            class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
-            title="0ặt lại bộ lọc"
-            @click="$emit('reset')"
-          >
-            <RotateCcw class="h-4 w-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          class="mt-1 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
+          title="Đặt lại bộ lọc"
+          @click="$emit('reset')"
+        >
+          <RotateCcw class="h-4 w-4" />
+          Xóa lọc
+        </button>
       </div>
     </div>
   </div>
 </template>
-
 
 <script setup lang="ts">
 import {
@@ -258,7 +250,7 @@ const selectedLecturerName = computed(() => {
 const lecturerInputValue = computed(() => {
   return lecturerQuery.value.length > 0
     ? lecturerQuery.value
-    : selectedLecturerName.value ?? "";
+    : (selectedLecturerName.value ?? "");
 });
 
 const filteredLecturers = computed(() => {
@@ -341,7 +333,7 @@ watch(
     if (!open) return;
     await nextTick();
     updateDropdownPosition();
-  }
+  },
 );
 
 function onWindowReposition() {

@@ -88,11 +88,6 @@ export const DEFAULT_ROLE_OPTIONS: RoleOption[] = [
     label: "BCN Khoa",
     description: "Quyền duyệt và giám sát công trình trong phạm vi khoa.",
   },
-  {
-    key: "SCIENCE_OFFICE",
-    label: "QLKH / Admin (Toàn trường)",
-    description: "Quyền quản lý cấp trường, cấu hình và báo cáo toàn trường.",
-  },
 ];
 
 export interface LecturerAccountFilterState {
@@ -120,7 +115,7 @@ export interface LecturerAccountSearchQueryDTO {
 }
 
 export function searchQueryToDto(
-  state: LecturerAccountFilterState
+  state: LecturerAccountFilterState,
 ): LecturerAccountSearchQueryDTO {
   return {
     keyword: state.keyword.trim(),
@@ -137,6 +132,15 @@ export interface UpdateLecturerAccountPayload {
   email: string;
   unit_id: number;
   position_title: string | null;
+}
+
+export interface CreateLecturerAccountPayload {
+  lecturer_code: string;
+  full_name: string;
+  email: string;
+  phone_number: string | null;
+  academic_title: string | null;
+  status: AccountStatus;
 }
 
 export interface AssignRolesPayload {
@@ -175,7 +179,7 @@ export interface LecturerAccountLookupsDTO {
 
 /** Mapper DTO -> UI */
 export function lecturerAccountFromDto(
-  dto: LecturerAccountDTO
+  dto: LecturerAccountDTO,
 ): LecturerAccount {
   return {
     id: dto.id,

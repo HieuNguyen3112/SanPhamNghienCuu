@@ -2,22 +2,51 @@
 
 namespace App\Http\Controllers;
 
+use App\DTO\UserManagement\CreateLecturerAccountData;
 use App\Http\Requests\Faculty\FacultyLecturerAccountListRequest;
+use App\Http\Requests\Faculty\FacultyLecturerAccountStoreRequest;
 use App\Http\Requests\Faculty\FacultyLecturerAccountRolesRequest;
 use App\Http\Requests\Faculty\FacultyLecturerAccountStatusRequest;
 use App\Http\Requests\Faculty\FacultyLecturerAccountUpdateRequest;
 use App\Models\Department;
 use App\Models\Lecturer;
 use App\Models\LecturerProfile;
+use App\Services\UserManagement\CreateFacultyLecturerAccountService;
 use App\Support\RoleMapper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
-use Spatie\Permission\Models\Role;
 use Symfony\Component\HttpFoundation\Response;
 
 class FacultyLecturerAccountController extends Controller
 {
+    public function __construct(
+        private readonly CreateFacultyLecturerAccountService $createFacultyLecturerAccountService,
+    ) {}
+
+    public function store(FacultyLecturerAccountStoreRequest $request)
+    {
+        $departmentScope = $this->resolveDepartmentScope($request);
+        if (! $departmentScope) {
+            return response()->json(['message' => 'department scope not found'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = CreateLecturerAccountData::fromFacultyRequest(
+            payload: $request->validated(),
+            creatorUserId: (int) $request->user()->id,
+            departmentId: $departmentScope['department_id'],
+            facultyId: $departmentScope['faculty_id'],
+        );
+
+        $lecturer = $this->createFacultyLecturerAccountService->handle($data, $request);
+        $lecturer->load(['user.roles', 'department', 'profile']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'created',
+            'data' => $this->buildRowPayload($lecturer),
+        ], Response::HTTP_CREATED);
+    }
+
     public function lookups(Request $request)
     {
         $scope = $this->resolveFacultyScope($request);
@@ -30,7 +59,7 @@ class FacultyLecturerAccountController extends Controller
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get()
-            ->map(fn (Department $d) => ['id' => (int) $d->id, 'name' => $d->name])
+            ->map(fn(Department $d) => ['id' => (int) $d->id, 'name' => $d->name])
             ->all();
 
         $roles = [
@@ -181,40 +210,9 @@ class FacultyLecturerAccountController extends Controller
 
     public function updateRoles(FacultyLecturerAccountRolesRequest $request, Lecturer $lecturer)
     {
-        $scope = $this->resolveFacultyScope($request);
-        if (! $scope || ! $this->lecturerInScope($lecturer->id, $scope['faculty_id'])) {
-            return response()->json(['message' => 'lecturer not in scope'], Response::HTTP_FORBIDDEN);
-        }
-
-        if (! $lecturer->user) {
-            return response()->json(['message' => 'user not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        $roleKeys = $this->normalizeRoleKeys($request->validated()['role_keys'] ?? []);
-        if (empty($roleKeys)) {
-            return response()->json([
-                'message' => 'role_keys must include LECTURER',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-        $backendRoles = RoleMapper::canonicalListToBackend($roleKeys);
-
-        $existingRoles = Role::query()
-            ->whereIn('name', $backendRoles)
-            ->pluck('name')
-            ->all();
-
-        if (count($existingRoles) !== count($backendRoles)) {
-            return response()->json(['message' => 'role not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $lecturer->user->syncRoles($backendRoles);
-        $lecturer->refresh()->load(['user.roles', 'department', 'profile']);
-
         return response()->json([
-            'success' => true,
-            'message' => 'updated',
-            'data' => $this->buildRowPayload($lecturer),
-        ], Response::HTTP_OK);
+            'message' => 'faculty role assignment is not allowed',
+        ], Response::HTTP_FORBIDDEN);
     }
 
     public function updateStatus(FacultyLecturerAccountStatusRequest $request, Lecturer $lecturer)
@@ -239,6 +237,19 @@ class FacultyLecturerAccountController extends Controller
 
     private function resolveFacultyScope(Request $request): ?array
     {
+        $departmentScope = $this->resolveDepartmentScope($request);
+        if (! $departmentScope) {
+            return null;
+        }
+
+        return [
+            'faculty_id' => $departmentScope['faculty_id'],
+            'faculty_name' => $departmentScope['faculty_name'],
+        ];
+    }
+
+    private function resolveDepartmentScope(Request $request): ?array
+    {
         $user = $request->user();
         $lecturer = $user?->lecturer;
         if (! $lecturer || ! $lecturer->department_id) {
@@ -256,6 +267,7 @@ class FacultyLecturerAccountController extends Controller
         }
 
         return [
+            'department_id' => (int) $lecturer->department_id,
             'faculty_id' => (int) $faculty->id,
             'faculty_name' => $faculty->name,
         ];

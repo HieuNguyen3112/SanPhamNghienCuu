@@ -14,6 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdminLecturerAccountController extends Controller
 {
+    private const ASSIGNABLE_ROLE_KEYS = ['LECTURER', 'DEPARTMENT_BOARD'];
+
     public function index(Request $request)
     {
         $validated = $this->validateListRequest($request);
@@ -91,7 +93,7 @@ class AdminLecturerAccountController extends Controller
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get()
-            ->map(fn (Department $d) => ['id' => (int) $d->id, 'name' => $d->name])
+            ->map(fn(Department $d) => ['id' => (int) $d->id, 'name' => $d->name])
             ->all();
 
         $roles = $this->roleOptions();
@@ -165,19 +167,18 @@ class AdminLecturerAccountController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
-        $roleKeys = $this->normalizeRoleKeys($data['role_keys'], null);
+        $roleKeys = $this->normalizeAssignableRoleKeys($data['role_keys']);
+        if (empty($roleKeys)) {
+            return response()->json([
+                'message' => 'role_keys must include LECTURER or DEPARTMENT_BOARD',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $backendRoles = RoleMapper::canonicalListToBackend($roleKeys);
 
         if (! empty($backendRoles)) {
-            $existingRoles = Role::query()
-                ->whereIn('name', $backendRoles)
-                ->pluck('name')
-                ->all();
-
-            if (count($existingRoles) !== count($backendRoles)) {
-                return response()->json([
-                    'message' => 'role not found',
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            foreach ($backendRoles as $roleName) {
+                Role::findOrCreate($roleName, 'web');
             }
         }
 
@@ -259,6 +260,20 @@ class AdminLecturerAccountController extends Controller
         return array_values(array_unique($normalized));
     }
 
+    private function normalizeAssignableRoleKeys(array $roleKeys): array
+    {
+        $normalized = [];
+        foreach ($roleKeys as $raw) {
+            $value = strtoupper((string) $raw);
+            $canonical = RoleMapper::backendToCanonical($value) ?? $value;
+            if (in_array($canonical, self::ASSIGNABLE_ROLE_KEYS, true)) {
+                $normalized[] = $canonical;
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
     private function parseSort(?string $sort): array
     {
         $raw = trim((string) $sort);
@@ -313,11 +328,6 @@ class AdminLecturerAccountController extends Controller
                 'key' => 'DEPARTMENT_BOARD',
                 'label' => 'BCN Khoa',
                 'description' => 'Quyền duyệt và giám sát công trình trong phạm vi khoa.',
-            ],
-            [
-                'key' => 'SCIENCE_OFFICE',
-                'label' => 'QLKH / Admin (Toàn trường)',
-                'description' => 'Quyền quản lý cấp trường, cấu hình và báo cáo toàn trường.',
             ],
         ];
     }

@@ -15,7 +15,7 @@ import {
 interface LecturerHoursServiceLike {
   loadOverview: (
     filter: LecturerHoursFilterModel,
-    pagination: { page: number; perPage: number }
+    pagination: { page: number; perPage: number },
   ) => Promise<{
     overview: LecturerHoursOverview[];
     totals: {
@@ -44,9 +44,10 @@ interface LecturerHoursServiceLike {
       };
     };
   }>;
-  loadDetail: (lecturerId: number, yearId: number) => Promise<
-    LecturerHoursDetailRow[]
-  >;
+  loadDetail: (
+    lecturerId: number,
+    yearId: number,
+  ) => Promise<LecturerHoursDetailRow[]>;
 }
 
 export interface UseLecturerHoursManagementOptions {
@@ -61,7 +62,7 @@ function clampPercent(value: number) {
 }
 
 export function useLecturerHoursManagement(
-  options: UseLecturerHoursManagementOptions
+  options: UseLecturerHoursManagementOptions,
 ) {
   const service = options.service ?? lecturerHoursService;
   const filter = reactive<LecturerHoursFilterModel>({
@@ -101,7 +102,7 @@ export function useLecturerHoursManagement(
     if (selectedLecturerId.value === null) return null;
     return (
       overview.value.find(
-        (row) => row.lecturerId === selectedLecturerId.value
+        (row) => row.lecturerId === selectedLecturerId.value,
       ) ?? null
     );
   });
@@ -128,12 +129,17 @@ export function useLecturerHoursManagement(
       facultyOptions.value = payload.options.faculties;
       kpiStatusOptions.value = payload.options.kpiStatuses;
 
-      if (!defaultYearId.value && payload.meta.filters.yearId) {
-        defaultYearId.value = payload.meta.filters.yearId;
+      const activeYearId =
+        payload.options.academicYears.find((year) => year.isActive)?.id ?? null;
+      const preferredYearId =
+        activeYearId ?? payload.meta.filters.yearId ?? null;
+
+      if (!defaultYearId.value && preferredYearId) {
+        defaultYearId.value = preferredYearId;
       }
 
-      if (!filter.yearId && payload.meta.filters.yearId) {
-        filter.yearId = payload.meta.filters.yearId;
+      if (!filter.yearId && preferredYearId) {
+        filter.yearId = preferredYearId;
       }
 
       if (payload.meta.pagination) {
@@ -170,10 +176,7 @@ export function useLecturerHoursManagement(
         detailRows.value = [];
         return;
       }
-      detailRows.value = await service.loadDetail(
-        lecturerId,
-        filter.yearId
-      );
+      detailRows.value = await service.loadDetail(lecturerId, filter.yearId);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(e);

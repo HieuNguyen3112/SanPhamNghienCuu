@@ -14,32 +14,11 @@ export function useResearchWorkApprovalFiltering(parameters: {
   isDepartmentFilterVisible: boolean;
   forcedDepartmentIdentifier: string | null; // faculty scope dùng để khóa phạm vi.
 }) {
-  const academicYearOptions = ref<string[]>([
-    "2022-2023",
-    "2023-2024",
-    "2024-2025",
-  ]);
+  const academicYearOptions = ref<string[]>([]);
 
   const departmentOptions = ref<
     { departmentIdentifier: string; departmentDisplayName: string }[]
-  >([
-    {
-      departmentIdentifier: "ALL_DEPARTMENTS",
-      departmentDisplayName: "Tất cả khoa / đơn vị",
-    },
-    {
-      departmentIdentifier: "FACULTY_INFORMATION_TECHNOLOGY",
-      departmentDisplayName: "Khoa Công nghệ thông tin",
-    },
-    {
-      departmentIdentifier: "FACULTY_ECONOMICS",
-      departmentDisplayName: "Khoa Kinh tế",
-    },
-    {
-      departmentIdentifier: "FACULTY_EDUCATION",
-      departmentDisplayName: "Khoa Sư phạm",
-    },
-  ]);
+  >([]);
 
   const researchWorkTypeOptions = ref<ResearchWorkType[]>([
     "JOURNAL_ARTICLE",
@@ -54,12 +33,13 @@ export function useResearchWorkApprovalFiltering(parameters: {
   });
 
   const approvalStatusOptionList = computed(() =>
-    displayMapping.getApprovalStatusOptionList()
+    displayMapping.getApprovalStatusOptionList(),
   );
 
   const selectedAcademicYear = ref<string>("ALL_ACADEMIC_YEARS");
+  const defaultAcademicYear = ref<string>("ALL_ACADEMIC_YEARS");
   const selectedDepartmentIdentifier = ref<string>(
-    parameters.forcedDepartmentIdentifier ?? "ALL_DEPARTMENTS"
+    parameters.forcedDepartmentIdentifier ?? "ALL_DEPARTMENTS",
   );
   const selectedResearchWorkType = ref<
     ResearchWorkType | "ALL_RESEARCH_WORK_TYPES"
@@ -116,7 +96,7 @@ export function useResearchWorkApprovalFiltering(parameters: {
           entry.researchWorkAuthorList.some((author) =>
             author.authorDisplayName
               .toLocaleLowerCase()
-              .includes(normalizedKeywordValue)
+              .includes(normalizedKeywordValue),
           );
 
         return (
@@ -142,12 +122,12 @@ export function useResearchWorkApprovalFiltering(parameters: {
           new Date(secondEntry.submittedAtDateTimeString).getTime() -
           new Date(firstEntry.submittedAtDateTimeString).getTime()
         );
-      }
+      },
     );
   }
 
   function resetResearchWorkFilterConditions(): void {
-    selectedAcademicYear.value = "ALL_ACADEMIC_YEARS";
+    selectedAcademicYear.value = defaultAcademicYear.value;
     selectedResearchWorkType.value = "ALL_RESEARCH_WORK_TYPES";
     selectedApprovalStatus.value = "ALL_APPROVAL_STATUSES";
     selectedLecturerOrResearchWorkKeyword.value = "";
@@ -162,6 +142,10 @@ export function useResearchWorkApprovalFiltering(parameters: {
     applyResearchWorkFilterConditions();
   }
 
+  function setDefaultAcademicYear(value: string): void {
+    defaultAcademicYear.value = value;
+  }
+
   watch(
     [
       selectedAcademicYear,
@@ -170,7 +154,7 @@ export function useResearchWorkApprovalFiltering(parameters: {
       selectedApprovalStatus,
       selectedLecturerOrResearchWorkKeyword,
     ],
-    () => applyResearchWorkFilterConditions()
+    () => applyResearchWorkFilterConditions(),
   );
 
   return {
@@ -189,5 +173,6 @@ export function useResearchWorkApprovalFiltering(parameters: {
 
     applyResearchWorkFilterConditions,
     resetResearchWorkFilterConditions,
+    setDefaultAcademicYear,
   };
 }

@@ -1,7 +1,9 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="space-y-4 p-4 md:p-6">
-      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+      <div
+        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
+      >
         <PageHeader
           title="Minh chứng chưa nộp"
           subtitle="Quản lý các công trình chưa có minh chứng để hoàn tất điều kiện gửi duyệt giờ."
@@ -22,7 +24,8 @@
           Công trình chưa có minh chứng: {{ worksMissingEvidence.length }}
         </div>
         <div class="mt-1 text-xs text-slate-600">
-          Tổng giờ dự kiến của danh sách này: {{ missingEvidenceHoursTotal }} giờ
+          Tổng giờ dự kiến của danh sách này:
+          {{ missingEvidenceHoursTotal }} giờ
         </div>
       </div>
 
@@ -31,6 +34,7 @@
         :academic-year-options="academicYearOptions"
         :loading="loadingList"
         :loading-academic-years="loadingAcademicYears"
+        :hide-hours-mode="true"
         @update:filter="applyFilterWithDefaultStatus"
         @reset="resetFilterWithDefaultStatus"
       />
@@ -116,7 +120,7 @@ const {
 const missingEvidenceHoursTotal = computed(() => {
   const total = worksMissingEvidence.value.reduce(
     (sum, work) => sum + (work.effectiveHoursDisplay ?? 0),
-    0
+    0,
   );
   return formatHours(total);
 });

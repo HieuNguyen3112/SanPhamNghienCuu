@@ -3,9 +3,9 @@
     <div class="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
       <!-- Năm học -->
       <div class="md:col-span-2">
-        <label class="mb-1 block text-xs font-semibold text-slate-700"
-          >Năm học</label
-        >
+        <label class="mb-1 block text-xs font-semibold text-slate-700">
+          Năm học
+        </label>
         <div class="relative">
           <select
             class="block w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100"
@@ -13,7 +13,7 @@
             @change="
               componentEvents(
                 'update:selectedAcademicYear',
-                ($event.target as HTMLSelectElement).value
+                ($event.target as HTMLSelectElement).value,
               )
             "
           >
@@ -43,11 +43,11 @@
         </div>
       </div>
 
-      <!-- Khoa / Đơn vị (optional) -->
+      <!-- Khoa / Đơn vị -->
       <div v-if="isDepartmentFilterVisible" class="md:col-span-2">
-        <label class="mb-1 block text-xs font-semibold text-slate-700"
-          >Khoa / Đơn vị</label
-        >
+        <label class="mb-1 block text-xs font-semibold text-slate-700">
+          Khoa / Đơn vị
+        </label>
         <div class="relative">
           <select
             class="block w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100"
@@ -55,7 +55,7 @@
             @change="
               componentEvents(
                 'update:selectedDepartmentIdentifier',
-                ($event.target as HTMLSelectElement).value
+                ($event.target as HTMLSelectElement).value,
               )
             "
           >
@@ -85,12 +85,10 @@
       </div>
 
       <!-- Loại công trình -->
-      <div
-        :class="isDepartmentFilterVisible ? 'md:col-span-2' : 'md:col-span-2'"
-      >
-        <label class="mb-1 block text-xs font-semibold text-slate-700"
-          >Loại công trình</label
-        >
+      <div class="md:col-span-2">
+        <label class="mb-1 block text-xs font-semibold text-slate-700">
+          Loại công trình
+        </label>
         <div class="relative">
           <select
             class="block w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100"
@@ -98,7 +96,7 @@
             @change="
               componentEvents(
                 'update:selectedResearchWorkType',
-                ($event.target as HTMLSelectElement).value as any
+                ($event.target as HTMLSelectElement).value as any,
               )
             "
           >
@@ -132,9 +130,9 @@
 
       <!-- Trạng thái -->
       <div class="md:col-span-2">
-        <label class="mb-1 block text-xs font-semibold text-slate-700"
-          >Trạng thái duyệt</label
-        >
+        <label class="mb-1 block text-xs font-semibold text-slate-700">
+          Trạng thái duyệt
+        </label>
         <div class="relative">
           <select
             class="block w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100"
@@ -142,7 +140,7 @@
             @change="
               componentEvents(
                 'update:selectedApprovalStatus',
-                ($event.target as HTMLSelectElement).value as any
+                ($event.target as HTMLSelectElement).value as any,
               )
             "
           >
@@ -171,42 +169,40 @@
         </div>
       </div>
 
-      <!-- Keyword -->
-      <div class="md:col-span-2">
-        <label class="mb-1 block text-xs font-semibold text-slate-700"
-          >Từ khóa</label
-        >
+      <!-- Từ khóa -->
+      <div
+        :class="isDepartmentFilterVisible ? 'md:col-span-2' : 'md:col-span-4'"
+      >
+        <label class="mb-1 block text-xs font-semibold text-slate-700">
+          Từ khóa
+        </label>
         <input
           class="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100"
           :value="selectedLecturerOrResearchWorkKeyword"
           @input="
             componentEvents(
               'update:selectedLecturerOrResearchWorkKeyword',
-              ($event.target as HTMLInputElement).value
+              ($event.target as HTMLInputElement).value,
             )
           "
           placeholder="Giảng viên / công trình"
         />
       </div>
+
       <!-- Reset -->
-      <div class="md:col-span-2 md:flex md:justify-end">
+      <div class="md:col-span-2 flex md:justify-end">
         <button
           type="button"
-          class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 md:w-auto"
+          class="inline-flex h-[42px] items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100"
           @click="componentEvents('resetFilterConditions')"
           title="Xóa lọc"
           aria-label="Xóa lọc"
         >
-          <RotateCcw class="h-6 w-6 text-slate-700" />
+          <RotateCcw class="h-4 w-4" />
+          Xóa lọc
         </button>
       </div>
     </div>
-
-    <!--
-    <p class="mt-3 text-xs leading-relaxed text-slate-500">
-      {{ filterPanelHelperText }}
-    </p>
-    -->
   </section>
 </template>
 
@@ -240,18 +236,18 @@ const componentEvents = defineEmits<{
   (eventName: "update:selectedDepartmentIdentifier", value: string): void;
   (
     eventName: "update:selectedResearchWorkType",
-    value: ResearchWorkType | "ALL_RESEARCH_WORK_TYPES"
+    value: ResearchWorkType | "ALL_RESEARCH_WORK_TYPES",
   ): void;
   (eventName: "update:selectedApprovalStatus", value: string): void;
   (
     eventName: "update:selectedLecturerOrResearchWorkKeyword",
-    value: string
+    value: string,
   ): void;
   (eventName: "resetFilterConditions"): void;
 }>();
 
 function mapResearchWorkTypeToDisplayName(
-  researchWorkType: ResearchWorkType
+  researchWorkType: ResearchWorkType,
 ): string {
   const mapping: Record<ResearchWorkType, string> = {
     JOURNAL_ARTICLE: "Bài báo",

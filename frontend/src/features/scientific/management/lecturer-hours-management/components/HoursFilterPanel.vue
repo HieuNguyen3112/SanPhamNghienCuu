@@ -55,7 +55,7 @@
           title="Đặt lại bộ lọc"
           aria-label="Đặt lại bộ lọc"
         >
-          <RotateCcw class="h-5 w-5 text-slate-700" />
+          <RotateCcw class="h-4 w-4 text-slate-700" />Xóa lọc
         </button>
       </div>
     </div>

@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Exports\AdminLecturerHoursSummaryExport;
 use App\Support\AcademicYearResolver;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
 
 class AdminLecturerHoursController extends Controller
@@ -30,7 +28,8 @@ class AdminLecturerHoursController extends Controller
     public function show(Request $request, int $lecturer)
     {
         $validated = $this->validateSummaryRequest($request);
-        $academicYearId = $this->resolveAcademicYearId($validated);
+        $hoursStageId = $this->resolveHoursStageId();
+        $academicYearId = $this->resolveAcademicYearId($validated, null, $lecturer, $hoursStageId);
         $academicYearCode = $this->resolveAcademicYearCode($academicYearId);
         $requiredHours = $this->resolveRequiredHours($academicYearId);
 
@@ -57,41 +56,48 @@ class AdminLecturerHoursController extends Controller
             return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
-        $hoursTotal = (float) (DB::table('lecturer_yearly_hours')
-            ->where('lecturer_id', $lecturer)
-            ->where('academic_year_id', $academicYearId)
-            ->value('hours_total') ?? 0);
+        $hoursTotal = $hoursStageId
+            ? $this->approvedHoursForLecturer($lecturer, $academicYearId, $hoursStageId)
+            : 0.0;
 
-        $detailRows = DB::table('research_activities as ra')
-            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
-            ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
-            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
-            ->join('research_activity_members as ram', function ($join) use ($lecturer) {
-                $join->on('ram.activity_id', '=', 'ra.id')
-                    ->where('ram.lecturer_id', '=', $lecturer);
-            })
-            ->where('ast.code', 'approved')
-            ->where('ra.academic_year_id', $academicYearId)
-            ->orderByDesc('ra.approved_at')
-            ->orderByDesc('ra.id')
-            ->select([
-                'ra.id as activity_id',
-                'ra.title as activity_title',
-                'ak.name as activity_kind_name',
-                'ay.code as academic_year_code',
-                'ram.hours_assigned as hours_converted',
-            ])
-            ->get()
-            ->map(function ($row) {
-                return [
-                    'activity_id' => (int) $row->activity_id,
-                    'activity_title' => $row->activity_title,
-                    'activity_kind_name' => $row->activity_kind_name,
-                    'academic_year_code' => $row->academic_year_code,
-                    'hours_converted' => $row->hours_converted !== null ? (float) $row->hours_converted : 0.0,
-                ];
-            })
-            ->all();
+        $detailRows = [];
+        if ($hoursStageId) {
+            $detailRows = DB::table('activity_approvals as aa')
+                ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+                ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+                ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+                ->join('research_activity_members as ram', function ($join) use ($lecturer) {
+                    $join->on('ram.activity_id', '=', 'ra.id')
+                        ->where('ram.lecturer_id', '=', $lecturer);
+                })
+                ->where('aa.stage_id', $hoursStageId)
+                ->where('aa.status', 'approved')
+                ->where('ra.academic_year_id', $academicYearId)
+                ->where(function ($query) {
+                    $query->where('ram.confirmation_status', 'accepted')
+                        ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+                })
+                ->orderByDesc('aa.decided_at')
+                ->orderByDesc('ra.id')
+                ->select([
+                    'ra.id as activity_id',
+                    'ra.title as activity_title',
+                    'ak.name as activity_kind_name',
+                    'ay.code as academic_year_code',
+                    'ram.hours_assigned as hours_converted',
+                ])
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'activity_id' => (int) $row->activity_id,
+                        'activity_title' => $row->activity_title,
+                        'activity_kind_name' => $row->activity_kind_name,
+                        'academic_year_code' => $row->academic_year_code,
+                        'hours_converted' => $row->hours_converted !== null ? (float) $row->hours_converted : 0.0,
+                    ];
+                })
+                ->all();
+        }
 
         $diffHours = $hoursTotal - $requiredHours;
         $progressPercent = $requiredHours > 0 ? ($hoursTotal / $requiredHours) * 100 : 0.0;
@@ -125,7 +131,7 @@ class AdminLecturerHoursController extends Controller
         $result = $this->summaryData($request, false);
         $filename = $this->buildExportFilename('xlsx');
 
-        return Excel::download(new AdminLecturerHoursSummaryExport($result['rows']), $filename);
+        return app('excel')->download(new AdminLecturerHoursSummaryExport($result['rows']), $filename);
     }
 
     public function exportSummaryPdf(Request $request)
@@ -134,7 +140,7 @@ class AdminLecturerHoursController extends Controller
         $filename = $this->buildExportFilename('pdf');
         $filters = $this->buildFilterPayload($result['filters']);
 
-        return Pdf::loadView('exports.admin_hours_summary', [
+        return app('dompdf.wrapper')->loadView('exports.admin_hours_summary', [
             'rows' => $result['rows'],
             'filters' => $filters,
         ])->setPaper('A4', 'landscape')->download($filename);
@@ -144,7 +150,8 @@ class AdminLecturerHoursController extends Controller
     {
         $validated = $this->validateSummaryRequest($request);
 
-        $academicYearId = $this->resolveAcademicYearId($validated);
+        $hoursStageId = $this->resolveHoursStageId();
+        $academicYearId = $this->resolveAcademicYearId($validated, null, null, $hoursStageId);
         $academicYearCode = $this->resolveAcademicYearCode($academicYearId);
         $requiredHours = $this->resolveRequiredHours($academicYearId);
 
@@ -152,15 +159,28 @@ class AdminLecturerHoursController extends Controller
         $search = trim((string) ($validated['q'] ?? ''));
         $kpiStatus = $this->normalizeKpiStatus($validated['kpi_status'] ?? null);
 
+        $approvedHoursByLecturer = null;
+        if ($hoursStageId) {
+            $approvedHoursByLecturer = DB::table('activity_approvals as aa')
+                ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+                ->join('research_activity_members as ram', 'ram.activity_id', '=', 'ra.id')
+                ->where('aa.stage_id', $hoursStageId)
+                ->where('aa.status', 'approved')
+                ->where('ra.academic_year_id', $academicYearId)
+                ->where(function ($query) {
+                    $query->where('ram.confirmation_status', 'accepted')
+                        ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+                })
+                ->selectRaw('ram.lecturer_id as lecturer_id')
+                ->selectRaw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as approved_hours_total')
+                ->groupBy('ram.lecturer_id');
+        }
+
         $baseQuery = DB::table('lecturers as l')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
             ->leftJoin('degrees as deg', 'l.degree_id', '=', 'deg.id')
             ->leftJoin('academic_ranks as ar', 'l.academic_rank_id', '=', 'ar.id')
-            ->leftJoin('lecturer_yearly_hours as lyh', function ($join) use ($academicYearId) {
-                $join->on('lyh.lecturer_id', '=', 'l.id')
-                    ->where('lyh.academic_year_id', '=', $academicYearId);
-            })
             ->when($facultyId, function ($query, $facultyId) {
                 $query->where('f.id', $facultyId);
             })
@@ -172,9 +192,17 @@ class AdminLecturerHoursController extends Controller
                 });
             });
 
+        $hoursExpression = '0';
+        if ($approvedHoursByLecturer !== null) {
+            $baseQuery->leftJoinSub($approvedHoursByLecturer, 'ahl', function ($join) {
+                $join->on('ahl.lecturer_id', '=', 'l.id');
+            });
+            $hoursExpression = 'COALESCE(ahl.approved_hours_total, 0)';
+        }
+
         $totalsRow = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_lecturers')
-            ->selectRaw('SUM(CASE WHEN COALESCE(lyh.hours_total, 0) >= ? THEN 1 ELSE 0 END) as met_count', [$requiredHours])
+            ->selectRaw("SUM(CASE WHEN {$hoursExpression} >= ? THEN 1 ELSE 0 END) as met_count", [$requiredHours])
             ->first();
 
         $totalLecturers = (int) ($totalsRow->total_lecturers ?? 0);
@@ -193,13 +221,13 @@ class AdminLecturerHoursController extends Controller
                 'f.name as faculty_name',
                 'deg.name as degree_name',
                 'ar.name as academic_rank_name',
-                DB::raw('COALESCE(lyh.hours_total, 0) as hours_total'),
+                DB::raw($hoursExpression . ' as hours_total'),
             ]);
 
         if ($kpiStatus === 'hit') {
-            $dataQuery->whereRaw('COALESCE(lyh.hours_total, 0) >= ?', [$requiredHours]);
+            $dataQuery->whereRaw($hoursExpression . ' >= ?', [$requiredHours]);
         } elseif ($kpiStatus === 'miss') {
-            $dataQuery->whereRaw('COALESCE(lyh.hours_total, 0) < ?', [$requiredHours]);
+            $dataQuery->whereRaw($hoursExpression . ' < ?', [$requiredHours]);
         }
 
         $dataQuery->orderBy('l.full_name');
@@ -282,8 +310,12 @@ class AdminLecturerHoursController extends Controller
         ]);
     }
 
-    private function resolveAcademicYearId(array $validated): int
-    {
+    private function resolveAcademicYearId(
+        array $validated,
+        ?int $facultyId = null,
+        ?int $lecturerId = null,
+        ?int $hoursStageId = null
+    ): int {
         if (! empty($validated['academic_year_id'])) {
             return (int) $validated['academic_year_id'];
         }
@@ -293,7 +325,75 @@ class AdminLecturerHoursController extends Controller
             return (int) $resolved;
         }
 
+        $stageId = $hoursStageId ?? $this->resolveHoursStageId();
+        if ($stageId) {
+            $yearIdWithData = $this->findAcademicYearIdWithApprovedHours($stageId, $facultyId, $lecturerId);
+            if ($yearIdWithData) {
+                return $yearIdWithData;
+            }
+        }
+
         return (int) (DB::table('academic_years')->orderByDesc('id')->value('id') ?? 0);
+    }
+
+    private function resolveHoursStageId(): ?int
+    {
+        $value = DB::table('approval_stages')
+            ->where('code', 'hours')
+            ->value('id');
+
+        return $value ? (int) $value : null;
+    }
+
+    private function findAcademicYearIdWithApprovedHours(
+        int $hoursStageId,
+        ?int $facultyId = null,
+        ?int $lecturerId = null
+    ): ?int {
+        $query = DB::table('activity_approvals as aa')
+            ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+            ->join('research_activity_members as ram', 'ram.activity_id', '=', 'ra.id')
+            ->join('lecturers as lh', 'ram.lecturer_id', '=', 'lh.id')
+            ->leftJoin('departments as dh', 'lh.department_id', '=', 'dh.id')
+            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+            ->where('aa.stage_id', $hoursStageId)
+            ->where('aa.status', 'approved')
+            ->whereNotNull('ra.academic_year_id')
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
+            ->orderByDesc('ay.is_active')
+            ->orderByDesc('ay.start_date');
+
+        if ($facultyId) {
+            $query->where('dh.faculty_id', $facultyId);
+        }
+
+        if ($lecturerId) {
+            $query->where('ram.lecturer_id', $lecturerId);
+        }
+
+        $value = $query->value('ra.academic_year_id');
+        return $value ? (int) $value : null;
+    }
+
+    private function approvedHoursForLecturer(int $lecturerId, int $academicYearId, int $hoursStageId): float
+    {
+        return (float) DB::table('activity_approvals as aa')
+            ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+            ->join('research_activity_members as ram', function ($join) use ($lecturerId) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturerId);
+            })
+            ->where('aa.stage_id', $hoursStageId)
+            ->where('aa.status', 'approved')
+            ->where('ra.academic_year_id', $academicYearId)
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
+            ->sum(DB::raw('COALESCE(ram.hours_assigned, 0)'));
     }
 
     private function resolveAcademicYearCode(int $academicYearId): string
@@ -327,7 +427,7 @@ class AdminLecturerHoursController extends Controller
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get()
-            ->map(fn ($row) => ['id' => (int) $row->id, 'name' => $row->name])
+            ->map(fn($row) => ['id' => (int) $row->id, 'name' => $row->name])
             ->all();
     }
 
@@ -338,7 +438,7 @@ class AdminLecturerHoursController extends Controller
             ->orderByDesc('is_active')
             ->orderByDesc('id')
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->id,
                 'code' => $row->code,
                 'is_active' => (bool) $row->is_active,

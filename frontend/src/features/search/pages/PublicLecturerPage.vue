@@ -38,10 +38,11 @@
             <div>
               <label class="text-xs font-medium text-slate-600">Khoa</label>
               <select
-                v-model="state.departmentId"
+                :value="selectedDepartmentValue"
+                @change="onDepartmentChange"
                 class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
               >
-                <option :value="null">Tất cả khoa</option>
+                <option value="ALL">Tất cả khoa</option>
                 <option
                   v-for="opt in facultyOptionsLocal"
                   :key="String(opt.value)"
@@ -55,10 +56,11 @@
             <div>
               <label class="text-xs font-medium text-slate-600">Năm học</label>
               <select
-                v-model="state.academicYearId"
+                :value="selectedAcademicYearValue"
+                @change="onAcademicYearChange"
                 class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
               >
-                <option :value="null">Tất cả năm học</option>
+                <option value="ALL">Tất cả năm học</option>
                 <option
                   v-for="opt in academicYearOptionsLocal"
                   :key="String(opt.value)"
@@ -233,12 +235,20 @@ async function fetchPublicLecturers(params: {
 }
 
 const facultyOptionsLocal = ref<Array<{ value: number; label: string }>>([]);
-const academicYearOptionsLocal = ref<Array<{ value: number; label: string }>>([]);
+const academicYearOptionsLocal = ref<Array<{ value: number; label: string }>>(
+  [],
+);
 
 async function loadLookups() {
   const lookups = await fetchPublicResearchLookupsApi();
-  facultyOptionsLocal.value = lookups.faculties.map((f) => ({ value: f.id, label: f.name }));
-  academicYearOptionsLocal.value = lookups.academic_years.map((y) => ({ value: y.id, label: y.code }));
+  facultyOptionsLocal.value = lookups.faculties.map((f) => ({
+    value: f.id,
+    label: f.name,
+  }));
+  academicYearOptionsLocal.value = lookups.academic_years.map((y) => ({
+    value: y.id,
+    label: y.code,
+  }));
 }
 
 /** layout */
@@ -283,12 +293,18 @@ const state = reactive({
   perPage: 12,
 });
 
+const selectedDepartmentValue = computed(() =>
+  state.departmentId == null ? "ALL" : String(state.departmentId),
+);
+
+const selectedAcademicYearValue = computed(() =>
+  state.academicYearId == null ? "ALL" : String(state.academicYearId),
+);
+
 const items = ref<PublicLecturerItem[]>([]);
 const pagination = ref({ page: 1, per_page: 12, total: 0, last_page: 1 });
 const loading = ref(false);
 const error = ref<string | null>(null);
-
-
 
 /** init from query */
 function initFromQuery() {
@@ -312,6 +328,16 @@ function initFromQuery() {
     ? academicYearId
     : null;
   state.page = Number.isFinite(page as any) && page > 0 ? page : 1;
+}
+
+function onDepartmentChange(event: Event) {
+  const raw = (event.target as HTMLSelectElement).value;
+  state.departmentId = raw === "ALL" ? null : Number(raw);
+}
+
+function onAcademicYearChange(event: Event) {
+  const raw = (event.target as HTMLSelectElement).value;
+  state.academicYearId = raw === "ALL" ? null : Number(raw);
 }
 
 async function load() {
@@ -345,7 +371,7 @@ async function load() {
 
 onMounted(async () => {
   initFromQuery();
-  await loadLookups();  
+  await loadLookups();
   await load();
 });
 
@@ -384,24 +410,24 @@ async function goPage(page: number) {
 /** map to grid cards */
 const lecturerCards = computed<LecturerCard[]>(() => {
   return items.value.map((it) => {
-  const c = it.research_works?.counts_by_kind ?? EMPTY_COUNTS;
-  const bookTotal = c.book_only + c.textbook;
+    const c = it.research_works?.counts_by_kind ?? EMPTY_COUNTS;
+    const bookTotal = c.book_only + c.textbook;
 
-  return {
-    lecturerId: it.id,
-    lecturerCode: it.code,
-    lecturerName: it.full_name,
-    facultyName: it.department_name ?? "",
-    lecturerQueryPretty: it.full_name,
-    counts: {
-      ARTICLE: c.paper,
-      BOOK: bookTotal,
-      PROJECT: c.project,
-      CONFERENCE: c.conference,
-      OTHER: 0,
-    } as any,
-  } as any;
-});
+    return {
+      lecturerId: it.id,
+      lecturerCode: it.code,
+      lecturerName: it.full_name,
+      facultyName: it.department_name ?? "",
+      lecturerQueryPretty: it.full_name,
+      counts: {
+        ARTICLE: c.paper,
+        BOOK: bookTotal,
+        PROJECT: c.project,
+        CONFERENCE: c.conference,
+        OTHER: 0,
+      } as any,
+    } as any;
+  });
 });
 
 /** navigation */

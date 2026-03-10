@@ -1,6 +1,7 @@
 import { computed, onMounted, ref } from "vue";
 import type {
   AssignRolesPayload,
+  CreateLecturerAccountPayload,
   LecturerAccount,
   LecturerAccountDTO,
   LecturerAccountFilterState,
@@ -30,7 +31,7 @@ export interface UseLecturerAccountManagementOptions {
 }
 
 export function useLecturerAccountManagement(
-  options?: UseLecturerAccountManagementOptions
+  options?: UseLecturerAccountManagementOptions,
 ) {
   const scope: LecturerAccountScope = options?.scope ?? "UNIVERSITY";
   const service =
@@ -46,7 +47,7 @@ export function useLecturerAccountManagement(
   const roleOptions = ref<RoleOption[]>(DEFAULT_ROLE_OPTIONS);
   const rowsDto = ref<LecturerAccountDTO[]>([]);
   const rows = computed<LecturerAccount[]>(() =>
-    rowsDto.value.map(lecturerAccountFromDto)
+    rowsDto.value.map(lecturerAccountFromDto),
   );
 
   const currentPageNumber = ref(1);
@@ -57,13 +58,14 @@ export function useLecturerAccountManagement(
   const resultCount = computed(() => totalItems.value);
 
   const editOpen = ref(false);
+  const createOpen = ref(false);
   const rolesOpen = ref(false);
   const deactivateOpen = ref(false);
   const selectedAccountId = ref<number | null>(null);
   const selectedAccount = computed(() =>
     selectedAccountId.value == null
       ? null
-      : rows.value.find((x) => x.id === selectedAccountId.value) ?? null
+      : (rows.value.find((x) => x.id === selectedAccountId.value) ?? null),
   );
 
   const savingEdit = ref(false);
@@ -113,7 +115,7 @@ export function useLecturerAccountManagement(
     } catch (e) {
       error.value = resolveFriendlyErrorMessage(
         e,
-        "Không tải được danh sách tài khoản."
+        "Không tải được danh sách tài khoản.",
       );
     } finally {
       loading.value = false;
@@ -133,7 +135,7 @@ export function useLecturerAccountManagement(
     } catch (e) {
       error.value = resolveFriendlyErrorMessage(
         e,
-        "Không tải được dữ liệu khởi tạo."
+        "Không tải được dữ liệu khởi tạo.",
       );
     } finally {
       loading.value = false;
@@ -157,7 +159,19 @@ export function useLecturerAccountManagement(
     savingError.value = null;
   }
 
+  function openCreate() {
+    createOpen.value = true;
+    editOpen.value = false;
+    rolesOpen.value = false;
+    deactivateOpen.value = false;
+    savingError.value = null;
+  }
+
   function openRoles(id: number) {
+    if (scope === "FACULTY") {
+      return;
+    }
+
     selectedAccountId.value = id;
     editOpen.value = false;
     rolesOpen.value = true;
@@ -174,6 +188,7 @@ export function useLecturerAccountManagement(
   }
 
   function closeAllModals() {
+    createOpen.value = false;
     editOpen.value = false;
     rolesOpen.value = false;
     deactivateOpen.value = false;
@@ -205,16 +220,66 @@ export function useLecturerAccountManagement(
               resolveFriendlyErrorMessage(error, "Không thể lưu thông tin."),
           },
           rethrow: false,
-        }
+        },
       );
     } catch (e) {
-      savingError.value = resolveFriendlyErrorMessage(e, "Không thể lưu thông tin.");
+      savingError.value = resolveFriendlyErrorMessage(
+        e,
+        "Không thể lưu thông tin.",
+      );
+    } finally {
+      savingEdit.value = false;
+    }
+  }
+
+  async function saveCreate(payload: CreateLecturerAccountPayload) {
+    savingEdit.value = true;
+    savingError.value = null;
+    try {
+      await runWithFeedback(
+        async () => {
+          await service.createLecturerAccountDTO(payload);
+          closeAllModals();
+          currentPageNumber.value = 1;
+          await search({ resetPage: false });
+        },
+        {
+          loading: {
+            title: "Đang tạo tài khoản",
+            message: "Hệ thống đang khởi tạo tài khoản giảng viên...",
+          },
+          success: {
+            title: "Thành công",
+            message:
+              "Đã tạo tài khoản giảng viên. Giảng viên cần đổi mật khẩu ở lần đăng nhập đầu tiên.",
+          },
+          error: {
+            title: "Tạo tài khoản thất bại",
+            message: (error) =>
+              resolveFriendlyErrorMessage(
+                error,
+                "Không thể tạo tài khoản giảng viên.",
+              ),
+          },
+          rethrow: false,
+        },
+      );
+    } catch (e) {
+      savingError.value = resolveFriendlyErrorMessage(
+        e,
+        "Không thể tạo tài khoản giảng viên.",
+      );
     } finally {
       savingEdit.value = false;
     }
   }
 
   async function saveRoles(payload: AssignRolesPayload) {
+    if (scope === "FACULTY") {
+      savingError.value = "Khoa không có quyền phân vai trò.";
+      return;
+    }
+
     savingRoles.value = true;
     savingError.value = null;
     try {
@@ -239,10 +304,13 @@ export function useLecturerAccountManagement(
               resolveFriendlyErrorMessage(error, "Không thể lưu phân quyền."),
           },
           rethrow: false,
-        }
+        },
       );
     } catch (e) {
-      savingError.value = resolveFriendlyErrorMessage(e, "Không thể lưu phân quyền.");
+      savingError.value = resolveFriendlyErrorMessage(
+        e,
+        "Không thể lưu phân quyền.",
+      );
     } finally {
       savingRoles.value = false;
     }
@@ -272,23 +340,25 @@ export function useLecturerAccountManagement(
             message: (error) =>
               resolveFriendlyErrorMessage(
                 error,
-                "Không thể cập nhật trạng thái tài khoản."
+                "Không thể cập nhật trạng thái tài khoản.",
               ),
           },
           rethrow: false,
-        }
+        },
       );
     } catch (e) {
       savingError.value = resolveFriendlyErrorMessage(
         e,
-        "Không thể cập nhật trạng thái tài khoản."
+        "Không thể cập nhật trạng thái tài khoản.",
       );
     } finally {
       savingDeactivate.value = false;
     }
   }
 
-  const unitOptionsUi = computed(() => unitOptions.value.map(unitOptionFromDto));
+  const unitOptionsUi = computed(() =>
+    unitOptions.value.map(unitOptionFromDto),
+  );
 
   onMounted(() => {
     void bootstrap();
@@ -307,6 +377,7 @@ export function useLecturerAccountManagement(
     pageSize,
     totalItems,
     editOpen,
+    createOpen,
     rolesOpen,
     deactivateOpen,
     selectedAccount,
@@ -320,10 +391,12 @@ export function useLecturerAccountManagement(
     updatePage,
     updatePageSize,
     openEdit,
+    openCreate,
     openRoles,
     openDeactivate,
     closeAllModals,
     saveEdit,
+    saveCreate,
     saveRoles,
     confirmToggleStatus,
   };

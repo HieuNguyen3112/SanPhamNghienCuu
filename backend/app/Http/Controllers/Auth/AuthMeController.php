@@ -27,6 +27,7 @@ class AuthMeController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'must_change_password' => (bool) $user->must_change_password,
             'roles' => $roles,
             'backend_roles' => $backendRoles,
         ], Response::HTTP_OK);

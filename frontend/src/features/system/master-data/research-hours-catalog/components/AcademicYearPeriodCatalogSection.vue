@@ -3,7 +3,6 @@
     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
     aria-label="Quản lý năm học và đợt tính giờ"
   >
-    <!-- Header -->
     <header
       class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
     >
@@ -28,15 +27,14 @@
       </button>
     </header>
 
-    <!-- Filters -->
     <div
       class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/40 p-3 md:p-4"
     >
       <div class="grid gap-3 md:grid-cols-12 md:items-end">
         <div class="md:col-span-3">
-          <label class="text-xs font-medium text-slate-700" for="filter-kind"
-            >Loại</label
-          >
+          <label class="text-xs font-medium text-slate-700" for="filter-kind">
+            Loại
+          </label>
           <select
             id="filter-kind"
             v-model="vm.filter.kind"
@@ -49,9 +47,9 @@
         </div>
 
         <div class="md:col-span-3">
-          <label class="text-xs font-medium text-slate-700" for="filter-status"
-            >Trạng thái</label
-          >
+          <label class="text-xs font-medium text-slate-700" for="filter-status">
+            Trạng thái
+          </label>
           <select
             id="filter-status"
             v-model="vm.filter.status"
@@ -65,9 +63,9 @@
         </div>
 
         <div class="md:col-span-6">
-          <label class="text-xs font-medium text-slate-700" for="filter-q"
-            >Tìm kiếm</label
-          >
+          <label class="text-xs font-medium text-slate-700" for="filter-q">
+            Tìm kiếm
+          </label>
           <div class="relative mt-1">
             <input
               id="filter-q"
@@ -90,11 +88,9 @@
       </div>
     </div>
 
-    <!-- Content -->
     <div
       class="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white"
     >
-      <!-- Desktop table -->
       <div class="hidden md:block">
         <div class="max-h-[560px] overflow-auto">
           <table class="min-w-full text-sm">
@@ -109,7 +105,6 @@
             </thead>
 
             <tbody>
-              <!-- Loading skeleton -->
               <tr
                 v-if="vm.loading"
                 v-for="i in 6"
@@ -138,7 +133,6 @@
                 </td>
               </tr>
 
-              <!-- Empty -->
               <tr v-else-if="vm.rows.length === 0">
                 <td class="px-4 py-10 text-slate-600" colspan="5">
                   <div
@@ -163,7 +157,6 @@
                 </td>
               </tr>
 
-              <!-- Rows -->
               <tr
                 v-else
                 v-for="r in vm.rows"
@@ -247,9 +240,7 @@
         </div>
       </div>
 
-      <!-- Mobile cards -->
       <div class="md:hidden">
-        <!-- Loading skeleton -->
         <div v-if="vm.loading" class="divide-y divide-slate-100">
           <div v-for="i in 6" :key="`m-sk-${i}`" class="p-4">
             <div class="h-4 w-2/3 animate-pulse rounded bg-slate-200"></div>
@@ -270,7 +261,6 @@
           </div>
         </div>
 
-        <!-- Empty -->
         <div v-else-if="vm.rows.length === 0" class="p-6">
           <div class="flex flex-col items-center justify-center text-center">
             <div class="text-2xl">📅</div>
@@ -291,7 +281,6 @@
           </div>
         </div>
 
-        <!-- Cards -->
         <div v-else class="divide-y divide-slate-100">
           <article
             v-for="r in vm.rows"
@@ -379,7 +368,6 @@
         </div>
       </div>
 
-      <!-- Pagination -->
       <div class="border-t border-slate-200 bg-white px-4 py-3">
         <SharedPaginationControls
           :total-item-count="vm.totalItems"
@@ -395,7 +383,6 @@
       </div>
     </div>
 
-    <!-- Modal -->
     <CatalogModalShell
       :open="vm.modal.open"
       :title="vm.modal.mode === 'create' ? 'Thêm năm học' : 'Chỉnh sửa năm học'"
@@ -414,7 +401,8 @@
             id="draft-code"
             v-model.trim="vm.draft.code"
             type="text"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+            readonly
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             placeholder="VD: 2024-2025"
             :aria-invalid="Boolean(vm.draftErrors.code)"
             aria-describedby="draft-code-help"
@@ -427,15 +415,15 @@
             {{
               vm.draftErrors.code
                 ? vm.draftErrors.code
-                : "Nhập theo định dạng năm học, ví dụ 2024-2025."
+                : "Hệ thống tự sinh tên năm học từ ngày bắt đầu và ngày kết thúc."
             }}
           </p>
         </div>
 
         <div>
-          <label class="text-xs font-medium text-slate-700" for="draft-status"
-            >Trạng thái</label
-          >
+          <label class="text-xs font-medium text-slate-700" for="draft-status">
+            Trạng thái
+          </label>
           <select
             id="draft-status"
             v-model="vm.draft.status"
@@ -510,50 +498,59 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from "vue";
+import { reactive, watch } from "vue";
 import { Plus, Pencil, CheckCircle2, PauseCircle, Lock } from "lucide-vue-next";
 import CatalogModalShell from "./CatalogModalShell.vue";
 import ConfirmActionModal from "./ConfirmActionModal.vue";
-
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
-
 import type { AcademicYearPeriodRow } from "../contracts/researchHoursCatalog.contract";
 
-const props = defineProps<{
-  vm: {
-    loading: boolean;
-    saving: boolean;
-    error: string | null;
+type RowStatus = "active" | "inactive" | "locked";
+type RowKind = "ALL" | "academic_year" | "period";
 
-    filter: {
-      kind: "ALL" | "academic_year" | "period";
-      status: "ALL" | "active" | "inactive" | "locked";
-      q: string;
-    };
-    rows: AcademicYearPeriodRow[];
-    page: number;
-    pageSize: number;
-    totalItems: number;
+interface ViewModel {
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
 
-    statusLabel: (s: "active" | "inactive" | "locked") => string;
-
-    modal: { open: boolean; mode: "create" | "edit" };
-    draft: {
-      code: string;
-      startDate: string;
-      endDate: string;
-      status: "active" | "inactive";
-    };
-    draftErrors: Record<string, string | undefined>;
-
-    openCreateYear: () => void;
-    openEditYear: (row: AcademicYearPeriodRow) => void;
-    closeModal: () => void;
-    saveYear: () => Promise<void> | void;
-    setActiveYearWithConfirm: (id: number) => Promise<void>;
-    setPage: (page: number) => void;
-    setPageSize: (pageSize: number) => void;
+  filter: {
+    kind: RowKind;
+    status: "ALL" | RowStatus;
+    q: string;
   };
+
+  rows: AcademicYearPeriodRow[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+
+  statusLabel: (s: RowStatus) => string;
+
+  modal: {
+    open: boolean;
+    mode: "create" | "edit";
+  };
+
+  draft: {
+    code: string;
+    startDate: string;
+    endDate: string;
+    status: "active" | "inactive";
+  };
+
+  draftErrors: Record<string, string | undefined>;
+
+  openCreateYear: () => void;
+  openEditYear: (row: AcademicYearPeriodRow) => void;
+  closeModal: () => void;
+  saveYear: () => Promise<void> | void;
+  setActiveYearWithConfirm: (id: number) => Promise<void>;
+  setPage: (page: number) => void;
+  setPageSize: (pageSize: number) => void;
+}
+
+const props = defineProps<{
+  vm: ViewModel;
 }>();
 
 const confirm = reactive({
@@ -561,6 +558,46 @@ const confirm = reactive({
   yearId: 0,
   description: "",
 });
+
+function parseDateSafe(value: string | null | undefined): Date | null {
+  if (!value || typeof value !== "string") return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildAcademicYearCode(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+): string {
+  const start = parseDateSafe(startDate);
+  const end = parseDateSafe(endDate);
+
+  if (!start || !end) return "";
+
+  const startYear = start.getFullYear();
+  const endYear = end.getFullYear();
+  const startMonth = start.getMonth() + 1;
+
+  if (startYear === endYear) {
+    return startMonth >= 7
+      ? `${startYear}-${startYear + 1}`
+      : `${endYear - 1}-${endYear}`;
+  }
+
+  return `${startYear}-${endYear}`;
+}
+
+watch(
+  () => [props.vm.draft.startDate, props.vm.draft.endDate] as const,
+  ([startDate, endDate]) => {
+    const nextCode = buildAcademicYearCode(startDate, endDate);
+    if (nextCode) {
+      props.vm.draft.code = nextCode;
+    }
+  },
+  { immediate: true },
+);
 
 function askActivateYear(r: AcademicYearPeriodRow) {
   confirm.open = true;

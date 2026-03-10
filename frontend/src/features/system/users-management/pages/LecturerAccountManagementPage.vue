@@ -4,14 +4,25 @@
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
-        <PageHeader
-          title="Quản lý tài khoản giảng viên"
-          subtitle="Theo dõi và quản lý các tài khoản của giảng viên."
-          :show-export-pdf="false"
-          :show-export-excel="false"
-          @exportPdfClicked="() => {}"
-          @exportExcelClicked="() => {}"
-        />
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <PageHeader
+            title="Quản lý tài khoản giảng viên"
+            subtitle="Theo dõi và quản lý các tài khoản của giảng viên."
+            :show-export-pdf="false"
+            :show-export-excel="false"
+            @exportPdfClicked="() => {}"
+            @exportExcelClicked="() => {}"
+          />
+
+          <button
+            v-if="isFacultyScope"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+            @click="openCreate"
+          >
+            + Thêm giảng viên
+          </button>
+        </div>
       </div>
 
       <!-- Filter -->
@@ -34,6 +45,7 @@
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
         :total-item-count="totalItems"
+        :can-manage-roles="!isFacultyScope"
         @edit="openEdit"
         @roles="openRoles"
         @toggle-status="openDeactivate"
@@ -42,6 +54,14 @@
       />
 
       <!-- Modals -->
+      <CreateLecturerModal
+        :open="createOpen"
+        :saving="savingEdit"
+        :error="savingError"
+        @close="closeAllModals"
+        @save="saveCreate"
+      />
+
       <EditLecturerModal
         :open="editOpen"
         :account="selectedAccount"
@@ -53,6 +73,7 @@
       />
 
       <AssignRolesModal
+        v-if="!isFacultyScope"
         :open="rolesOpen"
         :account="selectedAccount"
         :role-options="roleOptions"
@@ -79,6 +100,7 @@ import { computed } from "vue";
 import { useUserStore } from "@/app/stores/userStore";
 import LecturerAccountFilterBar from "../components/LecturerAccountFilterBar.vue";
 import LecturerAccountTable from "../components/LecturerAccountTable.vue";
+import CreateLecturerModal from "../components/CreateLecturerModal.vue";
 import EditLecturerModal from "../components/EditLecturerModal.vue";
 import AssignRolesModal from "../components/AssignRolesModal.vue";
 import DeactivateAccountModal from "../components/DeactivateAccountModal.vue";
@@ -87,8 +109,9 @@ import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
 const userStore = useUserStore();
 const scope = computed(() =>
-  userStore.role === "DEPARTMENT_BOARD" ? "FACULTY" : "UNIVERSITY"
+  userStore.role === "DEPARTMENT_BOARD" ? "FACULTY" : "UNIVERSITY",
 );
+const isFacultyScope = computed(() => scope.value === "FACULTY");
 
 const {
   filter,
@@ -103,6 +126,7 @@ const {
   pageSize,
   totalItems,
 
+  createOpen,
   editOpen,
   rolesOpen,
   deactivateOpen,
@@ -120,11 +144,13 @@ const {
   updatePage,
   updatePageSize,
 
+  openCreate,
   openEdit,
   openRoles,
   openDeactivate,
   closeAllModals,
 
+  saveCreate,
   saveEdit,
   saveRoles,
   confirmToggleStatus,

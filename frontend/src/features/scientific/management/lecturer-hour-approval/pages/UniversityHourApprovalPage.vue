@@ -21,7 +21,7 @@
         :loading="loadingList || loadingFaculties"
         :faculty-select-disabled="false"
         @update:filter="applyFilter"
-        @reset="resetFilter"
+        @reset="resetFilterWithDefaults"
       />
 
       <div class="mt-4">
@@ -74,11 +74,20 @@ const facultyOptions = ref<FacultyOption[]>([]);
 const academicYearOptions = ref<AcademicYearOption[]>([]);
 const loadingFaculties = ref(false);
 
+function resolveDefaultAcademicYearId(): number | null {
+  return (
+    academicYearOptions.value.find((item) => item.isActive)?.id ??
+    academicYearOptions.value.find((item) => item.isCurrent)?.id ??
+    academicYearOptions.value[0]?.id ??
+    null
+  );
+}
+
 async function loadFacultyOptions() {
   loadingFaculties.value = true;
   try {
     const { data } = await http.get<{ data: FacultyOption[] }>(
-      "/api/lookups/faculties"
+      "/api/lookups/faculties",
     );
     facultyOptions.value = (data.data ?? []).map((item) => ({
       id: item.id,
@@ -152,16 +161,22 @@ const {
 
 onMounted(async () => {
   await Promise.all([loadFacultyOptions(), loadAcademicYearOptions()]);
-  filter.academicYearId =
-    academicYearOptions.value.find((item) => item.isCurrent)?.id ??
-    academicYearOptions.value.find((item) => item.isActive)?.id ??
-    academicYearOptions.value[0]?.id ??
-    null;
+  filter.academicYearId = resolveDefaultAcademicYearId();
   await loadRequests();
 });
+
+async function resetFilterWithDefaults() {
+  await applyFilter({
+    facultyId: null,
+    academicYearId: resolveDefaultAcademicYearId(),
+    status: "pending",
+    submittedFrom: null,
+    submittedTo: null,
+    searchText: "",
+  });
+}
 
 function onApproveSelected(requestId: number, activityIds: number[]) {
   void approveRequest(requestId, { activityIds });
 }
 </script>
-

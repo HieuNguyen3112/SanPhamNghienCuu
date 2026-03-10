@@ -5,13 +5,23 @@
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
-        <div>
-          <div class="text-sm font-semibold text-slate-900">
-            Quản lý tài khoản giảng viên (BCN Khoa)
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="text-sm font-semibold text-slate-900">
+              Quản lý tài khoản giảng viên (BCN Khoa)
+            </div>
+            <div class="mt-1 text-sm text-slate-600">
+              Phạm vi: giảng viên thuộc khoa của bạn. Không thể xem khoa khác.
+            </div>
           </div>
-          <div class="mt-1 text-sm text-slate-600">
-            Phạm vi: giảng viên thuộc khoa của bạn. Không thể xem khoa khác.
-          </div>
+
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+            @click="openCreate"
+          >
+            + Thêm giảng viên
+          </button>
         </div>
       </div>
 
@@ -43,6 +53,14 @@
       />
 
       <!-- Modals -->
+      <CreateLecturerModal
+        :open="createOpen"
+        :saving="savingEdit"
+        :error="savingError"
+        @close="closeAllModals"
+        @save="saveCreate"
+      />
+
       <EditLecturerModal
         :open="editOpen"
         :account="selectedAccount"
@@ -78,6 +96,7 @@
 <script setup lang="ts">
 import LecturerAccountFilterBar from "../components/LecturerAccountFilterBar.vue";
 import LecturerAccountTable from "../components/LecturerAccountTable.vue";
+import CreateLecturerModal from "../components/CreateLecturerModal.vue";
 import EditLecturerModal from "../components/EditLecturerModal.vue";
 import AssignRolesModal from "../components/AssignRolesModal.vue";
 import DeactivateAccountModal from "../components/DeactivateAccountModal.vue";
@@ -96,6 +115,7 @@ const {
   pageSize,
   totalItems,
 
+  createOpen,
   editOpen,
   rolesOpen,
   deactivateOpen,
@@ -113,11 +133,13 @@ const {
   updatePage,
   updatePageSize,
 
+  openCreate,
   openEdit,
   openRoles,
   openDeactivate,
   closeAllModals,
 
+  saveCreate,
   saveEdit,
   saveRoles,
   confirmToggleStatus,

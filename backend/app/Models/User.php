@@ -34,6 +34,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',        // string
         'email',       // string (unique)
         'password',    // hashed
+        'must_change_password',
     ];
 
     /** ẨN KHI TOJSON */
@@ -45,6 +46,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /** CASTING */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'must_change_password' => 'boolean',
     ];
 
     public function password(): Attribute

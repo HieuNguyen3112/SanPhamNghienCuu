@@ -1,16 +1,18 @@
 <template>
   <div class="rounded-2xl border border-slate-200 bg-white p-4">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <div
+      class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
+    >
       <div class="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
         <div>
           <label class="text-xs text-slate-600">Năm học</label>
           <select
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0 disabled:bg-slate-50"
             :disabled="loading"
-            :value="filter.academicYearId ?? ''"
+            :value="academicYearValue"
             @change="onChangeAcademicYear"
           >
-            <option value="">Tất cả</option>
+            <option value="ALL">Tất cả</option>
             <option
               v-for="year in academicYearOptions"
               :key="year.id"
@@ -108,8 +110,8 @@
           @click="emit('reset')"
           title="Đặt lại"
         >
-          <Filter class="h-5 w-5 text-slate-700" />
-          <span class="hidden md:inline">Đặt lại</span>
+          <RotateCcw class="h-4 w-4 text-slate-700" />
+          <span class="hidden md:inline">Xóa lọc</span>
         </button>
       </div>
     </div>
@@ -117,14 +119,19 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import type {
   AcademicYearOption,
   FacultyOption,
   HourApprovalFilter,
 } from "../contracts/hourApproval.contract";
-import { CalendarRange, Filter as FilterIcon, Search } from "lucide-vue-next";
+import {
+  CalendarRange,
+  RotateCcw as FilterIcon,
+  Search,
+} from "lucide-vue-next";
 
-const Filter = FilterIcon;
+const RotateCcw = FilterIcon;
 
 interface Props {
   filter: HourApprovalFilter;
@@ -135,6 +142,12 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const academicYearValue = computed(() =>
+  props.filter.academicYearId == null
+    ? "ALL"
+    : String(props.filter.academicYearId),
+);
+
 const emit = defineEmits<{
   (e: "update:filter", next: HourApprovalFilter): void;
   (e: "reset"): void;
@@ -151,7 +164,7 @@ function onChangeFaculty(event: Event) {
 
 function onChangeAcademicYear(event: Event) {
   const raw = (event.target as HTMLSelectElement).value;
-  patch({ academicYearId: raw ? Number(raw) : null });
+  patch({ academicYearId: raw === "ALL" ? null : Number(raw) });
 }
 
 function onChangeStatus(event: Event) {
