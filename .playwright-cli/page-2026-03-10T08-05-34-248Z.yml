@@ -1,0 +1,34 @@
+- main [ref=e6]:
+  - generic [ref=e7]:
+    - generic "University introduction" [ref=e9]:
+      - link "Về trang chủ" [ref=e11] [cursor=pointer]:
+        - /url: /
+        - img "University logo" [ref=e12]
+      - generic [ref=e13]:
+        - heading "TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH" [level=1] [ref=e14]:
+          - text: TRƯỜNG ĐẠI HỌC SƯ PHẠM
+          - text: THÀNH PHỐ HỒ CHÍ MINH
+        - heading "Quản lý công trình nghiên cứu khoa học" [level=2] [ref=e15]
+    - region "Sign in form" [ref=e17]:
+      - generic [ref=e18]:
+        - heading "ĐĂNG NHẬP" [level=2] [ref=e19]
+        - generic [ref=e20]:
+          - generic [ref=e21]: Tên đăng nhập *
+          - textbox "Tên đăng nhập *" [ref=e22]:
+            - /placeholder: Nhập tên đăng nhập
+            - text: Password!123gv@local.test
+        - generic [ref=e23]:
+          - generic [ref=e24]: Mật khẩu *
+          - textbox "Mật khẩu *" [ref=e25]:
+            - /placeholder: Nhập mật khẩu
+          - paragraph [ref=e34]: Vui lòng nhập mật khẩu
+        - generic [ref=e26]:
+          - generic [ref=e27]: Vai trò
+          - combobox [ref=e28]:
+            - option "Giảng viên" [selected]
+            - option "Ban chủ nhiệm khoa"
+            - option "Phòng quản lý khoa học"
+        - button "Đăng nhập" [active] [ref=e30]:
+          - generic [ref=e31]: Đăng nhập
+        - separator [ref=e32]
+        - button "Quên mật khẩu?" [ref=e33]

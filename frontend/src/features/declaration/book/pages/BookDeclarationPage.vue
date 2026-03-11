@@ -210,11 +210,14 @@
           <!-- D -->
           <EvidenceUpload
             :existingFiles="existingEvidence"
+            :existingLinks="existingEvidenceLinks"
             v-model:pendingFiles="pendingEvidenceFiles"
             v-model:pendingLinks="pendingEvidenceLinks"
             :fileTypes="evidenceFileTypes"
             :readOnly="readOnly"
+            :deletingFileId="deletingEvidenceFileId"
             @remove-existing="onRemoveExistingEvidence"
+            @remove-existing-link="onRemoveExistingEvidenceLink"
           />
 
           <!-- E -->
@@ -249,9 +252,13 @@ import type {
   MemberRoleDto,
   EvidenceFileTypeDto,
   EvidenceFileDto,
+  EvidenceLinkDto,
 } from "../../shared/contracts/declarationSharedContract";
 import { mapStatusCodeToUi } from "../../shared/contracts/declarationSharedContract";
 import { useDeclarationFormShell } from "../../shared/composables/useDeclarationFormShell";
+import { useDeclarationPageLoadFeedback } from "../../shared/composables/useDeclarationPageLoadFeedback";
+import { useActionFeedback } from "@/shared/composables/useActionFeedback";
+import { mergeLecturerOptionsFromMembers } from "../../shared/utils/lecturerOptionMerge";
 import {
   fetch_academic_years,
   fetch_activity_kinds,
@@ -262,12 +269,17 @@ import {
 } from "../../shared/services/catalogs.service";
 import {
   fetch_activity,
-  fetch_current_lecturer_id,
+  fetch_current_lecturer_option,
   submit_activity,
   upsert_activity_base,
   upsert_members,
   upsert_book_details,
   list_evidence_files,
+  upload_evidence_file,
+  delete_evidence_file,
+  list_evidence_links,
+  add_evidence_link,
+  delete_evidence_link,
 } from "../../shared/services/declarations.service";
 import {
   computeBookHours,
@@ -306,8 +318,10 @@ const form = reactive<BookDeclarationFormModel>({
 });
 
 const existingEvidence = ref<EvidenceFileDto[]>([]);
+const existingEvidenceLinks = ref<EvidenceLinkDto[]>([]);
 const pendingEvidenceFiles = ref<any[]>([]);
 const pendingEvidenceLinks = ref<any[]>([]);
+const deletingEvidenceFileId = ref<number | null>(null);
 
 const typeCodeById = computed(() =>
   Object.fromEntries(types.value.map((t) => [t.id, t.code])),
@@ -422,17 +436,24 @@ const canSubmit = computed(() => {
     (p: any) => !p.file_type_id,
   );
   if (invalidPending) return false;
+  const invalidPendingLinks = pendingEvidenceLinks.value.some(
+    (l: any) => !String(l?.url ?? "").trim(),
+  );
+  if (invalidPendingLinks) return false;
   return true;
 });
 
 async function loadCatalogs() {
-  currentLecturerId.value = (await fetch_current_lecturer_id()) ?? 0;
-  const [years, kinds, roles, fileTypes] = await Promise.all([
-    fetch_academic_years(),
-    fetch_activity_kinds(),
-    fetch_member_roles(),
-    fetch_evidence_file_types(),
-  ]);
+  const [currentLecturerOption, years, kinds, roles, fileTypes] =
+    await Promise.all([
+      fetch_current_lecturer_option(),
+      fetch_academic_years(),
+      fetch_activity_kinds(),
+      fetch_member_roles(),
+      fetch_evidence_file_types(),
+    ]);
+  currentLecturerId.value = currentLecturerOption?.id ?? 0;
+  lecturers.value = currentLecturerOption ? [currentLecturerOption] : [];
   academicYears.value = years;
   memberRoles.value = roles;
   evidenceFileTypes.value = fileTypes;
@@ -441,7 +462,6 @@ async function loadCatalogs() {
   form.kindId = kindId.value;
 
   types.value = await fetch_activity_types_by_kind(kindId.value);
-  lecturers.value = await search_lecturer_options("");
 
   if (form.members.length === 0 && currentLecturerId.value) {
     const chiefRole = roles.find((r) => r.code === "chief_editor");
@@ -457,8 +477,143 @@ async function onSearchLecturers(q: string) {
   lecturers.value = await search_lecturer_options(q);
 }
 
+function normalizeErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const message = err.response?.data?.message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return err instanceof Error && err.message.trim() ? err.message : fallback;
+}
+
+const { runWithFeedback } = useActionFeedback();
+
 async function onRemoveExistingEvidence(_id: number) {
-  existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
+  if (!form.activityId) {
+    existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
+    return;
+  }
+
+  if (deletingEvidenceFileId.value === _id) return;
+  deletingEvidenceFileId.value = _id;
+
+  try {
+    await runWithFeedback(() => delete_evidence_file(form.activityId as number, _id), {
+      loading: {
+        enabled: true,
+        title: "Đang xoá minh chứng",
+        message: "Vui lòng đợi trong giây lát...",
+        delayMs: 450,
+        minShowMs: 250,
+      },
+      success: {
+        enabled: true,
+        title: "Thành công",
+        message: "Đã xoá file minh chứng.",
+      },
+      error: {
+        enabled: true,
+        title: "Không thể xoá",
+        message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
+      },
+      rethrow: true,
+    });
+    existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
+  } catch (err) {
+    shell.error_message.value = normalizeErrorMessage(
+      err,
+      "Không thể xóa file minh chứng.",
+    );
+  } finally {
+    deletingEvidenceFileId.value = null;
+  }
+}
+
+async function onRemoveExistingEvidenceLink(linkId: number) {
+  if (!form.activityId) {
+    existingEvidenceLinks.value = existingEvidenceLinks.value.filter(
+      (x) => x.id !== linkId,
+    );
+    return;
+  }
+
+  try {
+    await delete_evidence_link(form.activityId, linkId);
+    existingEvidenceLinks.value = existingEvidenceLinks.value.filter(
+      (x) => x.id !== linkId,
+    );
+  } catch (err) {
+    shell.error_message.value = normalizeErrorMessage(
+      err,
+      "Không thể xóa link minh chứng.",
+    );
+  }
+}
+
+async function persistEvidenceDraft(activityId: number) {
+  const failedFiles: any[] = [];
+  const failedLinks: any[] = [];
+  let firstError: string | null = null;
+
+  const validFilePendings = pendingEvidenceFiles.value.filter(
+    (pending) => pending?.file && pending?.file_type_id,
+  );
+  const invalidFilePendings = pendingEvidenceFiles.value.filter(
+    (pending) => !pending?.file || !pending?.file_type_id,
+  );
+  failedFiles.push(...invalidFilePendings);
+
+  const fileResults = await Promise.allSettled(
+    validFilePendings.map((pending) =>
+      upload_evidence_file(activityId, {
+        file: pending.file,
+        file_type_id: Number(pending.file_type_id),
+      }),
+    ),
+  );
+
+  fileResults.forEach((result, index) => {
+    if (result.status === "fulfilled") return;
+    failedFiles.push(validFilePendings[index]);
+    if (!firstError) {
+      firstError = normalizeErrorMessage(
+        result.reason,
+        "Không thể tải tệp minh chứng lên hệ thống.",
+      );
+    }
+  });
+
+  const validLinkPendings = pendingEvidenceLinks.value.filter(
+    (pendingLink) => String(pendingLink?.url ?? "").trim() !== "",
+  );
+  const linkResults = await Promise.allSettled(
+    validLinkPendings.map((pendingLink) =>
+      add_evidence_link(activityId, { url: String(pendingLink.url).trim() }),
+    ),
+  );
+
+  linkResults.forEach((result, index) => {
+    if (result.status === "fulfilled") return;
+    failedLinks.push(validLinkPendings[index]);
+    if (!firstError) {
+      firstError = normalizeErrorMessage(
+        result.reason,
+        "Không thể lưu link minh chứng.",
+      );
+    }
+  });
+
+  const [savedFiles, savedLinks] = await Promise.all([
+    list_evidence_files(activityId),
+    list_evidence_links(activityId),
+  ]);
+  existingEvidence.value = savedFiles;
+  existingEvidenceLinks.value = savedLinks;
+  pendingEvidenceFiles.value = failedFiles;
+  pendingEvidenceLinks.value = failedLinks;
+
+  if (firstError) {
+    throw new Error(firstError);
+  }
 }
 
 async function loadDraftFromQuery() {
@@ -468,94 +623,111 @@ async function loadDraftFromQuery() {
 
   if (!activityId || Number.isNaN(activityId)) return;
 
-  const data = await fetch_activity(activityId);
-  const activity = data.activity;
-  if (!activity) return;
+  try {
+    const data = await fetch_activity(activityId);
+    const activity = data.activity;
+    if (!activity) return;
 
-  form.activityId = activity.id;
-  form.academicYearId = activity.academic_year_id ?? null;
-  form.kindId = activity.kind_id ?? form.kindId;
-  form.typeId = activity.type_id ?? null;
-  form.title = activity.title ?? "";
-  form.notes = activity.notes ?? "";
+    form.activityId = activity.id;
+    form.academicYearId = activity.academic_year_id ?? null;
+    form.kindId = activity.kind_id ?? form.kindId;
+    form.typeId = activity.type_id ?? null;
+    form.title = activity.title ?? "";
+    form.notes = activity.notes ?? "";
 
-  if (data.detail_kind === "book_details" && data.detail) {
-    const detail = data.detail as any;
-    form.publisher = detail.publisher ?? "";
-    form.approvalDecisionNo = detail.approval_decision_no ?? "";
-    form.approvalDecisionDate = detail.approval_decision_date ?? null;
-    form.isbn = detail.isbn ?? "";
-    form.pages = detail.pages ?? null;
-    form.year = detail.year ?? null;
+    if (data.detail_kind === "book_details" && data.detail) {
+      const detail = data.detail as any;
+      form.publisher = detail.publisher ?? "";
+      form.approvalDecisionNo = detail.approval_decision_no ?? "";
+      form.approvalDecisionDate = detail.approval_decision_date ?? null;
+      form.isbn = detail.isbn ?? "";
+      form.pages = detail.pages ?? null;
+      form.year = detail.year ?? null;
+    }
+
+    form.members = (data.members ?? []).map((member) => ({
+      lecturer_id: member.lecturer_id,
+      member_role_id: member.member_role_id,
+      member_role_code: member.member_role_code ?? null,
+    }));
+    lecturers.value = mergeLecturerOptionsFromMembers(
+      lecturers.value,
+      data.members,
+    );
+
+    existingEvidence.value = data.evidence_files ?? [];
+    existingEvidenceLinks.value =
+      data.evidence_links ??
+      (activity.id ? await list_evidence_links(activity.id) : []);
+    pendingEvidenceFiles.value = [];
+    pendingEvidenceLinks.value = [];
+
+    const statusCode = (activity.status_code ?? "draft") as any;
+    shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
+  } catch (err) {
+    shell.error_message.value = normalizeErrorMessage(
+      err,
+      "Không thể tải bản nháp. Dữ liệu đang nhập tạm thời vẫn được giữ lại.",
+    );
   }
-
-  form.members = (data.members ?? []).map((member) => ({
-    lecturer_id: member.lecturer_id,
-    member_role_id: member.member_role_id,
-    member_role_code: member.member_role_code ?? null,
-  }));
-
-  existingEvidence.value = data.evidence_files ?? [];
-
-  const statusCode = (activity.status_code ?? "draft") as any;
-  shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
 }
 
 const shell = useDeclarationFormShell({
   initial_status: "DRAFT",
   on_save_draft: async () => {
-    const saved = await upsert_activity_base({
-      id: form.activityId ?? undefined,
-      owner_lecturer_id: currentLecturerId.value,
-      kind_id: form.kindId,
-      type_id: form.typeId,
-      academic_year_id: form.academicYearId ?? 0,
-      status_id: 100,
-      title: form.title,
-      abstract: null,
-      start_date: null,
-      end_date: null,
-      quantity: 1,
-      notes: form.notes || null,
-      submitted_at: null,
-      approved_at: null,
-      total_hours_calc: null,
-    } as any);
+    try {
+      const saved = await upsert_activity_base({
+        id: form.activityId ?? undefined,
+        owner_lecturer_id: currentLecturerId.value,
+        kind_id: form.kindId,
+        type_id: form.typeId,
+        academic_year_id: form.academicYearId ?? 0,
+        status_id: 100,
+        title: form.title,
+        abstract: null,
+        start_date: null,
+        end_date: null,
+        quantity: 1,
+        notes: form.notes || null,
+        submitted_at: null,
+        approved_at: null,
+        total_hours_calc: null,
+      } as any);
 
-    form.activityId = saved.id;
-    await router.replace({
-      query: { ...route.query, activity_id: String(saved.id) },
-    });
+      form.activityId = saved.id;
+      await router.replace({
+        query: { ...route.query, activity_id: String(saved.id) },
+      });
 
-    await upsert_book_details({
-      activity_id: saved.id,
-      publisher: form.publisher,
-      approval_decision_no: form.approvalDecisionNo || null,
-      approval_decision_date: form.approvalDecisionDate || null,
-      isbn: form.isbn || null,
-      pages: form.pages ?? null,
-      year: form.year ?? null,
-    });
+      await upsert_book_details({
+        activity_id: saved.id,
+        publisher: form.publisher,
+        approval_decision_no: form.approvalDecisionNo || null,
+        approval_decision_date: form.approvalDecisionDate || null,
+        isbn: form.isbn || null,
+        pages: form.pages ?? null,
+        year: form.year ?? null,
+      });
 
-    const upsertList = form.members
-      .filter(
-        (m) =>
-          typeof m.lecturer_id === "number" &&
-          typeof m.member_role_id === "number",
-      )
-      .map((m) => ({
-        lecturer_id: m.lecturer_id as number,
-        member_role_id: m.member_role_id as number,
-        contribution_share: null,
-      }));
-    await upsert_members(saved.id, upsertList);
+      const upsertList = form.members
+        .filter(
+          (m) =>
+            typeof m.lecturer_id === "number" &&
+            typeof m.member_role_id === "number",
+        )
+        .map((m) => ({
+          lecturer_id: m.lecturer_id as number,
+          member_role_id: m.member_role_id as number,
+          contribution_share: null,
+        }));
+      await upsert_members(saved.id, upsertList);
 
-    existingEvidence.value = await list_evidence_files(saved.id);
-
-    // Minh chứng chính thức được nộp ở bước duyệt giờ NCKH.
-    // Không chặn lưu nháp kê khai nếu người dùng đã chọn file/link tại màn này.
-    pendingEvidenceFiles.value = [];
-    pendingEvidenceLinks.value = [];
+      await persistEvidenceDraft(saved.id);
+    } catch (err) {
+      throw new Error(
+        normalizeErrorMessage(err, "Không thể lưu bản nháp. Vui lòng thử lại."),
+      );
+    }
   },
   on_submit: async () => {
     try {
@@ -583,8 +755,17 @@ const shell = useDeclarationFormShell({
   },
 });
 
+const { runPageLoad } = useDeclarationPageLoadFeedback();
+
 onMounted(async () => {
-  await loadCatalogs();
-  await loadDraftFromQuery();
+  await runPageLoad(async () => {
+    await loadCatalogs();
+    await loadDraftFromQuery();
+  }, {
+    onError: (message) => {
+      shell.error_message.value = message;
+    },
+    fallbackMessage: "Không thể khởi tạo trang kê khai.",
+  });
 });
 </script>

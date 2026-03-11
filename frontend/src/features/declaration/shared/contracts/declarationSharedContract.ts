@@ -91,8 +91,21 @@ export type EvidenceFileDto = {
 
   // derived (NOT a DB column)
   url?: string;
+  preview_url?: string;
+  download_url?: string;
   // derived (join)
   file_type_name?: string;
+};
+
+export type EvidenceLinkDto = {
+  id: number;
+  activity_id: number;
+  lecturer_id: number;
+  lecturer_name?: string | null;
+  url: string;
+  added_by_user_id: number;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type HoursDistributionItem = {

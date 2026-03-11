@@ -75,6 +75,8 @@ export type UniversityApprovalDetailResponse = {
     disk: string | null;
     uploaded_at: string | null;
     url: string | null;
+    preview_url?: string | null;
+    download_url?: string | null;
   }[];
   approvals: {
     id: number;

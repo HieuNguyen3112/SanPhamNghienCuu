@@ -9,6 +9,7 @@ use App\Http\Requests\ResearchActivities\SubmitResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\StoreResearchActivityRequest;
 use App\Http\Requests\ResearchActivities\UpdateResearchActivityRequest;
 use App\Notifications\ParticipationInvitationNotification;
+use App\Services\Evidence\ResearchEvidenceStorageService;
 use App\Services\Hours\HoursAllocator;
 use App\Services\Hours\HoursRuleResolver;
 use App\Support\AuditLogger;
@@ -16,7 +17,10 @@ use App\Support\WorkflowNotification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
 class ResearchActivityController extends Controller
@@ -28,15 +32,20 @@ class ResearchActivityController extends Controller
     private const STATUS_PENDING_FACULTY_REVIEW = 'pending_faculty_review';
     private const STATUS_APPROVED = 'approved';
     private const STATUS_REJECTED = 'rejected';
+    private const EVIDENCE_LINK_MIME = 'text/uri-list';
+    private const EVIDENCE_LINK_LABEL = 'Link minh chứng';
     private HoursRuleResolver $hoursRuleResolver;
     private HoursAllocator $hoursAllocator;
+    private ResearchEvidenceStorageService $evidenceStorageService;
 
     public function __construct(
         HoursRuleResolver $hoursRuleResolver,
-        HoursAllocator $hoursAllocator
+        HoursAllocator $hoursAllocator,
+        ResearchEvidenceStorageService $evidenceStorageService
     ) {
         $this->hoursRuleResolver = $hoursRuleResolver;
         $this->hoursAllocator = $hoursAllocator;
+        $this->evidenceStorageService = $evidenceStorageService;
     }
 
     public function store(StoreResearchActivityRequest $request)
@@ -45,7 +54,7 @@ class ResearchActivityController extends Controller
         $lecturer = $user?->lecturer;
 
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $data = $request->validated();
@@ -103,12 +112,12 @@ class ResearchActivityController extends Controller
         $lecturer = $user?->lecturer;
 
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $current = $this->getActivityWithMeta($activity, $lecturer->id);
         if (! $current) {
-            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
         }
 
         if (! $this->isEditableStatus($current->status_code)) {
@@ -173,12 +182,12 @@ class ResearchActivityController extends Controller
         $lecturer = $user?->lecturer;
 
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $current = $this->getActivityWithMeta($activity, $lecturer->id);
         if (! $current) {
-            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
         }
 
         if (! $this->isEditableStatus($current->status_code)) {
@@ -242,7 +251,7 @@ class ResearchActivityController extends Controller
 
         $current = $this->getActivityWithMeta($activity, $lecturer->id);
         if (! $current) {
-            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
         }
 
         if (! $this->isEditableStatus($current->status_code)) {
@@ -398,12 +407,12 @@ class ResearchActivityController extends Controller
         $lecturer = $user?->lecturer;
 
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $current = $this->getActivityWithMeta($activity, $lecturer->id);
         if (! $current) {
-            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
         }
 
         if (! $this->isEditableStatus($current->status_code)) {
@@ -850,12 +859,12 @@ class ResearchActivityController extends Controller
         $lecturer = $user?->lecturer;
 
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $current = $this->getActivityWithMeta($activity, $lecturer->id);
         if (! $current) {
-            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
         }
 
         $detailKind = $this->detailTableByKind()[$current->kind_code] ?? null;
@@ -883,6 +892,8 @@ class ResearchActivityController extends Controller
                 'ram.confirmation_status',
                 'ram.confirmation_note',
                 'ram.responded_at',
+                'l.code as lecturer_code',
+                'l.full_name as lecturer_full_name',
                 'mr.code as member_role_code',
                 'mr.name as member_role_name',
                 'd.id as department_id',
@@ -904,6 +915,7 @@ class ResearchActivityController extends Controller
             ->all();
 
         $evidenceFiles = $this->fetchEvidenceFiles($activity);
+        $evidenceLinks = $this->fetchEvidenceLinks($activity);
 
         $activityPayload = $this->serializeActivityRow($current);
         $activityPayload['status_code'] = $current->status_code;
@@ -916,6 +928,7 @@ class ResearchActivityController extends Controller
                 'detail' => $detail ? (array) $detail : null,
                 'members' => $members,
                 'evidence_files' => $evidenceFiles,
+                'evidence_links' => $evidenceLinks,
             ],
         ], Response::HTTP_OK);
     }
@@ -926,16 +939,522 @@ class ResearchActivityController extends Controller
         $lecturer = $user?->lecturer;
 
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
         }
 
         $current = $this->getActivityWithMeta($activity, $lecturer->id);
         if (! $current) {
-            return response()->json(['message' => 'activity not found'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
         }
 
         return response()->json([
             'data' => $this->fetchEvidenceFiles($activity),
+        ], Response::HTTP_OK);
+    }
+
+    public function uploadEvidenceFile(Request $request, int $activity)
+    {
+        $user = $request->user();
+        $lecturer = $user?->lecturer;
+
+        if (! $lecturer) {
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $current = $this->getActivityWithMeta($activity, $lecturer->id);
+        if (! $current) {
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (! $this->isEditableStatus($current->status_code)) {
+            return response()->json(['message' => 'Công trình không còn cho phép cập nhật minh chứng.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'file' => ['required', 'file', 'max:10240', 'mimes:pdf'],
+                'file_type_id' => ['required', 'integer', 'exists:evidence_file_types,id'],
+            ],
+            [
+                'file.required' => 'Vui lòng chọn tệp minh chứng.',
+                'file.file' => 'Tệp minh chứng không hợp lệ.',
+                'file.max' => 'Dung lượng tệp minh chứng không được vượt quá 10MB.',
+                'file.mimes' => 'Minh chứng chỉ hỗ trợ định dạng PDF.',
+                'file_type_id.required' => 'Vui lòng chọn loại minh chứng.',
+                'file_type_id.integer' => 'Loại minh chứng không hợp lệ.',
+                'file_type_id.exists' => 'Loại minh chứng không tồn tại.',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Dữ liệu minh chứng không hợp lệ.',
+                'errors' => $validator->errors(),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        /** @var \Illuminate\Http\UploadedFile $file */
+        $file = $request->file('file');
+        $contentSha256 = hash_file('sha256', $file->getRealPath());
+        $scopedSha256 = hash('sha256', $activity . '|' . $contentSha256);
+
+        $existing = DB::table('evidence_files')
+            ->where('activity_id', $activity)
+            ->whereIn('sha256', [$contentSha256, $scopedSha256])
+            ->first();
+        if ($existing) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Minh chứng đã tồn tại.',
+                'data' => $this->mapEvidenceRow($existing),
+            ], Response::HTTP_OK);
+        }
+
+        $ownerName = $this->resolveLecturerName((int) $current->owner_lecturer_id) ?: 'Giảng viên khai báo';
+        $uploaderName = (string) ($lecturer->full_name ?? '');
+        if (trim($uploaderName) === '') {
+            $uploaderName = $this->resolveLecturerName((int) $lecturer->id) ?: 'Giảng viên';
+        }
+        $activityFolder = trim(((string) $current->title) . ' - ' . $ownerName);
+
+        try {
+            $stored = $this->evidenceStorageService->storePdf(
+                $file,
+                $activityFolder,
+                $uploaderName
+            );
+        } catch (RuntimeException $exception) {
+            Log::error('research_activity.evidence_store_failed', [
+                'activity_id' => $activity,
+                'lecturer_id' => (int) $lecturer->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể lưu tệp minh chứng. Vui lòng thử lại.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $now = now();
+        $storedDisk = (string) ($stored['disk'] ?? ResearchEvidenceStorageService::RCLONE_DISK);
+        $storedPath = (string) ($stored['path'] ?? '');
+        if (trim($storedPath) === '') {
+            return response()->json([
+                'message' => 'Không thể xác định đường dẫn tệp minh chứng.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        try {
+            $id = DB::table('evidence_files')->insertGetId([
+                'activity_id' => $activity,
+                'file_type_id' => (int) $request->input('file_type_id'),
+                'disk' => $storedDisk,
+                'path' => $storedPath,
+                'original_name' => (string) ($file->getClientOriginalName() ?: ('evidence-' . Str::uuid() . '.pdf')),
+                'mime_type' => (string) ($file->getClientMimeType() ?: 'application/pdf'),
+                'size_bytes' => (int) $file->getSize(),
+                'sha256' => $scopedSha256,
+                'uploaded_by_user_id' => (int) $user->id,
+                'uploaded_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        } catch (\Throwable $exception) {
+            $this->cleanupStoredEvidence($storedDisk, $storedPath, $activity);
+
+            Log::error('research_activity.evidence_metadata_store_failed', [
+                'activity_id' => $activity,
+                'lecturer_id' => (int) $lecturer->id,
+                'disk' => $storedDisk,
+                'path' => $storedPath,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Lưu minh chứng chưa hoàn tất. Vui lòng thử lại.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($this->evidenceStorageService->isRcloneDisk($storedDisk)) {
+            $this->evidenceStorageService->queueColdSync(
+                (int) $id,
+                isset($stored['hot_path']) ? (string) $stored['hot_path'] : null,
+                $storedPath
+            );
+        }
+
+        $saved = DB::table('evidence_files')->where('id', $id)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã lưu minh chứng.',
+            'data' => $saved ? $this->mapEvidenceRow($saved) : null,
+        ], Response::HTTP_CREATED);
+    }
+
+    public function deleteEvidenceFile(Request $request, int $activity, int $evidence)
+    {
+        $user = $request->user();
+        $lecturer = $user?->lecturer;
+
+        if (! $lecturer) {
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $current = $this->getActivityWithMeta($activity, $lecturer->id);
+        if (! $current) {
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (! $this->isEditableStatus($current->status_code)) {
+            return response()->json(['message' => 'Công trình không còn cho phép cập nhật minh chứng.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $row = DB::table('evidence_files')
+            ->where('id', $evidence)
+            ->where('activity_id', $activity)
+            ->where('disk', '<>', ResearchEvidenceStorageService::LINK_DISK)
+            ->first();
+        if (! $row) {
+            return response()->json(['message' => 'Không tìm thấy tệp minh chứng.'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            if ($this->evidenceStorageService->isRcloneDisk((string) $row->disk)) {
+                $this->evidenceStorageService->deleteFromRclone((string) $row->path);
+                $this->evidenceStorageService->deleteHotCacheByColdPath((string) $row->path);
+            } else {
+                $disk = (string) ($row->disk ?? 'local');
+                $this->evidenceStorageService->deleteFromLocalDisk($disk, (string) $row->path);
+            }
+        } catch (RuntimeException $exception) {
+            Log::error('research_activity.evidence_delete_failed', [
+                'activity_id' => $activity,
+                'evidence_id' => $evidence,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể xóa tệp minh chứng. Vui lòng thử lại.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        DB::table('evidence_files')->where('id', $evidence)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã xóa tệp minh chứng.',
+            'data' => [
+                'evidence_id' => $evidence,
+                'activity_id' => $activity,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function downloadEvidenceFile(Request $request, int $activity, int $evidence)
+    {
+        $user = $request->user();
+        $lecturer = $user?->lecturer;
+
+        if (! $lecturer) {
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $current = $this->getReadableActivityWithMeta($activity, $lecturer->id);
+        if (! $current) {
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $row = DB::table('evidence_files')
+            ->where('id', $evidence)
+            ->where('activity_id', $activity)
+            ->where('disk', '<>', ResearchEvidenceStorageService::LINK_DISK)
+            ->first();
+        if (! $row) {
+            return response()->json(['message' => 'Không tìm thấy tệp minh chứng.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $filename = trim((string) ($row->original_name ?? ''));
+        if ($filename === '') {
+            $filename = 'evidence-' . $row->id . '.pdf';
+        }
+
+        try {
+            return $this->evidenceStorageService->streamDownload(
+                $request,
+                (string) ($row->disk ?? 'local'),
+                (string) ($row->path ?? ''),
+                $filename,
+                (string) ($row->mime_type ?? 'application/pdf')
+            );
+        } catch (RuntimeException $exception) {
+            Log::error('research_activity.evidence_download_failed', [
+                'activity_id' => $activity,
+                'evidence_id' => $evidence,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể tải tệp minh chứng. Vui lòng thử lại.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function previewEvidenceFile(Request $request, int $activity, int $evidence)
+    {
+        $user = $request->user();
+        $lecturer = $user?->lecturer;
+
+        if (! $lecturer) {
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $current = $this->getReadableActivityWithMeta($activity, $lecturer->id);
+        if (! $current) {
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $row = DB::table('evidence_files')
+            ->where('id', $evidence)
+            ->where('activity_id', $activity)
+            ->where('disk', '<>', ResearchEvidenceStorageService::LINK_DISK)
+            ->first();
+        if (! $row) {
+            return response()->json(['message' => 'Không tìm thấy tệp minh chứng.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $filename = trim((string) ($row->original_name ?? ''));
+        if ($filename === '') {
+            $filename = 'evidence-' . $row->id . '.pdf';
+        }
+
+        try {
+            return $this->evidenceStorageService->streamPreview(
+                $request,
+                (string) ($row->disk ?? 'local'),
+                (string) ($row->path ?? ''),
+                $filename,
+                (string) ($row->mime_type ?? 'application/pdf')
+            );
+        } catch (RuntimeException $exception) {
+            Log::error('research_activity.evidence_preview_failed', [
+                'activity_id' => $activity,
+                'evidence_id' => $evidence,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể xem trước tệp minh chứng. Vui lòng thử lại.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function listEvidenceLinks(Request $request, int $activity)
+    {
+        $user = $request->user();
+        $lecturer = $user?->lecturer;
+
+        if (! $lecturer) {
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $current = $this->getActivityWithMeta($activity, $lecturer->id);
+        if (! $current) {
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
+        }
+
+        return response()->json([
+            'data' => $this->fetchEvidenceLinks($activity),
+        ], Response::HTTP_OK);
+    }
+
+    public function storeEvidenceLink(Request $request, int $activity)
+    {
+        $user = $request->user();
+        $lecturer = $user?->lecturer;
+
+        if (! $lecturer) {
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $current = $this->getActivityWithMeta($activity, $lecturer->id);
+        if (! $current) {
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (! $this->isEditableStatus($current->status_code)) {
+            return response()->json(['message' => 'Công trình không còn cho phép cập nhật minh chứng.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'url' => ['required', 'url', 'max:500'],
+            ],
+            [
+                'url.required' => 'Vui lòng nhập link minh chứng.',
+                'url.url' => 'Link minh chứng không hợp lệ.',
+                'url.max' => 'Link minh chứng quá dài (tối đa 500 ký tự).',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Dữ liệu link minh chứng không hợp lệ.',
+                'errors' => $validator->errors(),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $url = trim((string) $request->input('url'));
+        $existing = DB::table('evidence_files as ef')
+            ->leftJoin('users as u', 'ef.uploaded_by_user_id', '=', 'u.id')
+            ->leftJoin('lecturers as l', 'u.id', '=', 'l.user_id')
+            ->where('ef.activity_id', $activity)
+            ->where('ef.disk', ResearchEvidenceStorageService::LINK_DISK)
+            ->where('ef.path', $url)
+            ->where('ef.uploaded_by_user_id', (int) $user->id)
+            ->select([
+                'ef.id',
+                'ef.activity_id',
+                'ef.path as url',
+                'ef.uploaded_by_user_id as added_by_user_id',
+                'ef.created_at',
+                'ef.updated_at',
+                'l.id as lecturer_id',
+                'l.full_name as lecturer_name',
+            ])
+            ->first();
+        if ($existing) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Link minh chứng đã tồn tại.',
+                'data' => $this->mapEvidenceLinkRow($existing),
+            ], Response::HTTP_OK);
+        }
+
+        $fileTypeId = $this->resolveEvidenceLinkFileTypeId();
+        if (! $fileTypeId) {
+            return response()->json([
+                'message' => 'Chưa cấu hình loại minh chứng mặc định để lưu liên kết.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $sha256 = $this->makeEvidenceLinkSha($activity, (int) $lecturer->id, $url);
+        $now = now();
+        try {
+            $id = DB::table('evidence_files')->insertGetId([
+                'activity_id' => $activity,
+                'file_type_id' => $fileTypeId,
+                'disk' => ResearchEvidenceStorageService::LINK_DISK,
+                'path' => $url,
+                'original_name' => self::EVIDENCE_LINK_LABEL,
+                'mime_type' => self::EVIDENCE_LINK_MIME,
+                'size_bytes' => 0,
+                'sha256' => $sha256,
+                'uploaded_by_user_id' => (int) $user->id,
+                'uploaded_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::error('research_activity.evidence_link_store_failed', [
+                'activity_id' => $activity,
+                'lecturer_id' => (int) $lecturer->id,
+                'url' => $url,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $existingBySha = DB::table('evidence_files as ef')
+                ->leftJoin('users as u', 'ef.uploaded_by_user_id', '=', 'u.id')
+                ->leftJoin('lecturers as l', 'u.id', '=', 'l.user_id')
+                ->where('ef.sha256', $sha256)
+                ->where('ef.activity_id', $activity)
+                ->where('ef.disk', ResearchEvidenceStorageService::LINK_DISK)
+                ->select([
+                    'ef.id',
+                    'ef.activity_id',
+                    'ef.path as url',
+                    'ef.uploaded_by_user_id as added_by_user_id',
+                    'ef.created_at',
+                    'ef.updated_at',
+                    'l.id as lecturer_id',
+                    'l.full_name as lecturer_name',
+                ])
+                ->first();
+
+            if ($existingBySha) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Link minh chứng đã tồn tại.',
+                    'data' => $this->mapEvidenceLinkRow($existingBySha),
+                ], Response::HTTP_OK);
+            }
+
+            return response()->json([
+                'message' => 'Không thể lưu link minh chứng. Vui lòng thử lại.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $saved = DB::table('evidence_files as ef')
+            ->leftJoin('users as u', 'ef.uploaded_by_user_id', '=', 'u.id')
+            ->leftJoin('lecturers as l', 'u.id', '=', 'l.user_id')
+            ->where('ef.id', $id)
+            ->select([
+                'ef.id',
+                'ef.activity_id',
+                'ef.path as url',
+                'ef.uploaded_by_user_id as added_by_user_id',
+                'ef.created_at',
+                'ef.updated_at',
+                'l.id as lecturer_id',
+                'l.full_name as lecturer_name',
+            ])
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã lưu link minh chứng.',
+            'data' => $saved ? $this->mapEvidenceLinkRow($saved) : null,
+        ], Response::HTTP_CREATED);
+    }
+
+    public function deleteEvidenceLink(Request $request, int $activity, int $link)
+    {
+        $lecturer = $request->user()?->lecturer;
+        if (! $lecturer) {
+            return response()->json(['message' => 'Không tìm thấy giảng viên.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $current = $this->getActivityWithMeta($activity, $lecturer->id);
+        if (! $current) {
+            return response()->json(['message' => 'Không tìm thấy công trình.'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (! $this->isEditableStatus($current->status_code)) {
+            return response()->json(['message' => 'Công trình không còn cho phép cập nhật minh chứng.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $exists = DB::table('evidence_files')
+            ->where('id', $link)
+            ->where('activity_id', $activity)
+            ->where('disk', ResearchEvidenceStorageService::LINK_DISK)
+            ->exists();
+        if (! $exists) {
+            return response()->json(['message' => 'Không tìm thấy link minh chứng.'], Response::HTTP_NOT_FOUND);
+        }
+
+        DB::table('evidence_files')
+            ->where('id', $link)
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã xóa link minh chứng.',
+            'data' => [
+                'link_id' => $link,
+                'activity_id' => $activity,
+            ],
         ], Response::HTTP_OK);
     }
 
@@ -1320,6 +1839,28 @@ class ResearchActivityController extends Controller
             ->first();
     }
 
+    private function getReadableActivityWithMeta(int $activityId, int $lecturerId): ?object
+    {
+        return DB::table('research_activities as ra')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('research_activity_members as ram', function ($join) use ($lecturerId) {
+                $join->on('ram.activity_id', '=', 'ra.id')
+                    ->where('ram.lecturer_id', '=', $lecturerId);
+            })
+            ->where('ra.id', $activityId)
+            ->where(function ($query) use ($lecturerId) {
+                $query->where('ra.owner_lecturer_id', $lecturerId)
+                    ->orWhereNotNull('ram.lecturer_id');
+            })
+            ->select([
+                'ra.*',
+                'ast.code as status_code',
+                'ak.code as kind_code',
+            ])
+            ->first();
+    }
+
     private function getStatusId(string $code): ?int
     {
         $id = DB::table('activity_statuses')->where('code', $code)->value('id');
@@ -1398,6 +1939,7 @@ class ResearchActivityController extends Controller
         return DB::table('evidence_files as ef')
             ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
             ->where('ef.activity_id', $activityId)
+            ->where('ef.disk', '<>', ResearchEvidenceStorageService::LINK_DISK)
             ->select([
                 'ef.id',
                 'ef.activity_id',
@@ -1416,11 +1958,143 @@ class ResearchActivityController extends Controller
             ])
             ->orderByDesc('ef.uploaded_at')
             ->get()
-            ->map(function ($row) {
-                $data = (array) $row;
-                $data['url'] = null;
-                return $data;
-            })
+            ->map(fn($row) => $this->mapEvidenceRow($row))
             ->all();
     }
+
+    private function mapEvidenceRow(object $row): array
+    {
+        $id = (int) $row->id;
+        $activityId = (int) $row->activity_id;
+        $previewUrl = route('research.activities.evidence.preview', [
+            'activity' => $activityId,
+            'evidence' => $id,
+        ]);
+        $downloadUrl = route('research.activities.evidence.download', [
+            'activity' => $activityId,
+            'evidence' => $id,
+        ]);
+
+        return [
+            'id' => $id,
+            'activity_id' => $activityId,
+            'file_type_id' => (int) $row->file_type_id,
+            'file_type_name' => $row->file_type_name ?? null,
+            'disk' => (string) $row->disk,
+            'path' => (string) $row->path,
+            'original_name' => (string) $row->original_name,
+            'mime_type' => (string) $row->mime_type,
+            'size_bytes' => (int) $row->size_bytes,
+            'sha256' => (string) $row->sha256,
+            'uploaded_by_user_id' => (int) $row->uploaded_by_user_id,
+            'uploaded_at' => $row->uploaded_at,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+            'url' => $previewUrl,
+            'preview_url' => $previewUrl,
+            'download_url' => $downloadUrl,
+        ];
+    }
+
+    private function fetchEvidenceLinks(int $activityId): array
+    {
+        return DB::table('evidence_files as ef')
+            ->leftJoin('users as u', 'ef.uploaded_by_user_id', '=', 'u.id')
+            ->leftJoin('lecturers as l', 'u.id', '=', 'l.user_id')
+            ->where('ef.activity_id', $activityId)
+            ->where('ef.disk', ResearchEvidenceStorageService::LINK_DISK)
+            ->select([
+                'ef.id',
+                'ef.activity_id',
+                'ef.path as url',
+                'ef.uploaded_by_user_id as added_by_user_id',
+                'ef.created_at',
+                'ef.updated_at',
+                'l.full_name as lecturer_name',
+                'l.id as lecturer_id',
+            ])
+            ->orderByDesc('ef.created_at')
+            ->get()
+            ->map(fn($row) => $this->mapEvidenceLinkRow($row))
+            ->all();
+    }
+
+    private function mapEvidenceLinkRow(object $row): array
+    {
+        return [
+            'id' => (int) $row->id,
+            'activity_id' => (int) $row->activity_id,
+            'lecturer_id' => isset($row->lecturer_id) ? (int) $row->lecturer_id : 0,
+            'lecturer_name' => $row->lecturer_name ?? null,
+            'url' => (string) $row->url,
+            'added_by_user_id' => (int) $row->added_by_user_id,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+        ];
+    }
+
+    private function cleanupStoredEvidence(string $disk, string $path, int $activityId): void
+    {
+        if (trim($path) === '') {
+            return;
+        }
+
+        try {
+            if ($this->evidenceStorageService->isRcloneDisk($disk)) {
+                $this->evidenceStorageService->deleteFromRclone($path, true);
+                $this->evidenceStorageService->deleteHotCacheByColdPath($path);
+                return;
+            }
+
+            $this->evidenceStorageService->deleteFromLocalDisk($disk, $path);
+        } catch (RuntimeException $exception) {
+            Log::warning('research_activity.evidence_cleanup_failed', [
+                'activity_id' => $activityId,
+                'disk' => $disk,
+                'path' => $path,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function resolveEvidenceLinkFileTypeId(): ?int
+    {
+        $preferred = ['content', 'cover', 'toc', 'acceptance_decision', 'publication_decision'];
+
+        $idsByCode = DB::table('evidence_file_types')
+            ->whereIn('code', $preferred)
+            ->pluck('id', 'code')
+            ->all();
+
+        foreach ($preferred as $code) {
+            $id = $idsByCode[$code] ?? null;
+            if ($id) {
+                return (int) $id;
+            }
+        }
+
+        $fallback = DB::table('evidence_file_types')->orderBy('id')->value('id');
+        return $fallback ? (int) $fallback : null;
+    }
+
+    private function makeEvidenceLinkSha(int $activityId, int $lecturerId, string $url): string
+    {
+        $normalized = Str::lower(trim($url));
+        return hash('sha256', 'link|' . $activityId . '|' . $lecturerId . '|' . $normalized);
+    }
+
+    private function resolveLecturerName(int $lecturerId): ?string
+    {
+        $name = DB::table('lecturers')
+            ->where('id', $lecturerId)
+            ->value('full_name');
+
+        if ($name === null) {
+            return null;
+        }
+
+        $trimmed = trim((string) $name);
+        return $trimmed !== '' ? $trimmed : null;
+    }
+
 }

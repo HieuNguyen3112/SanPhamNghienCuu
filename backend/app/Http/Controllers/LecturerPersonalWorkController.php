@@ -518,13 +518,25 @@ class LecturerPersonalWorkController extends Controller
                 'ef.uploaded_at',
             ])
             ->get()
-            ->map(function ($row) {
+            ->map(function ($row) use ($activityId) {
                 return [
                     'evidence_file_id' => (int) $row->id,
                     'file_type_id' => (int) $row->file_type_id,
                     'file_type_name' => $row->file_type_name,
                     'disk' => $row->disk,
                     'path' => $row->path,
+                    'preview_url' => route('research.activities.evidence.preview', [
+                        'activity' => $activityId,
+                        'evidence' => $row->id,
+                    ], false),
+                    'download_url' => route('research.activities.evidence.download', [
+                        'activity' => $activityId,
+                        'evidence' => $row->id,
+                    ], false),
+                    'url' => route('research.activities.evidence.preview', [
+                        'activity' => $activityId,
+                        'evidence' => $row->id,
+                    ], false),
                     'original_name' => $row->original_name,
                     'mime_type' => $row->mime_type,
                     'size_bytes' => $row->size_bytes !== null ? (int) $row->size_bytes : 0,

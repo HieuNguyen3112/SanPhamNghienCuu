@@ -245,13 +245,21 @@
                         <td class="px-3 py-3 text-left" :colspan="7">
                           <EvidenceUpload
                             :existingFiles="row.existingEvidenceFiles"
+                            :existingLinks="row.existingEvidenceLinks"
                             v-model:pendingFiles="row.pendingEvidenceFiles"
                             v-model:pendingLinks="row.pendingEvidenceLinks"
                             :fileTypes="evidenceFileTypes"
                             :readOnly="readOnly"
+                            :deletingFileId="
+                              getRowDeletingEvidenceFileId(row.rowId)
+                            "
                             @remove-existing="
                               (fileId) =>
                                 onRemoveRowExistingEvidence(row.rowId, fileId)
+                            "
+                            @remove-existing-link="
+                              (linkId) =>
+                                onRemoveRowExistingEvidenceLink(row.rowId, linkId)
                             "
                           />
                         </td>
@@ -287,6 +295,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from "axios";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Users, Plus, Trash2 } from "lucide-vue-next";
@@ -299,10 +308,13 @@ import type {
   AcademicYearDto,
   EvidenceFileTypeDto,
   EvidenceFileDto,
+  EvidenceLinkDto,
   ActivityTypeDto,
 } from "../../shared/contracts/declarationSharedContract";
 import { mapStatusCodeToUi } from "../../shared/contracts/declarationSharedContract";
 import { useDeclarationFormShell } from "../../shared/composables/useDeclarationFormShell";
+import { useDeclarationPageLoadFeedback } from "../../shared/composables/useDeclarationPageLoadFeedback";
+import { useActionFeedback } from "@/shared/composables/useActionFeedback";
 import {
   fetch_academic_years,
   fetch_activity_kinds,
@@ -314,6 +326,11 @@ import {
   fetch_activity,
   fetch_current_lecturer_id,
   list_evidence_files,
+  upload_evidence_file,
+  delete_evidence_file,
+  list_evidence_links,
+  add_evidence_link,
+  delete_evidence_link,
   submit_activity,
   upsert_activity_base,
   upsert_conference_details,
@@ -347,6 +364,7 @@ const form = reactive<ConferenceDeclarationFormModel>({
 });
 
 const openEvidenceRowId = ref<string | null>(null);
+const deletingEvidenceFileByRow = ref<Record<string, number | null>>({});
 
 const typeCodeById = computed(() =>
   Object.fromEntries(conferenceTypesAll.value.map((t) => [t.id, t.code])),
@@ -424,6 +442,7 @@ function hoursHintByTypeId(typeId: number | null): string {
 function evidenceCount(row: ConferenceOccurrenceFormItem): number {
   return (
     (row.existingEvidenceFiles?.length ?? 0) +
+    (row.existingEvidenceLinks?.length ?? 0) +
     (row.pendingEvidenceFiles?.length ?? 0) +
     (row.pendingEvidenceLinks?.length ?? 0)
   );
@@ -431,6 +450,17 @@ function evidenceCount(row: ConferenceOccurrenceFormItem): number {
 
 function toggleEvidence(rowId: string) {
   openEvidenceRowId.value = openEvidenceRowId.value === rowId ? null : rowId;
+}
+
+function getRowDeletingEvidenceFileId(rowId: string): number | null {
+  return deletingEvidenceFileByRow.value[rowId] ?? null;
+}
+
+function setRowDeletingEvidenceFileId(rowId: string, fileId: number | null) {
+  deletingEvidenceFileByRow.value = {
+    ...deletingEvidenceFileByRow.value,
+    [rowId]: fileId,
+  };
 }
 
 function addRow() {
@@ -442,6 +472,7 @@ function addRow() {
     heldOn: null,
     notes: "",
     existingEvidenceFiles: [] as EvidenceFileDto[],
+    existingEvidenceLinks: [] as EvidenceLinkDto[],
     pendingEvidenceFiles: [] as any[],
     pendingEvidenceLinks: [] as any[],
   });
@@ -449,17 +480,179 @@ function addRow() {
 
 function removeRow(index: number) {
   const row = form.items[index];
-  if (row && openEvidenceRowId.value === row.rowId)
+  if (row && openEvidenceRowId.value === row.rowId) {
     openEvidenceRowId.value = null;
+  }
+  if (row) {
+    const nextDeletingMap = { ...deletingEvidenceFileByRow.value };
+    delete nextDeletingMap[row.rowId];
+    deletingEvidenceFileByRow.value = nextDeletingMap;
+  }
   form.items.splice(index, 1);
+  if (index >= 0 && index < form.activityIds.length) {
+    form.activityIds.splice(index, 1);
+  }
 }
 
-function onRemoveRowExistingEvidence(rowId: string, fileId: number) {
+const { runWithFeedback } = useActionFeedback();
+
+async function onRemoveRowExistingEvidence(rowId: string, fileId: number) {
   const row = form.items.find((x) => x.rowId === rowId);
   if (!row) return;
-  row.existingEvidenceFiles = row.existingEvidenceFiles.filter(
-    (f) => f.id !== fileId,
+  const activityId = resolveRowActivityId(rowId);
+  if (!activityId) {
+    row.existingEvidenceFiles = row.existingEvidenceFiles.filter(
+      (f) => f.id !== fileId,
+    );
+    return;
+  }
+
+  const activeFileId = getRowDeletingEvidenceFileId(rowId);
+  if (activeFileId === fileId) return;
+  setRowDeletingEvidenceFileId(rowId, fileId);
+
+  try {
+    await runWithFeedback(() => delete_evidence_file(activityId, fileId), {
+      loading: {
+        enabled: true,
+        title: "Đang xoá minh chứng",
+        message: "Vui lòng đợi trong giây lát...",
+        delayMs: 450,
+        minShowMs: 250,
+      },
+      success: {
+        enabled: true,
+        title: "Thành công",
+        message: "Đã xoá file minh chứng.",
+      },
+      error: {
+        enabled: true,
+        title: "Không thể xoá",
+        message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
+      },
+      rethrow: true,
+    });
+    row.existingEvidenceFiles = row.existingEvidenceFiles.filter(
+      (f) => f.id !== fileId,
+    );
+  } catch (err) {
+    shell.error_message.value = normalizeErrorMessage(
+      err,
+      "Không thể xóa file minh chứng.",
+    );
+  } finally {
+    setRowDeletingEvidenceFileId(rowId, null);
+  }
+}
+
+function onRemoveRowExistingEvidenceLink(rowId: string, linkId: number) {
+  const row = form.items.find((x) => x.rowId === rowId);
+  if (!row) return;
+
+  const activityId = resolveRowActivityId(rowId);
+  if (!activityId) {
+    row.existingEvidenceLinks = row.existingEvidenceLinks.filter(
+      (link) => link.id !== linkId,
+    );
+    return;
+  }
+
+  delete_evidence_link(activityId, linkId)
+    .then(() => {
+      row.existingEvidenceLinks = row.existingEvidenceLinks.filter(
+        (link) => link.id !== linkId,
+      );
+    })
+    .catch((err) => {
+      shell.error_message.value = normalizeErrorMessage(
+        err,
+        "Không thể xóa link minh chứng.",
+      );
+    });
+}
+
+function resolveRowActivityId(rowId: string): number | null {
+  const rowIndex = form.items.findIndex((row) => row.rowId === rowId);
+  if (rowIndex < 0) return null;
+  const activityId = form.activityIds[rowIndex];
+  return typeof activityId === "number" ? activityId : null;
+}
+
+function normalizeErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const message = err.response?.data?.message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return err instanceof Error && err.message.trim() ? err.message : fallback;
+}
+
+async function persistRowEvidence(activityId: number, row: ConferenceOccurrenceFormItem) {
+  const failedFiles: any[] = [];
+  const failedLinks: any[] = [];
+  let firstError: string | null = null;
+
+  const allPendingFiles = row.pendingEvidenceFiles ?? [];
+  const validFilePendings = allPendingFiles.filter(
+    (pendingFile) => pendingFile?.file && pendingFile?.file_type_id,
   );
+  const invalidFilePendings = allPendingFiles.filter(
+    (pendingFile) => !pendingFile?.file || !pendingFile?.file_type_id,
+  );
+  failedFiles.push(...invalidFilePendings);
+
+  const fileResults = await Promise.allSettled(
+    validFilePendings.map((pendingFile) =>
+      upload_evidence_file(activityId, {
+        file: pendingFile.file,
+        file_type_id: Number(pendingFile.file_type_id),
+      }),
+    ),
+  );
+
+  fileResults.forEach((result, index) => {
+    if (result.status === "fulfilled") return;
+    failedFiles.push(validFilePendings[index]);
+    if (!firstError) {
+      firstError = normalizeErrorMessage(
+        result.reason,
+        "Không thể tải tệp minh chứng lên hệ thống.",
+      );
+    }
+  });
+
+  const allPendingLinks = row.pendingEvidenceLinks ?? [];
+  const validLinkPendings = allPendingLinks.filter(
+    (pendingLink) => String(pendingLink?.url ?? "").trim() !== "",
+  );
+  const linkResults = await Promise.allSettled(
+    validLinkPendings.map((pendingLink) =>
+      add_evidence_link(activityId, { url: String(pendingLink.url).trim() }),
+    ),
+  );
+
+  linkResults.forEach((result, index) => {
+    if (result.status === "fulfilled") return;
+    failedLinks.push(validLinkPendings[index]);
+    if (!firstError) {
+      firstError = normalizeErrorMessage(
+        result.reason,
+        "Không thể lưu link minh chứng.",
+      );
+    }
+  });
+
+  const [savedFiles, savedLinks] = await Promise.all([
+    list_evidence_files(activityId),
+    list_evidence_links(activityId),
+  ]);
+  row.existingEvidenceFiles = savedFiles;
+  row.existingEvidenceLinks = savedLinks;
+  row.pendingEvidenceFiles = failedFiles;
+  row.pendingEvidenceLinks = failedLinks;
+
+  if (firstError) {
+    throw new Error(firstError);
+  }
 }
 
 async function loadDraftFromQuery() {
@@ -469,36 +662,46 @@ async function loadDraftFromQuery() {
 
   if (!activityId || Number.isNaN(activityId)) return;
 
-  const data = await fetch_activity(activityId);
-  const activity = data.activity;
-  if (!activity) return;
+  try {
+    const data = await fetch_activity(activityId);
+    const activity = data.activity;
+    if (!activity) return;
 
-  form.activityIds = [activity.id];
-  form.academicYearId = activity.academic_year_id ?? null;
-  form.kindId = activity.kind_id ?? form.kindId;
+    form.activityIds = [activity.id];
+    form.academicYearId = activity.academic_year_id ?? null;
+    form.kindId = activity.kind_id ?? form.kindId;
 
-  const detail =
-    data.detail_kind === "conference_details" && data.detail
-      ? (data.detail as any)
-      : null;
+    const detail =
+      data.detail_kind === "conference_details" && data.detail
+        ? (data.detail as any)
+        : null;
 
-  form.items = [
-    {
-      rowId: createConferenceRowId(),
-      typeId: activity.type_id ?? null,
-      conferenceName: detail?.conference_name ?? activity.title ?? "",
-      location: detail?.location ?? "",
-      heldOn: detail?.held_on ?? activity.start_date ?? null,
-      notes: activity.notes ?? "",
-      existingEvidenceFiles: data.evidence_files ?? [],
-      pendingEvidenceFiles: [],
-      pendingEvidenceLinks: [],
-    },
-  ];
-  openEvidenceRowId.value = null;
+    form.items = [
+      {
+        rowId: createConferenceRowId(),
+        typeId: activity.type_id ?? null,
+        conferenceName: detail?.conference_name ?? activity.title ?? "",
+        location: detail?.location ?? "",
+        heldOn: detail?.held_on ?? activity.start_date ?? null,
+        notes: activity.notes ?? "",
+        existingEvidenceFiles: data.evidence_files ?? [],
+        existingEvidenceLinks:
+          data.evidence_links ??
+          (activity.id ? await list_evidence_links(activity.id) : []),
+        pendingEvidenceFiles: [],
+        pendingEvidenceLinks: [],
+      },
+    ];
+    openEvidenceRowId.value = null;
 
-  const statusCode = (activity.status_code ?? "draft") as any;
-  shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
+    const statusCode = (activity.status_code ?? "draft") as any;
+    shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
+  } catch (err) {
+    shell.error_message.value = normalizeErrorMessage(
+      err,
+      "Không thể tải bản nháp. Dữ liệu đang nhập tạm thời vẫn được giữ lại.",
+    );
+  }
 }
 
 const canSubmit = computed(() => {
@@ -519,7 +722,7 @@ const canSubmit = computed(() => {
     if (invalidPendingFiles) return false;
 
     const invalidPendingLinks = (row.pendingEvidenceLinks ?? []).some(
-      (l: any) => !l.file_type_id || !String(l.url ?? "").trim(),
+      (l: any) => !String(l.url ?? "").trim(),
     );
     if (invalidPendingLinks) return false;
 
@@ -569,77 +772,71 @@ function resolveDefaultMemberRoleId(): number {
 const shell = useDeclarationFormShell({
   initial_status: "DRAFT",
   on_save_draft: async () => {
-    const hasAnyPendingEvidence = form.items.some(
-      (r) =>
-        (r.pendingEvidenceFiles?.length ?? 0) > 0 ||
-        (r.pendingEvidenceLinks?.length ?? 0) > 0,
-    );
-
-    if (hasAnyPendingEvidence) {
-      throw new Error(
-        "Hiện chưa hỗ trợ tải minh chứng ngay ở màn kê khai hội thảo. Vui lòng gửi minh chứng tại bước duyệt giờ NCKH.",
-      );
-    }
-
-    if (!form.academicYearId) {
-      throw new Error("Vui lòng chọn niên học trước khi lưu.");
-    }
-    if (kindId.value <= 0) {
-      throw new Error("Không tìm thấy loại công trình hội nghị/hội thảo.");
-    }
-    if (!currentLecturerId.value) {
-      throw new Error("Không xác định được giảng viên hiện tại.");
-    }
-
-    const memberRoleId = resolveDefaultMemberRoleId();
-    const createdIds: number[] = [];
-
-    for (const [index, row] of form.items.entries()) {
-      if (!row.typeId || !row.conferenceName.trim()) {
-        continue;
+    try {
+      if (!form.academicYearId) {
+        throw new Error("Vui lòng chọn niên học trước khi lưu.");
+      }
+      if (kindId.value <= 0) {
+        throw new Error("Không tìm thấy loại công trình hội nghị/hội thảo.");
+      }
+      if (!currentLecturerId.value) {
+        throw new Error("Không xác định được giảng viên hiện tại.");
       }
 
-      const existingActivityId = form.activityIds[index] ?? null;
-      const activity = await upsert_activity_base({
-        id:
-          typeof existingActivityId === "number"
-            ? existingActivityId
-            : undefined,
-        kind_id: kindId.value,
-        type_id: row.typeId,
-        academic_year_id: form.academicYearId,
-        title: row.conferenceName.trim(),
-        abstract: null,
-        start_date: row.heldOn ?? null,
-        end_date: row.heldOn ?? null,
-        quantity: 1,
-        notes: row.notes?.trim() ? row.notes.trim() : null,
-      });
+      const memberRoleId = resolveDefaultMemberRoleId();
+      const createdIds: number[] = [];
 
-      await upsert_conference_details({
-        activity_id: activity.id,
-        conference_name: row.conferenceName.trim(),
-        location: row.location?.trim() ? row.location.trim() : null,
-        held_on: row.heldOn ?? null,
-      });
+      for (const [index, row] of form.items.entries()) {
+        if (!row.typeId || !row.conferenceName.trim()) {
+          continue;
+        }
 
-      await upsert_members(activity.id, [
-        {
-          lecturer_id: currentLecturerId.value,
-          member_role_id: memberRoleId,
-          contribution_share: null,
-        },
-      ]);
+        const existingActivityId = form.activityIds[index] ?? null;
+        const activity = await upsert_activity_base({
+          id:
+            typeof existingActivityId === "number"
+              ? existingActivityId
+              : undefined,
+          kind_id: kindId.value,
+          type_id: row.typeId,
+          academic_year_id: form.academicYearId,
+          title: row.conferenceName.trim(),
+          abstract: null,
+          start_date: row.heldOn ?? null,
+          end_date: row.heldOn ?? null,
+          quantity: 1,
+          notes: row.notes?.trim() ? row.notes.trim() : null,
+        });
 
-      row.existingEvidenceFiles = await list_evidence_files(activity.id);
-      createdIds.push(activity.id);
-    }
+        await upsert_conference_details({
+          activity_id: activity.id,
+          conference_name: row.conferenceName.trim(),
+          location: row.location?.trim() ? row.location.trim() : null,
+          held_on: row.heldOn ?? null,
+        });
 
-    form.activityIds = createdIds;
-    if (createdIds.length === 1) {
-      await router.replace({
-        query: { ...route.query, activity_id: String(createdIds[0]) },
-      });
+        await upsert_members(activity.id, [
+          {
+            lecturer_id: currentLecturerId.value,
+            member_role_id: memberRoleId,
+            contribution_share: null,
+          },
+        ]);
+
+        await persistRowEvidence(activity.id, row);
+        createdIds.push(activity.id);
+      }
+
+      form.activityIds = createdIds;
+      if (createdIds.length === 1) {
+        await router.replace({
+          query: { ...route.query, activity_id: String(createdIds[0]) },
+        });
+      }
+    } catch (err) {
+      throw new Error(
+        normalizeErrorMessage(err, "Không thể lưu bản nháp. Vui lòng thử lại."),
+      );
     }
   },
   on_submit: async () => {
@@ -665,8 +862,17 @@ const shell = useDeclarationFormShell({
   },
 });
 
+const { runPageLoad } = useDeclarationPageLoadFeedback();
+
 onMounted(async () => {
-  await loadCatalogs();
-  await loadDraftFromQuery();
+  await runPageLoad(async () => {
+    await loadCatalogs();
+    await loadDraftFromQuery();
+  }, {
+    onError: (message) => {
+      shell.error_message.value = message;
+    },
+    fallbackMessage: "Không thể khởi tạo trang kê khai.",
+  });
 });
 </script>

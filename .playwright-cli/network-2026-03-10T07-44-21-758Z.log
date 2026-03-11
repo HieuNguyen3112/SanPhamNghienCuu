@@ -1,0 +1,7 @@
+[GET] http://localhost:8000/sanctum/csrf-cookie => [204] No Content
+[POST] http://localhost:8000/login => [200] OK
+[GET] http://localhost:8000/api/auth/me => [200] OK
+[GET] http://localhost:8000/api/lecturer/notifications?page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/profile/me => [200] OK
+[GET] http://localhost:8000/api/lookups/degrees => [200] OK
+[GET] http://localhost:8000/api/lookups/academic-ranks => [200] OK

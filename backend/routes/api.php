@@ -105,6 +105,15 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LE
         Route::post('/{activity}/submit', [ResearchActivityController::class, 'submit']);
         Route::put('/{activity}/{detail}', [ResearchActivityController::class, 'upsertDetail']);
         Route::get('/{activity}/evidence-files', [ResearchActivityController::class, 'listEvidenceFiles']);
+        Route::post('/{activity}/evidence-files', [ResearchActivityController::class, 'uploadEvidenceFile']);
+        Route::delete('/{activity}/evidence-files/{evidence}', [ResearchActivityController::class, 'deleteEvidenceFile']);
+        Route::get('/{activity}/evidence-files/{evidence}/preview', [ResearchActivityController::class, 'previewEvidenceFile'])
+            ->name('research.activities.evidence.preview');
+        Route::get('/{activity}/evidence-files/{evidence}/download', [ResearchActivityController::class, 'downloadEvidenceFile'])
+            ->name('research.activities.evidence.download');
+        Route::get('/{activity}/evidence-links', [ResearchActivityController::class, 'listEvidenceLinks']);
+        Route::post('/{activity}/evidence-links', [ResearchActivityController::class, 'storeEvidenceLink']);
+        Route::delete('/{activity}/evidence-links/{link}', [ResearchActivityController::class, 'deleteEvidenceLink']);
     });
 
 // PARTICIPATION CONFIRMATION (Lecturer)
@@ -227,6 +236,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SC
     ->group(function () {
         Route::get('/lookups', [AdminResearchWorkSearchController::class, 'lookups']);
         Route::get('/search', [AdminResearchWorkSearchController::class, 'index']);
+        Route::get('/attachments/{attachment}/preview', [AdminResearchWorkSearchController::class, 'previewAttachment'])
+            ->name('admin.works.attachments.preview');
         Route::get('/attachments/{attachment}/download', [AdminResearchWorkSearchController::class, 'downloadAttachment'])
             ->name('admin.works.attachments.download');
         Route::get('/{activity}', [AdminResearchWorkSearchController::class, 'show']);
@@ -248,6 +259,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DE
         Route::get('/activities/{activity}/approved', [FacultyResearchWorkManagementController::class, 'approvedDetail']);
         Route::get('/export/excel', [FacultyResearchWorkManagementController::class, 'exportSummaryExcel'])->middleware('audit.export');
         Route::get('/export/pdf', [FacultyResearchWorkManagementController::class, 'exportSummaryPdf'])->middleware('audit.export');
+        Route::get('/evidence/{evidence}/preview', [FacultyResearchWorkManagementController::class, 'previewEvidence'])
+            ->name('faculty.works.evidence.preview');
         Route::get('/evidence/{evidence}/download', [FacultyResearchWorkManagementController::class, 'downloadEvidence'])
             ->name('faculty.works.evidence.download');
     });

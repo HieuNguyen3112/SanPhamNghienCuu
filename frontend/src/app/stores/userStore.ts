@@ -8,6 +8,8 @@ import {
 
 export type UserRole = "LECTURER" | "DEPARTMENT_BOARD" | "SCIENCE_OFFICE";
 
+const AUTH_SESSION_HINT_KEY = "spnc.auth.session_hint";
+
 interface User {
   id: string;
   name: string;
@@ -52,12 +54,35 @@ const mapBackendRoles = (roles: string[] = []): UserRole[] => {
   return Array.from(new Set(mapped));
 };
 
+const readAuthSessionHint = (): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(AUTH_SESSION_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const writeAuthSessionHint = (value: boolean) => {
+  if (typeof window === "undefined") return;
+  try {
+    if (value) {
+      window.localStorage.setItem(AUTH_SESSION_HINT_KEY, "1");
+      return;
+    }
+    window.localStorage.removeItem(AUTH_SESSION_HINT_KEY);
+  } catch {
+    // Ignore storage write errors. Auth still works without the hint.
+  }
+};
+
 export const useUserStore = defineStore("user", {
   state: () => ({
     currentUser: null as User | null,
     currentRole: null as UserRole | null, // role đang chọn
     _initPromise: null as Promise<User | null> | null,
     isInitialized: false,
+    hasSessionHint: readAuthSessionHint(),
     authErrorCode: null as AuthErrorCode,
     authErrorMessage: null as string | null,
   }),
@@ -68,6 +93,26 @@ export const useUserStore = defineStore("user", {
   },
 
   actions: {
+    setSessionHint(value: boolean) {
+      this.hasSessionHint = value;
+      writeAuthSessionHint(value);
+    },
+
+    async bootstrapAuth() {
+      if (this.isInitialized && !this._initPromise) return this.currentUser;
+
+      if (!this.hasSessionHint) {
+        this.currentUser = null;
+        this.currentRole = null;
+        this.authErrorCode = null;
+        this.authErrorMessage = null;
+        this.isInitialized = true;
+        return null;
+      }
+
+      return this.initAuth();
+    },
+
     async initAuth() {
       if (this.isInitialized && !this._initPromise) return this.currentUser;
       if (this._initPromise) return this._initPromise;
@@ -84,6 +129,7 @@ export const useUserStore = defineStore("user", {
           if (!mappedRoles.length) {
             this.currentUser = null;
             this.currentRole = null;
+            this.setSessionHint(false);
             return null;
           }
 
@@ -103,6 +149,8 @@ export const useUserStore = defineStore("user", {
           ) {
             this.currentRole = mappedRoles[0] ?? null;
           }
+
+          this.setSessionHint(true);
 
           return this.currentUser;
         } catch (err: any) {
@@ -126,6 +174,9 @@ export const useUserStore = defineStore("user", {
 
           this.currentUser = null;
           this.currentRole = null;
+          if (status === 401) {
+            this.setSessionHint(false);
+          }
           return null;
         } finally {
           this.isInitialized = true;
@@ -138,11 +189,11 @@ export const useUserStore = defineStore("user", {
 
     // Backward-compatible alias
     async ensureCurrentUser() {
-      return this.initAuth();
+      return this.bootstrapAuth();
     },
 
     async ensureAuthInitialized() {
-      return this.initAuth();
+      return this.bootstrapAuth();
     },
 
     async login(payload: LoginPayload) {
@@ -177,6 +228,9 @@ export const useUserStore = defineStore("user", {
       this.currentRole = mappedRoles[0] ?? null;
       this.isInitialized = true;
       this._initPromise = null;
+      this.authErrorCode = null;
+      this.authErrorMessage = null;
+      this.setSessionHint(true);
 
       return mappedRoles;
     },
@@ -203,6 +257,9 @@ export const useUserStore = defineStore("user", {
       this.currentRole = null;
       this._initPromise = null;
       this.isInitialized = false;
+      this.authErrorCode = null;
+      this.authErrorMessage = null;
+      this.setSessionHint(false);
       return remoteLogoutOk;
     },
   },

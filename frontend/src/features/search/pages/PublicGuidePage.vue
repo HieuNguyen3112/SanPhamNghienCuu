@@ -53,7 +53,7 @@ const userStore = useUserStore();
 
 onMounted(async () => {
   if (!userStore.isInitialized) {
-    await userStore.ensureAuthInitialized();
+    await userStore.bootstrapAuth();
   }
 });
 

@@ -1,0 +1,221 @@
+- generic [ref=e1]:
+  - generic [ref=e34]:
+    - complementary [ref=e35]:
+      - link "Về trang chủ" [ref=e37] [cursor=pointer]:
+        - /url: /
+        - img "University logo" [ref=e38]
+      - generic [ref=e40]:
+        - generic [ref=e42]: T
+        - generic [ref=e43]:
+          - generic [ref=e44]: Nguyễn Minh Tuấn
+          - generic [ref=e45]: Giảng viên
+      - button "‹" [ref=e48]:
+        - generic [ref=e49]: ‹
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - button "Hồ sơ cá nhân ▾" [ref=e53]:
+            - generic [ref=e54]: Hồ sơ cá nhân
+            - generic [ref=e55]: ▾
+          - link "Hồ sơ khoa học" [ref=e57] [cursor=pointer]:
+            - /url: /profile
+            - img [ref=e59]
+            - generic [ref=e62]: Hồ sơ khoa học
+        - generic [ref=e63]:
+          - button "Kê khai khoa học ▾" [ref=e64]:
+            - generic [ref=e65]: Kê khai khoa học
+            - generic [ref=e66]: ▾
+          - generic [ref=e67]:
+            - link "Kê khai công trình" [ref=e68] [cursor=pointer]:
+              - /url: /declarations/gateway
+              - img [ref=e70]
+              - generic [ref=e73]: Kê khai công trình
+            - link "Thông báo xác nhận" [ref=e74] [cursor=pointer]:
+              - /url: /declarations/participatier
+              - img [ref=e76]
+              - generic [ref=e80]: Thông báo xác nhận
+            - link "Công trình của tôi" [ref=e81] [cursor=pointer]:
+              - /url: /works/personal
+              - img [ref=e83]
+              - generic [ref=e86]: Công trình của tôi
+            - link "Tính giờ NCKH cá nhân" [ref=e87] [cursor=pointer]:
+              - /url: /hours/calculate
+              - img [ref=e89]
+              - generic [ref=e91]: Tính giờ NCKH cá nhân
+            - link "Giờ NCKH cá nhân" [ref=e92] [cursor=pointer]:
+              - /url: /hours/personal
+              - img [ref=e94]
+              - generic [ref=e97]: Giờ NCKH cá nhân
+            - link "Thông báo cảnh báo" [ref=e98] [cursor=pointer]:
+              - /url: /hours/personal_warnings
+              - img [ref=e100]
+              - generic [ref=e103]: Thông báo cảnh báo
+        - generic [ref=e104]:
+          - button "Tra cứu ▾" [ref=e105]:
+            - generic [ref=e106]: Tra cứu
+            - generic [ref=e107]: ▾
+          - link "Tra cứu công trình" [ref=e109] [cursor=pointer]:
+            - /url: /search
+            - img [ref=e111]
+            - generic [ref=e114]: Tra cứu công trình
+      - paragraph [ref=e116]: © 2026 Phần mềm quản lý NCKH
+    - generic [ref=e117]:
+      - banner [ref=e118]:
+        - generic [ref=e121]: TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH
+        - generic [ref=e122]:
+          - button "Mở danh sách thông báo" [ref=e124]:
+            - img [ref=e125]
+          - button "Tài khoản" [ref=e129]:
+            - generic [ref=e130]: Tài khoản
+            - img [ref=e131]
+      - main [ref=e133]:
+        - generic [ref=e136]:
+          - generic [ref=e138]:
+            - generic [ref=e139]:
+              - generic [ref=e140]:
+                - img [ref=e141]
+                - heading "Kê khai Giáo trình / Tài liệu tham khảo" [level=1] [ref=e143]
+              - paragraph [ref=e144]: Giờ tính theo loại tài liệu; Chủ biên nhận 1/5, 4/5 chia đều cho tất cả người tham gia.
+            - generic [ref=e146]: Bản nháp
+          - generic [ref=e149]:
+            - generic [ref=e150]: Rule phân bổ
+            - generic [ref=e151]: Chủ biên nhận 1/5 tổng giờ; phần còn lại 4/5 chia đều cho toàn bộ người tham gia (kể cả chủ biên).
+          - generic [ref=e152]:
+            - generic [ref=e153]:
+              - generic [ref=e154]: A. Loại tài liệu & giờ chuẩn
+              - generic [ref=e155]:
+                - generic [ref=e156]:
+                  - text: Niên học
+                  - combobox [ref=e157]:
+                    - option "— Chọn niên học —" [selected]
+                - generic [ref=e158]:
+                  - text: Loại tài liệu
+                  - combobox [ref=e159]:
+                    - option "— Chọn loại —" [selected]
+                  - generic [ref=e160]: "Giờ chuẩn: 0 giờ"
+            - generic [ref=e161]:
+              - generic [ref=e162]: B. Thông tin tài liệu
+              - generic [ref=e163]:
+                - generic [ref=e164]:
+                  - generic [ref=e165]: Tên tài liệu *
+                  - textbox [ref=e166]
+                - generic [ref=e167]:
+                  - generic [ref=e168]: Nhà xuất bản *
+                  - textbox "book_details.publisher (required)" [ref=e169]
+                - generic [ref=e170]:
+                  - text: Năm xuất bản
+                  - spinbutton [ref=e171]
+                - generic [ref=e172]:
+                  - text: ISBN
+                  - textbox [ref=e173]
+                - generic [ref=e174]:
+                  - text: Số trang
+                  - spinbutton [ref=e175]
+                - generic [ref=e176]:
+                  - text: Số QĐ phê duyệt
+                  - textbox [ref=e177]
+                - generic [ref=e178]:
+                  - text: Ngày QĐ phê duyệt
+                  - textbox [ref=e179]
+                - generic [ref=e180]:
+                  - text: Ghi chú
+                  - textbox [ref=e181]
+            - generic [ref=e182]:
+              - generic [ref=e183]:
+                - generic [ref=e184]:
+                  - generic [ref=e185]:
+                    - heading "Danh sách người tham gia" [level=2] [ref=e186]
+                    - paragraph [ref=e187]: Thêm/xóa chỉ khả dụng khi đang ở trạng thái bản nháp.
+                  - generic [ref=e188]:
+                    - textbox "Tìm giảng viên" [ref=e190]:
+                      - /placeholder: Tìm giảng viên...
+                    - generic [ref=e191]:
+                      - button "Tìm" [ref=e192]:
+                        - img [ref=e193]
+                        - generic [ref=e196]: Tìm
+                      - button "Thêm người tham gia" [ref=e197]:
+                        - img [ref=e198]
+                        - generic [ref=e199]: Thêm
+                - table [ref=e203]:
+                  - rowgroup [ref=e211]:
+                    - row "Ngoài Họ tên Đơn vị Vai trò Giờ NCKH" [ref=e212]:
+                      - columnheader "Ngoài" [ref=e213]
+                      - columnheader "Họ tên" [ref=e214]
+                      - columnheader "Đơn vị" [ref=e215]
+                      - columnheader "Vai trò" [ref=e216]
+                      - columnheader "Giờ NCKH" [ref=e217]
+                      - columnheader [ref=e218]
+                  - rowgroup [ref=e219]:
+                    - row "👥 Chưa có danh sách người tham gia. Thêm người tham gia" [ref=e220]:
+                      - cell "👥 Chưa có danh sách người tham gia. Thêm người tham gia" [ref=e221]:
+                        - generic [ref=e222]:
+                          - generic [ref=e223]: 👥
+                          - generic [ref=e224]: Chưa có danh sách người tham gia.
+                          - button "Thêm người tham gia" [ref=e225]:
+                            - img [ref=e226]
+                            - text: Thêm người tham gia
+              - generic [ref=e227]: Cần có ít nhất 1 Chủ biên để đúng nghiệp vụ (member_roles.code = chief_editor).
+            - generic [ref=e228]:
+              - generic [ref=e229]:
+                - generic [ref=e230]: Minh chứng
+                - generic [ref=e231]: Tải tệp PDF và thêm link minh chứng. Dữ liệu sẽ được lưu khi bấm Lưu nháp.
+                - generic [ref=e232]:
+                  - button "Choose File" [ref=e233]
+                  - generic [ref=e234]:
+                    - textbox "Thêm link minh chứng (URL)" [ref=e235]
+                    - button "Thêm link" [disabled] [ref=e236]:
+                      - img [ref=e237]
+                      - text: Thêm link
+              - generic [ref=e238]:
+                - generic [ref=e239]: File đã lưu
+                - generic [ref=e240]: Chưa có file đã lưu.
+                - generic [ref=e241]: File vừa chọn
+                - generic [ref=e242]: Chưa chọn file.
+                - generic [ref=e243]: Link minh chứng đã lưu
+                - generic [ref=e244]: Chưa có link đã lưu.
+                - generic [ref=e245]: Link vừa thêm
+                - generic [ref=e246]: Chưa có link mới.
+            - generic [ref=e247]:
+              - generic [ref=e248]:
+                - generic [ref=e249]:
+                  - generic [ref=e250]: Giờ NCKH tạm tính
+                  - generic [ref=e251]: Giờ được tính tự động theo loại công trình và phân bổ theo vai trò/số thành viên.
+                - generic [ref=e252]:
+                  - generic [ref=e253]: Tổng giờ chuẩn
+                  - generic [ref=e254]: 0.00 giờ
+              - generic [ref=e255]:
+                - generic [ref=e256]:
+                  - generic [ref=e257]: Giờ của giảng viên hiện tại
+                  - generic [ref=e258]: 0.00 giờ
+                - generic [ref=e259]:
+                  - generic [ref=e260]: Số người tham gia
+                  - generic [ref=e261]: "0"
+              - table [ref=e263]:
+                - rowgroup [ref=e264]:
+                  - row "Thành viên Vai trò Giờ" [ref=e265]:
+                    - columnheader "Thành viên" [ref=e266]
+                    - columnheader "Vai trò" [ref=e267]
+                    - columnheader "Giờ" [ref=e268]
+                - rowgroup [ref=e269]:
+                  - row "Chưa đủ dữ liệu để phân bổ giờ." [ref=e270]:
+                    - cell "Chưa đủ dữ liệu để phân bổ giờ." [ref=e271]
+              - generic [ref=e272]: Chọn loại tài liệu để xác định giờ chuẩn.
+          - generic [ref=e274]:
+            - generic [ref=e275]: Trạng thái:Bản nháp
+            - generic [ref=e276]:
+              - button "Lưu bản nháp" [ref=e277]:
+                - img [ref=e278]
+                - text: Lưu bản nháp
+              - button "Gửi duyệt" [disabled] [ref=e282]:
+                - img [ref=e283]
+                - text: Gửi duyệt
+  - dialog "Thành công" [ref=e287]:
+    - generic [ref=e288]:
+      - banner [ref=e289]:
+        - heading "Thành công" [level=2] [ref=e290]
+        - button "Đóng thông báo" [active] [ref=e291]:
+          - img [ref=e292]
+      - generic [ref=e296]:
+        - img [ref=e298]
+        - paragraph [ref=e301]: Đăng nhập thành công.
+      - contentinfo [ref=e302]:
+        - button "Đóng" [ref=e303]

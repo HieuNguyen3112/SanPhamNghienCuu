@@ -1,6 +1,8 @@
 import http, { ensureCsrfCookie } from "@/lib/http";
 import type {
   EvidenceFileDto,
+  EvidenceLinkDto,
+  LecturerOptionDto,
   ResearchActivityMemberUpsertDto,
 } from "../contracts/declarationSharedContract";
 
@@ -11,6 +13,11 @@ import type {
 // - PUT /api/research-activities/{id}/members
 // - POST /api/research-activities/{id}/submit
 // - GET  /api/research-activities/{id}/evidence-files
+// - POST /api/research-activities/{id}/evidence-files
+// - DELETE /api/research-activities/{id}/evidence-files/{evidence}
+// - GET  /api/research-activities/{id}/evidence-links
+// - POST /api/research-activities/{id}/evidence-links
+// - DELETE /api/research-activities/{id}/evidence-links/{link}
 
 const MOCK = false;
 
@@ -33,6 +40,14 @@ type ResearchActivityDto = {
   notes: string | null;
   created_at?: string;
   updated_at?: string;
+};
+
+type CurrentLecturerPayload = {
+  id?: number;
+  code?: string | null;
+  full_name?: string | null;
+  department_id?: number | null;
+  department_name?: string | null;
 };
 
 type PaperDetailsDto = {
@@ -93,6 +108,11 @@ type UpsertActivityPayload = {
   total_hours_calc?: number | null;
 };
 
+export type DownloadEvidenceFileResult = {
+  blob: Blob;
+  filename: string;
+};
+
 let next_id = 1000;
 const activities = new Map<number, ResearchActivityDto>();
 const paper_details = new Map<number, PaperDetailsDto>();
@@ -101,9 +121,39 @@ const project_details = new Map<number, ProjectDetailsDto>();
 const conference_details = new Map<number, ConferenceDetailsDto>();
 const members = new Map<number, ResearchActivityMemberUpsertDto[]>();
 const evidence = new Map<number, EvidenceFileDto[]>();
+const evidence_links = new Map<number, EvidenceLinkDto[]>();
+let next_evidence_link_id = 1;
+let current_lecturer_cache: CurrentLecturerPayload | null = null;
+let current_lecturer_promise: Promise<CurrentLecturerPayload | null> | null =
+  null;
+let current_lecturer_cached_at = 0;
+const CURRENT_LECTURER_CACHE_TTL_MS = 30_000;
 
 function now_iso() {
   return new Date().toISOString();
+}
+
+function decodeContentDispositionFilename(headerValue: string): string | null {
+  const value = headerValue.trim();
+  if (!value) return null;
+
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    const encodedName = utf8Match[1].trim().replace(/^"(.*)"$/, "$1");
+    try {
+      const decoded = decodeURIComponent(encodedName);
+      if (decoded.trim()) return decoded;
+    } catch {
+      // Fallback to plain filename parsing below.
+    }
+  }
+
+  const plainMatch = value.match(/filename="?([^";]+)"?/i);
+  if (plainMatch?.[1] && plainMatch[1].trim()) {
+    return plainMatch[1].trim();
+  }
+
+  return null;
 }
 
 export async function upsert_activity_base(
@@ -322,6 +372,158 @@ export async function list_evidence_files(
   return evidence.get(activity_id) ?? [];
 }
 
+export async function upload_evidence_file(
+  activity_id: number,
+  payload: {
+    file: File;
+    file_type_id: number;
+  },
+): Promise<EvidenceFileDto | null> {
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    const formData = new FormData();
+    formData.append("file", payload.file);
+    formData.append("file_type_id", String(payload.file_type_id));
+    const { data } = await http.post<{ data: EvidenceFileDto | null }>(
+      `/api/research-activities/${activity_id}/evidence-files`,
+      formData,
+    );
+    return data.data ?? null;
+  }
+
+  const list = evidence.get(activity_id) ?? [];
+  const created: EvidenceFileDto = {
+    id: Date.now(),
+    activity_id,
+    file_type_id: payload.file_type_id,
+    file_type_name: `Loại #${payload.file_type_id}`,
+    disk: "local",
+    path: `mock/evidence/${activity_id}/${payload.file.name}`,
+    original_name: payload.file.name,
+    mime_type: payload.file.type || "application/pdf",
+    size_bytes: payload.file.size,
+    sha256: `mock-${Math.random().toString(36).slice(2)}`,
+    uploaded_by_user_id: 0,
+    uploaded_at: now_iso(),
+    created_at: now_iso(),
+    updated_at: now_iso(),
+    url: "#",
+    download_url: "#",
+  };
+  evidence.set(activity_id, [created, ...list]);
+  return created;
+}
+
+export async function delete_evidence_file(
+  activity_id: number,
+  evidence_id: number,
+): Promise<void> {
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    await http.delete(
+      `/api/research-activities/${activity_id}/evidence-files/${evidence_id}`,
+    );
+    return;
+  }
+
+  const list = evidence.get(activity_id) ?? [];
+  evidence.set(
+    activity_id,
+    list.filter((item) => item.id !== evidence_id),
+  );
+}
+
+export async function download_evidence_file(
+  activity_id: number,
+  evidence_id: number,
+  fallbackName?: string,
+): Promise<DownloadEvidenceFileResult> {
+  const response = await http.get<Blob>(
+    `/api/research-activities/${activity_id}/evidence-files/${evidence_id}/download`,
+    {
+      responseType: "blob",
+    },
+  );
+
+  const headerValue = String(response.headers?.["content-disposition"] ?? "");
+  const fromHeader = decodeContentDispositionFilename(headerValue);
+  const fallback = String(fallbackName ?? "").trim();
+  const filename =
+    fromHeader?.trim() || fallback || `evidence-${evidence_id}.pdf`;
+
+  return {
+    blob: response.data,
+    filename,
+  };
+}
+
+export async function list_evidence_links(
+  activity_id: number,
+): Promise<EvidenceLinkDto[]> {
+  if (!MOCK) {
+    const { data } = await http.get<{ data: EvidenceLinkDto[] }>(
+      `/api/research-activities/${activity_id}/evidence-links`,
+    );
+    return data.data ?? [];
+  }
+
+  return evidence_links.get(activity_id) ?? [];
+}
+
+export async function add_evidence_link(
+  activity_id: number,
+  payload: {
+    url: string;
+  },
+): Promise<EvidenceLinkDto | null> {
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    const { data } = await http.post<{ data: EvidenceLinkDto | null }>(
+      `/api/research-activities/${activity_id}/evidence-links`,
+      { url: payload.url },
+    );
+    return data.data ?? null;
+  }
+
+  const trimmed = payload.url.trim();
+  if (!trimmed) return null;
+  const list = evidence_links.get(activity_id) ?? [];
+  const existing = list.find((item) => item.url === trimmed);
+  if (existing) return existing;
+
+  const created: EvidenceLinkDto = {
+    id: next_evidence_link_id++,
+    activity_id,
+    lecturer_id: 0,
+    lecturer_name: null,
+    url: trimmed,
+    added_by_user_id: 0,
+    created_at: now_iso(),
+    updated_at: now_iso(),
+  };
+  evidence_links.set(activity_id, [created, ...list]);
+  return created;
+}
+
+export async function delete_evidence_link(
+  activity_id: number,
+  link_id: number,
+): Promise<void> {
+  if (!MOCK) {
+    await ensureCsrfCookie();
+    await http.delete(
+      `/api/research-activities/${activity_id}/evidence-links/${link_id}`,
+    );
+    return;
+  }
+
+  const list = evidence_links.get(activity_id) ?? [];
+  evidence_links.set(
+    activity_id,
+    list.filter((item) => item.id !== link_id),
+  );
+}
+
 export type ResearchActivityDetailResponse = {
   activity: ResearchActivityDto & {
     status_code?: string | null;
@@ -336,8 +538,15 @@ export type ResearchActivityDetailResponse = {
     hours_assigned: number | null;
     member_role_code?: string | null;
     member_role_name?: string | null;
+    lecturer_code?: string | null;
+    lecturer_full_name?: string | null;
+    department_id?: number | null;
+    department_name?: string | null;
+    member_faculty_id?: number | null;
+    faculty_name?: string | null;
   }>;
   evidence_files?: EvidenceFileDto[];
+  evidence_links?: EvidenceLinkDto[];
 };
 
 export type ProjectHoursPreviewRequestDto = {
@@ -395,11 +604,70 @@ export async function fetch_activity(
   return data.data;
 }
 
+async function fetch_current_lecturer_payload(): Promise<CurrentLecturerPayload | null> {
+  if (
+    current_lecturer_cache &&
+    Date.now() - current_lecturer_cached_at <= CURRENT_LECTURER_CACHE_TTL_MS
+  ) {
+    return { ...current_lecturer_cache };
+  }
+  if (current_lecturer_promise) {
+    const payload = await current_lecturer_promise;
+    return payload ? { ...payload } : null;
+  }
+
+  current_lecturer_promise = http
+    .get<{ data: { lecturer?: CurrentLecturerPayload } }>("/api/profile/me")
+    .then(({ data }) => {
+      const lecturer = data?.data?.lecturer ?? null;
+      if (!lecturer?.id) {
+        current_lecturer_cache = null;
+        current_lecturer_cached_at = 0;
+        return null;
+      }
+
+      current_lecturer_cache = {
+        id: lecturer.id,
+        code: lecturer.code ?? null,
+        full_name: lecturer.full_name ?? null,
+        department_id: lecturer.department_id ?? null,
+        department_name: lecturer.department_name ?? null,
+      };
+      current_lecturer_cached_at = Date.now();
+
+      return current_lecturer_cache;
+    })
+    .finally(() => {
+      current_lecturer_promise = null;
+    });
+
+  const payload = await current_lecturer_promise;
+  return payload ? { ...payload } : null;
+}
+
 export async function fetch_current_lecturer_id(): Promise<number | null> {
-  const { data } = await http.get<{ data: { lecturer?: { id?: number } } }>(
-    "/api/profile/me",
-  );
-  return data?.data?.lecturer?.id ?? null;
+  const lecturer = await fetch_current_lecturer_payload();
+  return lecturer?.id ?? null;
+}
+
+export async function fetch_current_lecturer_option(): Promise<LecturerOptionDto | null> {
+  const lecturer = await fetch_current_lecturer_payload();
+  if (!lecturer?.id) return null;
+
+  const code = String(lecturer.code ?? "").trim();
+  const fullName = String(lecturer.full_name ?? "").trim();
+  if (!code || !fullName) return null;
+
+  const departmentId = Number(lecturer.department_id ?? 0);
+  return {
+    id: lecturer.id,
+    code,
+    full_name: fullName,
+    department_id: Number.isFinite(departmentId) && departmentId > 0 ? departmentId : 0,
+    department_name: lecturer.department_name ?? undefined,
+    faculty_id: null,
+    faculty_name: null,
+  };
 }
 
 export async function preview_project_hours(

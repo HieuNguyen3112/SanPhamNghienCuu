@@ -1,0 +1,14 @@
+[  853251ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/src/shared/components/modals/PdfPreviewModal.vue?t=1773132216545:0
+[  853251ms] [ERROR] [vite] Failed to reload /src/shared/components/modals/PdfPreviewModal.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808
+[ 1084993ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/src/shared/components/modals/PdfPreviewModal.vue?t=1773132448288:0
+[ 1084994ms] [ERROR] [vite] Failed to reload /src/shared/components/modals/PdfPreviewModal.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808
+[ 1090198ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/src/shared/components/pdf/PdfCanvasViewer.vue?t=1773132453494:0
+[ 1090198ms] [ERROR] [vite] Failed to reload /src/shared/components/pdf/PdfCanvasViewer.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808
+[ 1097171ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/shared/components/pdf/PdfCanvasViewer.vue?t=1773132460452:0
+[ 1097171ms] [ERROR] [vite] Failed to reload /src/shared/components/pdf/PdfCanvasViewer.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808
+[ 1161176ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/src/shared/components/pdf/PdfCanvasViewer.vue?t=1773132524469:0
+[ 1161176ms] [ERROR] [vite] Failed to reload /src/shared/components/pdf/PdfCanvasViewer.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808
+[ 1168555ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/src/shared/components/modals/PdfPreviewModal.vue?t=1773132531850:0
+[ 1168555ms] [ERROR] [vite] Failed to reload /src/shared/components/modals/PdfPreviewModal.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808
+[ 1397351ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/src/shared/components/modals/PdfPreviewModal.vue?t=1773132760646:0
+[ 1397351ms] [ERROR] [vite] Failed to reload /src/shared/components/modals/PdfPreviewModal.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:808

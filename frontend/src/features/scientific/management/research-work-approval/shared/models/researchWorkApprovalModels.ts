@@ -35,6 +35,7 @@ export interface EvidenceAttachment {
   evidenceAttachmentDisplayName: string;
   evidenceAttachmentFileType: string;
   evidenceAttachmentPreviewUrl: string;
+  evidenceAttachmentDownloadUrl?: string | null;
 }
 
 export interface ResearchWorkAuthor {

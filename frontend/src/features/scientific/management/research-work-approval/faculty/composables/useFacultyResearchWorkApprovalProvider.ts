@@ -319,7 +319,9 @@ export function useFacultyResearchWorkApprovalProvider() {
         evidenceAttachmentIdentifier: file.id,
         evidenceAttachmentDisplayName: file.original_name ?? "",
         evidenceAttachmentFileType: file.file_type_name ?? "",
-        evidenceAttachmentPreviewUrl: file.url ?? "#",
+        evidenceAttachmentPreviewUrl: file.preview_url ?? file.url ?? "#",
+        evidenceAttachmentDownloadUrl:
+          file.download_url ?? null,
       })),
       researchWorkAuthorList: authorList,
       coAuthorList: [],

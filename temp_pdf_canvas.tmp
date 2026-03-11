@@ -1,0 +1,473 @@
+<template>
+  <div class="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg bg-white">
+    <div
+      ref="viewportRef"
+      class="relative min-h-0 flex-1 overflow-auto bg-slate-100 p-2 [overflow-anchor:none] md:p-3"
+    >
+      <div
+        v-if="loading"
+        class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-slate-100 text-slate-600"
+      >
+        <div
+          class="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"
+        />
+        <p class="text-sm">Đang tải trang PDF...</p>
+      </div>
+
+      <div
+        v-else-if="errorMessage"
+        class="absolute inset-0 z-10 flex items-center justify-center px-4 text-center text-sm font-medium text-rose-700"
+      >
+        {{ errorMessage }}
+      </div>
+
+      <div
+        v-else
+        class="flex min-h-0 w-full items-start justify-center pb-3"
+      >
+        <canvas
+          ref="canvasRef"
+          class="block rounded-lg bg-white shadow-[0_10px_30px_-18px_rgba(15,23,42,0.55)]"
+        />
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between gap-2 border-t border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="rounded-md border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="loading || page <= 1"
+          @click="goPrevPage"
+        >
+          Trang trước
+        </button>
+        <button
+          type="button"
+          class="rounded-md border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="loading || page >= pageCount"
+          @click="goNextPage"
+        >
+          Trang sau
+        </button>
+      </div>
+
+      <div>Trang {{ page }} / {{ pageCount || 1 }}</div>
+
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="rounded-md border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="loading || zoom <= MIN_ZOOM"
+          @click="zoomOut"
+        >
+          -
+        </button>
+        <span>{{ Math.round(zoom * 100) }}%</span>
+        <button
+          type="button"
+          class="rounded-md border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="loading || zoom >= MAX_ZOOM"
+          @click="zoomIn"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import {
+  GlobalWorkerOptions,
+  getDocument,
+  type PDFDocumentLoadingTask,
+  type PDFDocumentProxy,
+  type PDFPageProxy,
+  type RenderTask,
+} from "pdfjs-dist";
+import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+GlobalWorkerOptions.workerSrc = workerSrc;
+
+type ViewportMetrics = {
+  width: number;
+  height: number;
+};
+
+const props = defineProps<{
+  src: string | null;
+}>();
+
+const emit = defineEmits<{
+  (e: "loaded"): void;
+  (e: "error", message: string): void;
+}>();
+
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const viewportRef = ref<HTMLDivElement | null>(null);
+const loading = ref(false);
+const errorMessage = ref<string | null>(null);
+const pageCount = ref(0);
+const page = ref(1);
+const zoom = ref(1);
+
+let documentRef: PDFDocumentProxy | null = null;
+let loadingTask: PDFDocumentLoadingTask | null = null;
+let renderTask: RenderTask | null = null;
+let resizeObserver: ResizeObserver | null = null;
+let resizeFrame: number | null = null;
+let keepFitOnResize = true;
+let suppressZoomWatch = false;
+let renderGeneration = 0;
+let lastStableViewport: ViewportMetrics | null = null;
+let lastRequestedAnimation = 0;
+
+const MIN_ZOOM = 0.6;
+const MAX_ZOOM = 2.25;
+const ZOOM_STEP = 0.15;
+
+function releaseTasks(): void {
+  if (renderTask) {
+    renderTask.cancel();
+    renderTask = null;
+  }
+  if (loadingTask) {
+    loadingTask.destroy();
+    loadingTask = null;
+  }
+  if (documentRef) {
+    documentRef.destroy();
+    documentRef = null;
+  }
+}
+
+function normalizeZoom(value: number): number {
+  return Number(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value)).toFixed(2));
+}
+
+function getViewportMetrics(): ViewportMetrics {
+  const viewport = viewportRef.value;
+  if (!viewport) {
+    return { width: 0, height: 0 };
+  }
+
+  const rect = viewport.getBoundingClientRect();
+  return {
+    width: Math.max(0, Math.floor(rect.width)),
+    height: Math.max(0, Math.floor(rect.height)),
+  };
+}
+
+function layoutStable(prev: ViewportMetrics, current: ViewportMetrics, tolerance = 1): boolean {
+  return (
+    Math.abs(prev.width - current.width) <= tolerance &&
+    Math.abs(prev.height - current.height) <= tolerance
+  );
+}
+
+async function waitForViewportReady(): Promise<boolean> {
+  const timeoutAt = performance.now() + 1200;
+  let previous = getViewportMetrics();
+  let stableCount = 0;
+
+  while (performance.now() < timeoutAt) {
+    await nextTick();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+    const current = getViewportMetrics();
+    if (current.width >= 32 && current.height >= 32) {
+      if (layoutStable(previous, current)) {
+        stableCount += 1;
+      } else {
+        stableCount = 0;
+      }
+      previous = current;
+
+      if (stableCount >= 2) {
+        lastStableViewport = current;
+        return true;
+      }
+    }
+  }
+
+  const fallback = getViewportMetrics();
+  if (fallback.width >= 32 && fallback.height >= 32) {
+    lastStableViewport = fallback;
+    return true;
+  }
+
+  return false;
+}
+
+function computeFitScale(pdfPage: PDFPageProxy, viewport: ViewportMetrics): number {
+  const baseViewport = pdfPage.getViewport({ scale: 1 });
+  if (
+    viewport.width <= 0 ||
+    viewport.height <= 0 ||
+    baseViewport.width <= 0 ||
+    baseViewport.height <= 0
+  ) {
+    return zoom.value || 1;
+  }
+
+  const widthScale = viewport.width / baseViewport.width;
+  const heightScale = viewport.height / baseViewport.height;
+  return normalizeZoom(Math.min(widthScale, heightScale, MAX_ZOOM));
+}
+
+function resetViewportScroll(): void {
+  const viewport = viewportRef.value;
+  if (!viewport) return;
+  viewport.scrollTop = 0;
+  viewport.scrollLeft = 0;
+}
+
+function goPrevPage(): void {
+  if (page.value <= 1) return;
+  page.value -= 1;
+}
+
+function goNextPage(): void {
+  if (page.value >= pageCount.value) return;
+  page.value += 1;
+}
+
+function zoomIn(): void {
+  keepFitOnResize = false;
+  zoom.value = normalizeZoom(zoom.value + ZOOM_STEP);
+}
+
+function zoomOut(): void {
+  keepFitOnResize = false;
+  zoom.value = normalizeZoom(zoom.value - ZOOM_STEP);
+}
+
+async function renderPage(
+  targetPage: number,
+  options: {
+    resetScroll?: boolean;
+    ensureFit?: boolean;
+  } = {},
+): Promise<void> {
+  if (!documentRef || !canvasRef.value) return;
+
+  const currentGeneration = renderGeneration;
+  if (!(await waitForViewportReady())) return;
+  if (!viewportRef.value) return;
+  const viewport = lastStableViewport || getViewportMetrics();
+  if (currentGeneration !== renderGeneration) return;
+
+  if (renderTask) {
+    renderTask.cancel();
+    renderTask = null;
+  }
+
+  let pdfPage: PDFPageProxy;
+  try {
+    pdfPage = await documentRef.getPage(targetPage);
+  } catch {
+    errorMessage.value = "Không thể đọc trang PDF.";
+    emit("error", errorMessage.value);
+    return;
+  }
+  if (currentGeneration !== renderGeneration) return;
+
+  const shouldFit = options.ensureFit ?? keepFitOnResize;
+  const scale = shouldFit ? computeFitScale(pdfPage, viewport) : zoom.value;
+  if (Math.abs(scale - zoom.value) > 0.001) {
+    suppressZoomWatch = true;
+    zoom.value = scale;
+  }
+
+  const pdfViewport = pdfPage.getViewport({ scale });
+  const cssWidth = Math.max(1, Math.floor(pdfViewport.width));
+  const cssHeight = Math.max(1, Math.floor(pdfViewport.height));
+  const canvas = canvasRef.value;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    errorMessage.value = "Không thể khởi tạo lớp hiển thị PDF.";
+    emit("error", errorMessage.value);
+    return;
+  }
+
+  const outputScale = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.floor(cssWidth * outputScale));
+  canvas.height = Math.max(1, Math.floor(cssHeight * outputScale));
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+  canvas.style.display = "block";
+
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  try {
+    renderTask = pdfPage.render({
+      canvasContext: context,
+      canvas,
+      viewport: pdfViewport,
+      transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
+    });
+    await renderTask.promise;
+    if (options.resetScroll) {
+      resetViewportScroll();
+    }
+  } catch (error: unknown) {
+    const message = String((error as { message?: string })?.message ?? "");
+    if (message.toLowerCase().includes("rendering cancelled")) {
+      return;
+    }
+
+    errorMessage.value = "Không thể hiển thị trang PDF.";
+    emit("error", errorMessage.value);
+  } finally {
+    renderTask = null;
+  }
+}
+
+async function loadDocument(src: string | null): Promise<void> {
+  const generation = ++renderGeneration;
+  releaseTasks();
+  errorMessage.value = null;
+
+  if (!src) {
+    loading.value = false;
+    pageCount.value = 0;
+    page.value = 1;
+    return;
+  }
+
+  loading.value = true;
+  page.value = 1;
+  zoom.value = 1;
+  keepFitOnResize = true;
+  lastStableViewport = null;
+
+  try {
+    if (!(await waitForViewportReady())) {
+      throw new Error("Không thể xác định vùng xem trước.");
+    }
+
+    loadingTask = getDocument({
+      url: src,
+      withCredentials: true,
+      disableAutoFetch: false,
+      disableRange: false,
+      disableStream: false,
+      rangeChunkSize: 1024 * 64,
+    });
+    documentRef = await loadingTask.promise;
+    if (generation !== renderGeneration || !documentRef) return;
+
+    pageCount.value = Math.max(1, documentRef.numPages);
+    await nextTick();
+    if (!(await waitForViewportReady())) return;
+    if (generation !== renderGeneration) return;
+
+    await renderPage(page.value, { resetScroll: true, ensureFit: true });
+
+    if (!errorMessage.value) {
+      emit("loaded");
+    }
+  } catch (error: unknown) {
+    const errMessage = String((error as { message?: string })?.message ?? "");
+    if (
+      errMessage === "Không thể xác định vùng xem trước." ||
+      errMessage === "PDF viewer container is not ready."
+    ) {
+      errorMessage.value =
+        "Không thể khởi tạo khung xem trước ngay lúc này. Vui lòng thử lại.";
+    } else {
+      errorMessage.value = "Không thể tải nội dung PDF.";
+    }
+    emit("error", errorMessage.value);
+  } finally {
+    if (generation === renderGeneration) {
+      loading.value = false;
+    }
+  }
+}
+
+watch(
+  () => props.src,
+  (src) => {
+    loadDocument(src).catch(() => {
+      errorMessage.value = "Không thể tải nội dung PDF.";
+      loading.value = false;
+    });
+  },
+  { immediate: true },
+);
+
+watch(page, async (nextPage, previousPage) => {
+  if (!documentRef || loading.value || errorMessage.value) return;
+  await renderPage(nextPage, { resetScroll: nextPage !== previousPage });
+});
+
+watch(zoom, async (nextZoom, previousZoom) => {
+  if (suppressZoomWatch) {
+    suppressZoomWatch = false;
+    return;
+  }
+
+  if (!documentRef || loading.value || errorMessage.value) return;
+  if (Math.abs(nextZoom - previousZoom) < 0.001) return;
+  await renderPage(page.value);
+});
+
+watch(
+  viewportRef,
+  (element, previousElement) => {
+    if (resizeObserver && previousElement) {
+      resizeObserver.unobserve(previousElement);
+    }
+
+    if (!element) {
+      return;
+    }
+
+    if (!resizeObserver) {
+      resizeObserver = new ResizeObserver(() => {
+        if (!documentRef || loading.value || errorMessage.value || !keepFitOnResize) {
+          return;
+        }
+
+        if (resizeFrame !== null) {
+          cancelAnimationFrame(resizeFrame);
+        }
+
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = null;
+          const next = getViewportMetrics();
+          if (lastStableViewport && layoutStable(lastStableViewport, next, 4)) {
+            return;
+          }
+
+          const now = ++lastRequestedAnimation;
+          void renderPage(page.value, { ensureFit: true }).catch(() => {
+            if (now === lastRequestedAnimation) {
+              errorMessage.value = "Không thể hiển thị trang PDF.";
+            }
+          });
+        });
+      });
+    }
+
+    resizeObserver.observe(element);
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  if (resizeFrame !== null) {
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = null;
+  }
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
+  releaseTasks();
+});
+</script>

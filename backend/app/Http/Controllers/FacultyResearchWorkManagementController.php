@@ -5,15 +5,23 @@ namespace App\Http\Controllers;
 use App\Exports\AdminResearchWorksSummaryExport;
 use App\Http\Requests\Faculty\FacultyResearchWorkLecturerWorksRequest;
 use App\Http\Requests\Faculty\FacultyResearchWorkSummaryRequest;
+use App\Services\Evidence\ResearchEvidenceStorageService;
 use App\Support\StorageDownload;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
 class FacultyResearchWorkManagementController extends Controller
 {
+    public function __construct(
+        private ResearchEvidenceStorageService $evidenceStorageService
+    ) {
+    }
+
     public function lookups(Request $request)
     {
         $scope = $this->resolveFacultyScope($request);
@@ -241,7 +249,9 @@ class FacultyResearchWorkManagementController extends Controller
                     'mime_type' => $row->mime_type,
                     'size_bytes' => $row->size_bytes !== null ? (int) $row->size_bytes : null,
                     'uploaded_at' => $row->uploaded_at,
+                    'preview_url' => route('faculty.works.evidence.preview', ['evidence' => $row->evidence_file_id], false),
                     'download_url' => route('faculty.works.evidence.download', ['evidence' => $row->evidence_file_id], false),
+                    'url' => route('faculty.works.evidence.preview', ['evidence' => $row->evidence_file_id], false),
                 ];
             })
             ->all();
@@ -342,11 +352,81 @@ class FacultyResearchWorkManagementController extends Controller
 
         $disk = $file->disk ?: 'public';
         $path = $file->path;
-        $filename = $file->original_name ?: ('evidence-' . $file->id);
+        $filename = $file->original_name ?: ('evidence-' . $file->id . '.pdf');
+
+        if ($this->evidenceStorageService->isRcloneDisk((string) $disk)) {
+            try {
+                return $this->evidenceStorageService->streamDownload(
+                    $request,
+                    (string) $disk,
+                    (string) $path,
+                    (string) $filename,
+                    (string) ($file->mime_type ?? 'application/octet-stream')
+                );
+            } catch (RuntimeException $exception) {
+                Log::error('faculty_research_work.evidence_download_failed', [
+                    'evidence_id' => $evidence,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Không thể tải tệp minh chứng. Vui lòng thử lại.',
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
 
         return StorageDownload::stream($disk, $path, $filename, [
             'Content-Type' => $file->mime_type ?: 'application/octet-stream',
         ]);
+    }
+
+    public function previewEvidence(Request $request, int $evidence)
+    {
+        $scope = $this->resolveFacultyScope($request);
+        if (! $scope) {
+            return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
+        }
+
+        $fileQuery = DB::table('evidence_files as ef')
+            ->join('research_activities as ra', 'ef.activity_id', '=', 'ra.id')
+            ->where('ef.id', $evidence);
+
+        $this->applyActivityFacultyScope($fileQuery, $scope['faculty_id']);
+
+        $file = $fileQuery
+            ->select([
+                'ef.id',
+                'ef.disk',
+                'ef.path',
+                'ef.original_name',
+                'ef.mime_type',
+            ])
+            ->first();
+
+        if (! $file) {
+            return response()->json(['message' => 'evidence not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $filename = $file->original_name ?: ('evidence-' . $file->id . '.pdf');
+
+        try {
+            return $this->evidenceStorageService->streamPreview(
+                $request,
+                (string) ($file->disk ?? 'local'),
+                (string) ($file->path ?? ''),
+                (string) $filename,
+                (string) ($file->mime_type ?? 'application/pdf')
+            );
+        } catch (RuntimeException $exception) {
+            Log::error('faculty_research_work.evidence_preview_failed', [
+                'evidence_id' => $evidence,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể xem trước tệp minh chứng. Vui lòng thử lại.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     private function resolveFacultyScope(Request $request): ?array

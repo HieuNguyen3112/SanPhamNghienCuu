@@ -573,11 +573,21 @@ class LecturerParticipationNotificationController extends Controller
 
         $evidences = [];
         foreach ($items as $item) {
+            $previewUrl = route('research.activities.evidence.preview', [
+                'activity' => (int) $row->activity_id,
+                'evidence' => (int) $item->id,
+            ], false);
+            $downloadUrl = route('research.activities.evidence.download', [
+                'activity' => (int) $row->activity_id,
+                'evidence' => (int) $item->id,
+            ], false);
             $evidences[] = [
                 'id' => (int) $item->id,
                 'type' => 'FILE',
                 'label' => $item->file_type_name ?: ($item->original_name ?: 'Evidence file'),
-                'url' => route('lecturer.works.attachments.download', ['attachment' => $item->id], false),
+                'url' => $previewUrl,
+                'preview_url' => $previewUrl,
+                'download_url' => $downloadUrl,
             ];
         }
 
@@ -789,4 +799,3 @@ class LecturerParticipationNotificationController extends Controller
         return 'https://doi.org/' . $trimmed;
     }
 }
-

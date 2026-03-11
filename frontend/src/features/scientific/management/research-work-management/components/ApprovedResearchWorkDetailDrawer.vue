@@ -196,10 +196,15 @@
                       </div>
                       <button
                         type="button"
-                        class="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        class="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="isEvidenceLoading(item.evidenceFileId)"
                         @click="openEvidenceUrl(item)"
                       >
-                        Xem
+                        {{
+                          isEvidenceLoading(item.evidenceFileId)
+                            ? "Đang mở..."
+                            : "Xem"
+                        }}
                       </button>
                     </div>
 
@@ -255,17 +260,31 @@
         </div>
       </aside>
     </Transition>
+
+    <PdfPreviewModal
+      :open="previewOpen"
+      :title="previewTitle"
+      :file-name="previewFileName"
+      :preview-url="previewUrl"
+      :loading="previewLoading"
+      :error-message="previewError"
+      :can-download="canDownload"
+      @close="closePdfPreview"
+      @retry="retryOpenPdfPreview"
+      @download="downloadPreviewedPdf"
+    />
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import type {
   ApprovedDetail,
   Evidence,
 } from "../lecturerResearchWork.contracts";
 import { ArrowLeftToLine } from "lucide-vue-next";
-import http from "@/lib/http";
+import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
+import { usePdfPreview } from "@/shared/composables/usePdfPreview";
 
 interface DetailDrawerProps {
   isOpen: boolean;
@@ -283,6 +302,21 @@ const detailEmptyEvidenceMessage =
 
 const props = defineProps<DetailDrawerProps>();
 const emit = defineEmits<DetailDrawerEmits>();
+const {
+  previewOpen,
+  previewLoading,
+  previewError,
+  previewTitle,
+  previewFileName,
+  previewUrl,
+  canDownload,
+  openPdfPreview,
+  retryOpenPdfPreview,
+  closePdfPreview,
+  isPreviewLoading,
+  downloadPreviewedPdf,
+  prefetchPdfPreview,
+} = usePdfPreview();
 
 const emptyEvidenceMessage = detailEmptyEvidenceMessage;
 
@@ -323,21 +357,55 @@ function formatFileSize(sizeBytes: number | null) {
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-function openEvidenceUrl(item: Evidence) {
-  const baseUrl = http.defaults.baseURL ?? window.location.origin;
+function isEvidenceLoading(evidenceId: number): boolean {
+  return isPreviewLoading(`approved-work-evidence:${evidenceId}`);
+}
 
+async function openEvidenceUrl(item: Evidence) {
   if (item.disk === "url") {
     window.open(item.path, "_blank", "noreferrer");
     return;
   }
 
-  const rawUrl = item.downloadUrl ?? item.path;
-  if (!rawUrl) return;
+  const previewRawUrl = (item.previewUrl ?? item.downloadUrl ?? item.path).trim();
+  if (!previewRawUrl) return;
+  const downloadRawUrl = (item.downloadUrl ?? item.path).trim();
+  const fallbackFileName =
+    item.originalName?.trim() || `minh-chung-${item.evidenceFileId}.pdf`;
 
-  const resolvedUrl = rawUrl.startsWith("http")
-    ? rawUrl
-    : new URL(rawUrl, baseUrl).toString();
-
-  window.open(resolvedUrl, "_blank", "noreferrer");
+  await openPdfPreview({
+    cacheKey: `approved-work-evidence:${item.evidenceFileId}`,
+    title: "Xem minh chứng",
+    fallbackFileName,
+    previewUrl: previewRawUrl,
+    downloadUrl: downloadRawUrl,
+    errorMessage: "Không thể mở file minh chứng. Vui lòng thử lại.",
+  });
 }
+
+watch(
+  () => [props.isOpen, props.detail?.activityId, props.detail?.evidenceItems],
+  ([isOpen]) => {
+    if (!isOpen) return;
+    const firstFile = (props.detail?.evidenceItems ?? []).find(
+      (item) => item.disk !== "url",
+    );
+    if (!firstFile) return;
+
+    const previewRawUrl =
+      (firstFile.previewUrl ?? firstFile.downloadUrl ?? firstFile.path).trim();
+    if (!previewRawUrl) return;
+    const downloadRawUrl = (firstFile.downloadUrl ?? firstFile.path).trim();
+
+    void prefetchPdfPreview({
+      cacheKey: `approved-work-evidence:${firstFile.evidenceFileId}`,
+      previewUrl: previewRawUrl,
+      downloadUrl: downloadRawUrl,
+      fallbackFileName:
+        firstFile.originalName?.trim() ||
+        `minh-chung-${firstFile.evidenceFileId}.pdf`,
+    });
+  },
+  { immediate: true, deep: true },
+);
 </script>

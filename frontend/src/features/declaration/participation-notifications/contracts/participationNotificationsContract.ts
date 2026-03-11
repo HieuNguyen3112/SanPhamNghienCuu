@@ -7,6 +7,8 @@ export interface ParticipationEvidenceDto {
   type: EvidenceTypeDto;
   label: string;
   url: string;
+  preview_url?: string | null;
+  download_url?: string | null;
 }
 
 export interface ParticipationMemberDto {
@@ -55,6 +57,8 @@ export interface ParticipationEvidence {
   type: EvidenceType;
   label: string;
   url: string;
+  previewUrl?: string | null;
+  downloadUrl?: string | null;
 }
 
 export interface ParticipationMember {
@@ -127,6 +131,8 @@ export function mapParticipationNotificationDtoToModel(
       type: e.type,
       label: e.label,
       url: e.url,
+      previewUrl: e.preview_url ?? null,
+      downloadUrl: e.download_url ?? null,
     })),
   };
 }
@@ -165,6 +171,8 @@ export function mapParticipationNotificationModelToDto(
       type: e.type,
       label: e.label,
       url: e.url,
+      preview_url: e.previewUrl ?? null,
+      download_url: e.downloadUrl ?? null,
     })),
   };
 }

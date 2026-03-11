@@ -223,15 +223,28 @@
                       </div>
                     </div>
 
-                    <a
-                      class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                      :href="ev.url"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <ExternalLink class="h-4 w-4" />
-                      Xem
-                    </a>
+                    <template v-if="ev.type === 'LINK'">
+                      <a
+                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                        :href="ev.url"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <ExternalLink class="h-4 w-4" />
+                        Mở link
+                      </a>
+                    </template>
+                    <template v-else>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="isEvidenceLoading(ev.id) || props.processing"
+                        @click="openEvidenceFile(ev)"
+                      >
+                        <ExternalLink class="h-4 w-4" />
+                        {{ isEvidenceLoading(ev.id) ? "Đang mở..." : "Xem" }}
+                      </button>
+                    </template>
                   </div>
                 </div>
 
@@ -389,6 +402,19 @@
         </div>
       </aside>
     </Transition>
+
+    <PdfPreviewModal
+      :open="previewOpen"
+      :title="previewTitle"
+      :file-name="previewFileName"
+      :preview-url="previewUrl"
+      :loading="previewLoading"
+      :error-message="previewError"
+      :can-download="canDownload"
+      @close="closePdfPreview"
+      @retry="retryOpenPdfPreview"
+      @download="downloadPreviewedPdf"
+    />
   </Teleport>
 </template>
 
@@ -403,6 +429,8 @@ import {
   X,
   XCircle,
 } from "lucide-vue-next";
+import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
+import { usePdfPreview } from "@/shared/composables/usePdfPreview";
 
 type WorkType = "ARTICLE" | "PROJECT" | "BOOK" | "CONFERENCE";
 type NotificationStatus = "PENDING" | "ACCEPTED" | "REJECTED";
@@ -413,6 +441,8 @@ interface ParticipationEvidence {
   type: EvidenceType;
   label: string;
   url: string;
+  previewUrl?: string | null;
+  downloadUrl?: string | null;
 }
 
 interface ParticipationMember {
@@ -461,6 +491,21 @@ const emit = defineEmits<{
 const isRejecting = ref(false);
 const rejectReason = ref("");
 const rejectError = ref<string | null>(null);
+const {
+  previewOpen,
+  previewLoading,
+  previewError,
+  previewTitle,
+  previewFileName,
+  previewUrl,
+  canDownload,
+  openPdfPreview,
+  retryOpenPdfPreview,
+  closePdfPreview,
+  isPreviewLoading,
+  downloadPreviewedPdf,
+  prefetchPdfPreview,
+} = usePdfPreview();
 
 watch(
   () => props.open,
@@ -483,6 +528,52 @@ watch(
 );
 
 const notification = computed(() => props.notification);
+
+function isEvidenceLoading(evidenceId: number): boolean {
+  return isPreviewLoading(`participation-evidence:${evidenceId}`);
+}
+
+async function openEvidenceFile(ev: ParticipationEvidence): Promise<void> {
+  if (ev.type !== "FILE") {
+    return;
+  }
+
+  const previewRawUrl = (ev.previewUrl ?? ev.url).trim();
+  if (!previewRawUrl) return;
+  const downloadRawUrl = (ev.downloadUrl ?? ev.url).trim();
+  const fallbackFileName = ev.label.trim() || `minh-chung-${ev.id}.pdf`;
+
+  await openPdfPreview({
+    cacheKey: `participation-evidence:${ev.id}`,
+    title: "Xem minh chứng",
+    fallbackFileName,
+    previewUrl: previewRawUrl,
+    downloadUrl: downloadRawUrl,
+    errorMessage: "Không thể mở file minh chứng. Vui lòng thử lại.",
+  });
+}
+
+watch(
+  () => [props.open, props.notification?.id, props.notification?.evidences],
+  ([isOpen]) => {
+    if (!isOpen) return;
+    const firstFile = (props.notification?.evidences ?? []).find(
+      (item) => item.type === "FILE",
+    );
+    if (!firstFile) return;
+    const previewRawUrl = (firstFile.previewUrl ?? firstFile.url).trim();
+    if (!previewRawUrl) return;
+    const downloadRawUrl = (firstFile.downloadUrl ?? firstFile.url).trim();
+
+    void prefetchPdfPreview({
+      cacheKey: `participation-evidence:${firstFile.id}`,
+      previewUrl: previewRawUrl,
+      downloadUrl: downloadRawUrl,
+      fallbackFileName: firstFile.label.trim() || `minh-chung-${firstFile.id}.pdf`,
+    });
+  },
+  { immediate: true, deep: true },
+);
 
 function typeLabel(t: WorkType) {
   if (t === "ARTICLE") return "Bài báo";

@@ -239,7 +239,7 @@ const route = useRoute();
 const userStore = useUserStore();
 
 onMounted(async () => {
-  if (!userStore.isInitialized) await userStore.ensureAuthInitialized();
+  if (!userStore.isInitialized) await userStore.bootstrapAuth();
 });
 
 const isAuthenticated = computed(() => userStore.isAuthenticated);

@@ -317,7 +317,7 @@ function telHref(phone: string) {
 const LinkRow = defineComponent({
   name: "LinkRow",
   props: {
-    icon: { type: Object as () => Component, required: true },
+    icon: { type: [Object, Function], required: true },
     label: { type: String, required: true },
     value: { type: String, required: true },
     href: { type: String as () => string | null, default: null }, // ✅ allow null

@@ -247,7 +247,7 @@ const route = useRoute();
 const userStore = useUserStore();
 
 onMounted(async () => {
-  if (!userStore.isInitialized) await userStore.ensureAuthInitialized();
+  if (!userStore.isInitialized) await userStore.bootstrapAuth();
 });
 const EMPTY_COUNTS: PublicLecturerItem["research_works"]["counts_by_kind"] = {
   paper: 0,

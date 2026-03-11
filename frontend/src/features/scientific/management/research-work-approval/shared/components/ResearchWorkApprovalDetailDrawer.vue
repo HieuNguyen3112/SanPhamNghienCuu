@@ -164,10 +164,9 @@
                 </div>
 
                 <div v-else class="mt-3 space-y-2">
-                  <a
+                  <div
                     v-for="evidenceAttachment in selectedResearchWorkApprovalEntry.evidenceAttachmentList"
                     :key="evidenceAttachment.evidenceAttachmentIdentifier"
-                    :href="evidenceAttachment.evidenceAttachmentPreviewUrl"
                     class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2 hover:bg-slate-50"
                   >
                     <div class="min-w-0">
@@ -179,10 +178,25 @@
                         {{ evidenceAttachment.evidenceAttachmentFileType }}
                       </div>
                     </div>
-                    <span class="text-xs font-semibold text-slate-600"
-                      >Xem</span
+                    <button
+                      type="button"
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      :disabled="
+                        isEvidenceLoading(
+                          evidenceAttachment.evidenceAttachmentIdentifier,
+                        )
+                      "
+                      @click="openEvidenceAttachment(evidenceAttachment)"
                     >
-                  </a>
+                      {{
+                        isEvidenceLoading(
+                          evidenceAttachment.evidenceAttachmentIdentifier,
+                        )
+                          ? "Đang mở..."
+                          : "Xem"
+                      }}
+                    </button>
+                  </div>
                 </div>
               </section>
 
@@ -465,13 +479,29 @@
         </div>
       </aside></Transition
     >
+
+    <PdfPreviewModal
+      :open="previewOpen"
+      :title="previewTitle"
+      :file-name="previewFileName"
+      :preview-url="previewUrl"
+      :loading="previewLoading"
+      :error-message="previewError"
+      :can-download="canDownload"
+      @close="closePdfPreview"
+      @retry="retryOpenPdfPreview"
+      @download="downloadPreviewedPdf"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, toRefs } from "vue";
 import { X } from "lucide-vue-next";
+import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
+import { usePdfPreview } from "@/shared/composables/usePdfPreview";
 import type {
+  EvidenceAttachment,
   ResearchWorkApprovalEntry,
   ResearchWorkApprovalScopeIdentifier,
   ResearchWorkRejectionReasonType,
@@ -550,7 +580,81 @@ const {
   formatIntegerValue,
   formatDateTimeDisplayValue,
 } = displayMapping;
-const { openActionResultModal } = useActionResultModal();
+const { openActionResultModal, showErrorModal } = useActionResultModal();
+const {
+  previewOpen,
+  previewLoading,
+  previewError,
+  previewTitle,
+  previewFileName,
+  previewUrl,
+  canDownload,
+  openPdfPreview,
+  retryOpenPdfPreview,
+  closePdfPreview,
+  isPreviewLoading,
+  downloadPreviewedPdf,
+  prefetchPdfPreview,
+} = usePdfPreview();
+
+function isEvidenceLoading(evidenceAttachmentId: number): boolean {
+  return isPreviewLoading(`approval-evidence:${evidenceAttachmentId}`);
+}
+
+async function openEvidenceAttachment(
+  evidenceAttachment: EvidenceAttachment,
+): Promise<void> {
+  const evidencePreviewUrl =
+    evidenceAttachment.evidenceAttachmentPreviewUrl?.trim() ?? "";
+  if (!evidencePreviewUrl || evidencePreviewUrl === "#") {
+    showErrorModal(
+      "Không thể mở tệp minh chứng ở thời điểm này. Vui lòng thử lại.",
+      "Không thể mở minh chứng",
+    );
+    return;
+  }
+
+  const downloadUrl = evidenceAttachment.evidenceAttachmentDownloadUrl ?? null;
+  const fallbackFileName =
+    evidenceAttachment.evidenceAttachmentDisplayName.trim() ||
+    `minh-chung-${evidenceAttachment.evidenceAttachmentIdentifier}.pdf`;
+
+  await openPdfPreview({
+    cacheKey: `approval-evidence:${evidenceAttachment.evidenceAttachmentIdentifier}`,
+    title: "Xem minh chứng",
+    fallbackFileName,
+    previewUrl: evidencePreviewUrl,
+    downloadUrl,
+    errorMessage: "Không thể mở file minh chứng. Vui lòng thử lại.",
+  });
+}
+
+watch(
+  () => [
+    isOpen.value,
+    selectedResearchWorkApprovalEntry.value?.researchWorkIdentifier,
+    selectedResearchWorkApprovalEntry.value?.evidenceAttachmentList,
+  ],
+  ([drawerOpen]) => {
+    if (!drawerOpen) return;
+    const firstAttachment =
+      selectedResearchWorkApprovalEntry.value?.evidenceAttachmentList?.[0] ??
+      null;
+    if (!firstAttachment) return;
+    const previewUrl = firstAttachment.evidenceAttachmentPreviewUrl?.trim() ?? "";
+    if (!previewUrl || previewUrl === "#") return;
+
+    void prefetchPdfPreview({
+      cacheKey: `approval-evidence:${firstAttachment.evidenceAttachmentIdentifier}`,
+      previewUrl,
+      downloadUrl: firstAttachment.evidenceAttachmentDownloadUrl ?? null,
+      fallbackFileName:
+        firstAttachment.evidenceAttachmentDisplayName.trim() ||
+        `minh-chung-${firstAttachment.evidenceAttachmentIdentifier}.pdf`,
+    });
+  },
+  { immediate: true, deep: true },
+);
 
 // chỉ cấp trường mới được chốt giờ
 const canFinalizeHours = computed(() => {
@@ -780,4 +884,3 @@ async function onRejectActionButtonClicked(): Promise<void> {
   });
 }
 </script>
-

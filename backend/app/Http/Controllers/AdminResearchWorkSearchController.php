@@ -3,14 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Admin\WorkSearchRequest;
+use App\Services\Evidence\ResearchEvidenceStorageService;
 use App\Support\RoleMapper;
 use App\Support\StorageDownload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
 class AdminResearchWorkSearchController extends Controller
 {
+    public function __construct(
+        private ResearchEvidenceStorageService $evidenceStorageService
+    ) {
+    }
+
     public function lookups(Request $request)
     {
         $faculties = DB::table('faculties')
@@ -172,7 +180,73 @@ class AdminResearchWorkSearchController extends Controller
         ], Response::HTTP_OK);
     }
 
+    public function previewAttachment(Request $request, int $attachment)
+    {
+        $file = $this->resolveAttachmentWithScope($request, $attachment);
+        if (! $file) {
+            return response()->json(['message' => 'attachment not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $filename = $file->original_name ?: ('attachment-' . $file->id . '.pdf');
+
+        try {
+            return $this->evidenceStorageService->streamPreview(
+                $request,
+                (string) ($file->disk ?? 'local'),
+                (string) ($file->path ?? ''),
+                (string) $filename,
+                (string) ($file->mime_type ?? 'application/pdf')
+            );
+        } catch (RuntimeException $exception) {
+            Log::error('admin_research_work.attachment_preview_failed', [
+                'attachment_id' => $attachment,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể xem trước tệp minh chứng. Vui lòng thử lại.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     public function downloadAttachment(Request $request, int $attachment)
+    {
+        $file = $this->resolveAttachmentWithScope($request, $attachment);
+        if (! $file) {
+            return response()->json(['message' => 'attachment not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $disk = $file->disk ?: 'public';
+        $path = $file->path;
+        $filename = $file->original_name ?: ('attachment-' . $file->id . '.pdf');
+
+        if ($this->evidenceStorageService->isRcloneDisk((string) $disk)) {
+            try {
+                return $this->evidenceStorageService->streamDownload(
+                    $request,
+                    (string) $disk,
+                    (string) $path,
+                    (string) $filename,
+                    (string) ($file->mime_type ?? 'application/octet-stream')
+                );
+            } catch (RuntimeException $exception) {
+                Log::error('admin_research_work.attachment_download_failed', [
+                    'attachment_id' => $attachment,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Không thể tải tệp minh chứng. Vui lòng thử lại.',
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        return StorageDownload::stream($disk, $path, $filename, [
+            'Content-Type' => $file->mime_type ?: 'application/octet-stream',
+        ]);
+    }
+
+    private function resolveAttachmentWithScope(Request $request, int $attachment): ?object
     {
         $file = DB::table('evidence_files as ef')
             ->where('ef.id', $attachment)
@@ -187,22 +261,16 @@ class AdminResearchWorkSearchController extends Controller
             ->first();
 
         if (! $file) {
-            return response()->json(['message' => 'attachment not found'], Response::HTTP_NOT_FOUND);
+            return null;
         }
 
         $accessQuery = DB::table('research_activities as ra')->where('ra.id', $file->activity_id);
         $this->applyRoleScope($accessQuery, $request);
         if (! $accessQuery->exists()) {
-            return response()->json(['message' => 'forbidden'], Response::HTTP_FORBIDDEN);
+            return null;
         }
 
-        $disk = $file->disk ?: 'public';
-        $path = $file->path;
-        $filename = $file->original_name ?: ('attachment-' . $file->id);
-
-        return StorageDownload::stream($disk, $path, $filename, [
-            'Content-Type' => $file->mime_type ?: 'application/octet-stream',
-        ]);
+        return $file;
     }
 
     protected function normalizeFilters(array $validated): array
@@ -657,11 +725,15 @@ class AdminResearchWorkSearchController extends Controller
 
         $files = [];
         foreach ($items as $item) {
+            $previewUrl = route('admin.works.attachments.preview', ['attachment' => $item->id], false);
+            $downloadUrl = route('admin.works.attachments.download', ['attachment' => $item->id], false);
             $files[] = [
                 'file_id' => (string) $item->id,
                 'kind' => 'file',
                 'label' => $item->file_type_name ?: ($item->original_name ?: 'Tệp minh chứng'),
-                'url' => route('admin.works.attachments.download', ['attachment' => $item->id], false),
+                'url' => $previewUrl,
+                'preview_url' => $previewUrl,
+                'download_url' => $downloadUrl,
                 'file_name' => $item->original_name,
                 'mime_type' => $item->mime_type,
                 'size_bytes' => $item->size_bytes !== null ? (int) $item->size_bytes : null,

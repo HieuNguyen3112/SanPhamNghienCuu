@@ -1,0 +1,308 @@
+- generic [ref=e34]:
+  - complementary [ref=e35]:
+    - link "Về trang chủ" [ref=e37] [cursor=pointer]:
+      - /url: /
+      - img "University logo" [ref=e38]
+    - generic [ref=e40]:
+      - generic [ref=e42]: T
+      - generic [ref=e43]:
+        - generic [ref=e44]: Nguyễn Minh Tuấn
+        - generic [ref=e45]: Giảng viên
+    - button "‹" [ref=e48]:
+      - generic [ref=e49]: ‹
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - button "Hồ sơ cá nhân ▾" [ref=e53]:
+          - generic [ref=e54]: Hồ sơ cá nhân
+          - generic [ref=e55]: ▾
+        - link "Hồ sơ khoa học" [ref=e57] [cursor=pointer]:
+          - /url: /profile
+          - img [ref=e59]
+          - generic [ref=e62]: Hồ sơ khoa học
+      - generic [ref=e63]:
+        - button "Kê khai khoa học ▾" [ref=e64]:
+          - generic [ref=e65]: Kê khai khoa học
+          - generic [ref=e66]: ▾
+        - generic [ref=e67]:
+          - link "Kê khai công trình" [ref=e68] [cursor=pointer]:
+            - /url: /declarations/gateway
+            - img [ref=e70]
+            - generic [ref=e73]: Kê khai công trình
+          - link "Thông báo xác nhận" [ref=e74] [cursor=pointer]:
+            - /url: /declarations/participatier
+            - img [ref=e76]
+            - generic [ref=e80]: Thông báo xác nhận
+          - link "Công trình của tôi" [ref=e81] [cursor=pointer]:
+            - /url: /works/personal
+            - img [ref=e83]
+            - generic [ref=e86]: Công trình của tôi
+          - link "Tính giờ NCKH cá nhân" [ref=e87] [cursor=pointer]:
+            - /url: /hours/calculate
+            - img [ref=e89]
+            - generic [ref=e91]: Tính giờ NCKH cá nhân
+          - link "Giờ NCKH cá nhân" [ref=e92] [cursor=pointer]:
+            - /url: /hours/personal
+            - img [ref=e94]
+            - generic [ref=e97]: Giờ NCKH cá nhân
+          - link "Thông báo cảnh báo" [ref=e98] [cursor=pointer]:
+            - /url: /hours/personal_warnings
+            - img [ref=e100]
+            - generic [ref=e103]: Thông báo cảnh báo
+      - generic [ref=e104]:
+        - button "Tra cứu ▾" [ref=e105]:
+          - generic [ref=e106]: Tra cứu
+          - generic [ref=e107]: ▾
+        - link "Tra cứu công trình" [ref=e109] [cursor=pointer]:
+          - /url: /search
+          - img [ref=e111]
+          - generic [ref=e114]: Tra cứu công trình
+    - paragraph [ref=e116]: © 2026 Phần mềm quản lý NCKH
+  - generic [ref=e117]:
+    - banner [ref=e118]:
+      - generic [ref=e121]: TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH
+      - generic [ref=e122]:
+        - button "Mở danh sách thông báo" [ref=e124]:
+          - img [ref=e125]
+          - generic [ref=e378]: "14"
+        - button "Tài khoản" [ref=e129]:
+          - generic [ref=e130]: Tài khoản
+          - img [ref=e131]
+    - main [ref=e133]:
+      - generic [ref=e135]:
+        - generic [ref=e138]:
+          - heading "Hồ sơ khoa học & Công trình NCKH" [level=1] [ref=e139]
+          - paragraph [ref=e140]: Xem và cập nhật thông tin cá nhân, hồ sơ khoa học; tổng hợp công trình đã duyệt.
+        - generic [ref=e141]:
+          - generic [ref=e142]:
+            - generic [ref=e143]:
+              - generic [ref=e144]:
+                - heading "Thông tin cá nhân" [level=2] [ref=e145]
+                - paragraph [ref=e146]: Một số thông tin do hệ thống quản lý sẽ ở trạng thái chỉ xem.
+              - button "Chỉnh sửa" [ref=e148]:
+                - img [ref=e149]
+                - text: Chỉnh sửa
+            - generic [ref=e152]:
+              - generic [ref=e155]: NT
+              - generic [ref=e156]:
+                - generic [ref=e157]: Nguyễn Minh Tuấn
+                - generic [ref=e158]:
+                  - generic [ref=e159]: GV-001
+                  - generic [ref=e160]: •
+                  - generic [ref=e161]: Bộ môn Kỹ thuật Phần mềm
+            - generic [ref=e162]:
+              - generic [ref=e163]:
+                - generic [ref=e164]: Mã giảng viên
+                - generic [ref=e379]: GV-001
+              - generic [ref=e165]:
+                - generic [ref=e166]: Đơn vị công tác
+                - generic [ref=e167]: Bộ môn Kỹ thuật Phần mềm
+              - generic [ref=e168]:
+                - generic [ref=e169]: Họ và tên
+                - generic [ref=e170]: Nguyễn Minh Tuấn
+              - generic [ref=e171]:
+                - generic [ref=e172]: Ngày sinh
+                - generic [ref=e173]: 5/20/1985
+              - generic [ref=e174]:
+                - generic [ref=e175]: Giới tính
+                - generic [ref=e176]: Nam
+              - generic [ref=e177]:
+                - generic [ref=e178]: Chức danh nghề nghiệp
+                - generic [ref=e179]: Giảng viên cao cấp
+              - generic [ref=e180]:
+                - generic [ref=e181]: Loại cán bộ
+                - generic [ref=e182]: Cơ hữu
+              - generic [ref=e183]:
+                - generic [ref=e184]: Tình trạng công tác
+                - generic [ref=e185]: Đang công tác
+          - generic [ref=e186]:
+            - generic [ref=e187]:
+              - generic [ref=e188]:
+                - generic [ref=e189]: Thông tin liên hệ
+                - paragraph [ref=e190]: Bạn có thể cập nhật email cá nhân, số điện thoại, địa chỉ và các liên kết hồ sơ.
+              - button "Chỉnh sửa" [ref=e192]:
+                - img [ref=e193]
+                - text: Chỉnh sửa
+            - generic [ref=e197]:
+              - generic [ref=e198]:
+                - generic [ref=e200]:
+                  - img [ref=e201]
+                  - generic [ref=e204]:
+                    - generic [ref=e205]: Email công vụ
+                    - link "gv-001@local.test" [ref=e380] [cursor=pointer]:
+                      - /url: mailto:gv-001@local.test
+                - generic [ref=e207]:
+                  - img [ref=e208]
+                  - generic [ref=e211]:
+                    - generic [ref=e212]: Email cá nhân
+                    - link "gv.profile@local.test" [ref=e381] [cursor=pointer]:
+                      - /url: mailto:gv.profile@local.test
+              - generic [ref=e214]:
+                - generic [ref=e216]:
+                  - img [ref=e217]
+                  - generic [ref=e219]:
+                    - generic [ref=e220]: Số điện thoại
+                    - link "0900000001" [ref=e382] [cursor=pointer]:
+                      - /url: tel:0900000001
+                - generic [ref=e223]:
+                  - img [ref=e224]
+                  - generic [ref=e227]:
+                    - generic [ref=e228]: Địa chỉ liên hệ
+                    - generic [ref=e229]: 280 An Dương Vương, Quận 5, TP. Hồ Chí Minh
+              - generic [ref=e230]:
+                - generic [ref=e232]:
+                  - img [ref=e233]
+                  - generic [ref=e236]:
+                    - generic [ref=e237]: Website cá nhân
+                    - link "https://example.local" [ref=e383] [cursor=pointer]:
+                      - /url: https://example.local
+                - generic [ref=e240]:
+                  - img [ref=e241]
+                  - generic [ref=e245]:
+                    - generic [ref=e246]: Google Scholar
+                    - link "https://scholar.google.com/example" [ref=e384] [cursor=pointer]:
+                      - /url: https://scholar.google.com/example
+              - generic [ref=e250]:
+                - img [ref=e251]
+                - generic [ref=e254]:
+                  - generic [ref=e255]: ORCID
+                  - link "0000-0002-0000-0001" [ref=e385] [cursor=pointer]:
+                    - /url: 0000-0002-0000-0001
+          - generic [ref=e259]:
+            - generic [ref=e260]:
+              - generic [ref=e261]:
+                - generic [ref=e262]: Hồ sơ khoa học
+                - paragraph [ref=e263]: Trình độ, lĩnh vực nghiên cứu và ngoại ngữ.
+              - button "Chỉnh sửa" [ref=e265]:
+                - img [ref=e266]
+                - text: Chỉnh sửa
+            - generic [ref=e269]:
+              - generic [ref=e270]:
+                - generic [ref=e271]:
+                  - img [ref=e272]
+                  - generic [ref=e275]: Trình độ & học hàm
+                - generic [ref=e276]:
+                  - generic [ref=e277]:
+                    - generic [ref=e278]: Badge
+                    - generic [ref=e279]:
+                      - generic [ref=e386]: Tiến sĩ
+                      - generic [ref=e387]: Phó giáo sư
+                  - generic [ref=e281]:
+                    - generic [ref=e282]: Năm ghi nhận
+                    - generic [ref=e283]: "Học vị: 2016 •Học hàm: —"
+                  - generic [ref=e284]:
+                    - generic [ref=e285]: Trình độ / ngành đào tạo
+                    - generic [ref=e286]: Tiến sĩ • Hệ thống thông tin
+              - generic [ref=e287]:
+                - generic [ref=e288]:
+                  - img [ref=e289]
+                  - generic [ref=e291]: Lĩnh vực nghiên cứu
+                - generic [ref=e292]:
+                  - generic [ref=e293]:
+                    - generic [ref=e294]: Lĩnh vực chính
+                    - generic [ref=e295]: Trí tuệ nhân tạo
+                  - generic [ref=e296]:
+                    - generic [ref=e297]: Lĩnh vực phụ
+                    - generic [ref=e298]: Học máy
+                  - generic [ref=e299]:
+                    - generic [ref=e300]: Từ khóa (keywords)
+                    - generic [ref=e388]: "#Khai phá dữ liệu giáo dục"
+              - generic [ref=e303]:
+                - generic [ref=e304]:
+                  - img [ref=e305]
+                  - generic [ref=e309]: Ngoại ngữ
+                - table [ref=e311]:
+                  - rowgroup [ref=e312]:
+                    - row "Ngoại ngữ Trình độ" [ref=e313]:
+                      - columnheader "Ngoại ngữ" [ref=e314]
+                      - columnheader "Trình độ" [ref=e315]
+                  - rowgroup [ref=e316]:
+                    - row "English IELTS 6.5" [ref=e389]:
+                      - cell "English" [ref=e390]:
+                        - generic [ref=e391]: English
+                      - cell "IELTS 6.5" [ref=e392]
+                    - row "Japanese JLPT N3" [ref=e393]:
+                      - cell "Japanese" [ref=e394]:
+                        - generic [ref=e395]: Japanese
+                      - cell "JLPT N3" [ref=e396]
+          - generic [ref=e320]:
+            - generic [ref=e321]:
+              - generic [ref=e322]:
+                - generic [ref=e323]: Công trình khoa học
+                - paragraph [ref=e324]: Chỉ hiển thị công trình đã duyệt (read-only).
+              - button "Kê khai mới" [ref=e326]:
+                - img [ref=e327]
+                - text: Kê khai mới
+            - generic [ref=e328]:
+              - button "Bài báo khoa học 4" [ref=e397]:
+                - img [ref=e330]
+                - text: Bài báo khoa học
+                - generic [ref=e333]: "4"
+              - button "Đề tài nghiên cứu 3" [ref=e398]:
+                - img [ref=e335]
+                - text: Đề tài nghiên cứu
+                - generic [ref=e337]: "3"
+              - button "Sách / Giáo trình 1" [ref=e399]:
+                - img [ref=e339]
+                - text: Sách / Giáo trình
+                - generic [ref=e341]: "1"
+              - button "Báo cáo hội thảo 3" [ref=e400]:
+                - img [ref=e343]
+                - text: Báo cáo hội thảo
+                - generic [ref=e346]: "3"
+            - table [ref=e349]:
+              - rowgroup [ref=e350]:
+                - row "Tên công trình Thông tin Năm Vai trò Hành động" [ref=e351]:
+                  - columnheader "Tên công trình" [ref=e352]
+                  - columnheader "Thông tin" [ref=e353]
+                  - columnheader "Năm" [ref=e354]
+                  - columnheader "Vai trò" [ref=e355]
+                  - columnheader "Hành động" [ref=e356]
+              - rowgroup [ref=e357]:
+                - row "Nghiên cứu khung đánh giá năng lực số cho sinh viên sư phạm Tạp chí Toán Tin học 2024 —" [ref=e401]:
+                  - cell "Nghiên cứu khung đánh giá năng lực số cho sinh viên sư phạm" [ref=e402]:
+                    - button "Nghiên cứu khung đánh giá năng lực số cho sinh viên sư phạm" [ref=e403]
+                  - cell "Tạp chí Toán Tin học" [ref=e404]
+                  - cell "2024" [ref=e405]
+                  - cell "—" [ref=e406]
+                  - cell [ref=e407]:
+                    - generic [ref=e408]:
+                      - button "Xem" [ref=e409]:
+                        - img [ref=e410]
+                      - button "Minh chứng" [ref=e413]:
+                        - img [ref=e414]
+                - row "Mô hình dự báo nhu cầu học phần bằng học máy Tạp chí Toán học và Tin học ứng dụng, Vol 5 No 1, pp. 45-58 2025 Đồng tác giả" [ref=e416]:
+                  - cell "Mô hình dự báo nhu cầu học phần bằng học máy" [ref=e417]:
+                    - button "Mô hình dự báo nhu cầu học phần bằng học máy" [ref=e418]
+                  - cell "Tạp chí Toán học và Tin học ứng dụng, Vol 5 No 1, pp. 45-58" [ref=e419]
+                  - cell "2025" [ref=e420]
+                  - cell "Đồng tác giả" [ref=e421]
+                  - cell [ref=e422]:
+                    - generic [ref=e423]:
+                      - button "Xem" [ref=e424]:
+                        - img [ref=e425]
+                      - button "Minh chứng" [ref=e428]:
+                        - img [ref=e429]
+                - row "Ứng dụng mô hình ngôn ngữ lớn hỗ trợ phản hồi bài tập lập trình Tạp chí Khoa học Trường Đại học Sư phạm TP. Hồ Chí Minh, Vol 12 No 2, pp. 101-120 2024 Chủ nhiệm" [ref=e431]:
+                  - cell "Ứng dụng mô hình ngôn ngữ lớn hỗ trợ phản hồi bài tập lập trình" [ref=e432]:
+                    - button "Ứng dụng mô hình ngôn ngữ lớn hỗ trợ phản hồi bài tập lập trình" [ref=e433]
+                  - cell "Tạp chí Khoa học Trường Đại học Sư phạm TP. Hồ Chí Minh, Vol 12 No 2, pp. 101-120" [ref=e434]
+                  - cell "2024" [ref=e435]
+                  - cell "Chủ nhiệm" [ref=e436]
+                  - cell [ref=e437]:
+                    - generic [ref=e438]:
+                      - button "Xem" [ref=e439]:
+                        - img [ref=e440]
+                      - button "Minh chứng" [ref=e443]:
+                        - img [ref=e444]
+                - row "Ứng dụng AI trong phản hồi bài tập lập trình 2026 Chủ nhiệm" [ref=e446]:
+                  - cell "Ứng dụng AI trong phản hồi bài tập lập trình" [ref=e447]:
+                    - button "Ứng dụng AI trong phản hồi bài tập lập trình" [ref=e448]
+                  - cell [ref=e449]
+                  - cell "2026" [ref=e450]
+                  - cell "Chủ nhiệm" [ref=e451]
+                  - cell [ref=e452]:
+                    - generic [ref=e453]:
+                      - button "Xem" [ref=e454]:
+                        - img [ref=e455]
+                      - button "Minh chứng" [ref=e458]:
+                        - img [ref=e459]

@@ -41,6 +41,14 @@ class Kernel extends ConsoleKernel
                 ->onOneServer();
         }
 
+        $evidenceCacheCleanupTime = (string) config('evidence.storage.hot_cache_cleanup_time', '04:30');
+        $schedule
+            ->command('spnc:evidence:cache:prune')
+            ->dailyAt($evidenceCacheCleanupTime)
+            ->timezone($timezone)
+            ->withoutOverlapping(30)
+            ->onOneServer();
+
         $schedule
             ->command('spnc:backup:prune --trigger=schedule')
             ->days($backupDays)

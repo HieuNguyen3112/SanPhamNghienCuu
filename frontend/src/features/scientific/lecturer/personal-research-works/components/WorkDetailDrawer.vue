@@ -220,14 +220,14 @@
                       <div class="mt-1 text-xs text-slate-400">Uploaded: {{ formatDateTime(item.uploadedAt) }}</div>
                     </div>
 
-                    <a
-                      class="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      :href="buildEvidenceUrl(item.disk, item.path)"
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      class="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      :disabled="isEvidenceLoading(item.evidenceFileId)"
+                      @click="openEvidenceFile(item)"
                     >
-                      Mở
-                    </a>
+                      {{ isEvidenceLoading(item.evidenceFileId) ? "Đang mở..." : "Mở" }}
+                    </button>
                   </div>
                 </div>
               </section>
@@ -295,17 +295,33 @@
         </div>
       </aside>
     </Transition>
+
+    <PdfPreviewModal
+      :open="previewOpen"
+      :title="previewTitle"
+      :file-name="previewFileName"
+      :preview-url="previewUrl"
+      :loading="previewLoading"
+      :error-message="previewError"
+      :can-download="canDownload"
+      @close="closePdfPreview"
+      @retry="retryOpenPdfPreview"
+      @download="downloadPreviewedPdf"
+    />
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import type {
+  PersonalWorkEvidence,
   PersonalWorkDetail,
   PersonalWorkStatusCode,
 } from "../contracts/personalResearchWorksContracts";
 import InfoRow from "@/features/scientific/lecturer/personal-research-works/components/InfoRow.vue";
 import TimelineItem from "@/features/scientific/lecturer/personal-research-works/components/TimelineItem.vue";
+import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
+import { usePdfPreview } from "@/shared/composables/usePdfPreview";
 
 const props = defineProps<{
   open: boolean;
@@ -319,6 +335,21 @@ const emit = defineEmits<{
   (e: "edit-draft", workId: number): void;
   (e: "reinvite-member", memberId: number): void;
 }>();
+const {
+  previewOpen,
+  previewLoading,
+  previewError,
+  previewTitle,
+  previewFileName,
+  previewUrl,
+  canDownload,
+  openPdfPreview,
+  retryOpenPdfPreview,
+  closePdfPreview,
+  isPreviewLoading,
+  downloadPreviewedPdf,
+  prefetchPdfPreview,
+} = usePdfPreview();
 
 const rejectedActedAt = computed<string | null>(() => {
   const currentWork = props.work;
@@ -370,8 +401,64 @@ function formatBytes(bytes: number): string {
   return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+function isEvidenceLoading(evidenceId: number): boolean {
+  return isPreviewLoading(`personal-work-evidence:${evidenceId}`);
+}
+
+async function openEvidenceFile(item: PersonalWorkEvidence): Promise<void> {
+  const fallbackUrl = buildEvidenceUrl(item.disk, item.path);
+  const previewRawUrl = (item.previewUrl ?? item.downloadUrl ?? fallbackUrl).trim();
+  if (!previewRawUrl) return;
+
+  if (item.disk === "url" && /^https?:\/\//i.test(previewRawUrl)) {
+    window.open(previewRawUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  const downloadRawUrl = (item.downloadUrl ?? fallbackUrl).trim();
+  const fallbackFileName =
+    item.originalName?.trim() || `minh-chung-${item.evidenceFileId}.pdf`;
+
+  await openPdfPreview({
+    cacheKey: `personal-work-evidence:${item.evidenceFileId}`,
+    title: "Xem minh chứng",
+    fallbackFileName,
+    previewUrl: previewRawUrl,
+    downloadUrl: downloadRawUrl,
+    errorMessage: "Không thể mở file minh chứng. Vui lòng thử lại.",
+  });
+}
+
 function buildEvidenceUrl(disk: string, path: string): string {
   void disk;
   return path.startsWith("http") ? path : `/${path.replace(/^\/+/, "")}`;
 }
+
+watch(
+  () => [props.open, props.work?.activityId, props.work?.evidenceItems],
+  ([isOpen]) => {
+    if (!isOpen) return;
+    const firstFile = (props.work?.evidenceItems ?? []).find(
+      (item) => item.disk !== "url",
+    );
+    if (!firstFile) return;
+
+    const fallbackUrl = buildEvidenceUrl(firstFile.disk, firstFile.path);
+    const previewRawUrl =
+      (firstFile.previewUrl ?? firstFile.downloadUrl ?? fallbackUrl).trim();
+    if (!previewRawUrl) return;
+    const downloadRawUrl = (firstFile.downloadUrl ?? fallbackUrl).trim();
+
+    void prefetchPdfPreview({
+      cacheKey: `personal-work-evidence:${firstFile.evidenceFileId}`,
+      previewUrl: previewRawUrl,
+      downloadUrl: downloadRawUrl,
+      fallbackFileName:
+        firstFile.originalName?.trim() ||
+        `minh-chung-${firstFile.evidenceFileId}.pdf`,
+    });
+  },
+  { immediate: true, deep: true },
+);
 </script>
+

@@ -936,7 +936,9 @@ class FacultyResearchWorkApprovalController extends Controller
             ->get()
             ->map(function ($row) {
                 $payload = (array) $row;
-                $payload['url'] = route('faculty.works.evidence.download', ['evidence' => $row->id], false);
+                $payload['preview_url'] = route('faculty.works.evidence.preview', ['evidence' => $row->id], false);
+                $payload['download_url'] = route('faculty.works.evidence.download', ['evidence' => $row->id], false);
+                $payload['url'] = $payload['preview_url'];
                 return $payload;
             })
             ->all();

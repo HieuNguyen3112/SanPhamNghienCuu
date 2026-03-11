@@ -88,7 +88,9 @@ export interface EvidenceDTO {
 
   disk: string;
   path: string;
+  preview_url?: string | null;
   download_url?: string | null;
+  url?: string | null;
 
   original_name: string;
   mime_type: string;
@@ -223,6 +225,7 @@ export interface Evidence {
 
   disk: string;
   path: string;
+  previewUrl?: string | null;
   downloadUrl?: string | null;
 
   originalName: string;
@@ -363,6 +366,7 @@ export const mapper = {
         fileTypeName: e.file_type_name,
         disk: e.disk,
         path: e.path,
+        previewUrl: e.preview_url ?? e.url ?? null,
         downloadUrl: e.download_url ?? null,
         originalName: e.original_name,
         mimeType: e.mime_type,

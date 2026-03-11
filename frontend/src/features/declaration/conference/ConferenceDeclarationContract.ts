@@ -1,6 +1,7 @@
 // File: src/features/declaration/conference/ConferenceDeclarationContract.ts
 import type {
   EvidenceFileDto,
+  EvidenceLinkDto,
   HoursDistributionItem,
 } from "../shared/contracts/declarationSharedContract";
 
@@ -17,6 +18,7 @@ export interface ConferenceOccurrenceFormItem {
 
   // Evidence per-row (UI-only)
   existingEvidenceFiles: EvidenceFileDto[];
+  existingEvidenceLinks: EvidenceLinkDto[];
   pendingEvidenceFiles: any[]; // giữ any để khớp EvidenceUpload hiện tại của bạn
   pendingEvidenceLinks: any[];
 }

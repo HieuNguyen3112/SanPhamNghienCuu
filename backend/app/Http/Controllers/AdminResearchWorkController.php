@@ -151,7 +151,21 @@ class AdminResearchWorkController extends Controller
                 'ef.size_bytes',
                 'ef.uploaded_at',
             ])
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                $payload = (array) $row;
+                $payload['preview_url'] = route('admin.works.attachments.preview', [
+                    'attachment' => $row->evidence_file_id,
+                ], false);
+                $payload['download_url'] = route('admin.works.attachments.download', [
+                    'attachment' => $row->evidence_file_id,
+                ], false);
+                $payload['url'] = $payload['preview_url'];
+
+                return $payload;
+            })
+            ->values()
+            ->all();
 
         $finalApproval = DB::table('activity_approvals as aa')
             ->join('approval_stages as st', 'aa.stage_id', '=', 'st.id')

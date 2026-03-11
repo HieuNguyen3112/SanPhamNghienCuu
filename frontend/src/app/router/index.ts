@@ -151,7 +151,7 @@ router.beforeEach(async (to) => {
 
   // ✅ dùng đúng init method từ index.ts 2
   if (needsSession && !userStore.isInitialized) {
-    await userStore.ensureAuthInitialized();
+    await userStore.bootstrapAuth();
   }
 
   const isAuthenticated = userStore.isAuthenticated;

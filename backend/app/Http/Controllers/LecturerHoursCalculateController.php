@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Lecturer\LecturerHoursCalculateIndexRequest;
 use App\Http\Requests\Lecturer\LecturerHoursCalculateSubmitRequest;
+use App\Services\Evidence\ResearchEvidenceStorageService;
 use App\Services\Hours\HoursRecomputeService;
 use App\Services\Hours\HoursRuleResolver;
 use App\Support\StorageDownload;
@@ -11,9 +12,11 @@ use App\Support\AcademicYearResolver;
 use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
 class LecturerHoursCalculateController extends Controller
@@ -247,6 +250,7 @@ class LecturerHoursCalculateController extends Controller
         $evidenceCountByActivity = DB::table('evidence_files')
             ->selectRaw('activity_id, COUNT(*) as total')
             ->whereIn('activity_id', $eligibleIds)
+            ->where('disk', '<>', ResearchEvidenceStorageService::LINK_DISK)
             ->groupBy('activity_id')
             ->pluck('total', 'activity_id');
 
@@ -632,12 +636,32 @@ class LecturerHoursCalculateController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        DB::table('evidence_files')->where('id', $evidenceId)->delete();
+        $disk = (string) ($evidence->disk ?: 'local');
 
-        $disk = $evidence->disk ?: 'local';
-        if (config("filesystems.disks.{$disk}") && Storage::disk($disk)->exists($evidence->path)) {
-            Storage::disk($disk)->delete($evidence->path);
+        try {
+            if (strtolower(trim($disk)) === ResearchEvidenceStorageService::RCLONE_DISK) {
+                /** @var ResearchEvidenceStorageService $storage */
+                $storage = app(ResearchEvidenceStorageService::class);
+                $storage->deleteFromRclone((string) $evidence->path);
+            } elseif (config("filesystems.disks.{$disk}") && Storage::disk($disk)->exists($evidence->path)) {
+                Storage::disk($disk)->delete($evidence->path);
+            }
+        } catch (RuntimeException $exception) {
+            Log::error('lecturer.hours.evidence_delete_failed', [
+                'evidence_id' => (int) $evidenceId,
+                'activity_id' => (int) $evidence->activity_id,
+                'disk' => $disk,
+                'path' => (string) $evidence->path,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Không thể xóa minh chứng trên kho lưu trữ.',
+                'code' => 'EVIDENCE_DELETE_STORAGE_FAILED',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        DB::table('evidence_files')->where('id', $evidenceId)->delete();
 
         return response()->json([
             'success' => true,
@@ -1643,6 +1667,7 @@ class LecturerHoursCalculateController extends Controller
         return DB::table('evidence_files as ef')
             ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
             ->where('ef.activity_id', $activityId)
+            ->where('ef.disk', '<>', ResearchEvidenceStorageService::LINK_DISK)
             ->select([
                 'ef.id',
                 'ef.activity_id',
