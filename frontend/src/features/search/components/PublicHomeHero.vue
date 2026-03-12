@@ -15,6 +15,7 @@
 
     <div class="relative mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-14">
       <div class="grid gap-8 lg:grid-cols-12 lg:items-center">
+
         <!-- LEFT -->
         <div class="lg:col-span-7">
           <div
@@ -31,9 +32,7 @@
             <span class="text-rose-300">Khoa học &amp; Công nghệ</span>
           </h1>
 
-          <p
-            class="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 md:text-base"
-          >
+          <p class="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 md:text-base">
             Tra cứu nhanh các công trình đã được khoa và trường phê duyệt.
           </p>
 
@@ -52,6 +51,7 @@
                 </div>
               </div>
             </div>
+
             <div class="flex items-start gap-3 rounded-2xl bg-white/10 p-4">
               <span
                 class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white"
@@ -66,6 +66,7 @@
                 </div>
               </div>
             </div>
+
             <div class="flex items-start gap-3 rounded-2xl bg-white/10 p-4">
               <span
                 class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white"
@@ -79,28 +80,6 @@
                   Mở drawer để xem thông tin.
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div class="mt-7">
-            <div class="text-xs font-semibold text-white/80">
-              Nhóm dữ liệu (chọn để tìm)
-            </div>
-            <div class="mt-2 flex flex-wrap gap-2">
-              <button
-                v-for="it in categoryItems"
-                :key="it.key"
-                type="button"
-                class="rounded-full border px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide"
-                :class="
-                  it.key === category
-                    ? 'border-white/30 bg-white/20 text-white'
-                    : 'border-white/20 bg-white/10 text-white hover:bg-white/15'
-                "
-                @click="$emit('update:category', it.key)"
-              >
-                {{ it.label }}
-              </button>
             </div>
           </div>
         </div>
@@ -124,6 +103,8 @@
             </div>
 
             <form class="mt-4 space-y-3" @submit.prevent="$emit('search')">
+              
+              <!-- Giảng viên -->
               <div>
                 <label class="text-xs font-semibold text-slate-600"
                   >Giảng viên (tên/mã)</label
@@ -133,10 +114,32 @@
                   @input="onLecturerQueryInput"
                   type="text"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
-                  placeholder="VD: Nguyễn Văn An / GV001"
+                  placeholder="Nguyễn Văn An / GV-001"
+                  
                 />
               </div>
 
+              <!-- Nhóm dữ liệu -->
+              <div>
+                <label class="text-xs font-semibold text-slate-600"
+                  >Nhóm dữ liệu</label
+                >
+                <select
+                  :value="category"
+                  @change="onCategoryChange"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
+                >
+                  <option
+                    v-for="it in categoryItems"
+                    :key="it.key"
+                    :value="it.key"
+                  >
+                    {{ it.label }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Khoa -->
               <div>
                 <label class="text-xs font-semibold text-slate-600">Khoa</label>
                 <select
@@ -154,6 +157,7 @@
                 </select>
               </div>
 
+              <!-- Năm học -->
               <div>
                 <label class="text-xs font-semibold text-slate-600"
                   >Năm học</label
@@ -188,14 +192,9 @@
                 Đặt lại bộ lọc
               </button>
             </form>
-
-            <div
-              class="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"
-            >
-              ⚠️ Chỉ hiển thị công trình đã được khoa và trường phê duyệt.
-            </div>
           </div>
         </div>
+
       </div>
     </div>
   </section>
@@ -208,7 +207,12 @@ import type {
   SelectOption,
 } from "@/features/public-research/models/publicResearchModels";
 
-type CategoryKey = "lecturer" | "article" | "project" | "book" | "conference";
+type CategoryKey =
+  | "lecturer"
+  | "article"
+  | "project"
+  | "book"
+  | "conference";
 
 const props = defineProps<{
   filterState: PublicResearchFilterState;
@@ -228,6 +232,7 @@ const ALL_OPTION_VALUE = "ALL";
 
 const normalizedFacultyOptions = computed(() => {
   const hasAll = props.facultyOptions.some((opt) => opt.value === null);
+
   if (hasAll) {
     return props.facultyOptions.map((opt) => ({
       value: opt.value === null ? ALL_OPTION_VALUE : String(opt.value),
@@ -246,6 +251,7 @@ const normalizedFacultyOptions = computed(() => {
 
 const normalizedAcademicYearOptions = computed(() => {
   const hasAll = props.academicYearOptions.some((opt) => opt.value === null);
+
   if (hasAll) {
     return props.academicYearOptions.map((opt) => ({
       value: opt.value === null ? ALL_OPTION_VALUE : String(opt.value),
@@ -265,21 +271,21 @@ const normalizedAcademicYearOptions = computed(() => {
 const selectedFacultyValue = computed(() =>
   props.filterState.facultyId == null
     ? ALL_OPTION_VALUE
-    : String(props.filterState.facultyId),
+    : String(props.filterState.facultyId)
 );
 
 const selectedAcademicYearValue = computed(() =>
   props.filterState.academicYearId == null
     ? ALL_OPTION_VALUE
-    : String(props.filterState.academicYearId),
+    : String(props.filterState.academicYearId)
 );
 
 const categoryItems: Array<{ key: CategoryKey; label: string }> = [
   { key: "lecturer", label: "Giảng viên" },
-  { key: "article", label: "Bài báo" },
-  { key: "project", label: "Đề tài" },
-  { key: "book", label: "Sách" },
-  { key: "conference", label: "Hội thảo" },
+  { key: "article", label: "Bài báo khoa học" },
+  { key: "project", label: "Đề tài nghiên cứu" },
+  { key: "book", label: "Sách - Giáo trình" },
+  { key: "conference", label: "Hội thảo - Báo cáo khoa học" },
 ];
 
 function onLecturerQueryInput(e: Event) {
@@ -287,16 +293,23 @@ function onLecturerQueryInput(e: Event) {
     lecturerQuery: (e.target as HTMLInputElement).value,
   });
 }
+
 function onFacultyChange(e: Event) {
   const raw = (e.target as HTMLSelectElement).value;
   emit("update-filter", {
     facultyId: raw === ALL_OPTION_VALUE ? null : Number(raw),
   });
 }
+
 function onAcademicYearChange(e: Event) {
   const raw = (e.target as HTMLSelectElement).value;
   emit("update-filter", {
     academicYearId: raw === ALL_OPTION_VALUE ? null : Number(raw),
   });
+}
+
+function onCategoryChange(e: Event) {
+  const raw = (e.target as HTMLSelectElement).value as CategoryKey;
+  emit("update:category", raw);
 }
 </script>

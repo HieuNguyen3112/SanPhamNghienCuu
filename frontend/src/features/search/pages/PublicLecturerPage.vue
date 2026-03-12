@@ -30,7 +30,7 @@
                 v-model="state.q"
                 type="text"
                 class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
-                placeholder="VD: Nguyễn Văn An / GV001"
+                placeholder="VD: Nguyễn Văn An / GV-001"
                 @keyup.enter="onSearch"
               />
             </div>
@@ -74,10 +74,11 @@
             <div class="flex items-end justify-end gap-2">
               <button
                 type="button"
-                class="inline-flex items-center gap-2 rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-extrabold text-white shadow-sm hover:brightness-110 active:scale-[0.99]"
+                class="inline-flex items-center gap-2 rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 active:scale-[0.99]"
                 @click="onSearch"
               >
-                🔎 Tìm kiếm
+              <Search class="h-4 w-4" />
+                Tìm kiếm
               </button>
 
               <button
@@ -85,7 +86,8 @@
                 class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
                 @click="onReset"
               >
-                ↩ Đặt lại
+              <RotateCcw class="h-4 w-4" />
+                Đặt lại
               </button>
             </div>
           </div>
@@ -154,10 +156,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
-
+import { RotateCcw, Search } from "lucide-vue-next";
 import PublicHomeTopHeader from "@/features/search/components/PublicHomeTopHeader.vue";
 import PublicHomeNavBar from "@/features/search/components/PublicHomeNavBar.vue";
 import PublicHomeFooter from "@/features/search/components/PublicHomeFooter.vue";
@@ -306,28 +308,41 @@ const pagination = ref({ page: 1, per_page: 12, total: 0, last_page: 1 });
 const loading = ref(false);
 const error = ref<string | null>(null);
 
+function normalizeLecturerParam(raw: string) {
+  // hỗ trợ cả "Tên / Mã" -> lấy "Tên"
+  return raw.split("/")[0]?.trim() ?? "";
+}
+
+function parseNumberQuery(v: unknown): number | null {
+  if (typeof v !== "string") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** init from query */
 function initFromQuery() {
-  const q = typeof route.query.q === "string" ? route.query.q : "";
-  const departmentId =
-    typeof route.query.department_id === "string"
-      ? Number(route.query.department_id)
-      : null;
-  const academicYearId =
-    typeof route.query.academic_year_id === "string"
-      ? Number(route.query.academic_year_id)
-      : null;
-  const page =
-    typeof route.query.page === "string" ? Number(route.query.page) : 1;
+  // ✅ Home gửi lecturer, facultyId, academicYearId
+  // ✅ Page cũ có thể gửi q, department_id, academic_year_id
+  const lecturerRaw =
+    (typeof route.query.lecturer === "string" && route.query.lecturer) ||
+    (typeof route.query.q === "string" && route.query.q) ||
+    "";
 
-  state.q = q;
-  state.departmentId = Number.isFinite(departmentId as any)
-    ? departmentId
-    : null;
-  state.academicYearId = Number.isFinite(academicYearId as any)
-    ? academicYearId
-    : null;
-  state.page = Number.isFinite(page as any) && page > 0 ? page : 1;
+  const facultyId =
+    parseNumberQuery(route.query.facultyId) ??
+    parseNumberQuery(route.query.faculty_id) ??
+    parseNumberQuery(route.query.department_id);
+
+  const academicYearId =
+    parseNumberQuery(route.query.academicYearId) ??
+    parseNumberQuery(route.query.academic_year_id);
+
+  const page = parseNumberQuery(route.query.page) ?? 1;
+
+  state.q = normalizeLecturerParam(lecturerRaw);
+  state.departmentId = facultyId; // giữ tên state cũ cho khỏi phải đổi nhiều
+  state.academicYearId = academicYearId;
+  state.page = page > 0 ? page : 1;
 }
 
 function onDepartmentChange(event: Event) {
@@ -377,9 +392,10 @@ onMounted(async () => {
 
 function syncQuery() {
   const q: Record<string, any> = {};
-  if (state.q.trim()) q.q = state.q.trim();
-  if (state.departmentId != null) q.department_id = state.departmentId;
-  if (state.academicYearId != null) q.academic_year_id = state.academicYearId;
+
+  if (state.q.trim()) q.lecturer = state.q.trim(); // ✅ dùng lecturer cho thống nhất
+  if (state.departmentId != null) q.facultyId = state.departmentId; // ✅ dùng facultyId
+  if (state.academicYearId != null) q.academicYearId = state.academicYearId;
   if (state.page !== 1) q.page = state.page;
 
   router.replace({ query: q });

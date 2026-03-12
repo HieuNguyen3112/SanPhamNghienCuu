@@ -34,7 +34,7 @@ export type PublicResearchItemDto = {
 };
 
 export type PublicResearchListQueryDto = {
-  // ✅ bắt buộc string (không undefined)
+  q?: string | null;
   lecturer_query: string;
   faculty_id: number | null;
   work_type: PublicResearchWorkTypeDto | null;

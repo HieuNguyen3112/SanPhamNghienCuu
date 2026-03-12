@@ -6,6 +6,22 @@
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div>
           <label class="text-xs font-medium text-slate-600"
+            >Tên công trình</label
+          >
+          <input
+            :value="filterState.keyword"
+            @input="
+              $emit('update-filter', {
+                keyword: ($event.target as HTMLInputElement).value,
+              })
+            "
+            type="text"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
+            placeholder="Ứng dụng AI trong giáo dục..."
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600"
             >Tên giảng viên (tên/mã)</label
           >
           <input
@@ -14,7 +30,7 @@
             @input="onLecturerQueryInput"
             type="text"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
-            placeholder="VD: Nguyễn Văn An / GV001"
+            placeholder="Nguyễn Văn An / GV-001"
           />
         </div>
 
@@ -35,11 +51,8 @@
           </select>
         </div>
 
-        <!-- ✅ Ẩn "Loại công trình" khi tab đã cố định loại -->
-        <div v-if="!hideWorkType">
-          <label class="text-xs font-medium text-slate-600"
-            >Loại công trình</label
-          >
+        <!--<div v-if="!hideWorkType">
+          
           <select
             :value="filterState.workType ?? ''"
             @change="onWorkTypeChange"
@@ -53,7 +66,7 @@
               {{ opt.label }}
             </option>
           </select>
-        </div>
+        </div>-->
 
         <div>
           <label class="text-xs font-medium text-slate-600">Năm học</label>
@@ -76,7 +89,7 @@
       <div class="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-extrabold text-white shadow-sm hover:brightness-110 active:scale-[0.99]"
+          class="inline-flex items-center gap-2 rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 active:scale-[0.99]"
           @click="$emit('search')"
         >
           <Search class="h-4 w-4" />

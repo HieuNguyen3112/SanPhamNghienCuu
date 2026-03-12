@@ -17,6 +17,7 @@ export function usePublicResearch() {
   const publicResearchItems = ref<PublicResearchItem[]>([]);
 
   const filterState = reactive<PublicResearchFilterState>({
+    keyword: "",
     lecturerQuery: "",
     facultyId: null,
     workType: null,
@@ -95,13 +96,13 @@ export function usePublicResearch() {
   });
 
   async function loadPublicResearchItems() {
-    // ✅ đảm bảo dropdown khoa/năm học có data thật
     await ensureLookupsLoaded();
 
     loadingState.value = "loading";
     errorState.value = null;
 
     const queryDto: PublicResearchListQueryDto = {
+      q: filterState.keyword?.trim() || null,   
       lecturer_query: filterState.lecturerQuery,
       faculty_id: filterState.facultyId,
       work_type: filterState.workType,
@@ -130,6 +131,7 @@ export function usePublicResearch() {
   }
 
   function resetFilterState() {
+    filterState.keyword = "";
     filterState.lecturerQuery = "";
     filterState.facultyId = null;
     filterState.workType = null;
