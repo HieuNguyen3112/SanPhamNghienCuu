@@ -22,10 +22,11 @@ class Kernel extends ConsoleKernel
         $timezone = (string) config('backup.schedule.timezone', 'Asia/Ho_Chi_Minh');
         $backupTime = (string) config('backup.schedule.time', '02:00');
         $pruneTime = (string) config('backup.schedule.prune_time', '03:00');
+        $verifyTime = (string) config('backup.verification.time', '04:00');
         $snapshotRefreshIntervalMinutes = min(59, max(5, (int) config('backup.snapshot_cache.refresh_interval_minutes', 10)));
 
         $schedule
-            ->command('spnc:backup:run --trigger=schedule --skip-prune')
+            ->command('spnc:backup:run --trigger=schedule')
             ->days($backupDays)
             ->at($backupTime)
             ->timezone($timezone)
@@ -56,6 +57,15 @@ class Kernel extends ConsoleKernel
             ->timezone($timezone)
             ->withoutOverlapping(180)
             ->onOneServer();
+
+        if ((bool) config('backup.verification.enabled', true)) {
+            $schedule
+                ->command('spnc:backup:check --trigger=schedule')
+                ->dailyAt($verifyTime)
+                ->timezone($timezone)
+                ->withoutOverlapping(120)
+                ->onOneServer();
+        }
     }
 
     private function scheduleDays(): array

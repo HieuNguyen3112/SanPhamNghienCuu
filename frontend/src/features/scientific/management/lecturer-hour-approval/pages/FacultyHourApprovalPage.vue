@@ -21,7 +21,7 @@
         :loading="loadingList || loadingLookups"
         :faculty-select-disabled="true"
         @update:filter="applyFilter"
-        @reset="resetFilter"
+        @reset="resetFilterWithDefaults"
       />
 
       <div class="mt-4">
@@ -62,6 +62,7 @@ import HourApprovalTable from "@/features/scientific/management/lecturer-hour-ap
 import HourApprovalDetailDrawer from "@/features/scientific/management/lecturer-hour-approval/components/HourApprovalDetailDrawer.vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import http from "@/lib/http";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 import type {
   AcademicYearOption,
@@ -74,6 +75,17 @@ const facultyOptions = ref<FacultyOption[]>([]);
 const academicYearOptions = ref<AcademicYearOption[]>([]);
 const currentAcademicYearId = ref<number | null>(null);
 const loadingLookups = ref(false);
+const { runPageLoad } = usePageLoadFeedback();
+
+function resolveDefaultAcademicYearId(): number | null {
+  return (
+    academicYearOptions.value.find((item) => item.isActive)?.id ??
+    academicYearOptions.value.find((item) => item.isCurrent)?.id ??
+    currentAcademicYearId.value ??
+    academicYearOptions.value[0]?.id ??
+    null
+  );
+}
 
 async function loadLookups() {
   loadingLookups.value = true;
@@ -91,21 +103,21 @@ async function loadLookups() {
         }>;
         current_academic_year_id?: number | null;
       };
-    }>(
-      "/api/faculty/hours/approvals/lookups"
-    );
+    }>("/api/faculty/hours/approvals/lookups");
     facultyOptions.value = (data.data?.faculties ?? []).map((item) => ({
       id: item.id,
       name: item.name,
     }));
-    academicYearOptions.value = (data.data?.academic_years ?? []).map((item) => ({
-      id: item.id,
-      code: item.code,
-      startDate: item.start_date,
-      endDate: item.end_date,
-      isActive: item.is_active ?? false,
-      isCurrent: item.is_current ?? false,
-    }));
+    academicYearOptions.value = (data.data?.academic_years ?? []).map(
+      (item) => ({
+        id: item.id,
+        code: item.code,
+        startDate: item.start_date,
+        endDate: item.end_date,
+        isActive: item.is_active ?? false,
+        isCurrent: item.is_current ?? false,
+      }),
+    );
     currentAcademicYearId.value = data.data?.current_academic_year_id ?? null;
   } catch (_e) {
     facultyOptions.value = [];
@@ -140,7 +152,6 @@ const {
 
   loadRequests,
   applyFilter,
-  resetFilter,
   openRequestDetail,
   closeRequestDetail,
   approveRequest,
@@ -154,24 +165,38 @@ const {
 });
 
 onMounted(async () => {
-  await loadLookups();
-  if (!filter.facultyId && facultyOptions.value[0]?.id) {
-    filter.facultyId = facultyOptions.value[0].id;
-  }
-  if (!filter.academicYearId) {
-    filter.academicYearId =
-      currentAcademicYearId.value ??
-      academicYearOptions.value.find((item) => item.isActive)?.id ??
-      academicYearOptions.value.find((item) => item.isCurrent)?.id ??
-      academicYearOptions.value[0]?.id ??
-      null;
-  }
-  await loadRequests();
+  await runPageLoad(
+    async () => {
+      await loadLookups();
+      if (!filter.facultyId && facultyOptions.value[0]?.id) {
+        filter.facultyId = facultyOptions.value[0].id;
+      }
+      if (!filter.academicYearId) {
+        filter.academicYearId = resolveDefaultAcademicYearId();
+      }
+      await loadRequests({ withFeedback: false });
+    },
+    {
+      loading: {
+        title: "Đang khởi tạo xét duyệt giờ NCKH",
+        message: "Hệ thống đang chuẩn bị dữ liệu xét duyệt giờ nghiên cứu khoa học...",
+      },
+    },
+  );
 });
+
+async function resetFilterWithDefaults() {
+  await applyFilter({
+    facultyId: facultyOptions.value[0]?.id ?? null,
+    academicYearId: resolveDefaultAcademicYearId(),
+    status: "pending",
+    submittedFrom: null,
+    submittedTo: null,
+    searchText: "",
+  });
+}
 
 function onApproveSelected(requestId: number, activityIds: number[]) {
   void approveRequest(requestId, { activityIds });
 }
 </script>
-
-

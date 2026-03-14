@@ -19,6 +19,7 @@ class ProfileController extends Controller
             'id'    => $u->id,
             'name'  => $u->name,
             'email' => $u->email,
+            'must_change_password' => (bool) $u->must_change_password,
             'roles' => \App\Support\RoleMapper::backendListToCanonical($u->getRoleNames()->all()),
             'backend_roles' => $u->getRoleNames(),
         ]);
@@ -34,6 +35,7 @@ class ProfileController extends Controller
 
         $user = $request->user();
         $user->password = Hash::make($data['password']);
+        $user->must_change_password = false;
         $user->save();
 
         // Đảm bảo session an toàn sau khi đổi mật khẩu
@@ -59,6 +61,7 @@ class ProfileController extends Controller
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
+                'must_change_password' => (bool) $user->must_change_password,
                 'roles' => \App\Support\RoleMapper::backendListToCanonical($user->getRoleNames()->all()),
                 'backend_roles' => $user->getRoleNames(),
             ],

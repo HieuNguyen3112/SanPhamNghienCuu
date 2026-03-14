@@ -61,6 +61,7 @@ import LecturerChartSection from "../components/LecturerChartSection.vue";
 import LecturerStatisticsTable from "../components/LecturerStatisticsTable.vue";
 import { useUserStore } from "@/app/stores/userStore";
 import { useExportActionFeedback } from "@/shared/composables/useExportActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 import {
   exportLecturerReportExcel,
   exportLecturerReportPdf,
@@ -106,6 +107,7 @@ const pageSize = ref(12);
 const isLoading = ref(false);
 const errorMessage = ref("");
 const { exporting, runExport } = useExportActionFeedback();
+const { runPageLoad } = usePageLoadFeedback();
 
 const filterOptions = ref<LecturerReportFiltersResponse>({
   faculties: [],
@@ -229,13 +231,22 @@ async function loadReport() {
   }
 }
 
+async function refreshReportWithFeedback() {
+  await runPageLoad(() => loadReport(), {
+    loading: {
+      title: "Đang tải thống kê nhân sự",
+      message: "Hệ thống đang cập nhật dữ liệu thống kê giảng viên...",
+    },
+  });
+}
+
 function applyFilters(nextFilters: LecturerReportFilters) {
   filters.value = { ...nextFilters };
   if (isFacultyScope.value && scopeFacultyId.value) {
     filters.value.facultyId = scopeFacultyId.value;
   }
   page.value = 1;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 function resetFilters() {
@@ -244,24 +255,24 @@ function resetFilters() {
     filters.value.facultyId = scopeFacultyId.value;
   }
   page.value = 1;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 function applySort(nextSort: LecturerSortCondition) {
   sort.value = { ...nextSort };
   page.value = 1;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 function changePage(nextPage: number) {
   page.value = nextPage;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 function changePageSize(nextPageSize: number) {
   pageSize.value = nextPageSize;
   page.value = 1;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 async function handleExport(type: "pdf" | "excel") {
@@ -280,7 +291,17 @@ async function handleExport(type: "pdf" | "excel") {
 }
 
 onMounted(async () => {
-  await loadFilters();
-  await loadReport();
+  await runPageLoad(
+    async () => {
+      await loadFilters();
+      await loadReport();
+    },
+    {
+      loading: {
+        title: "Đang khởi tạo thống kê nhân sự",
+        message: "Hệ thống đang chuẩn bị dữ liệu thống kê giảng viên...",
+      },
+    },
+  );
 });
 </script>

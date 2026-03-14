@@ -43,29 +43,18 @@
             </button>
 
             <button
-              v-if="statusCode === 'draft'"
+              v-if="showEditAction"
               type="button"
               class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
               role="menuitem"
-              @click="onClickEdit"
+              @click="onClickPrimaryEdit"
             >
               <Pencil class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
-              <span class="min-w-0 truncate">Tiếp tục kê khai</span>
+              <span class="min-w-0 truncate">{{ editLabel }}</span>
             </button>
 
             <button
-              v-if="statusCode === 'member_rejected'"
-              type="button"
-              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-              role="menuitem"
-              @click="onClickEdit"
-            >
-              <Pencil class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
-              <span class="min-w-0 truncate">Chỉnh sửa thành viên</span>
-            </button>
-
-            <button
-              v-if="statusCode === 'member_rejected'"
+              v-if="showReinviteAction"
               type="button"
               class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
               role="menuitem"
@@ -75,16 +64,6 @@
               <span class="min-w-0 truncate">Gửi lại yêu cầu xác nhận</span>
             </button>
 
-            <button
-              v-if="statusCode === 'rejected'"
-              type="button"
-              class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-              role="menuitem"
-              @click="onClickCopyRejected"
-            >
-              <Copy class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
-              <span class="min-w-0 truncate">Sao chép kê khai lại</span>
-            </button>
           </div>
         </div>
       </Transition>
@@ -94,14 +73,18 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import type { PersonalWorkStatusCode } from "../contracts/personalResearchWorksContracts";
-import { MoreHorizontal, Eye, Pencil, Copy, Send } from "lucide-vue-next";
+import type {
+  PersonalWorkActions,
+  PersonalWorkStatusCode,
+} from "../contracts/personalResearchWorksContracts";
+import { MoreHorizontal, Eye, Pencil, Send } from "lucide-vue-next";
 
 const props = withDefaults(
   defineProps<{
     open: boolean;
     activityId: number;
     statusCode: PersonalWorkStatusCode;
+    actions: PersonalWorkActions;
     showView?: boolean;
     viewLabel?: string | null;
   }>(),
@@ -133,6 +116,18 @@ const viewLabelResolved = computed(() => {
     : "Xem chi tiết";
 });
 
+const showEditAction = computed(() => props.actions.canEdit);
+
+const showReinviteAction = computed(
+  () => props.statusCode === "member_rejected" && props.actions.canReinvite
+);
+
+const editLabel = computed(() => {
+  if (props.statusCode === "member_rejected") return "Chỉnh sửa thành viên";
+  if (props.statusCode === "rejected") return "Mở lại để chỉnh sửa";
+  return "Tiếp tục kê khai";
+});
+
 const menuStyle = computed(() => ({
   top: `${menuTop.value}px`,
   left: `${menuLeft.value}px`,
@@ -148,9 +143,14 @@ function onClickEdit() {
   emit("close");
 }
 
-function onClickCopyRejected() {
-  emit("copy-rejected", props.activityId);
-  emit("close");
+function onClickPrimaryEdit() {
+  if (props.statusCode === "rejected") {
+    emit("copy-rejected", props.activityId);
+    emit("close");
+    return;
+  }
+
+  onClickEdit();
 }
 
 function onClickReinvite() {

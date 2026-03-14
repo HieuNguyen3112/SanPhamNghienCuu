@@ -12,7 +12,7 @@
         v-if="open"
         class="fixed inset-0 z-[70] bg-slate-950/45 backdrop-blur-[1.5px]"
         aria-hidden="true"
-        @click="requestClose"
+        @click="requestClose('overlay')"
       />
     </Transition>
 
@@ -46,13 +46,13 @@
             </h2>
 
             <button
-              v-if="!loading"
+              v-if="showHeaderCloseButton"
               ref="closeButtonRef"
               type="button"
               class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white/90 transition hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="disableClose"
               aria-label="Đóng thông báo"
-              @click="requestClose"
+              @click="requestClose('header')"
             >
               <X class="h-4 w-4" />
             </button>
@@ -98,10 +98,11 @@
               {{ secondaryLabel }}
             </button>
             <button
+              ref="footerCloseButtonRef"
               type="button"
               class="rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="disableClose"
-              @click="requestClose"
+              @click="requestClose('button')"
             >
               {{ closeLabel }}
             </button>
@@ -123,6 +124,12 @@ import {
   X,
 } from "lucide-vue-next";
 import type { ActionResultType } from "@/shared/composables/useActionResultModal";
+import {
+  focusModalElement,
+  restoreModalFocus,
+} from "@/shared/utils/modalFocus";
+
+type CloseSource = "overlay" | "header" | "keyboard" | "button";
 
 const props = withDefaults(
   defineProps<{
@@ -135,12 +142,14 @@ const props = withDefaults(
     closeLabel?: string;
     secondaryLabel?: string | null;
     disableClose?: boolean;
+    requireExplicitClose?: boolean;
   }>(),
   {
     loading: false,
     closeLabel: "Đóng",
     secondaryLabel: null,
     disableClose: false,
+    requireExplicitClose: false,
   }
 );
 
@@ -151,6 +160,7 @@ const emit = defineEmits<{
 
 const panelRef = ref<HTMLElement | null>(null);
 const closeButtonRef = ref<HTMLButtonElement | null>(null);
+const footerCloseButtonRef = ref<HTMLButtonElement | null>(null);
 let previousFocusedElement: HTMLElement | null = null;
 
 const resolvedTitle = computed(() => {
@@ -162,6 +172,14 @@ const resolvedTitle = computed(() => {
   if (props.type === "warning") return "Cảnh báo";
   return "Thông báo";
 });
+
+const explicitCloseOnly = computed(
+  () => props.requireExplicitClose && !props.loading
+);
+
+const showHeaderCloseButton = computed(
+  () => !props.loading && !explicitCloseOnly.value
+);
 
 const toneClasses = computed(() => {
   if (props.loading) {
@@ -205,8 +223,9 @@ const toneClasses = computed(() => {
   }
 });
 
-function requestClose() {
+function requestClose(source: CloseSource) {
   if (props.disableClose || props.loading) return;
+  if (explicitCloseOnly.value && source !== "button") return;
   emit("close");
 }
 
@@ -231,14 +250,14 @@ function trapFocus(event: KeyboardEvent) {
   if (event.shiftKey) {
     if (active === first || !panelRef.value?.contains(active)) {
       event.preventDefault();
-      last.focus();
+      focusModalElement(last, { preventScroll: true });
     }
     return;
   }
 
   if (active === last || !panelRef.value?.contains(active)) {
     event.preventDefault();
-    first.focus();
+    focusModalElement(first, { preventScroll: true });
   }
 }
 
@@ -246,7 +265,7 @@ function onWindowKeydown(event: KeyboardEvent) {
   if (!props.open) return;
   if (event.key === "Escape") {
     event.preventDefault();
-    requestClose();
+    requestClose("keyboard");
     return;
   }
   if (event.key === "Tab") {
@@ -261,16 +280,15 @@ watch(
       previousFocusedElement = document.activeElement as HTMLElement | null;
       window.addEventListener("keydown", onWindowKeydown);
       await nextTick();
-      if (props.loading) {
-        panelRef.value?.focus();
-      } else {
-        closeButtonRef.value?.focus();
-      }
+      const focusTarget = props.loading
+        ? panelRef.value
+        : closeButtonRef.value ?? footerCloseButtonRef.value ?? panelRef.value;
+      focusModalElement(focusTarget, { preventScroll: true });
       return;
     }
 
     window.removeEventListener("keydown", onWindowKeydown);
-    previousFocusedElement?.focus?.();
+    restoreModalFocus(previousFocusedElement, { preventScroll: true });
     previousFocusedElement = null;
   }
 );

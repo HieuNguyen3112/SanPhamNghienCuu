@@ -18,7 +18,7 @@ class SpncBackupForget extends Command
         {--initiated-by= : user_id kích hoạt}
         {--snapshot-id=* : Danh sách snapshot id cần xóa}';
 
-    protected $description = 'Xóa snapshot backup theo danh sách chọn trước (không chạy prune trong cùng request).';
+    protected $description = 'Xóa snapshot backup theo danh sách chọn trước.';
 
     private ResticBackupManager $backupManager;
     private BackupRunStateStore $stateStore;
@@ -95,7 +95,6 @@ class SpncBackupForget extends Command
             $runId,
             'Bắt đầu xóa snapshot theo danh sách chọn: ' . implode(', ', $snapshotIds)
         );
-        $this->snapshotStore->markRefreshing($runId);
 
         $lock = Cache::lock('spnc:backup:forget', 7200);
         if (! $lock->get()) {
@@ -109,7 +108,6 @@ class SpncBackupForget extends Command
                 'error_message' => $message,
             ]);
             $this->stateStore->appendLog($runId, $message, 'warning');
-            $this->snapshotStore->markRefreshFailed($message, $runId);
             $this->error($message);
             return self::FAILURE;
         }
@@ -126,7 +124,6 @@ class SpncBackupForget extends Command
 
             $forgetResult = $this->backupManager->forgetSnapshots($snapshotIds);
             $cache = $this->snapshotStore->removeBySnapshotIds($snapshotIds);
-            $this->snapshotStore->markIdle();
             $this->stateStore->appendLog($runId, 'Xóa snapshot thành công, đã cập nhật cache cục bộ.');
             if (! empty($forgetResult['stdout'])) {
                 $this->stateStore->appendLog($runId, 'forget.stdout: ' . (string) $forgetResult['stdout']);
@@ -167,7 +164,6 @@ class SpncBackupForget extends Command
                 'error_message' => $exception->getMessage(),
             ]);
             $this->stateStore->appendLog($runId, $userMessage . ': ' . $exception->getMessage(), 'error');
-            $this->snapshotStore->markRefreshFailed($userMessage, $runId);
 
             $this->error('Xóa snapshot thất bại: ' . $exception->getMessage());
             return self::FAILURE;

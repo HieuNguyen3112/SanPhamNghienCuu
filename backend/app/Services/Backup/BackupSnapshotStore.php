@@ -73,6 +73,103 @@ class BackupSnapshotStore
         return $payload;
     }
 
+    public function upsert(array $item, ?string $runId = null): array
+    {
+        $snapshotId = trim((string) ($item['snapshot_id'] ?? ''));
+        if ($snapshotId === '') {
+            return $this->read();
+        }
+
+        $payload = $this->read();
+        $items = array_values((array) ($payload['items'] ?? []));
+        $normalizedItem = $this->normalizeItems([$item]);
+        if ($normalizedItem === []) {
+            return $payload;
+        }
+
+        $normalizedSnapshotId = Str::lower($snapshotId);
+        $items = array_values(array_filter($items, static function (array $existing) use ($normalizedSnapshotId): bool {
+            $candidate = Str::lower(trim((string) ($existing['snapshot_id'] ?? '')));
+            $candidateFull = Str::lower(trim((string) ($existing['snapshot_id_full'] ?? $candidate)));
+
+            return $candidate !== $normalizedSnapshotId && $candidateFull !== $normalizedSnapshotId;
+        }));
+        $items[] = $normalizedItem[0];
+
+        usort($items, static function (array $a, array $b): int {
+            return strcmp((string) ($b['created_at'] ?? ''), (string) ($a['created_at'] ?? ''));
+        });
+
+        $maxItems = max(10, (int) config('backup.snapshot_cache.max_items', 200));
+        $payload['items'] = array_slice(array_values($items), 0, $maxItems);
+        $payload['refreshing'] = false;
+        $payload['refresh_started_at'] = null;
+        $payload['refresh_run_id'] = null;
+        $payload['last_error'] = null;
+        $payload['last_refresh_run_id'] = $runId;
+        $payload['refreshed_at'] = now()->toIso8601String();
+        $payload['updated_at'] = now()->toIso8601String();
+        $payload['context'] = $this->contextPayload();
+
+        $this->write($payload);
+
+        return $payload;
+    }
+
+    public function mergeBySnapshotId(string $snapshotId, array $patch, ?string $runId = null): array
+    {
+        $snapshotId = trim($snapshotId);
+        if ($snapshotId === '') {
+            return $this->read();
+        }
+
+        $payload = $this->read();
+        $items = array_values((array) ($payload['items'] ?? []));
+        $updated = false;
+
+        foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $candidate = trim((string) ($item['snapshot_id'] ?? ''));
+            $candidateFull = trim((string) ($item['snapshot_id_full'] ?? $candidate));
+            if (
+                $candidate !== $snapshotId
+                && $candidateFull !== $snapshotId
+                && ! str_starts_with($candidate, $snapshotId)
+                && ! str_starts_with($candidateFull, $snapshotId)
+            ) {
+                continue;
+            }
+
+            $items[$index] = array_merge($item, $patch, [
+                'snapshot_id' => $item['snapshot_id'] ?? $snapshotId,
+                'snapshot_id_full' => $item['snapshot_id_full'] ?? $item['snapshot_id'] ?? $snapshotId,
+            ]);
+            $updated = true;
+            break;
+        }
+
+        if (! $updated) {
+            return $payload;
+        }
+
+        usort($items, static function (array $a, array $b): int {
+            return strcmp((string) ($b['created_at'] ?? ''), (string) ($a['created_at'] ?? ''));
+        });
+
+        $payload['items'] = array_values($items);
+        $payload['last_refresh_run_id'] = $runId ?? ($payload['last_refresh_run_id'] ?? null);
+        $payload['updated_at'] = now()->toIso8601String();
+        $payload['refreshed_at'] = $payload['refreshed_at'] ?? now()->toIso8601String();
+        $payload['context'] = $this->contextPayload();
+
+        $this->write($payload);
+
+        return $payload;
+    }
+
     public function markRefreshing(string $runId): array
     {
         $payload = $this->read();

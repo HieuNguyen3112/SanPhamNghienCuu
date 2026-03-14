@@ -17,8 +17,11 @@ return [
 
         'folder_name' => env('SPNC_EVIDENCE_DRIVE_FOLDER', 'declaration-evidence'),
 
-        'rclone_binary' => env('SPNC_EVIDENCE_RCLONE_BINARY', 'rclone'),
-        'rclone_config_path' => env('SPNC_EVIDENCE_RCLONE_CONFIG', ''),
+        'rclone_binary' => env('SPNC_RCLONE_BINARY', env('SPNC_EVIDENCE_RCLONE_BINARY', 'rclone')),
+        'rclone_config_path' => env(
+            'SPNC_RCLONE_CONFIG',
+            env('SPNC_EVIDENCE_RCLONE_CONFIG', 'storage/app/rclone/rclone.conf')
+        ),
         'rclone_service_account_file' => env('SPNC_EVIDENCE_RCLONE_SERVICE_ACCOUNT_FILE', ''),
         'rclone_drive_impersonate' => env('SPNC_EVIDENCE_RCLONE_DRIVE_IMPERSONATE', ''),
         'require_writable_rclone_config' => filter_var(

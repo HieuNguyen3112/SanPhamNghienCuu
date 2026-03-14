@@ -13,7 +13,8 @@
           <div class="flex flex-wrap items-center gap-2">
             <button
               class="rounded-xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="selectedSnapshotIds.length === 0 || deletingSelection || isForgetting"
+              :disabled="selectedSnapshotIds.length === 0 || deletingSelection || isDeleteBlocked"
+              :title="buildDeleteSelectionTitle()"
               @click="deleteSelectedBackups"
             >
               Xóa đã chọn ({{ selectedSnapshotIds.length }})
@@ -36,14 +37,6 @@
             </button>
 
             <button
-              class="rounded-xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-              :disabled="isPruning || isRunningPrune || isRestoring || isRunningBackup"
-              @click="triggerPrune"
-            >
-              Dọn bản sao lưu cũ
-            </button>
-
-            <button
               class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
               :disabled="isTriggeringBackup || isRunningBackup || isRestoring"
               @click="triggerBackupNow"
@@ -52,6 +45,9 @@
             </button>
           </div>
         </div>
+        <p class="mt-3 text-xs text-slate-500">
+          Xóa snapshot sẽ gỡ bản sao lưu khỏi danh sách sau khi tiến trình hoàn tất. Việc dọn dung lượng được hệ thống xử lý riêng theo bảo trì.
+        </p>
       </section>
 
       <section class="grid gap-3 md:grid-cols-3">
@@ -128,7 +124,7 @@
                     type="checkbox"
                     class="h-4 w-4 rounded border-slate-300"
                     :checked="isAllCurrentPageSelected"
-                    :disabled="snapshots.length === 0"
+                    :disabled="currentPageSelectableSnapshotIds.length === 0"
                     @change="toggleSelectAll"
                   />
                 </th>
@@ -151,45 +147,75 @@
                     type="checkbox"
                     class="h-4 w-4 rounded border-slate-300"
                     :checked="isSelected(snapshot)"
+                    :disabled="!isSnapshotBulkSelectable(snapshot)"
                     @change="toggleSnapshotSelection(snapshot)"
                   />
                 </td>
                 <td class="px-2 py-3 align-top">
                   <p class="font-semibold text-slate-800">{{ snapshot.backup_name || `Backup ${snapshot.short_id}` }}</p>
                   <p class="text-xs text-slate-500">{{ mapBackupType(snapshot.backup_type) }}</p>
+                  <p v-if="isSnapshotDeleting(snapshot)" class="mt-1 text-[11px] text-amber-700">
+                    Snapshot đang được xóa ở nền. Hàng này sẽ biến mất sau khi tiến trình hoàn tất.
+                  </p>
+                  <p
+                    v-else-if="shouldShowExportStateHint(snapshot)"
+                    class="mt-1 text-[11px]"
+                    :class="exportStateTextClass(snapshot.export_state)"
+                  >
+                    {{ resolveExportStateMessage(snapshot) }}
+                  </p>
                 </td>
                 <td class="px-2 py-3 text-slate-700">{{ formatDateTime(snapshot.created_at) }}</td>
                 <td class="px-2 py-3 text-slate-700">{{ backupSummary(snapshot) }}</td>
                 <td class="px-2 py-3 text-slate-700">{{ formatSize(snapshot.size_bytes) }}</td>
                 <td class="px-2 py-3">
-                  <span
-                    class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
-                    :class="statusBadgeClass(snapshot.status || snapshot.run_state)"
-                  >
-                    {{ mapStatusLabel(snapshot.status || snapshot.run_state) }}
-                  </span>
+                  <div class="space-y-1">
+                    <span
+                      class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
+                      :class="isSnapshotDeleting(snapshot) ? 'bg-amber-100 text-amber-700' : statusBadgeClass(snapshot.status || snapshot.run_state)"
+                    >
+                      {{ isSnapshotDeleting(snapshot) ? "Đang xóa..." : mapStatusLabel(snapshot.status || snapshot.run_state) }}
+                    </span>
+                    <p
+                      v-if="isSnapshotDeleting(snapshot)"
+                      class="text-[11px] text-amber-700"
+                    >
+                      Các thao tác trên snapshot này đã được tạm khóa.
+                    </p>
+                    <p
+                      v-else-if="shouldShowExportStateHint(snapshot)"
+                      class="text-[11px]"
+                      :class="exportStateTextClass(snapshot.export_state)"
+                    >
+                      Export: {{ mapExportStateLabel(snapshot.export_state) }}
+                    </p>
+                  </div>
                 </td>
                 <td class="px-2 py-3">
                   <div class="flex flex-wrap justify-end gap-1.5">
                     <button
-                      class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                      class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      :disabled="isSnapshotActionLocked(snapshot)"
+                      :title="buildDetailActionTitle(snapshot)"
                       @click="openDetails(snapshot)"
                     >
                       Xem chi tiết
                     </button>
                     <button
                       class="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                      :disabled="!snapshot.export_available"
+                      :disabled="!snapshot.export_available || isSnapshotActionLocked(snapshot)"
+                      :title="buildExportActionTitle(snapshot)"
                       @click="downloadExportFile(resolveSnapshotId(snapshot))"
                     >
-                      Tải export
+                      {{ buildExportActionLabel(snapshot) }}
                     </button>
                     <button
                       class="rounded-lg border border-rose-200 px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-                      :disabled="isForgetting"
+                      :disabled="isSnapshotDeleteBlocked(snapshot)"
+                      :title="buildDeleteActionTitle(snapshot)"
                       @click="deleteSingleBackup(snapshot)"
                     >
-                      Xóa
+                      {{ buildDeleteActionLabel(snapshot) }}
                     </button>
                   </div>
                 </td>
@@ -247,24 +273,32 @@
         <div class="mt-3 flex flex-wrap gap-2">
           <button
             class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            :disabled="!detailResponse?.export.available"
+            :disabled="!detailResponse?.export.available || isSnapshotActionLocked(detailSnapshot)"
+            :title="buildDetailExportActionTitle()"
             @click="downloadExportFile(resolveSnapshotId(detailSnapshot))"
           >
-            Tải export
+            {{ buildDetailExportActionLabel() }}
           </button>
           <button
-            class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+            class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            :disabled="isSnapshotActionLocked(detailSnapshot)"
+            :title="buildRestoreActionTitle(detailSnapshot)"
             @click="restoreFromDetail"
           >
             Khôi phục thử (staging)
           </button>
           <button
             class="rounded-lg border border-rose-200 px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50"
+            :disabled="isSnapshotDeleteBlocked(detailSnapshot)"
+            :title="buildDeleteActionTitle(detailSnapshot)"
             @click="deleteSingleBackup(detailSnapshot)"
           >
-            Xóa bản sao lưu
+            {{ isSnapshotDeleting(detailSnapshot) ? "Đang xóa..." : "Xóa bản sao lưu" }}
           </button>
         </div>
+        <p v-if="isSnapshotDeleting(detailSnapshot)" class="mt-2 text-xs text-amber-700">
+          Snapshot đang được xóa ở nền. Các thao tác khác đã được tạm khóa cho đến khi tiến trình hoàn tất.
+        </p>
 
         <div v-if="detailLoading" class="mt-4 space-y-2">
           <div class="h-10 animate-pulse rounded-xl bg-slate-100" />
@@ -298,9 +332,15 @@
             </p>
             <p class="mt-1 text-xs text-slate-600">
               Trạng thái:
-              <span class="font-medium" :class="detailResponse?.export.available ? 'text-emerald-700' : 'text-slate-600'">
-                {{ detailResponse?.export.available ? "Đã sẵn sàng" : "Chưa có export" }}
+              <span
+                class="font-medium"
+                :class="exportStateTextClass(detailResponse?.export.state)"
+              >
+                {{ mapExportStateLabel(detailResponse?.export.state) }}
               </span>
+            </p>
+            <p v-if="detailResponse?.export.message" class="mt-1 text-xs" :class="exportStateTextClass(detailResponse?.export.state)">
+              {{ detailResponse.export.message }}
             </p>
             <p v-if="detailResponse?.export.artifacts?.length" class="mt-1 text-xs text-slate-600">
               Tệp: {{ detailResponse.export.artifacts.join(", ") }}
@@ -361,7 +401,6 @@ import {
   getExportsInfo,
   getRunStatus,
   listBackups,
-  pruneSnapshots,
   refreshBackups,
   restoreSnapshot,
   runBackup,
@@ -392,9 +431,10 @@ const listSyncing = ref(false);
 const errorMessage = ref("");
 const isLoading = ref(false);
 const isTriggeringBackup = ref(false);
-const isPruning = ref(false);
 const deletingSelection = ref(false);
 const selectedSnapshotIds = ref<string[]>([]);
+const deletingSnapshotIds = ref<string[]>([]);
+const activeDeleteRunId = ref<string | null>(null);
 
 const currentRunState = ref<BackupRunState | null>(null);
 const isRetryingSync = ref(false);
@@ -433,9 +473,29 @@ const activeRunProcessing = computed(
 );
 const isSyncingList = computed(() => activeRunProcessing.value && activeRunOperation.value === "snapshot_refresh");
 const isRunningBackup = computed(() => activeRunProcessing.value && activeRunOperation.value === "backup");
+const isRunningBackupPostprocess = computed(
+  () => activeRunProcessing.value && activeRunOperation.value === "backup_postprocess"
+);
 const isRunningPrune = computed(() => activeRunProcessing.value && activeRunOperation.value === "prune");
 const isRestoring = computed(() => activeRunProcessing.value && activeRunOperation.value === "restore");
 const isForgetting = computed(() => activeRunProcessing.value && activeRunOperation.value === "forget");
+const hasActiveBackupPostprocess = computed(() =>
+  isRunningBackupPostprocess.value
+  || snapshots.value.some((snapshot) => isRunActive(snapshot.export_run, "backup_postprocess"))
+  || isRunActive(detailResponse.value?.export.run || null, "backup_postprocess")
+);
+const activeRunDeleteSnapshotIds = computed(() => {
+  if (!isForgetting.value) return [];
+  const ids = activeRunState.value?.snapshot_ids;
+  return Array.isArray(ids) ? normalizeSnapshotIds(ids) : [];
+});
+const effectiveDeletingSnapshotIds = computed(() =>
+  normalizeSnapshotIds([...deletingSnapshotIds.value, ...activeRunDeleteSnapshotIds.value])
+);
+const hasDeletingSnapshots = computed(() => effectiveDeletingSnapshotIds.value.length > 0);
+const isDeleteBlocked = computed(
+  () => isForgetting.value || hasActiveBackupPostprocess.value || hasDeletingSnapshots.value
+);
 const cacheRefreshOperation = computed(() => (cacheMeta.value?.refresh_operation || "").toLowerCase());
 const cacheRefreshStatus = computed(() => (cacheMeta.value?.refresh_status || "").toLowerCase());
 const cacheLastErrorCode = computed(() => (cacheMeta.value?.last_error_code || "").toUpperCase());
@@ -516,11 +576,16 @@ function toFriendlySyncMessage(rawMessage: string | null | undefined) {
 }
 function toFriendlyBackgroundRunFailureMessage(
   userMessage: string | null | undefined,
-  errorCode: string | null | undefined
+  errorCode: string | null | undefined,
+  operation?: string | null | undefined
 ) {
   const code = (errorCode || "").trim().toUpperCase();
+  const normalizedOperation = (operation || "").trim().toLowerCase();
   const primary = (userMessage || "").trim();
   if (code === "BACKUP_LOCKED") {
+    if (normalizedOperation === "forget") {
+      return "Không thể xóa snapshot lúc này vì hệ thống sao lưu đang bận. Nếu snapshot vừa sao lưu xong, hãy đợi readable export hoàn tất rồi thử lại.";
+    }
     return "Bản sao lưu đang bị khóa bởi tiến trình khác. Nếu không còn tác vụ nào chạy, bạn có thể dùng nút “Gỡ khóa treo”.";
   }
   if (code === "RUN_TIMEOUT") {
@@ -587,10 +652,15 @@ const exportsRootPath = computed(() => {
   return byOverview || "";
 });
 
-const isAllCurrentPageSelected = computed(() => {
-  const ids = snapshots.value
+const currentPageSelectableSnapshotIds = computed(() =>
+  snapshots.value
+    .filter((snapshot) => isSnapshotBulkSelectable(snapshot))
     .map((item) => resolveSnapshotId(item))
-    .filter((id): id is string => Boolean(id));
+    .filter((id): id is string => Boolean(id))
+);
+
+const isAllCurrentPageSelected = computed(() => {
+  const ids = currentPageSelectableSnapshotIds.value;
   if (ids.length === 0) return false;
   return ids.every((id) => selectedSnapshotIds.value.includes(id));
 });
@@ -687,6 +757,37 @@ function resolveSnapshotId(snapshot: BackupListItem | null | undefined) {
   return fallback !== "" ? fallback : null;
 }
 
+function normalizeSnapshotId(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase();
+}
+
+function normalizeSnapshotIds(values: string[]) {
+  return Array.from(
+    new Set(values.map((value) => normalizeSnapshotId(value)).filter((value) => value !== ""))
+  );
+}
+
+function matchesSnapshotTarget(snapshotId: string, targetId: string) {
+  return snapshotId === targetId || snapshotId.startsWith(targetId) || targetId.startsWith(snapshotId);
+}
+
+function snapshotMatchesAnyDeleteTarget(
+  snapshot: BackupListItem | null | undefined,
+  targets = effectiveDeletingSnapshotIds.value
+) {
+  const snapshotId = normalizeSnapshotId(resolveSnapshotId(snapshot));
+  if (!snapshotId) return false;
+  return targets.some((targetId) => matchesSnapshotTarget(snapshotId, targetId));
+}
+
+function isSnapshotDeleting(snapshot: BackupListItem | null | undefined) {
+  return snapshotMatchesAnyDeleteTarget(snapshot);
+}
+
+function isSnapshotActionLocked(snapshot: BackupListItem | null | undefined) {
+  return isSnapshotDeleting(snapshot);
+}
+
 function mapStatusLabel(status: string | null | undefined) {
   const s = (status || "").toLowerCase();
   if (s === "queued") return "Đang chờ";
@@ -714,14 +815,157 @@ function statusTextClass(status: string | null | undefined) {
   return "text-slate-700";
 }
 
+function mapExportStateLabel(state: string | null | undefined) {
+  const normalized = (state || "").toLowerCase();
+  if (normalized === "ready") return "Sẵn sàng";
+  if (normalized === "running") return "Đang xử lý";
+  if (normalized === "queued") return "Đang chờ";
+  if (normalized === "pending") return "Đã tiếp nhận";
+  if (normalized === "finalizing") return "Đang hoàn tất";
+  if (normalized === "failed") return "Thất bại";
+  if (normalized === "disabled") return "Đã tắt";
+  return "Chưa sẵn sàng";
+}
+
+function exportStateTextClass(state: string | null | undefined) {
+  const normalized = (state || "").toLowerCase();
+  if (normalized === "ready") return "text-emerald-700";
+  if (["running", "queued", "pending", "finalizing"].includes(normalized)) return "text-amber-700";
+  if (normalized === "failed") return "text-rose-700";
+  if (normalized === "disabled") return "text-slate-500";
+  return "text-slate-600";
+}
+
+function resolveExportStateMessage(snapshot: BackupListItem) {
+  const explicitMessage = (snapshot.export_message || "").trim();
+  if (explicitMessage !== "") return explicitMessage;
+
+  const normalized = (snapshot.export_state || "").toLowerCase();
+  if (normalized === "ready") return "Readable export đã sẵn sàng để tải.";
+  if (normalized === "running") return "Readable export đang được tạo và đồng bộ lên Drive.";
+  if (normalized === "queued" || normalized === "pending") return "Readable export đang chờ xử lý ở nền.";
+  if (normalized === "finalizing") return "Readable export đã xử lý xong, đang chờ công bố hoàn tất.";
+  if (normalized === "failed") return "Snapshot an toàn đã xong nhưng readable export chưa hoàn thiện.";
+  if (normalized === "disabled") return "Readable export đang tắt theo cấu hình.";
+  return "Readable export chưa sẵn sàng.";
+}
+
+function shouldShowExportStateHint(snapshot: BackupListItem) {
+  return (snapshot.export_state || "").toLowerCase() !== "ready";
+}
+
+function buildExportActionLabel(snapshot: BackupListItem) {
+  if (isSnapshotDeleting(snapshot)) return "Đang xóa...";
+  const normalized = (snapshot.export_state || "").toLowerCase();
+  if (snapshot.export_available) return "Tải export";
+  if (["running", "queued", "pending", "finalizing"].includes(normalized)) return "Đang tạo export...";
+  if (normalized === "failed") return "Export lỗi";
+  if (normalized === "disabled") return "Export đã tắt";
+  return "Chưa có export";
+}
+
+function buildExportActionTitle(snapshot: BackupListItem) {
+  if (isSnapshotDeleting(snapshot)) {
+    return "Snapshot đang được xóa. Tải export đã tạm khóa cho đến khi tiến trình hoàn tất.";
+  }
+  if (snapshot.export_available) return "Tải gói export đã hoàn tất.";
+  return resolveExportStateMessage(snapshot);
+}
+
+function buildDetailExportActionLabel() {
+  const snapshot = detailResponse.value?.snapshot || detailSnapshot.value;
+  if (!snapshot) return "Tải export";
+  return buildExportActionLabel(snapshot);
+}
+
+function buildDetailExportActionTitle() {
+  const snapshot = detailResponse.value?.snapshot || detailSnapshot.value;
+  if (!snapshot) return "Tải export";
+  return buildExportActionTitle(snapshot);
+}
+
 function mapOperationLabel(operation: string | undefined) {
   const s = (operation || "").toLowerCase();
   if (s === "backup") return "Tiến trình sao lưu";
+  if (s === "backup_postprocess") return "Hoàn thiện readable export";
   if (s === "prune") return "Tiến trình dọn snapshot";
   if (s === "restore") return "Tiến trình khôi phục";
   if (s === "forget") return "Xóa snapshot";
   if (s === "snapshot_refresh") return "Làm mới danh sách";
   return "Tiến trình hệ thống";
+}
+
+function isRunActive(run: BackupRunState | null | undefined, operation?: string) {
+  if (!run) return false;
+  const status = (run.status || "").toLowerCase();
+  if (!["queued", "running"].includes(status)) return false;
+
+  if (!operation) return true;
+
+  return (run.operation || "").toLowerCase() === operation.toLowerCase();
+}
+
+function resolveDeleteBlockedMessage() {
+  if (hasDeletingSnapshots.value || isForgetting.value) {
+    return "Đang có tiến trình xóa snapshot. Vui lòng đợi hoàn tất.";
+  }
+  if (hasActiveBackupPostprocess.value) {
+    return "Readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất trước khi xóa snapshot.";
+  }
+
+  return "";
+}
+
+function isSnapshotDeleteBlocked(snapshot: BackupListItem | null | undefined) {
+  if (isDeleteBlocked.value) return true;
+
+  return isRunActive(snapshot?.export_run || null, "backup_postprocess");
+}
+
+function isSnapshotBulkSelectable(snapshot: BackupListItem | null | undefined) {
+  return !isSnapshotDeleting(snapshot) && !isSnapshotDeleteBlocked(snapshot);
+}
+
+function buildDeleteSelectionTitle() {
+  const blockedMessage = resolveDeleteBlockedMessage();
+  if (blockedMessage) return blockedMessage;
+
+  if (selectedSnapshotIds.value.length === 0) {
+    return "Chọn ít nhất một snapshot để xóa.";
+  }
+
+  return "Xóa các snapshot đã chọn.";
+}
+
+function buildDeleteActionTitle(snapshot: BackupListItem | null | undefined) {
+  if (isSnapshotDeleting(snapshot)) {
+    return "Snapshot đang được xóa ở nền. Vui lòng đợi tiến trình hoàn tất.";
+  }
+  if (isSnapshotDeleteBlocked(snapshot)) {
+    return resolveDeleteBlockedMessage() || "Snapshot đang tạm thời không thể xóa.";
+  }
+
+  return "Xóa snapshot này.";
+}
+
+function buildDeleteActionLabel(snapshot: BackupListItem | null | undefined) {
+  return isSnapshotDeleting(snapshot) ? "Đang xóa..." : "Xóa";
+}
+
+function buildDetailActionTitle(snapshot: BackupListItem | null | undefined) {
+  if (isSnapshotActionLocked(snapshot)) {
+    return "Snapshot đang được xóa. Tạm thời chưa thể mở thêm thao tác chi tiết.";
+  }
+
+  return "Xem chi tiết snapshot này.";
+}
+
+function buildRestoreActionTitle(snapshot: BackupListItem | null | undefined) {
+  if (isSnapshotActionLocked(snapshot)) {
+    return "Snapshot đang được xóa. Tạm thời chưa thể khôi phục.";
+  }
+
+  return "Khôi phục thử snapshot này vào staging.";
 }
 
 function mapBackupType(type: string | undefined) {
@@ -783,6 +1027,61 @@ function handleConfirmModalCancel() {
   closeConfirmModal();
 }
 
+function clearDeleteTracking(runId?: string | null) {
+  if (runId && activeDeleteRunId.value && activeDeleteRunId.value !== runId) return;
+  deletingSnapshotIds.value = [];
+  activeDeleteRunId.value = null;
+}
+
+function beginDeleteTracking(snapshotIds: string[], runId?: string | null) {
+  deletingSnapshotIds.value = normalizeSnapshotIds(snapshotIds);
+  activeDeleteRunId.value = runId || null;
+  selectedSnapshotIds.value = selectedSnapshotIds.value.filter(
+    (selectedId) =>
+      !deletingSnapshotIds.value.some((targetId) => matchesSnapshotTarget(normalizeSnapshotId(selectedId), targetId))
+  );
+}
+
+function finalizeDeleteSuccess(runId?: string | null) {
+  if (runId && activeDeleteRunId.value && activeDeleteRunId.value !== runId) return;
+  const targets = [...deletingSnapshotIds.value];
+  if (targets.length === 0) {
+    clearDeleteTracking(runId);
+    return;
+  }
+
+  const previousTotal = snapshots.value.length;
+  snapshots.value = snapshots.value.filter((snapshot) => !snapshotMatchesAnyDeleteTarget(snapshot, targets));
+  const removedCount = previousTotal - snapshots.value.length;
+
+  if (detailSnapshot.value && snapshotMatchesAnyDeleteTarget(detailSnapshot.value, targets)) {
+    closeDetails();
+  }
+
+  selectedSnapshotIds.value = selectedSnapshotIds.value.filter(
+    (selectedId) => !targets.some((targetId) => matchesSnapshotTarget(normalizeSnapshotId(selectedId), targetId))
+  );
+
+  if (removedCount > 0) {
+    pagination.value.total = Math.max(0, (pagination.value.total || 0) - removedCount);
+  }
+
+  clearDeleteTracking(runId);
+}
+
+function reconcileDeleteTrackingFromCurrentData() {
+  if (deletingSnapshotIds.value.length === 0) return;
+  if (isForgetting.value) return;
+
+  const stillExists = snapshots.value.some((snapshot) => snapshotMatchesAnyDeleteTarget(snapshot));
+  if (!stillExists) {
+    if (detailSnapshot.value && snapshotMatchesAnyDeleteTarget(detailSnapshot.value)) {
+      closeDetails();
+    }
+    clearDeleteTracking();
+  }
+}
+
 function stopPolling() {
   if (pollingTimer) {
     window.clearInterval(pollingTimer);
@@ -807,11 +1106,19 @@ async function syncRunStatus(runId: string) {
     const stateStatus = (state.status || "").toLowerCase();
     const stateOperation = (state.operation || "").toLowerCase();
     if (!["queued", "running"].includes(stateStatus)) {
+      if (stateOperation === "forget") {
+        if (stateStatus === "success") {
+          finalizeDeleteSuccess(state.run_id);
+        } else {
+          clearDeleteTracking(state.run_id);
+        }
+      }
       stopPolling();
       if (stateStatus === "failed" && stateOperation !== "snapshot_refresh") {
         errorMessage.value = toFriendlyBackgroundRunFailureMessage(
           state.user_message || state.message,
-          state.error_code
+          state.error_code,
+          state.operation
         );
       }
       await loadBackups({ silent: true });
@@ -888,6 +1195,7 @@ async function loadBackups(options: { silent?: boolean } = {}) {
     listSyncing.value = Boolean(response.is_syncing ?? responseCacheSnapshotRefreshActive);
 
     syncSelectionWithCurrentPage();
+    reconcileDeleteTrackingFromCurrentData();
 
     const running =
       response.active_run ||
@@ -929,7 +1237,7 @@ function changePage(page: number) {
 
 function toggleSnapshotSelection(snapshot: BackupListItem) {
   const snapshotId = resolveSnapshotId(snapshot);
-  if (!snapshotId) return;
+  if (!snapshotId || !isSnapshotBulkSelectable(snapshot)) return;
 
   if (selectedSnapshotIds.value.includes(snapshotId)) {
     selectedSnapshotIds.value = selectedSnapshotIds.value.filter((id) => id !== snapshotId);
@@ -951,9 +1259,7 @@ function toggleSelectAll() {
     return;
   }
 
-  selectedSnapshotIds.value = snapshots.value
-    .map((item) => resolveSnapshotId(item))
-    .filter((id): id is string => Boolean(id));
+  selectedSnapshotIds.value = [...currentPageSelectableSnapshotIds.value];
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -993,39 +1299,6 @@ async function triggerBackupNow() {
   }
 }
 
-async function triggerPrune() {
-  if (isPruning.value || isRunningPrune.value || isRestoring.value || isRunningBackup.value) return;
-
-  openConfirmModal(
-    {
-      title: "Xác nhận dọn snapshot",
-      message: "Bạn có chắc muốn dọn bản sao lưu cũ theo chính sách retention hiện tại không?",
-      confirmText: "Dọn",
-      cancelText: "Huỷ",
-      variant: "warning",
-    },
-    async () => {
-      isPruning.value = true;
-      try {
-        const result = await runWithFeedback(() => pruneSnapshots(), {
-          loading: { enabled: false },
-          success: {
-            title: "Đã kích hoạt",
-            message: "Đã bắt đầu dọn bản sao lưu cũ.",
-          },
-          error: {
-            title: "Có lỗi xảy ra",
-            message: (error) => resolveApiErrorMessage(error, "Không thể dọn snapshot cũ."),
-          },
-        });
-
-        if (result?.run_id) startPolling(result.run_id);
-      } finally {
-        isPruning.value = false;
-      }
-    }
-  );
-}
 async function refreshList() {
   await refreshListInternal();
 }
@@ -1166,6 +1439,7 @@ async function downloadExportFile(snapshotId: string | null) {
 }
 
 async function openDetails(snapshot: BackupListItem) {
+  if (isSnapshotActionLocked(snapshot)) return;
   const snapshotId = resolveSnapshotId(snapshot);
   if (!snapshotId) {
     errorMessage.value = "Không xác định được snapshot để xem chi tiết.";
@@ -1201,6 +1475,7 @@ function closeDetails() {
 
 async function restoreFromDetail() {
   if (!detailSnapshot.value) return;
+  if (isSnapshotActionLocked(detailSnapshot.value)) return;
 
   const snapshotId = resolveSnapshotId(detailSnapshot.value);
   if (!snapshotId) {
@@ -1247,20 +1522,18 @@ async function restoreFromDetail() {
 async function deleteSnapshots(snapshotIds: string[]) {
   if (snapshotIds.length === 0) return;
 
+  const normalizedTargets = normalizeSnapshotIds(snapshotIds);
+
   const result = await runWithFeedback(
-    () =>
-      forgetSnapshots({
-        snapshot_ids: snapshotIds,
-        prune_after: false,
-      }),
+    () => forgetSnapshots({ snapshot_ids: snapshotIds }),
     {
       loading: { enabled: false },
       success: {
-        title: "Thành công",
+        title: "Đã tiếp nhận",
         message:
           snapshotIds.length > 1
-            ? `Đã xoá thành công ${snapshotIds.length} bản sao lưu.`
-            : "Đã xoá thành công.",
+            ? `Đã tiếp nhận yêu cầu xóa ${snapshotIds.length} bản sao lưu. Các hàng sẽ biến mất khi tiến trình xóa hoàn tất.`
+            : "Đã tiếp nhận yêu cầu xóa bản sao lưu. Hàng này sẽ biến mất khi tiến trình xóa hoàn tất.",
       },
       error: {
         title: "Có lỗi xảy ra",
@@ -1269,48 +1542,31 @@ async function deleteSnapshots(snapshotIds: string[]) {
     }
   );
 
-  const normalizedTargets = snapshotIds
-    .map((id) => id.trim().toLowerCase())
-    .filter((id) => id !== "");
-  const isDeletedSnapshot = (id: string | null) => {
-    const normalizedId = (id || "").trim().toLowerCase();
-    if (normalizedId === "") return false;
-    return normalizedTargets.some(
-      (target) => normalizedId === target || normalizedId.startsWith(target)
-    );
-  };
-
-  snapshots.value = snapshots.value.filter(
-    (snapshot) => !isDeletedSnapshot(resolveSnapshotId(snapshot))
-  );
-
-  if (detailSnapshot.value) {
-    const detailId = resolveSnapshotId(detailSnapshot.value);
-    if (isDeletedSnapshot(detailId)) {
-      closeDetails();
-    }
-  }
-
-  selectedSnapshotIds.value = selectedSnapshotIds.value.filter(
-    (id) => !isDeletedSnapshot(id)
-  );
-
-  pagination.value.total = Math.max(0, (pagination.value.total || 0) - snapshotIds.length);
-
   if (result?.run_id) {
+    beginDeleteTracking(normalizedTargets, result.run_id);
+    currentRunState.value = {
+      run_id: result.run_id,
+      operation: result.operation || "forget",
+      status: result.status || "queued",
+      message: result.user_message || "Đã tiếp nhận yêu cầu xóa bản sao lưu.",
+      user_message: result.user_message || "Đã tiếp nhận yêu cầu xóa bản sao lưu.",
+      error_code: result.error_code || null,
+      snapshot_ids: normalizedTargets,
+    };
     startPolling(result.run_id);
+    return;
   }
 
   void loadBackups({ silent: true });
 }
 async function deleteSelectedBackups() {
-  if (selectedSnapshotIds.value.length === 0 || deletingSelection.value || isForgetting.value) return;
+  if (selectedSnapshotIds.value.length === 0 || deletingSelection.value || isDeleteBlocked.value) return;
 
   const ids = [...selectedSnapshotIds.value];
   openConfirmModal(
     {
       title: "Xác nhận xoá",
-      message: `Bạn có chắc muốn xoá ${ids.length} bản sao lưu đã chọn không?`,
+      message: `Bạn có chắc muốn xoá ${ids.length} bản sao lưu đã chọn không? Các snapshot này sẽ được gỡ khỏi danh sách sau khi tiến trình xóa hoàn tất.`,
       confirmText: "Xoá",
       cancelText: "Huỷ",
       loadingText: "Đang xoá…",
@@ -1327,7 +1583,7 @@ async function deleteSelectedBackups() {
   );
 }
 async function deleteSingleBackup(snapshot: BackupListItem) {
-  if (isForgetting.value) return;
+  if (isSnapshotDeleteBlocked(snapshot)) return;
   const snapshotId = resolveSnapshotId(snapshot);
   if (!snapshotId) {
     errorMessage.value = "Không xác định được snapshot để xoá.";
@@ -1337,7 +1593,7 @@ async function deleteSingleBackup(snapshot: BackupListItem) {
   openConfirmModal(
     {
       title: "Xác nhận xoá",
-      message: "Bạn có chắc muốn xoá bản sao lưu này không?",
+      message: "Bạn có chắc muốn xoá bản sao lưu này không? Snapshot sẽ được gỡ khỏi danh sách sau khi tiến trình xóa hoàn tất.",
       confirmText: "Xoá",
       cancelText: "Huỷ",
       loadingText: "Đang xoá…",
@@ -1357,4 +1613,5 @@ onBeforeUnmount(() => {
   stopPolling();
 });
 </script>
+
 

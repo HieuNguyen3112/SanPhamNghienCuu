@@ -26,6 +26,7 @@ import {
   searchWorks,
   type ResearchWorkSearchScope,
 } from "../api/researchWorkSearchApi";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 function clampYearRange(filter: GlobalResearchWorkSearchFilter) {
   const from = filter.yearFrom;
@@ -46,9 +47,10 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export function useGlobalResearchWorkSearch() {
+  const { runPageLoad } = usePageLoadFeedback();
   const userStore = useUserStore();
   const searchScope = computed<ResearchWorkSearchScope>(() =>
-    userStore.role === "LECTURER" ? "lecturer" : "admin"
+    userStore.role === "LECTURER" ? "lecturer" : "admin",
   );
   const isLecturer = computed(() => searchScope.value === "lecturer");
 
@@ -109,9 +111,11 @@ export function useGlobalResearchWorkSearch() {
       authorRoleOptions.value = lookups.author_roles;
       if (isLecturer.value) {
         const approvedOnly = lookups.statuses.filter(
-          (status) => status.code === "approved"
+          (status) => status.code === "approved",
         );
-        statusOptions.value = approvedOnly.length ? approvedOnly : lookups.statuses;
+        statusOptions.value = approvedOnly.length
+          ? approvedOnly
+          : lookups.statuses;
         filterDraft.value = { ...filterDraft.value, status: "approved" };
         appliedFilter.value = { ...appliedFilter.value, status: "approved" };
       } else {
@@ -124,7 +128,7 @@ export function useGlobalResearchWorkSearch() {
     }
   }
 
-  async function fetchList(nextPage?: number, nextPerPage?: number) {
+  async function fetchListInternal(nextPage?: number, nextPerPage?: number) {
     loadingList.value = true;
     errorList.value = null;
 
@@ -138,7 +142,7 @@ export function useGlobalResearchWorkSearch() {
     try {
       const dto = await searchWorks(
         filterToDto(filter, page, perPage),
-        searchScope.value
+        searchScope.value,
       );
       rows.value = dto.table.items.map(summaryFromDto);
       pagination.value = {
@@ -155,13 +159,33 @@ export function useGlobalResearchWorkSearch() {
     }
   }
 
-  async function search() {
+  async function fetchList(
+    nextPage?: number,
+    nextPerPage?: number,
+    options?: { withFeedback?: boolean },
+  ) {
+    if (options?.withFeedback === false) {
+      await fetchListInternal(nextPage, nextPerPage);
+      return;
+    }
+
+    await runPageLoad(() => fetchListInternal(nextPage, nextPerPage), {
+      loading: {
+        title: "Đang tải kết quả tra cứu",
+        message: "Hệ thống đang cập nhật danh sách công trình...",
+      },
+    });
+  }
+
+  async function search(options?: { withFeedback?: boolean }) {
     const nextFilter = clampYearRange({ ...filterDraft.value });
     if (isLecturer.value) {
       nextFilter.status = "approved";
     }
     appliedFilter.value = nextFilter;
-    await fetchList(1, pagination.value.perPage);
+    await fetchList(1, pagination.value.perPage, {
+      withFeedback: options?.withFeedback,
+    });
   }
 
   function reset() {
@@ -178,7 +202,23 @@ export function useGlobalResearchWorkSearch() {
       managementLevel: null,
     };
     appliedFilter.value = { ...filterDraft.value };
+    lecturerSuggestions.value = [];
     void fetchList(1, pagination.value.perPage);
+  }
+
+  async function bootstrap() {
+    await runPageLoad(
+      async () => {
+        await loadLookups();
+        await search({ withFeedback: false });
+      },
+      {
+        loading: {
+          title: "Đang khởi tạo tra cứu công trình",
+          message: "Hệ thống đang chuẩn bị dữ liệu tra cứu công trình...",
+        },
+      },
+    );
   }
 
   async function openDetail(workId: number) {
@@ -213,7 +253,10 @@ export function useGlobalResearchWorkSearch() {
     }
 
     try {
-      const result = await downloadWorkAttachment(file.fileId, searchScope.value);
+      const result = await downloadWorkAttachment(
+        file.fileId,
+        searchScope.value,
+      );
       downloadBlob(result.blob, result.filename);
     } catch (e) {
       console.error(e);
@@ -226,18 +269,22 @@ export function useGlobalResearchWorkSearch() {
     () => filterDraft.value.lecturerKeyword,
     (value) => {
       if (lecturerTimer) window.clearTimeout(lecturerTimer);
+
+      const keyword = value.trim();
+      if (!keyword) {
+        lecturerSuggestions.value = [];
+        return;
+      }
+
       lecturerTimer = window.setTimeout(async () => {
         try {
-          const keyword = value.trim();
-          lecturerSuggestions.value = await getLecturerSuggestions(
-            keyword ? keyword : undefined
-          );
+          lecturerSuggestions.value = await getLecturerSuggestions(keyword);
         } catch (e) {
           console.error(e);
         }
       }, 300);
     },
-    { immediate: true }
+    { immediate: false },
   );
 
   onBeforeUnmount(() => {
@@ -270,6 +317,7 @@ export function useGlobalResearchWorkSearch() {
     errorDetail,
 
     loadLookups,
+    bootstrap,
     search,
     reset,
     fetchList,

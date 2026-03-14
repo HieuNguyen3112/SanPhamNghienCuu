@@ -1,6 +1,10 @@
 <template>
-  <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
-    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+  <div
+    class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
+  >
+    <div
+      class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
+    >
       <div class="min-w-0">
         <div class="text-base font-semibold text-slate-900 md:text-lg">
           Tra cứu công trình khoa học
@@ -33,7 +37,7 @@
       </div>
     </div>
 
-    <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       <!-- Keyword -->
       <div>
         <label class="mb-1 block text-xs font-medium text-slate-700">
@@ -54,7 +58,7 @@
       </div>
 
       <!-- Lecturer -->
-      <div class="relative">
+      <div ref="lecturerFilterEl" class="relative z-20">
         <label class="mb-1 block text-xs font-medium text-slate-700">
           Giảng viên
         </label>
@@ -68,15 +72,14 @@
             :value="filter.lecturerKeyword"
             placeholder="Nhập tên / mã giảng viên..."
             @input="onChangeLecturerKeyword"
-            @focus="isLecturerDropdownOpen = true"
+            @focus="openLecturerSuggestions"
             @keydown.enter.prevent="emit('search')"
           />
         </div>
 
         <div
-          v-if="isLecturerDropdownOpen && lecturerSuggestionList.length > 0"
-          class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-          @mousedown.prevent
+          v-if="showLecturerSuggestions"
+          class="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
         >
           <button
             v-for="s in lecturerSuggestionList"
@@ -95,6 +98,23 @@
             </div>
             <ChevronRight class="mt-1 h-4 w-4 text-slate-400" />
           </button>
+
+          <div
+            v-if="
+              lecturerSuggestionList.length === 0 &&
+              filter.lecturerKeyword.trim()
+            "
+            class="px-3 py-2 text-xs text-slate-500"
+          >
+            Không tìm thấy giảng viên phù hợp
+          </div>
+
+          <div
+            v-else-if="lecturerSuggestionList.length === 0"
+            class="px-3 py-2 text-xs text-slate-500"
+          >
+            Chưa có dữ liệu giảng viên
+          </div>
         </div>
       </div>
 
@@ -149,7 +169,7 @@
         </select>
       </div>
 
-      <!-- Year range -->
+      <!-- Academic year range from DB -->
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="mb-1 block text-xs font-medium text-slate-700">
@@ -161,8 +181,12 @@
             @change="onChangeYearFrom"
           >
             <option value="">-</option>
-            <option v-for="y in yearOptions" :key="y" :value="y">
-              {{ y }}
+            <option
+              v-for="year in academicYearOptions"
+              :key="year"
+              :value="year"
+            >
+              {{ year }}
             </option>
           </select>
         </div>
@@ -177,49 +201,15 @@
             @change="onChangeYearTo"
           >
             <option value="">-</option>
-            <option v-for="y in yearOptions" :key="y" :value="y">
-              {{ y }}
+            <option
+              v-for="year in academicYearOptions"
+              :key="year"
+              :value="year"
+            >
+              {{ year }}
             </option>
           </select>
         </div>
-      </div>
-
-      <!-- Status -->
-      <div>
-        <label class="mb-1 block text-xs font-medium text-slate-700">
-          Trạng thái
-        </label>
-        <select
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
-          :value="filter.status ?? ''"
-          @change="onChangeStatus"
-        >
-          <option value="">Tất cả</option>
-          <option v-for="s in statusOptions" :key="s.id" :value="s.code">
-            {{ s.name }}
-          </option>
-        </select>
-      </div>
-
-      <!-- Optional management level -->
-      <div>
-        <label class="mb-1 block text-xs font-medium text-slate-700">
-          Cấp quản lý (optional)
-        </label>
-        <select
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
-          :value="filter.managementLevel ?? ''"
-          @change="onChangeLevel"
-        >
-          <option value="">Tất cả</option>
-          <option
-            v-for="lvl in managementLevelOptions"
-            :key="lvl.id"
-            :value="lvl.code"
-          >
-            {{ lvl.name }}
-          </option>
-        </select>
       </div>
     </div>
 
@@ -230,15 +220,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { ChevronRight, RotateCcw, Search, User } from "lucide-vue-next";
 import type {
   AuthorRoleOption,
   FacultyOption,
   GlobalResearchWorkSearchFilter,
   LecturerSuggestion,
-  ManagementLevelOption,
-  StatusOption,
   WorkTypeOption,
 } from "../contracts/globalResearchWorkSearch.contract";
 import { normalizeText } from "../contracts/globalResearchWorkSearch.contract";
@@ -250,9 +238,7 @@ const props = defineProps<{
   facultyOptions: FacultyOption[];
   workTypeOptions: WorkTypeOption[];
   authorRoleOptions: AuthorRoleOption[];
-  statusOptions: StatusOption[];
-  managementLevelOptions: ManagementLevelOption[];
-  yearOptions: number[];
+  academicYearOptions: number[];
   lecturerSuggestions: LecturerSuggestion[];
 
   resultCountText: string;
@@ -264,11 +250,23 @@ const emit = defineEmits<{
   (e: "reset"): void;
 }>();
 
+const lecturerFilterEl = ref<HTMLElement | null>(null);
+const showLecturerSuggestions = ref(false);
+
+function openLecturerSuggestions() {
+  showLecturerSuggestions.value = true;
+}
+
+function closeLecturerSuggestions() {
+  showLecturerSuggestions.value = false;
+}
+
 function onChangeKeyword(event: Event) {
   emit("update:filter", { keyword: (event.target as HTMLInputElement).value });
 }
 
 function onChangeLecturerKeyword(event: Event) {
+  openLecturerSuggestions();
   emit("update:filter", {
     lecturerKeyword: (event.target as HTMLInputElement).value,
   });
@@ -300,47 +298,44 @@ function onChangeYearTo(event: Event) {
   emit("update:filter", { yearTo: v ? Number(v) : null });
 }
 
-function onChangeStatus(event: Event) {
-  emit("update:filter", {
-    status: (event.target as HTMLSelectElement).value || null,
-  });
-}
-
-function onChangeLevel(event: Event) {
-  emit("update:filter", {
-    managementLevel: (event.target as HTMLSelectElement).value || null,
-  });
-}
-
-const isLecturerDropdownOpen = ref(false);
-
 const lecturerSuggestionList = computed(() => {
   const kw = normalizeText(props.filter.lecturerKeyword);
-  if (!kw) return props.lecturerSuggestions.slice(0, 6);
+
+  // Chưa nhập gì thì hiện toàn bộ danh sách ban đầu
+  if (!kw) {
+    return props.lecturerSuggestions.slice(0, 20);
+  }
 
   return props.lecturerSuggestions
     .filter((s) => {
       const hay = normalizeText(
-        `${s.lecturer_name} ${s.lecturer_code} ${s.unit_name ?? ""}`
+        `${s.lecturer_name} ${s.lecturer_code} ${s.unit_name ?? ""}`,
       );
       return hay.includes(kw);
     })
-    .slice(0, 6);
+    .slice(0, 20);
 });
 
 function pickLecturerSuggestion(s: LecturerSuggestion) {
   emit("update:filter", {
     lecturerKeyword: `${s.lecturer_name} (${s.lecturer_code})`,
   });
-  isLecturerDropdownOpen.value = false;
+  closeLecturerSuggestions();
 }
 
-function onGlobalClick() {
-  isLecturerDropdownOpen.value = false;
+function onDocumentMouseDown(event: MouseEvent) {
+  const container = lecturerFilterEl.value;
+  if (!container) return;
+  if (event.target instanceof Node && !container.contains(event.target)) {
+    closeLecturerSuggestions();
+  }
 }
 
-window.addEventListener("click", onGlobalClick);
+onMounted(() => {
+  document.addEventListener("mousedown", onDocumentMouseDown);
+});
+
 onBeforeUnmount(() => {
-  window.removeEventListener("click", onGlobalClick);
+  document.removeEventListener("mousedown", onDocumentMouseDown);
 });
 </script>

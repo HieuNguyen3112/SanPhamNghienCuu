@@ -14,12 +14,20 @@ return [
 
     'restic' => [
         'binary' => env('SPNC_BACKUP_RESTIC_BINARY', 'restic'),
-        'rclone_binary' => env('SPNC_BACKUP_RCLONE_BINARY', 'rclone'),
+        'rclone_binary' => env('SPNC_RCLONE_BINARY', env('SPNC_BACKUP_RCLONE_BINARY', 'rclone')),
         'repository' => env('SPNC_BACKUP_REPOSITORY', ''),
         'password' => env('SPNC_BACKUP_PASSWORD', ''),
         'compression' => env('SPNC_BACKUP_COMPRESSION', 'auto'),
-        'check_after_backup' => filter_var(env('SPNC_BACKUP_CHECK_AFTER_BACKUP', true), FILTER_VALIDATE_BOOL),
-        'rclone_config_path' => env('SPNC_BACKUP_RCLONE_CONFIG', ''),
+        'rclone_config_path' => env(
+            'SPNC_RCLONE_CONFIG',
+            env('SPNC_BACKUP_RCLONE_CONFIG', 'storage/app/rclone/rclone.conf')
+        ),
+    ],
+
+    'verification' => [
+        'enabled' => filter_var(env('SPNC_BACKUP_VERIFY_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'time' => env('SPNC_BACKUP_VERIFY_TIME', '04:00'),
+        'read_data_subset' => env('SPNC_BACKUP_VERIFY_READ_DATA_SUBSET', '1/20'),
     ],
 
     'network' => [
@@ -61,6 +69,7 @@ return [
     'exports' => [
         'enabled' => filter_var(env('SPNC_BACKUP_EXPORT_ENABLED', true), FILTER_VALIDATE_BOOL),
         'sync_to_drive' => filter_var(env('SPNC_BACKUP_EXPORT_SYNC_TO_DRIVE', true), FILTER_VALIDATE_BOOL),
+        'pdf_enabled' => filter_var(env('SPNC_BACKUP_EXPORT_PDF_ENABLED', true), FILTER_VALIDATE_BOOL),
         'folder_name' => env('SPNC_BACKUP_EXPORT_FOLDER_NAME', 'exports'),
         // Cho phép override đích export. Ví dụ:
         // - rclone:drive:spnc-backups/exports
@@ -124,6 +133,8 @@ return [
             'snapshot_refresh' => max(60, (int) env('SPNC_BACKUP_SNAPSHOT_REFRESH_TIMEOUT_SECONDS', 900)),
             'forget' => max(120, (int) env('SPNC_BACKUP_FORGET_RUNNING_STALE_SECONDS', 1800)),
             'backup' => max(300, (int) env('SPNC_BACKUP_BACKUP_RUNNING_STALE_SECONDS', 3600)),
+            'backup_postprocess' => max(300, (int) env('SPNC_BACKUP_POSTPROCESS_RUNNING_STALE_SECONDS', 7200)),
+            'backup_check' => max(300, (int) env('SPNC_BACKUP_VERIFY_RUNNING_STALE_SECONDS', 5400)),
             'prune' => max(300, (int) env('SPNC_BACKUP_PRUNE_RUNNING_STALE_SECONDS', 7200)),
             'restore' => max(300, (int) env('SPNC_BACKUP_RESTORE_RUNNING_STALE_SECONDS', 7200)),
         ],

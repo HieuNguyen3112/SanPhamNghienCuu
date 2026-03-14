@@ -24,8 +24,10 @@ import {
   fetchAuditLogEntries,
   fetchAuditLogMeta,
 } from "../services/auditLogService";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 export function useAuditLog(scope: AuditLogScope) {
+  const { runPageLoad } = usePageLoadFeedback();
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
@@ -68,7 +70,7 @@ export function useAuditLog(scope: AuditLogScope) {
 
   const pagedEntries = computed(() => entries.value);
 
-  async function loadEntries() {
+  async function loadEntriesInternal() {
     isLoading.value = true;
     error.value = null;
 
@@ -95,7 +97,21 @@ export function useAuditLog(scope: AuditLogScope) {
     }
   }
 
-  async function bootstrap() {
+  async function loadEntries(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadEntriesInternal();
+      return;
+    }
+
+    await runPageLoad(loadEntriesInternal, {
+      loading: {
+        title: "Đang tải nhật ký hệ thống",
+        message: "Hệ thống đang cập nhật dữ liệu nhật ký...",
+      },
+    });
+  }
+
+  async function bootstrapInternal() {
     isLoading.value = true;
     error.value = null;
 
@@ -106,7 +122,7 @@ export function useAuditLog(scope: AuditLogScope) {
       actionCodes.value = meta.action_codes.map(actionCodeOptionFromDto);
       facultyIdScoped.value = meta.faculty_id_scoped;
 
-      await loadEntries();
+      await loadEntriesInternal();
     } catch (e) {
       console.error(e);
       error.value =
@@ -114,6 +130,15 @@ export function useAuditLog(scope: AuditLogScope) {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  async function bootstrap() {
+    await runPageLoad(bootstrapInternal, {
+      loading: {
+        title: "Đang khởi tạo nhật ký hệ thống",
+        message: "Hệ thống đang chuẩn bị dữ liệu nhật ký...",
+      },
+    });
   }
 
   function applyFilters() {

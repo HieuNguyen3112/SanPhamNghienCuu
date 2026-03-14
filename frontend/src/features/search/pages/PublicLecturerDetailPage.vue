@@ -183,6 +183,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
+import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
 
 import PublicHomeTopHeader from "@/features/search/components/PublicHomeTopHeader.vue";
 import PublicHomeNavBar from "@/features/search/components/PublicHomeNavBar.vue";
@@ -237,6 +238,7 @@ async function fetchLecturerDetail(code: string): Promise<DetailRes> {
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
+const { logoutWithFeedback } = useLogoutFeedback("/");
 
 onMounted(async () => {
   if (!userStore.isInitialized) await userStore.bootstrapAuth();
@@ -252,8 +254,7 @@ const meInitials = computed(() => {
   return ((parts[0]?.[0] ?? "U") + (parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "")).toUpperCase();
 });
 async function handleLogout() {
-  await userStore.logout();
-  await router.replace("/");
+  await logoutWithFeedback();
 }
 
 const lecturerCode = computed(() => String(route.params.lecturerCode ?? ""));

@@ -8,6 +8,7 @@ interface ApiEnvelope<T> {
 
 export type BackupOperation =
   | "backup"
+  | "backup_postprocess"
   | "prune"
   | "forget"
   | "restore"
@@ -46,6 +47,9 @@ export interface BackupListItem {
   export_generated_at?: string | null;
   export_bundle_filename?: string | null;
   export_artifacts?: string[];
+  export_state?: string | null;
+  export_message?: string | null;
+  export_run?: BackupRunState | null;
 }
 
 export interface BackupRunLog {
@@ -72,6 +76,7 @@ export interface BackupRunState {
   logs?: BackupRunLog[];
   result?: Record<string, unknown> | null;
   snapshot_id?: string | null;
+  snapshot_ids?: string[] | null;
   scope?: "db_only" | "files_only" | "full" | string | null;
   target?: "staging" | "current" | string | null;
 }
@@ -190,6 +195,9 @@ export interface BackupDetailResponse {
   };
   export: {
     available: boolean;
+    state?: string | null;
+    message?: string | null;
+    run?: BackupRunState | null;
     drive_path?: string | null;
     export_path?: string | null;
     bundle_filename?: string | null;
@@ -243,7 +251,6 @@ export interface FileDownloadPayload {
 
 export interface ForgetSnapshotsPayload {
   snapshot_ids: string[];
-  prune_after?: boolean;
 }
 
 export interface ForgetSnapshotsResponse {
@@ -258,9 +265,6 @@ export interface ForgetSnapshotsResponse {
   deleted_count?: number;
   stdout?: string | null;
   stderr?: string | null;
-  prune_after?: boolean;
-  prune_run_id?: string | null;
-  prune_status_url?: string | null;
 }
 
 function parseFilename(disposition?: string | null): string | null {
@@ -340,13 +344,6 @@ export async function unlockStaleLock(): Promise<BackupUnlockResponse> {
 export async function getRunStatus(runId: string): Promise<BackupRunState> {
   const { data } = await http.get<ApiEnvelope<BackupRunState>>(
     `/api/admin/backups/runs/${runId}`
-  );
-  return data.data;
-}
-
-export async function pruneSnapshots(): Promise<BackupActionRunResponse> {
-  const { data } = await http.post<ApiEnvelope<BackupActionRunResponse>>(
-    "/api/admin/backups/prune"
   );
   return data.data;
 }

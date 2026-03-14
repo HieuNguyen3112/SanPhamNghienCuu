@@ -324,9 +324,9 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:DE
     ->prefix('faculty/users/lecturer-accounts')
     ->group(function () {
         Route::get('/', [FacultyLecturerAccountController::class, 'index']);
+        Route::post('/', [FacultyLecturerAccountController::class, 'store']);
         Route::get('/lookups', [FacultyLecturerAccountController::class, 'lookups']);
         Route::put('/{lecturer}', [FacultyLecturerAccountController::class, 'update']);
-        Route::put('/{lecturer}/roles', [FacultyLecturerAccountController::class, 'updateRoles']);
         Route::put('/{lecturer}/status', [FacultyLecturerAccountController::class, 'updateStatus']);
     });
 
@@ -515,7 +515,7 @@ Route::middleware(['force.json'])
         Route::get('/lecturers/{lecturer:code}', [PublicLecturerController::class, 'show']);
     });
 
-    Route::middleware(['force.json'])
+Route::middleware(['force.json'])
     ->prefix('public')
     ->group(function () {
         Route::get('/research-works/lookups', [PublicResearchWorkController::class, 'lookups']);

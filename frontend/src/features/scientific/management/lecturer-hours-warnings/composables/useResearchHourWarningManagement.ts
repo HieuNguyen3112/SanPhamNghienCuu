@@ -11,6 +11,7 @@ import type {
 import { overviewFromDto } from "../contracts/lecturerResearchHourWarning.contract";
 import type { ResearchHourWarningService } from "../services/researchHourWarningService";
 import { useActionFeedback } from "@/shared/composables/useActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 export interface ResearchHourWarningFilterState {
   selectedFacultyIdentifier: FacultyIdentifier | "ALL_FACULTIES";
@@ -21,14 +22,15 @@ export interface ResearchHourWarningFilterState {
 }
 
 export function useResearchHourWarningManagement(
-  service: ResearchHourWarningService
+  service: ResearchHourWarningService,
 ) {
   const { runWithFeedback } = useActionFeedback();
+  const { runPageLoad } = usePageLoadFeedback();
   const overview = ref<LecturerResearchHourWarningOverview | null>(null);
 
   const filter = ref<ResearchHourWarningFilterState>({
     selectedFacultyIdentifier: "ALL_FACULTIES",
-    selectedAcademicYearIdentifier: "2024-2025",
+    selectedAcademicYearIdentifier: "",
     severityFilter: "ALL",
     notificationStateFilter: "ALL",
     keyword: "",
@@ -38,23 +40,25 @@ export function useResearchHourWarningManagement(
   const error = ref<string | null>(null);
   const detailOpen = ref(false);
   const selectedEntry = ref<LecturerResearchHourShortfallWarningEntry | null>(
-    null
+    null,
   );
   const submittingWarning = ref(false);
   const submitWarningError = ref<string | null>(null);
 
-  const facultyOptions = computed(() => overview.value?.facultyOptionList ?? []);
+  const facultyOptions = computed(
+    () => overview.value?.facultyOptionList ?? [],
+  );
   const academicYearOptions = computed(
-    () => overview.value?.academicYearOptionList ?? []
+    () => overview.value?.academicYearOptionList ?? [],
   );
   const summaryStatistics = computed(
-    () => overview.value?.summaryStatistics ?? null
+    () => overview.value?.summaryStatistics ?? null,
   );
   const entryList = computed(() => overview.value?.entryList ?? []);
   const isFacultyLocked = computed(() => facultyOptions.value.length === 1);
   const filteredEntries = computed(() => entryList.value);
 
-  async function loadOverview() {
+  async function loadOverviewInternal() {
     loading.value = true;
     error.value = null;
 
@@ -77,9 +81,15 @@ export function useResearchHourWarningManagement(
       const yearExists = overview.value.academicYearOptionList.some(
         (y) =>
           y.academicYearIdentifier ===
-          filter.value.selectedAcademicYearIdentifier
+          filter.value.selectedAcademicYearIdentifier,
       );
-      if (!yearExists && overview.value.academicYearOptionList[0]) {
+      const activeYearIdentifier =
+        overview.value.academicYearOptionList.find((year) => year.isActive)
+          ?.academicYearIdentifier ?? null;
+
+      if (!yearExists && activeYearIdentifier) {
+        filter.value.selectedAcademicYearIdentifier = activeYearIdentifier;
+      } else if (!yearExists && overview.value.academicYearOptionList[0]) {
         filter.value.selectedAcademicYearIdentifier =
           overview.value.academicYearOptionList[0].academicYearIdentifier;
       }
@@ -91,15 +101,31 @@ export function useResearchHourWarningManagement(
     }
   }
 
+  async function loadOverview(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadOverviewInternal();
+      return;
+    }
+
+    await runPageLoad(loadOverviewInternal, {
+      loading: {
+        title: "Đang tải cảnh báo giảng viên",
+        message: "Hệ thống đang cập nhật danh sách cảnh báo giờ NCKH...",
+      },
+    });
+  }
+
   function patchFilter(next: Partial<ResearchHourWarningFilterState>) {
     filter.value = { ...filter.value, ...next };
-    void loadOverview();
+    const nextKeys = Object.keys(next);
+    const keywordOnly = nextKeys.length === 1 && nextKeys[0] === "keyword";
+    void loadOverview({ withFeedback: !keywordOnly });
   }
 
   function resetFilter() {
     filter.value = {
       selectedFacultyIdentifier: isFacultyLocked.value
-        ? facultyOptions.value[0]?.facultyIdentifier ?? "ALL_FACULTIES"
+        ? (facultyOptions.value[0]?.facultyIdentifier ?? "ALL_FACULTIES")
         : "ALL_FACULTIES",
       selectedAcademicYearIdentifier:
         filter.value.selectedAcademicYearIdentifier,
@@ -141,7 +167,7 @@ export function useResearchHourWarningManagement(
             reason_note: payload.reasonNote,
           });
           closeDetail();
-          await loadOverview();
+          await loadOverview({ withFeedback: false });
         },
         {
           loading: {
@@ -156,7 +182,7 @@ export function useResearchHourWarningManagement(
             title: "Có lỗi xảy ra",
             message: "Không thể gửi cảnh báo. Vui lòng thử lại.",
           },
-        }
+        },
       );
     } catch (e) {
       console.error(e);

@@ -193,6 +193,7 @@ import {
   resolveApiErrorMessage,
   useActionFeedback,
 } from "@/shared/composables/useActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
@@ -205,6 +206,7 @@ const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
 ];
 
 const wc = useWorkCatalogs();
+const { runPageLoad } = usePageLoadFeedback();
 
 const {
   activeTab,
@@ -297,13 +299,23 @@ const {
 } = wc;
 const { runWithFeedback } = useActionFeedback();
 
+async function loadActiveTabWithFeedback() {
+  await runPageLoad(() => loadActiveTab(), {
+    loading: {
+      title: "Đang tải danh mục công trình",
+      message: "Hệ thống đang chuẩn bị dữ liệu danh mục phục vụ kê khai...",
+    },
+    onError: (error) => console.error(error),
+  });
+}
+
 const setActiveTab = (tab: WorkCatalogTabKey) => {
   activeTab.value = tab;
-  loadActiveTab();
+  void loadActiveTabWithFeedback();
 };
 
-onMounted(async () => {
-  await loadActiveTab();
+onMounted(() => {
+  void loadActiveTabWithFeedback();
 });
 
 function onEditWorkType(id: number) {

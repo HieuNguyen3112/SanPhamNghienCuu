@@ -7,6 +7,7 @@
     :details="actionResultModal.details"
     :loading="actionResultModal.loading"
     :disable-close="actionResultModal.disableClose"
+    :require-explicit-close="actionResultModal.requireExplicitClose"
     :close-label="actionResultModal.closeLabel"
     :secondary-label="actionResultModal.secondaryLabel"
     @close="onClose"

@@ -202,6 +202,7 @@ class LecturerPersonalWorkController extends Controller
                 'ram.member_role_id',
                 'mr.code as member_role_code',
                 'mr.name as member_role_name',
+                'ram.confirmation_status as member_confirmation_status',
                 'ram.hours_assigned',
                 'ra.submitted_at',
                 'ra.approved_at',
@@ -267,7 +268,7 @@ class LecturerPersonalWorkController extends Controller
 
     private function parseSort(?string $sort): array
     {
-        $key = 'updated_at';
+        $key = 'ra.updated_at';
         $direction = 'desc';
 
         if ($sort) {
@@ -351,6 +352,11 @@ class LecturerPersonalWorkController extends Controller
     {
         $statusCode = $row->status_code;
         $isOwner = (int) $row->owner_lecturer_id === (int) $lecturerId;
+        $actions = $this->buildActions(
+            $statusCode,
+            $isOwner,
+            $row->member_confirmation_status ?? null
+        );
 
         return [
             'activity_id' => (int) $row->activity_id,
@@ -374,12 +380,7 @@ class LecturerPersonalWorkController extends Controller
             'submitted_at' => $this->normalizeDateTime($row->submitted_at),
             'approved_at' => $this->normalizeDateTime($row->approved_at),
             'updated_at' => $this->normalizeDateTime($row->updated_at) ?? $row->updated_at,
-            'actions' => [
-                'can_edit' => $isOwner && in_array($statusCode, ['draft', 'member_rejected', 'rejected'], true),
-                'can_submit' => $isOwner && in_array($statusCode, ['draft', 'member_rejected', 'rejected'], true),
-                'can_delete' => $isOwner && in_array($statusCode, ['draft', 'member_rejected'], true),
-                'can_view' => true,
-            ],
+            'actions' => $actions,
         ];
     }
 
@@ -415,9 +416,32 @@ class LecturerPersonalWorkController extends Controller
             'evidence_items' => $this->buildEvidenceItems((int) $row->activity_id),
             'approvals' => $this->buildApprovals((int) $row->activity_id),
             'status_histories' => $this->buildStatusHistories((int) $row->activity_id),
+            'actions' => $this->buildActions(
+                $row->status_code,
+                (int) $row->owner_lecturer_id === (int) $lecturerId,
+                $row->member_confirmation_status ?? null
+            ),
         ];
 
         return $detail;
+    }
+
+    private function buildActions(?string $statusCode, bool $isOwner, ?string $memberConfirmationStatus): array
+    {
+        $canTeamReworkRejected = ! $isOwner
+            && $statusCode === 'rejected'
+            && $memberConfirmationStatus === 'accepted';
+
+        $canEdit = ($isOwner && in_array($statusCode, ['draft', 'member_rejected', 'rejected'], true))
+            || $canTeamReworkRejected;
+
+        return [
+            'can_edit' => $canEdit,
+            'can_submit' => $canEdit,
+            'can_delete' => $isOwner && in_array($statusCode, ['draft', 'member_rejected'], true),
+            'can_view' => true,
+            'can_reinvite' => $isOwner && $statusCode === 'member_rejected',
+        ];
     }
 
     private function buildAuthors(int $activityId): array
@@ -634,6 +658,10 @@ class LecturerPersonalWorkController extends Controller
 
     private function activityYearExpression(): string
     {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "COALESCE(pd.year, bd.year, CAST(strftime('%Y', prd.start_month) AS INTEGER), CAST(strftime('%Y', cd.held_on) AS INTEGER), CAST(strftime('%Y', ra.start_date) AS INTEGER), CAST(strftime('%Y', ra.created_at) AS INTEGER))";
+        }
+
         return 'COALESCE(pd.year, bd.year, YEAR(prd.start_month), YEAR(cd.held_on), YEAR(ra.start_date), YEAR(ra.created_at))';
     }
 

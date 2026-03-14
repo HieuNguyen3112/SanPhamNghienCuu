@@ -1829,8 +1829,19 @@ class ResearchActivityController extends Controller
         return DB::table('research_activities as ra')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('research_activity_members as collaborator_ram', function ($join) use ($lecturerId) {
+                $join->on('collaborator_ram.activity_id', '=', 'ra.id')
+                    ->where('collaborator_ram.lecturer_id', '=', $lecturerId)
+                    ->where('collaborator_ram.confirmation_status', '=', 'accepted');
+            })
             ->where('ra.id', $activityId)
-            ->where('ra.owner_lecturer_id', $lecturerId)
+            ->where(function ($query) use ($lecturerId) {
+                $query->where('ra.owner_lecturer_id', $lecturerId)
+                    ->orWhere(function ($memberQuery) {
+                        $memberQuery->where('ast.code', self::STATUS_REJECTED)
+                            ->whereNotNull('collaborator_ram.lecturer_id');
+                    });
+            })
             ->select([
                 'ra.*',
                 'ast.code as status_code',

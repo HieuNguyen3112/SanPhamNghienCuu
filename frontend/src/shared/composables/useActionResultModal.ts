@@ -12,6 +12,7 @@ export interface ActionResultModalState {
   details: unknown;
   loading: boolean;
   disableClose: boolean;
+  requireExplicitClose: boolean;
   closeLabel: string;
   secondaryLabel: string | null;
   onClose: ActionResultCallback;
@@ -26,6 +27,7 @@ const actionResultModal = reactive<ActionResultModalState>({
   details: null,
   loading: false,
   disableClose: false,
+  requireExplicitClose: false,
   closeLabel: "Đóng",
   secondaryLabel: null,
   onClose: null,
@@ -47,6 +49,7 @@ export function useActionResultModal() {
     secondaryLabel?: string | null;
     loading?: boolean;
     disableClose?: boolean;
+    requireExplicitClose?: boolean;
     onClose?: ActionResultCallback;
     onSecondary?: ActionResultCallback;
   }) {
@@ -56,6 +59,8 @@ export function useActionResultModal() {
     actionResultModal.details = payload.details ?? null;
     actionResultModal.loading = payload.loading ?? false;
     actionResultModal.disableClose = payload.disableClose ?? false;
+    actionResultModal.requireExplicitClose =
+      payload.requireExplicitClose ?? false;
     actionResultModal.closeLabel = payload.closeLabel?.trim() || "Đóng";
     actionResultModal.secondaryLabel = payload.secondaryLabel ?? null;
     actionResultModal.onClose = payload.onClose ?? null;
@@ -101,6 +106,7 @@ export function useActionResultModal() {
       details,
       loading: false,
       disableClose: false,
+      requireExplicitClose: true,
       secondaryLabel: options?.secondaryLabel ?? null,
       onClose: options?.onClose ?? null,
       onSecondary: options?.onSecondary ?? null,
@@ -127,6 +133,7 @@ export function useActionResultModal() {
     actionResultModal.details = null;
     actionResultModal.loading = false;
     actionResultModal.disableClose = false;
+    actionResultModal.requireExplicitClose = false;
     actionResultModal.closeLabel = "Đóng";
     actionResultModal.secondaryLabel = null;
     resetCallbacks();

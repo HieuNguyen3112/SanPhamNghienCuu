@@ -3,22 +3,22 @@ import { computed, ref } from "vue";
 import { RouterView, useRouter } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
 import { useLayoutStore } from "@/app/stores/layoutStore";
-import { useActionFeedback } from "@/shared/composables/useActionFeedback";
 import Sidebar from "@/shared/components/layout/Sidebar.vue";
 import Navbar from "@/shared/components/layout/Navbar.vue";
 import ChangePasswordModal from "@/features/auth/components/ChangePasswordModal.vue";
+import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
 
 const userStore = useUserStore();
 const router = useRouter();
 const layout = useLayoutStore();
-const { runWithFeedback } = useActionFeedback();
+const { logoutWithFeedback } = useLogoutFeedback("/");
 
 const isSidebarOpen = ref(true);
 const isChangePasswordOpen = ref(false);
 
 const userName = computed(() => userStore.currentUser?.name ?? "");
 const userCode = computed(
-  () => userStore.currentUser?.code ?? userStore.currentUser?.email ?? ""
+  () => userStore.currentUser?.code ?? userStore.currentUser?.email ?? "",
 );
 
 const toggleSidebar = () => {
@@ -35,40 +35,7 @@ const handleOpenProfile = async () => {
 };
 
 const handleLogout = async () => {
-  try {
-    await runWithFeedback(
-      async () => {
-        const remoteLogoutOk = await userStore.logout();
-        await router.replace("/");
-        if (!remoteLogoutOk) {
-          throw new Error("LOGOUT_ENDPOINT_FAILED");
-        }
-      },
-      {
-        loading: {
-          title: "Đang đăng xuất",
-          message: "Đang xử lý đăng xuất...",
-        },
-        success: {
-          title: "Thành công",
-          message: "Đăng xuất thành công.",
-        },
-        error: {
-          title: "Đăng xuất chưa hoàn tất",
-          message: (error) => {
-            const message =
-              error instanceof Error ? error.message : String(error ?? "");
-            if (message === "LOGOUT_ENDPOINT_FAILED") {
-              return "Đã thoát phiên cục bộ nhưng không gọi được API đăng xuất. Vui lòng đăng nhập lại nếu cần.";
-            }
-            return "Không thể đăng xuất hoàn toàn. Vui lòng thử lại.";
-          },
-        },
-      }
-    );
-  } catch {
-    // Modal đã hiển thị trong runWithFeedback.
-  }
+  await logoutWithFeedback();
 };
 
 const handleGoHome = async () => {

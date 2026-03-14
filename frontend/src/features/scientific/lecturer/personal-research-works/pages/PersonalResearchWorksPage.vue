@@ -88,7 +88,7 @@ const {
   noticeMessage,
   noticeTone,
 
-  loadWorks,
+  bootstrap,
 
   selectCard,
   openDetail,
@@ -109,6 +109,6 @@ const {
 } = usePersonalResearchWorks();
 
 onMounted(async () => {
-  await loadWorks();
+  await bootstrap();
 });
 </script>

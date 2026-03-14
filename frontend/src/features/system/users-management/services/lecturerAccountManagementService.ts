@@ -1,5 +1,6 @@
 import type {
   AssignRolesPayload,
+  CreateLecturerAccountPayload,
   LecturerAccountFilterState,
   LecturerAccountListResponseDTO,
   LecturerAccountLookupsDTO,
@@ -19,6 +20,7 @@ import {
   updateFacultyLecturerRolesApi,
   updateLecturerStatusApi,
   updateFacultyLecturerStatusApi,
+  createFacultyLecturerAccountApi,
 } from "../api/lecturerAccountsApi";
 
 function resolveApiErrorMessage(error: unknown, fallback: string): string {
@@ -27,9 +29,7 @@ function resolveApiErrorMessage(error: unknown, fallback: string): string {
       message?: string;
       response?: { data?: { message?: string } };
     };
-    return (
-      anyError.response?.data?.message || anyError.message || fallback
-    );
+    return anyError.response?.data?.message || anyError.message || fallback;
   }
   return fallback;
 }
@@ -38,10 +38,13 @@ export interface LecturerAccountManagementService {
   getLookupsDTO(): Promise<LecturerAccountLookupsDTO>;
   searchLecturerAccountsDTO(
     filter: LecturerAccountFilterState,
-    options: { page: number; per_page: number; sort?: string }
+    options: { page: number; per_page: number; sort?: string },
   ): Promise<LecturerAccountListResponseDTO>;
   updateLecturerAccountDTO(
-    payload: UpdateLecturerAccountPayload
+    payload: UpdateLecturerAccountPayload,
+  ): Promise<void>;
+  createLecturerAccountDTO(
+    payload: CreateLecturerAccountPayload,
   ): Promise<void>;
   assignRolesDTO(payload: AssignRolesPayload): Promise<void>;
   toggleAccountStatusDTO(payload: ToggleAccountStatusPayload): Promise<void>;
@@ -60,7 +63,7 @@ export function createLecturerAccountManagementService(_params: {
           : await fetchLecturerAccountLookupsApi();
       } catch (error) {
         throw new Error(
-          resolveApiErrorMessage(error, "Không tải được danh mục.")
+          resolveApiErrorMessage(error, "Không tải được danh mục."),
         );
       }
     },
@@ -84,7 +87,7 @@ export function createLecturerAccountManagementService(_params: {
           : await fetchLecturerAccountsApi(query);
       } catch (error) {
         throw new Error(
-          resolveApiErrorMessage(error, "Không tải được danh sách.")
+          resolveApiErrorMessage(error, "Không tải được danh sách."),
         );
       }
     },
@@ -98,7 +101,20 @@ export function createLecturerAccountManagementService(_params: {
         }
       } catch (error) {
         throw new Error(
-          resolveApiErrorMessage(error, "Không thể lưu thay đổi.")
+          resolveApiErrorMessage(error, "Không thể lưu thay đổi."),
+        );
+      }
+    },
+
+    async createLecturerAccountDTO(payload) {
+      try {
+        if (!isFacultyScope) {
+          throw new Error("Chức năng tạo tài khoản chỉ áp dụng cho cấp khoa.");
+        }
+        await createFacultyLecturerAccountApi(payload);
+      } catch (error) {
+        throw new Error(
+          resolveApiErrorMessage(error, "Không thể tạo tài khoản giảng viên."),
         );
       }
     },
@@ -112,7 +128,7 @@ export function createLecturerAccountManagementService(_params: {
         }
       } catch (error) {
         throw new Error(
-          resolveApiErrorMessage(error, "Không thể lưu phân quyền.")
+          resolveApiErrorMessage(error, "Không thể lưu phân quyền."),
         );
       }
     },
@@ -126,7 +142,7 @@ export function createLecturerAccountManagementService(_params: {
         }
       } catch (error) {
         throw new Error(
-          resolveApiErrorMessage(error, "Không thể cập nhật trạng thái.")
+          resolveApiErrorMessage(error, "Không thể cập nhật trạng thái."),
         );
       }
     },

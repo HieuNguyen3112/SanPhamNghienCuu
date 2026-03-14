@@ -1,0 +1,220 @@
+- generic [ref=e34]:
+  - complementary [ref=e35]:
+    - link "Về trang chủ" [ref=e37] [cursor=pointer]:
+      - /url: /
+      - img "University logo" [ref=e38]
+    - generic [ref=e40]:
+      - generic [ref=e42]: H
+      - generic [ref=e43]:
+        - generic [ref=e44]: Đặng Thu Hà
+        - generic [ref=e45]: Ban chủ nhiệm khoa
+    - button "‹" [ref=e48]:
+      - generic [ref=e49]: ‹
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - button "Quản lý khoa học ▾" [ref=e53]:
+          - generic [ref=e54]: Quản lý khoa học
+          - generic [ref=e55]: ▾
+        - generic [ref=e56]:
+          - link "Quản lý công trình NCKH" [ref=e57] [cursor=pointer]:
+            - /url: /works/facmanagement
+            - img [ref=e59]
+            - generic [ref=e64]: Quản lý công trình NCKH
+          - link "Xét duyệt công trình" [ref=e65] [cursor=pointer]:
+            - /url: /works/facapprovals
+            - img [ref=e67]
+            - generic [ref=e71]: Xét duyệt công trình
+          - link "Cảnh báo giảng viên" [ref=e72] [cursor=pointer]:
+            - /url: /hours/facwarning
+            - img [ref=e74]
+            - generic [ref=e76]: Cảnh báo giảng viên
+          - link "Quản lý giờ NCKH" [ref=e77] [cursor=pointer]:
+            - /url: /hours/facmanagement
+            - img [ref=e79]
+            - generic [ref=e81]: Quản lý giờ NCKH
+          - link "Xét duyệt giờ NCKH" [ref=e82] [cursor=pointer]:
+            - /url: /hours/facapprovals
+            - img [ref=e84]
+            - generic [ref=e88]: Xét duyệt giờ NCKH
+      - generic [ref=e89]:
+        - button "Quản lý hệ thống ▾" [ref=e90]:
+          - generic [ref=e91]: Quản lý hệ thống
+          - generic [ref=e92]: ▾
+        - generic [ref=e93]:
+          - link "Tài khoản giảng viên" [ref=e94] [cursor=pointer]:
+            - /url: /users/lecturer-accounts
+            - img [ref=e96]
+            - generic [ref=e101]: Tài khoản giảng viên
+          - link "Cơ cấu tổ chức" [ref=e102] [cursor=pointer]:
+            - /url: /users/org-structure
+            - img [ref=e104]
+            - generic [ref=e109]: Cơ cấu tổ chức
+          - link "Nhật ký hệ thống (Khoa)" [ref=e110] [cursor=pointer]:
+            - /url: /audit-logs/faculty
+            - img [ref=e112]
+            - generic [ref=e115]: Nhật ký hệ thống (Khoa)
+      - generic [ref=e116]:
+        - button "Thống kê và báo cáo ▾" [ref=e117]:
+          - generic [ref=e118]: Thống kê và báo cáo
+          - generic [ref=e119]: ▾
+        - generic [ref=e120]:
+          - link "Thống kê nhân sự" [ref=e121] [cursor=pointer]:
+            - /url: /report/lecturer
+            - img [ref=e123]
+            - generic [ref=e127]: Thống kê nhân sự
+          - link "Thống kê công trình NCKH" [ref=e128] [cursor=pointer]:
+            - /url: /report/research
+            - img [ref=e130]
+            - generic [ref=e133]: Thống kê công trình NCKH
+          - link "Thống kê giờ NCKH" [ref=e134] [cursor=pointer]:
+            - /url: /report/hour-research
+            - img [ref=e136]
+            - generic [ref=e141]: Thống kê giờ NCKH
+      - generic [ref=e142]:
+        - button "Tra cứu ▾" [ref=e143]:
+          - generic [ref=e144]: Tra cứu
+          - generic [ref=e145]: ▾
+        - link "Tra cứu công trình" [ref=e147] [cursor=pointer]:
+          - /url: /search
+          - img [ref=e149]
+          - generic [ref=e152]: Tra cứu công trình
+    - paragraph [ref=e154]: © 2026 Phần mềm quản lý NCKH
+  - generic [ref=e155]:
+    - banner [ref=e156]:
+      - generic [ref=e159]: TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH
+      - generic [ref=e160]:
+        - button "Mở danh sách thông báo" [ref=e162]:
+          - img [ref=e163]
+          - generic [ref=e325]: "3"
+        - button "Tài khoản" [ref=e167]:
+          - generic [ref=e168]: Tài khoản
+          - img [ref=e169]
+    - main [ref=e171]:
+      - generic [ref=e173]:
+        - generic [ref=e175]:
+          - generic [ref=e176]:
+            - heading "Thống kê giờ nghiên cứu khoa học" [level=1] [ref=e177]
+            - paragraph [ref=e178]: Tổng quan tình hình thực hiện giờ NCKH của giảng viên
+          - generic [ref=e179]:
+            - button "Xuất PDF" [ref=e180]:
+              - img [ref=e181]
+              - text: Xuất PDF
+            - button "Xuất Excel" [ref=e184]:
+              - img [ref=e185]
+              - text: Xuất Excel
+        - generic [ref=e189]:
+          - generic [ref=e190]:
+            - text: Chọn khoa
+            - generic [ref=e191]:
+              - combobox [ref=e192]:
+                - option "Tất cả khoa"
+                - option "Khoa Công nghệ Thông tin" [selected]
+              - img
+          - generic [ref=e193]:
+            - text: Chọn năm học
+            - generic [ref=e194]:
+              - combobox [ref=e195]:
+                - option "Tất cả năm học" [selected]
+                - option "2024-2025"
+                - option "2025-2026"
+                - option "2023-2024"
+              - img
+          - generic [ref=e196]:
+            - text: Trạng thái giờ NCKH
+            - generic [ref=e197]:
+              - combobox [ref=e198]:
+                - option "Tất cả" [selected]
+                - option "Đạt chuẩn"
+                - option "Chưa đạt"
+              - img
+          - button "Xóa lọc" [ref=e199]:
+            - img [ref=e200]
+            - text: Xóa lọc
+        - generic [ref=e203]:
+          - generic [ref=e205]:
+            - generic [ref=e206]:
+              - generic [ref=e207]: Quy mô nhân lực
+              - generic [ref=e208]: "0"
+              - generic [ref=e209]: Tổng số giảng viên
+            - img [ref=e211]
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e216]: Khối lượng nghiên cứu
+              - generic [ref=e217]: "0"
+              - generic [ref=e218]: Tổng giờ NCKH
+            - img [ref=e220]
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - generic [ref=e225]: Mức độ bình quân
+              - generic [ref=e226]: "0"
+              - generic [ref=e227]: Giờ NCKH trung bình / giảng viên
+            - img [ref=e229]
+          - generic [ref=e232]:
+            - generic [ref=e233]:
+              - generic [ref=e234]: Mức độ đáp ứng chuẩn
+              - generic [ref=e235]: 0%
+              - generic [ref=e236]: Tỉ lệ giảng viên đạt chuẩn (%)
+            - img [ref=e238]
+        - generic [ref=e240]:
+          - heading "Giờ NCKH theo khoa" [level=2] [ref=e243]
+          - heading "Phân bố giảng viên theo mức giờ NCKH" [level=2] [ref=e248]
+          - heading "Giờ NCKH theo năm học" [level=2] [ref=e253]
+          - heading "Tỉ lệ giảng viên đạt / chưa đạt chuẩn" [level=2] [ref=e258]
+        - generic [ref=e261]:
+          - generic [ref=e263]:
+            - heading "Danh sách giảng viên" [level=2] [ref=e264]
+            - paragraph [ref=e265]: Hiển thị 3 giảng viên theo điều kiện lọc.
+          - table [ref=e267]:
+            - rowgroup [ref=e268]:
+              - row "Giảng viên Khoa Tổng giờ NCKH Giờ chuẩn Trạng thái Năm học" [ref=e269]:
+                - columnheader "Giảng viên" [ref=e270]
+                - columnheader "Khoa" [ref=e271]
+                - columnheader "Tổng giờ NCKH" [ref=e272]
+                - columnheader "Giờ chuẩn" [ref=e273]
+                - columnheader "Trạng thái" [ref=e274]
+                - columnheader "Năm học" [ref=e275]
+            - rowgroup [ref=e326]:
+              - row "Lê Quang Huy Khoa Công nghệ Thông tin 35 600 Chưa đạt 2024-2025" [ref=e327]:
+                - cell "Lê Quang Huy" [ref=e328]
+                - cell "Khoa Công nghệ Thông tin" [ref=e329]
+                - cell "35" [ref=e330]
+                - cell "600" [ref=e331]
+                - cell "Chưa đạt" [ref=e332]:
+                  - generic [ref=e333]: Chưa đạt
+                - cell "2024-2025" [ref=e334]
+              - row "Nguyễn Minh Tuấn Khoa Công nghệ Thông tin 1.840 600 Đạt chuẩn 2024-2025" [ref=e335]:
+                - cell "Nguyễn Minh Tuấn" [ref=e336]
+                - cell "Khoa Công nghệ Thông tin" [ref=e337]
+                - cell "1.840" [ref=e338]
+                - cell "600" [ref=e339]
+                - cell "Đạt chuẩn" [ref=e340]:
+                  - generic [ref=e341]: Đạt chuẩn
+                - cell "2024-2025" [ref=e342]
+              - row "Vũ Đức Anh Khoa Công nghệ Thông tin 36 600 Chưa đạt 2023-2024" [ref=e343]:
+                - cell "Vũ Đức Anh" [ref=e344]
+                - cell "Khoa Công nghệ Thông tin" [ref=e345]
+                - cell "36" [ref=e346]
+                - cell "600" [ref=e347]
+                - cell "Chưa đạt" [ref=e348]:
+                  - generic [ref=e349]: Chưa đạt
+                - cell "2023-2024" [ref=e350]
+          - generic [ref=e284]:
+            - generic [ref=e285]: Hiển thị 3 / 3 giảng viên
+            - generic [ref=e286]:
+              - generic [ref=e287]:
+                - button "Trang đầu" [disabled] [ref=e288]:
+                  - img [ref=e289]
+                - button "Trang trước" [disabled] [ref=e292]:
+                  - img [ref=e293]
+                - button "1" [ref=e296]
+                - button "Trang sau" [disabled] [ref=e297]:
+                  - img [ref=e298]
+                - button "Trang cuối" [disabled] [ref=e300]:
+                  - img [ref=e301]
+              - generic [ref=e304]:
+                - generic [ref=e305]: Dòng / trang
+                - combobox [ref=e306]:
+                  - option "8"
+                  - option "12" [selected]
+                  - option "20"
+                  - option "50"

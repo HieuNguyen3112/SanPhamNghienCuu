@@ -243,6 +243,8 @@ class BackupRunStateStore
         $message = match ($operation) {
             'snapshot_refresh' => 'Đồng bộ danh sách snapshot quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.',
             'forget' => 'Tiến trình xóa snapshot bị quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.',
+            'backup_postprocess' => 'Tiến trình hoàn thiện readable export bị quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.',
+            'backup_check' => 'Tiến trình kiểm tra repository backup bị quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.',
             'prune' => 'Tiến trình dọn snapshot bị quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.',
             'backup' => 'Tiến trình sao lưu bị quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.',
             'restore' => 'Tiến trình khôi phục bị quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.',

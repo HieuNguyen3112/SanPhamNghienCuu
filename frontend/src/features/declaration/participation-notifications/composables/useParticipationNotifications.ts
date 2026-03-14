@@ -1,8 +1,8 @@
 import { onMounted, ref, watch } from "vue";
 import {
   mapParticipationNotificationDtoToModel,
-  type ParticipationNotification,
   type NotificationStatus,
+  type ParticipationNotification,
 } from "../contracts/participationNotificationsContract";
 import {
   accept_participation_notification,
@@ -14,6 +14,7 @@ import {
   resolveApiErrorMessage,
   useActionFeedback,
 } from "@/shared/composables/useActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 export type StatusFilter = "ALL" | NotificationStatus;
 
@@ -48,6 +49,7 @@ export function useParticipationNotifications() {
   let notificationTimer: number | null = null;
 
   const { runWithFeedback } = useActionFeedback();
+  const { runPageLoad } = usePageLoadFeedback();
 
   function setNotification(message: string) {
     notificationMessage.value = message;
@@ -71,7 +73,7 @@ export function useParticipationNotifications() {
     };
   }
 
-  async function loadList() {
+  async function loadListInternal() {
     loading.value = true;
     try {
       const response = await list_participation_notifications(buildListParams());
@@ -89,6 +91,29 @@ export function useParticipationNotifications() {
     } finally {
       loading.value = false;
     }
+  }
+
+  async function loadList(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadListInternal();
+      return;
+    }
+
+    await runPageLoad(loadListInternal, {
+      loading: {
+        title: "Đang tải thông báo xác nhận",
+        message: "Hệ thống đang cập nhật danh sách yêu cầu tham gia...",
+      },
+    });
+  }
+
+  async function bootstrap() {
+    await runPageLoad(loadListInternal, {
+      loading: {
+        title: "Đang khởi tạo thông báo xác nhận",
+        message: "Hệ thống đang chuẩn bị danh sách lời mời tham gia công trình...",
+      },
+    });
   }
 
   async function loadDetail(id: number) {
@@ -134,13 +159,13 @@ export function useParticipationNotifications() {
       await runWithFeedback(
         async () => {
           const updatedDto = await accept_participation_notification(
-            selected.value!.id
+            selected.value!.id,
           );
           const updated = mapParticipationNotificationDtoToModel(updatedDto);
           selected.value = updated;
           rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
           closeDetail();
-          await loadList();
+          await loadList({ withFeedback: false });
         },
         {
           loading: {
@@ -156,10 +181,10 @@ export function useParticipationNotifications() {
             message: (error) =>
               resolveApiErrorMessage(
                 error,
-                "Không thể xác nhận tham gia. Vui lòng thử lại."
+                "Không thể xác nhận tham gia. Vui lòng thử lại.",
               ),
           },
-        }
+        },
       );
     } catch (error) {
       console.error(error);
@@ -179,13 +204,13 @@ export function useParticipationNotifications() {
         async () => {
           const updatedDto = await reject_participation_notification(
             selected.value!.id,
-            reason
+            reason,
           );
           const updated = mapParticipationNotificationDtoToModel(updatedDto);
           selected.value = updated;
           rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
           closeDetail();
-          await loadList();
+          await loadList({ withFeedback: false });
         },
         {
           loading: {
@@ -201,10 +226,10 @@ export function useParticipationNotifications() {
             message: (error) =>
               resolveApiErrorMessage(
                 error,
-                "Không thể từ chối tham gia. Vui lòng thử lại."
+                "Không thể từ chối tham gia. Vui lòng thử lại.",
               ),
           },
-        }
+        },
       );
     } catch (error) {
       console.error(error);
@@ -213,13 +238,13 @@ export function useParticipationNotifications() {
     }
   }
 
-  function onUpdateCurrentPageNumber(n: number) {
-    currentPageNumber.value = n;
+  function onUpdateCurrentPageNumber(nextPage: number) {
+    currentPageNumber.value = nextPage;
     void loadList();
   }
 
-  function onUpdatePageSize(s: number) {
-    pageSize.value = s;
+  function onUpdatePageSize(nextPageSize: number) {
+    pageSize.value = nextPageSize;
     currentPageNumber.value = 1;
     void loadList();
   }
@@ -232,19 +257,24 @@ export function useParticipationNotifications() {
       filters.value.from,
       filters.value.to,
     ],
-    () => {
+    (nextValues, previousValues) => {
       if (filterTimer != null) {
         window.clearTimeout(filterTimer);
       }
       filterTimer = window.setTimeout(() => {
         currentPageNumber.value = 1;
-        void loadList();
+        const keywordOnly =
+          Array.isArray(previousValues) &&
+          nextValues[0] === previousValues[0] &&
+          nextValues[2] === previousValues[2] &&
+          nextValues[3] === previousValues[3];
+        void loadList({ withFeedback: !keywordOnly });
       }, 300);
-    }
+    },
   );
 
   onMounted(() => {
-    void loadList();
+    void bootstrap();
   });
 
   return {

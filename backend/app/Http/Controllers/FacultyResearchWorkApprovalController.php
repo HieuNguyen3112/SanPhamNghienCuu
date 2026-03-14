@@ -469,18 +469,23 @@ class FacultyResearchWorkApprovalController extends Controller
         });
 
         $workTitle = trim((string) ($current->title ?? ''));
-        WorkflowNotification::notifyLecturer(
-            (int) $current->lecturer_id,
+        $recipientLecturerIds = $this->resolveTeamRecipientLecturerIds(
+            (int) $activity,
+            (int) $current->lecturer_id
+        );
+
+        WorkflowNotification::notifyLecturers(
+            $recipientLecturerIds,
             WorkflowNotification::makePayload(
                 'work_rejected',
                 'Công trình bị từ chối',
                 $workTitle !== ''
-                    ? 'Công trình "' . $workTitle . '" đã bị từ chối ở cấp khoa.'
-                    : 'Công trình của bạn đã bị từ chối ở cấp khoa.',
+                    ? 'Công trình "' . $workTitle . '" đã bị khoa từ chối và trả về để nhóm cập nhật.'
+                    : 'Công trình đã bị khoa từ chối và trả về để nhóm cập nhật.',
                 '/works/personal?activity_id=' . $activity,
                 [
                     'activity_id' => (int) $activity,
-                    'lecturer_id' => (int) $current->lecturer_id,
+                    'activity_title' => $workTitle !== '' ? $workTitle : null,
                     'rejection_note' => $note,
                 ]
             )
@@ -1014,5 +1019,22 @@ class FacultyResearchWorkApprovalController extends Controller
         }
 
         return $reasonType . ': ' . $reasonDetail;
+    }
+
+    private function resolveTeamRecipientLecturerIds(int $activityId, int $ownerLecturerId): array
+    {
+        $memberLecturerIds = DB::table('research_activity_members')
+            ->where('activity_id', $activityId)
+            ->where('confirmation_status', 'accepted')
+            ->pluck('lecturer_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return collect(array_merge([$ownerLecturerId], $memberLecturerIds))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

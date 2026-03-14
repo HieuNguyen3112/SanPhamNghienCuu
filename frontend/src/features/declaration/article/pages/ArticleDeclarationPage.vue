@@ -78,7 +78,7 @@
                 >
                 <select
                   v-model="form.typeId"
-                  :disabled="readOnly"
+                  :disabled="readOnly || isTypeLockedByJournal"
                   :class="selectClass(formErrors.typeId)"
                 >
                   <option :value="null">-- Chọn loại --</option>
@@ -92,6 +92,12 @@
                   <span class="font-semibold text-slate-900">{{
                     baseHoursText
                   }}</span>
+                </div>
+                <div
+                  v-if="isTypeLockedByJournal"
+                  class="mt-1 text-xs text-sky-700"
+                >
+                  Loại bài báo được tự động xác định theo tạp chí đã chọn.
                 </div>
                 <p v-if="formErrors.typeId" class="mt-1 text-xs text-rose-600">
                   {{ formErrors.typeId }}
@@ -136,7 +142,15 @@
                   :search-fn="searchJournals"
                   :error="formErrors.journalName ?? undefined"
                   @select="onJournalSelect"
+                  @clear="onJournalClear"
                 />
+                <p
+                  v-if="!isJournalFromCatalog"
+                  class="mt-2 text-xs text-amber-700"
+                >
+                  Lưu ý: Nếu tự nhập tên tạp chí, vui lòng chọn loại bài báo ở
+                  trên để hệ thống tính giờ đúng.
+                </p>
               </div>
               <div v-if="form.typeId" class="mt-2 text-xs text-slate-600">
                 Giờ NCKH lấy theo loại công trình trong cấu hình quy đổi:
@@ -425,6 +439,8 @@ const types = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
 
 const currentLecturerId = ref<number>(0);
+const selectedJournalClassification = ref<string | null>(null);
+const selectedJournalResearchHours = ref<number | null>(null);
 
 // Keywords (UI + persist)
 const keywords = ref("");
@@ -560,6 +576,48 @@ const baseHoursText = computed(() => {
   const byType = code ? (articleBaseHoursByTypeCode[code] ?? 0) : 0;
   return `${byType} giờ`;
 });
+
+const isJournalFromCatalog = computed(() => typeof form.journalId === "number");
+
+const mappedTypeCodeFromJournal = computed(() => {
+  const normalizedClassification = String(
+    selectedJournalClassification.value ?? "",
+  )
+    .trim()
+    .toUpperCase();
+
+  const typeCodeByClassification: Record<string, string> = {
+    HDGSNN_GE_2: "hdgsnn_900",
+    POINT_GE_2: "hdgsnn_900",
+    HDGSNN_GE_1: "hdgsnn_600",
+    POINT_GE_1: "hdgsnn_600",
+    ISSN_ISBN: "hdgsnn_300",
+  };
+
+  const mappedFromClassification =
+    typeCodeByClassification[normalizedClassification];
+  if (mappedFromClassification) return mappedFromClassification;
+
+  const hours = selectedJournalResearchHours.value;
+  if (typeof hours === "number") {
+    if (hours >= 900) return "hdgsnn_900";
+    if (hours >= 600) return "hdgsnn_600";
+    if (hours > 0) return "hdgsnn_300";
+  }
+
+  return null;
+});
+
+const mappedTypeIdFromJournal = computed(() => {
+  const mappedCode = mappedTypeCodeFromJournal.value;
+  if (!mappedCode) return null;
+  const mappedId = typeIdByCode.value[mappedCode];
+  return typeof mappedId === "number" ? mappedId : null;
+});
+
+const isTypeLockedByJournal = computed(
+  () => isJournalFromCatalog.value && mappedTypeIdFromJournal.value !== null,
+);
 
 const hoursNote = computed(() => {
   if (!form.typeId) return "Chọn loại bài báo để xác định giờ chuẩn.";
@@ -762,21 +820,21 @@ function onJournalSelect(option: {
   form.journalResearchHours =
     typeof option.researchHours === "number" ? option.researchHours : null;
 
-  const normalizedClassification = String(option.classification ?? "").trim();
-  const typeCodeByClassification: Record<string, string> = {
-    POINT_GE_2: "hdgsnn_900",
-    POINT_GE_1: "hdgsnn_600",
-    ISSN_ISBN: "hdgsnn_300",
-  };
-  const mappedTypeCode = typeCodeByClassification[normalizedClassification];
-  const mappedTypeId = mappedTypeCode
-    ? typeIdByCode.value[mappedTypeCode]
-    : null;
-  if (mappedTypeId) {
-    form.typeId = mappedTypeId;
+  selectedJournalClassification.value = option.classification ?? null;
+  selectedJournalResearchHours.value =
+    typeof option.researchHours === "number" ? option.researchHours : null;
+
+  if (mappedTypeIdFromJournal.value !== null) {
+    form.typeId = mappedTypeIdFromJournal.value;
   }
 
   clearFieldError("journalName");
+}
+
+function onJournalClear() {
+  selectedJournalClassification.value = null;
+  selectedJournalResearchHours.value = null;
+  form.journalResearchHours = null;
 }
 
 const { runWithFeedback } = useActionFeedback();
@@ -1126,7 +1184,23 @@ watch(
 );
 watch(
   () => form.journalName,
-  () => clearFieldError("journalName"),
+  () => {
+    clearFieldError("journalName");
+    if (form.journalId === null) {
+      selectedJournalClassification.value = null;
+      selectedJournalResearchHours.value = null;
+      form.journalResearchHours = null;
+    }
+  },
+);
+
+watch(
+  () => mappedTypeIdFromJournal.value,
+  (nextTypeId) => {
+    if (isJournalFromCatalog.value && nextTypeId !== null) {
+      form.typeId = nextTypeId;
+    }
+  },
 );
 watch(
   () => form.year,

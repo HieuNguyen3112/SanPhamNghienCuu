@@ -799,7 +799,7 @@ class ResearchEvidenceStorageService
         if (! is_dir($configDir) || ! is_writable($configDir)) {
             throw new RuntimeException(
                 'Thư mục cấu hình rclone cho minh chứng không có quyền ghi. '
-                . 'Hãy chuyển SPNC_EVIDENCE_RCLONE_CONFIG sang đường dẫn server có quyền ghi.'
+                . 'Hãy cấu hình SPNC_RCLONE_CONFIG tới đường dẫn server có quyền ghi.'
             );
         }
     }

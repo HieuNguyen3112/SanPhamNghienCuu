@@ -67,13 +67,13 @@ const {
   loadingSuggestions,
   errorSuggestions,
 
-  loadAlerts,
+  bootstrap,
   changeFilter,
   markAsSeen,
   deleteAlert,
 } = useHoursWarning();
 
 onMounted(() => {
-  loadAlerts();
+  void bootstrap();
 });
 </script>

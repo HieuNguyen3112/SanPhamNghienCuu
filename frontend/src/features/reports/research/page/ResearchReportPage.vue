@@ -126,6 +126,7 @@ import ResearchTypeDonutChart from "../components/charts/ResearchTypeDonutChart.
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 import { useUserStore } from "@/app/stores/userStore";
 import { useExportActionFeedback } from "@/shared/composables/useExportActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 import {
   exportResearchReportExcel,
   exportResearchReportPdf,
@@ -169,6 +170,7 @@ const pageSize = ref(12);
 const isLoading = ref(false);
 const errorMessage = ref("");
 const { exporting, runExport } = useExportActionFeedback();
+const { runPageLoad } = usePageLoadFeedback();
 
 const filterOptions = ref<ResearchReportFiltersResponse>({
   years: [],
@@ -295,21 +297,30 @@ async function loadReport() {
   }
 }
 
+async function refreshReportWithFeedback() {
+  await runPageLoad(() => loadReport(), {
+    loading: {
+      title: "Đang tải thống kê công trình",
+      message: "Hệ thống đang cập nhật dữ liệu thống kê công trình nghiên cứu khoa học...",
+    },
+  });
+}
+
 function applySort(nextSort: ResearchReportSortCondition) {
   sort.value = { ...nextSort };
   page.value = 1;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 function changePage(nextPage: number) {
   page.value = nextPage;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 function changePageSize(nextPageSize: number) {
   pageSize.value = nextPageSize;
   page.value = 1;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 async function handleExport(type: "pdf" | "excel") {
@@ -351,12 +362,22 @@ watch(
   ],
   () => {
     page.value = 1;
-    void loadReport();
+    void refreshReportWithFeedback();
   }
 );
 
 onMounted(async () => {
-  await loadFilters();
-  await loadReport();
+  await runPageLoad(
+    async () => {
+      await loadFilters();
+      await loadReport();
+    },
+    {
+      loading: {
+        title: "Đang khởi tạo thống kê công trình",
+        message: "Hệ thống đang chuẩn bị dữ liệu thống kê công trình nghiên cứu khoa học...",
+      },
+    },
+  );
 });
 </script>

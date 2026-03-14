@@ -1,6 +1,7 @@
 import http, { ensureCsrfCookie } from "@/lib/http";
 import type {
   AssignRolesPayload,
+  CreateLecturerAccountPayload,
   LecturerAccountDTO,
   LecturerAccountListResponseDTO,
   LecturerAccountLookupsDTO,
@@ -28,107 +29,118 @@ export interface LecturerAccountItemApiResponse {
 }
 
 export async function fetchLecturerAccountsApi(
-  query: Record<string, unknown>
+  query: Record<string, unknown>,
 ): Promise<LecturerAccountListResponseDTO> {
   const { data } = await http.get<LecturerAccountListApiResponse>(
     "/api/admin/lecturer-accounts",
-    { params: query }
+    { params: query },
   );
   return data.data;
 }
 
 export async function fetchLecturerAccountLookupsApi(): Promise<LecturerAccountLookupsDTO> {
   const { data } = await http.get<LecturerAccountLookupsApiResponse>(
-    "/api/admin/lecturer-accounts/lookups"
+    "/api/admin/lecturer-accounts/lookups",
   );
   return data.data;
 }
 
 export async function fetchFacultyLecturerAccountsApi(
-  query: Record<string, unknown>
+  query: Record<string, unknown>,
 ): Promise<LecturerAccountListResponseDTO> {
   const { data } = await http.get<LecturerAccountListApiResponse>(
     "/api/faculty/users/lecturer-accounts",
-    { params: query }
+    { params: query },
   );
   return data.data;
 }
 
 export async function fetchFacultyLecturerAccountLookupsApi(): Promise<LecturerAccountLookupsDTO> {
   const { data } = await http.get<LecturerAccountLookupsApiResponse>(
-    "/api/faculty/users/lecturer-accounts/lookups"
+    "/api/faculty/users/lecturer-accounts/lookups",
   );
   return data.data;
 }
 
 export async function updateLecturerAccountApi(
   lecturerId: number,
-  payload: UpdateLecturerAccountPayload
+  payload: UpdateLecturerAccountPayload,
 ): Promise<LecturerAccountDTO> {
   await ensureCsrfCookie();
   const { data } = await http.put<LecturerAccountItemApiResponse>(
     `/api/admin/lecturer-accounts/${lecturerId}`,
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function updateLecturerRolesApi(
   lecturerId: number,
-  payload: AssignRolesPayload
+  payload: AssignRolesPayload,
 ): Promise<LecturerAccountDTO> {
   await ensureCsrfCookie();
   const { data } = await http.put<LecturerAccountItemApiResponse>(
     `/api/admin/lecturer-accounts/${lecturerId}/roles`,
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function updateLecturerStatusApi(
   lecturerId: number,
-  payload: ToggleAccountStatusPayload
+  payload: ToggleAccountStatusPayload,
 ): Promise<LecturerAccountDTO> {
   await ensureCsrfCookie();
   const { data } = await http.put<LecturerAccountItemApiResponse>(
     `/api/admin/lecturer-accounts/${lecturerId}/status`,
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function updateFacultyLecturerAccountApi(
   lecturerId: number,
-  payload: UpdateLecturerAccountPayload
+  payload: UpdateLecturerAccountPayload,
 ): Promise<LecturerAccountDTO> {
   await ensureCsrfCookie();
   const { data } = await http.put<LecturerAccountItemApiResponse>(
     `/api/faculty/users/lecturer-accounts/${lecturerId}`,
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function updateFacultyLecturerRolesApi(
   lecturerId: number,
-  payload: AssignRolesPayload
+  payload: AssignRolesPayload,
 ): Promise<LecturerAccountDTO> {
   await ensureCsrfCookie();
   const { data } = await http.put<LecturerAccountItemApiResponse>(
     `/api/faculty/users/lecturer-accounts/${lecturerId}/roles`,
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function updateFacultyLecturerStatusApi(
   lecturerId: number,
-  payload: ToggleAccountStatusPayload
+  payload: ToggleAccountStatusPayload,
 ): Promise<LecturerAccountDTO> {
   await ensureCsrfCookie();
   const { data } = await http.put<LecturerAccountItemApiResponse>(
     `/api/faculty/users/lecturer-accounts/${lecturerId}/status`,
-    payload
+    payload,
+  );
+  return data.data;
+}
+
+export async function createFacultyLecturerAccountApi(
+  payload: CreateLecturerAccountPayload,
+): Promise<LecturerAccountDTO> {
+  await ensureCsrfCookie();
+  const { data } = await http.post<LecturerAccountItemApiResponse>(
+    "/api/faculty/users/lecturer-accounts",
+    payload,
   );
   return data.data;
 }

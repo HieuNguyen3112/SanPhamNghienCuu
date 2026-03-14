@@ -36,20 +36,17 @@ export const RESEARCH_HOUR_WARNING_REASON_OPTIONS: ResearchHourWarningReasonOpti
     {
       code: "MISSING_HOURS",
       label: "Thiếu giờ NCKH",
-      description:
-        "Giảng viên chưa đạt định mức giờ NCKH theo năm học.",
+      description: "Giảng viên chưa đạt định mức giờ NCKH theo năm học.",
     },
     {
       code: "DEADLINE_NEAR",
       label: "Sắp hết hạn kê khai",
-      description:
-        "Gần đến hạn chốt kê khai/xét duyệt giờ NCKH.",
+      description: "Gần đến hạn chốt kê khai/xét duyệt giờ NCKH.",
     },
     {
       code: "DEADLINE_PASSED",
       label: "Đã hết hạn kê khai",
-      description:
-        "Đã quá hạn; cần xử lý theo quy định/biên bản.",
+      description: "Đã quá hạn; cần xử lý theo quy định/biên bản.",
     },
     {
       code: "MISSING_EVIDENCE",
@@ -77,6 +74,7 @@ export interface FacultyOptionDTO {
 export interface AcademicYearOptionDTO {
   academic_year_identifier: AcademicYearIdentifier;
   label: string;
+  isActive: boolean;
 }
 
 export interface LecturerResearchHourSummaryStatisticsDTO {
@@ -144,6 +142,7 @@ export interface FacultyOption {
 export interface AcademicYearOption {
   academicYearIdentifier: AcademicYearIdentifier;
   label: string;
+  isActive: boolean;
 }
 
 export interface LecturerResearchHourSummaryStatistics {
@@ -196,16 +195,17 @@ export function facultyOptionFromDto(dto: FacultyOptionDTO): FacultyOption {
 }
 
 export function academicYearOptionFromDto(
-  dto: AcademicYearOptionDTO
+  dto: AcademicYearOptionDTO,
 ): AcademicYearOption {
   return {
     academicYearIdentifier: dto.academic_year_identifier,
     label: dto.label,
+    isActive: dto.isActive ?? false,
   };
 }
 
 export function summaryStatisticsFromDto(
-  dto: LecturerResearchHourSummaryStatisticsDTO
+  dto: LecturerResearchHourSummaryStatisticsDTO,
 ): LecturerResearchHourSummaryStatistics {
   return {
     totalLecturersNotMeetingStandard: dto.total_lecturers_not_meeting_standard,
@@ -218,7 +218,7 @@ export function summaryStatisticsFromDto(
 }
 
 export function warningEntryFromDto(
-  dto: LecturerResearchHourShortfallWarningEntryDTO
+  dto: LecturerResearchHourShortfallWarningEntryDTO,
 ): LecturerResearchHourShortfallWarningEntry {
   return {
     lecturerIdentifier: dto.lecturer_identifier,
@@ -245,12 +245,12 @@ export function warningEntryFromDto(
 }
 
 export function overviewFromDto(
-  dto: LecturerResearchHourWarningOverviewDTO
+  dto: LecturerResearchHourWarningOverviewDTO,
 ): LecturerResearchHourWarningOverview {
   return {
     facultyOptionList: dto.faculty_option_list.map(facultyOptionFromDto),
     academicYearOptionList: dto.academic_year_option_list.map(
-      academicYearOptionFromDto
+      academicYearOptionFromDto,
     ),
     summaryStatistics: summaryStatisticsFromDto(dto.summary_statistics),
     entryList: dto.entry_list.map(warningEntryFromDto),

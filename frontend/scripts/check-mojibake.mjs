@@ -1,13 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const roots = [
-  "src",
-  "../backend/app",
-  "../backend/routes",
-  "../backend/tests",
-  "../backend/database/seeders",
-];
+const inputPaths = process.argv.slice(2);
+const roots = inputPaths.length > 0
+  ? inputPaths
+  : [
+      "src",
+      "../backend/app",
+      "../backend/routes",
+      "../backend/tests",
+      "../backend/database/seeders",
+      "../backend/resources/views",
+    ];
 const textExtensions = new Set([
   ".vue",
   ".ts",

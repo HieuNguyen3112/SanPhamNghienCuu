@@ -22,7 +22,7 @@
           @reset="resetFilter"
         >
           <template #extraFilter="{ filter, updateFilter }">
-            <div class="max-w-[320px]">
+            <div class="w-full">
               <label class="text-xs text-slate-600">Khoa</label>
               <select
                 class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"

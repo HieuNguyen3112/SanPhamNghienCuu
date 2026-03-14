@@ -45,6 +45,37 @@ class WorkflowNotification
         $user->notify(new WorkflowDatabaseNotification($payload));
     }
 
+    public static function notifyLecturers(array $lecturerIds, array $payload): void
+    {
+        $lecturerIds = collect($lecturerIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($lecturerIds)) {
+            return;
+        }
+
+        $userIds = DB::table('lecturers')
+            ->whereIn('id', $lecturerIds)
+            ->whereNotNull('user_id')
+            ->distinct()
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (empty($userIds)) {
+            return;
+        }
+
+        $users = User::whereIn('id', $userIds)->get();
+        foreach ($users as $user) {
+            $user->notify(new WorkflowDatabaseNotification($payload));
+        }
+    }
+
     public static function notifyFacultyBoardByActivityId(
         int $activityId,
         array $payload,
@@ -104,4 +135,3 @@ class WorkflowNotification
         }
     }
 }
-

@@ -43,6 +43,7 @@ import {
   resolveApiErrorMessage,
   useActionFeedback,
 } from "@/shared/composables/useActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 import ResearchHoursCatalogTabs from "../components/ResearchHoursCatalogTabs.vue";
 import WorkConversionCatalogSection from "../components/WorkConversionCatalogSection.vue";
@@ -75,9 +76,23 @@ const work = useWorkConversionCatalog();
 const quota = useHoursQuotaCatalog();
 const year = useAcademicYearPeriodCatalog();
 const { runWithFeedback } = useActionFeedback();
+const { runPageLoad } = usePageLoadFeedback();
 
-onMounted(async () => {
-  await Promise.all([work.fetch(), quota.fetch(), year.fetch()]);
+async function loadCatalogDataWithFeedback() {
+  await runPageLoad(
+    () => Promise.all([work.fetch(), quota.fetch(), year.fetch()]),
+    {
+      loading: {
+        title: "Đang tải danh mục giờ NCKH",
+        message: "Hệ thống đang chuẩn bị dữ liệu cấu hình giờ nghiên cứu...",
+      },
+      onError: (error) => console.error(error),
+    },
+  );
+}
+
+onMounted(() => {
+  void loadCatalogDataWithFeedback();
 });
 
 const workVm = computed(() => ({

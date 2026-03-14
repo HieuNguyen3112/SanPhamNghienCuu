@@ -10,6 +10,7 @@ import type {
   PaginatedResult,
 } from "../lecturerResearchWork.contracts";
 import type { LecturerResearchWorkClient, PaginationRequest } from "../api/lecturerResearchWork.client";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 export interface UseOptions {
   client: LecturerResearchWorkClient;
@@ -23,6 +24,7 @@ const defaultPagination: Pagination = {
 };
 
 export function useLecturerResearchWorkManagement(options: UseOptions) {
+  const { runPageLoad } = usePageLoadFeedback();
   const filter = reactive<FilterState>({
     facultyId: null,
     academicYearId: null,
@@ -88,7 +90,7 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
     }
   }
 
-  async function loadOverview() {
+  async function loadOverviewInternal() {
     isOverviewLoading.value = true;
     overviewError.value = null;
 
@@ -110,10 +112,27 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
     }
   }
 
+  async function loadOverview(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadOverviewInternal();
+      return;
+    }
+
+    await runPageLoad(loadOverviewInternal, {
+      loading: {
+        title: "Đang tải quản lý công trình",
+        message: "Hệ thống đang cập nhật danh sách công trình nghiên cứu khoa học...",
+      },
+    });
+  }
+
   function updateFilter(partial: Partial<FilterState>) {
     Object.assign(filter, partial);
     overviewPagination.page = 1;
-    loadOverview();
+    const nextKeys = Object.keys(partial);
+    const lecturerKeywordOnly =
+      nextKeys.length === 1 && nextKeys[0] === "lecturerName";
+    void loadOverview({ withFeedback: !lecturerKeywordOnly });
   }
 
   function resetFilter() {
@@ -123,7 +142,7 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
     filter.lecturerName = "";
     filter.statusMode = "all";
     overviewPagination.page = 1;
-    loadOverview();
+    void loadOverview();
   }
 
   async function loadApprovedWorks() {
@@ -204,13 +223,13 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
 
   function updateOverviewPage(page: number) {
     overviewPagination.page = page;
-    loadOverview();
+    void loadOverview();
   }
 
   function updateOverviewPerPage(perPage: number) {
     overviewPagination.perPage = perPage;
     overviewPagination.page = 1;
-    loadOverview();
+    void loadOverview();
   }
 
   function updateApprovedPage(page: number) {
@@ -225,8 +244,18 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
   }
 
   onMounted(async () => {
-    await loadOptions();
-    await loadOverview();
+    await runPageLoad(
+      async () => {
+        await loadOptions();
+        await loadOverviewInternal();
+      },
+      {
+        loading: {
+          title: "Đang khởi tạo quản lý công trình",
+          message: "Hệ thống đang chuẩn bị dữ liệu công trình nghiên cứu khoa học...",
+        },
+      },
+    );
   });
 
   return {

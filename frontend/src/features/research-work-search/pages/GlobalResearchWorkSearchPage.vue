@@ -10,7 +10,7 @@
         :author-role-options="authorRoleOptions"
         :status-options="statusOptions"
         :management-level-options="managementLevelOptions"
-        :year-options="years"
+        :academic-year-options="years"
         :lecturer-suggestions="lecturerSuggestions"
         :result-count-text="resultCountText"
         @update:filter="onUpdateFilter"
@@ -71,7 +71,7 @@ const {
   loadingDetail,
   errorDetail,
 
-  loadLookups,
+  bootstrap,
   search,
   reset,
   fetchList,
@@ -86,8 +86,7 @@ function onUpdateFilter(partial: Partial<GlobalResearchWorkSearchFilter>) {
 
 onMounted(() => {
   void (async () => {
-    await loadLookups();
-    await search();
+    await bootstrap();
   })();
 });
 

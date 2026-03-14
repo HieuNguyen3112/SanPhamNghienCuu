@@ -125,6 +125,10 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { X } from "lucide-vue-next";
 import PdfCanvasViewer from "@/shared/components/pdf/PdfCanvasViewer.vue";
+import {
+  focusModalElement,
+  restoreModalFocus,
+} from "@/shared/utils/modalFocus";
 
 const props = withDefaults(
   defineProps<{
@@ -221,14 +225,14 @@ function trapFocus(event: KeyboardEvent): void {
   if (event.shiftKey) {
     if (active === first || !panelRef.value?.contains(active)) {
       event.preventDefault();
-      last.focus({ preventScroll: true });
+      focusModalElement(last, { preventScroll: true });
     }
     return;
   }
 
   if (active === last || !panelRef.value?.contains(active)) {
     event.preventDefault();
-    first.focus({ preventScroll: true });
+    focusModalElement(first, { preventScroll: true });
   }
 }
 
@@ -236,7 +240,7 @@ function onAfterEnter(): void {
   window.removeEventListener("keydown", onWindowKeydown);
   window.addEventListener("keydown", onWindowKeydown);
   setReadyStateIfOpen();
-  closeButtonRef.value?.focus({ preventScroll: true });
+  focusModalElement(closeButtonRef.value, { preventScroll: true });
 }
 
 function onBeforeLeave(): void {
@@ -267,7 +271,7 @@ watch(
         modalReadyFrame = null;
       }
       window.removeEventListener("keydown", onWindowKeydown);
-      previousFocusedElement?.focus?.({ preventScroll: true });
+      restoreModalFocus(previousFocusedElement, { preventScroll: true });
       previousFocusedElement = null;
       return;
     }
@@ -294,6 +298,6 @@ onBeforeUnmount(() => {
     modalReadyFrame = null;
   }
   window.removeEventListener("keydown", onWindowKeydown);
-  previousFocusedElement?.focus?.({ preventScroll: true });
+  restoreModalFocus(previousFocusedElement, { preventScroll: true });
 });
 </script>

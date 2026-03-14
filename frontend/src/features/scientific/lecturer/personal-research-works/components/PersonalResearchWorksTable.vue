@@ -105,6 +105,7 @@
                   :open="openMenuWorkId === row.activityId"
                   :activity-id="row.activityId"
                   :status-code="row.statusCode"
+                  :actions="row.actions"
                   @toggle="(nextOpen) => setMenuOpen(row.activityId, nextOpen)"
                   @close="closeMenu"
                   @view="(id) => emit('open-detail', id)"

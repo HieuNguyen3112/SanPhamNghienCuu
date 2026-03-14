@@ -67,6 +67,24 @@ class BackupRunLauncher
         ]);
     }
 
+    public function launchBackupPostProcess(
+        string $runId,
+        int $initiatedByUserId,
+        string $snapshotId,
+        string $trigger = 'manual'
+    ): void {
+        $this->assertSafeRunId($runId);
+        $this->assertSafeTrigger($trigger);
+        $this->assertSafeSnapshotId($snapshotId);
+        $this->runDetached('spnc:backup:post-process', [
+            '--run-id' => $runId,
+            '--snapshot-id' => $snapshotId,
+            '--trigger' => $trigger,
+            '--initiated-by' => (string) $initiatedByUserId,
+            '--no-interaction' => true,
+        ]);
+    }
+
     public function launchForget(
         string $runId,
         int $initiatedByUserId,

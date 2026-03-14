@@ -74,6 +74,11 @@ let degreeDonutChartDatasetReference: { data: number[] } | null = null;
 let academicRankPieChartDatasetReference: { data: number[] } | null = null;
 let genderBarChartDatasetReference: { data: number[] } | null = null;
 
+const chartAnimationOptions = {
+  duration: 650,
+  easing: "easeOutQuart" as const,
+};
+
 const facultyDistribution = computed(() => componentProperties.charts.byFaculty);
 const degreeDistribution = computed(() => componentProperties.charts.byDegree);
 const academicRankDistribution = computed(
@@ -119,7 +124,7 @@ function createOrUpdateFacultyBarChart() {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          animation: false,
+          animation: chartAnimationOptions,
           plugins: {
             legend: { position: "bottom" },
             tooltip: { mode: "index", intersect: false },
@@ -139,7 +144,7 @@ function createOrUpdateFacultyBarChart() {
   if (facultyBarChartDatasetReference) {
     facultyBarChartDatasetReference.data = facultyDistribution.value.values;
   }
-  facultyBarChartInstance.update("none");
+  facultyBarChartInstance.update();
 }
 
 function createOrUpdateDegreeDonutChart() {
@@ -178,7 +183,7 @@ function createOrUpdateDegreeDonutChart() {
           responsive: true,
           maintainAspectRatio: false,
           cutout: "62%",
-          animation: false,
+          animation: chartAnimationOptions,
           plugins: {
             legend: { position: "bottom" },
             tooltip: { enabled: true },
@@ -194,7 +199,7 @@ function createOrUpdateDegreeDonutChart() {
   if (degreeDonutChartDatasetReference) {
     degreeDonutChartDatasetReference.data = degreeDistribution.value.values;
   }
-  degreeDonutChartInstance.update("none");
+  degreeDonutChartInstance.update();
 }
 
 function createOrUpdateAcademicRankPieChart() {
@@ -230,7 +235,7 @@ function createOrUpdateAcademicRankPieChart() {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          animation: false,
+          animation: chartAnimationOptions,
           plugins: {
             legend: { position: "bottom" },
             tooltip: { enabled: true },
@@ -248,7 +253,7 @@ function createOrUpdateAcademicRankPieChart() {
     academicRankPieChartDatasetReference.data =
       academicRankDistribution.value.values;
   }
-  academicRankPieChartInstance.update("none");
+  academicRankPieChartInstance.update();
 }
 
 function createOrUpdateGenderBarChart() {
@@ -282,7 +287,7 @@ function createOrUpdateGenderBarChart() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: false,
+        animation: chartAnimationOptions,
         plugins: {
           legend: { position: "bottom" },
           tooltip: { mode: "index", intersect: false },
@@ -301,7 +306,7 @@ function createOrUpdateGenderBarChart() {
   if (genderBarChartDatasetReference) {
     genderBarChartDatasetReference.data = genderDistribution.value.values;
   }
-  genderBarChartInstance.update("none");
+  genderBarChartInstance.update();
 }
 
 function createOrUpdateAllCharts() {

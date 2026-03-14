@@ -164,6 +164,6 @@ const {
 } = useSelectHoursRequest();
 
 onMounted(() => {
-  initialize();
+  void initialize();
 });
 </script>

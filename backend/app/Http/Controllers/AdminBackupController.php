@@ -62,11 +62,18 @@ class AdminBackupController extends Controller
             $cacheMeta = $this->snapshotStore->cacheMeta();
             $systemActiveRun = $this->stateStore->latestActive([
                 'backup',
+                'backup_postprocess',
                 'prune',
                 'restore',
                 'snapshot_refresh',
                 'forget',
             ]);
+            $parentRunCache = [];
+            $postProcessRunCache = [];
+            $list['items'] = array_values(array_map(
+                fn (array $item): array => $this->decorateSnapshotWithExportState($item, $parentRunCache, $postProcessRunCache),
+                array_values((array) ($list['items'] ?? []))
+            ));
             $activeRun = $this->toUiActiveRun($systemActiveRun);
             $schedule = $this->backupManager->buildScheduleMeta();
             $scheduleRuntime = $this->latestScheduleRunSummary();
@@ -420,6 +427,7 @@ class AdminBackupController extends Controller
             $this->backupManager->assertValidSnapshotId($snapshotId);
             $snapshotHint = $this->snapshotStore->findBySnapshotId($snapshotId);
             $detail = $this->backupManager->getSnapshotDetails($snapshotId, $snapshotHint);
+            $detail = $this->decorateBackupDetailWithExportState($detail);
 
             return response()->json([
                 'success' => true,
@@ -761,7 +769,7 @@ class AdminBackupController extends Controller
 
     public function forget(Request $request)
     {
-        $conflict = $this->rejectWhenConflictingRunActive(['backup', 'prune', 'forget', 'restore']);
+        $conflict = $this->rejectWhenConflictingRunActive(['backup', 'backup_postprocess', 'prune', 'forget', 'restore', 'snapshot_refresh']);
         if ($conflict !== null) {
             return $conflict;
         }
@@ -780,7 +788,7 @@ class AdminBackupController extends Controller
 
         if ($pruneAfter) {
             return response()->json([
-                'message' => 'Không hỗ trợ prune trong cùng request xóa. Vui lòng dùng hành động "Dọn bản sao lưu cũ".',
+                'message' => 'Xóa snapshot chỉ hỗ trợ forget. Việc dọn dung lượng được hệ thống xử lý riêng theo bảo trì.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -831,7 +839,6 @@ class AdminBackupController extends Controller
                     'error_code' => null,
                     'status_url' => '/api/admin/backups/runs/' . $runId,
                     'snapshot_ids' => $snapshotIds,
-                    'prune_after' => false,
                 ],
             ], Response::HTTP_ACCEPTED);
         } catch (\Throwable $exception) {
@@ -919,9 +926,11 @@ class AdminBackupController extends Controller
     {
         return match ($operation) {
             'backup' => 'Đang có một bản sao lưu đang chạy. Vui lòng đợi hoàn tất.',
+            'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
             'prune' => 'Đang có tiến trình dọn bản sao lưu cũ. Vui lòng đợi hoàn tất.',
             'forget' => 'Đang có tiến trình xóa snapshot đang chạy. Vui lòng đợi hoàn tất.',
             'restore' => 'Đang có tiến trình khôi phục dữ liệu đang chạy. Vui lòng đợi hoàn tất.',
+            'snapshot_refresh' => 'Đang có tiến trình làm mới danh sách snapshot. Vui lòng đợi hoàn tất.',
             default => 'Đang có tiến trình nền đang chạy. Vui lòng đợi hoàn tất.',
         };
     }
@@ -966,6 +975,153 @@ class AdminBackupController extends Controller
             'last_run_id' => null,
             'last_run_status' => null,
             'last_run_at' => null,
+        ];
+    }
+
+    private function decorateBackupDetailWithExportState(array $detail): array
+    {
+        $snapshot = is_array($detail['snapshot'] ?? null) ? $detail['snapshot'] : [];
+        $parentRunCache = [];
+        $postProcessRunCache = [];
+        $snapshot = $this->decorateSnapshotWithExportState($snapshot, $parentRunCache, $postProcessRunCache);
+        $detail['snapshot'] = $snapshot;
+
+        $detail['export'] = array_merge(
+            is_array($detail['export'] ?? null) ? $detail['export'] : [],
+            [
+                'state' => $snapshot['export_state'] ?? null,
+                'message' => $snapshot['export_message'] ?? null,
+                'run' => $snapshot['export_run'] ?? null,
+            ]
+        );
+
+        return $detail;
+    }
+
+    private function decorateSnapshotWithExportState(
+        array $snapshot,
+        array &$parentRunCache = [],
+        array &$postProcessRunCache = []
+    ): array {
+        $postProcessRun = $this->resolvePostProcessRunForSnapshot($snapshot, $parentRunCache, $postProcessRunCache);
+        $exportState = $this->resolveExportStatePayload($snapshot, $postProcessRun);
+
+        return array_merge($snapshot, [
+            'export_state' => $exportState['state'],
+            'export_message' => $exportState['message'],
+            'export_run' => $exportState['run'],
+        ]);
+    }
+
+    private function resolvePostProcessRunForSnapshot(
+        array $snapshot,
+        array &$parentRunCache = [],
+        array &$postProcessRunCache = []
+    ): ?array {
+        $parentRunId = trim((string) ($snapshot['run_id'] ?? ''));
+        if ($parentRunId === '') {
+            return null;
+        }
+
+        if (! array_key_exists($parentRunId, $parentRunCache)) {
+            $parentRunCache[$parentRunId] = $this->stateStore->get($parentRunId);
+        }
+
+        $parentRun = $parentRunCache[$parentRunId] ?? null;
+        if (! is_array($parentRun)) {
+            return null;
+        }
+
+        $postProcessRunId = trim((string) (($parentRun['result']['export']['run_id'] ?? null) ?: ''));
+        if ($postProcessRunId === '') {
+            return null;
+        }
+
+        if (! array_key_exists($postProcessRunId, $postProcessRunCache)) {
+            $postProcessRunCache[$postProcessRunId] = $this->stateStore->get($postProcessRunId);
+        }
+
+        $postProcessRun = $postProcessRunCache[$postProcessRunId] ?? null;
+        if (! is_array($postProcessRun)) {
+            return null;
+        }
+
+        return Str::lower(trim((string) ($postProcessRun['operation'] ?? ''))) === 'backup_postprocess'
+            ? $postProcessRun
+            : null;
+    }
+
+    private function resolveExportStatePayload(array $snapshot, ?array $postProcessRun): array
+    {
+        $publicPostProcessRun = $this->toPublicRunState($postProcessRun);
+        $safeStatus = Str::lower(trim((string) ($snapshot['status'] ?? $snapshot['run_state'] ?? '')));
+        $exportAvailable = (bool) ($snapshot['export_available'] ?? false);
+        $exportsEnabled = (bool) config('backup.exports.enabled', true);
+
+        if ($exportAvailable) {
+            return [
+                'state' => 'ready',
+                'message' => 'Readable export đã sẵn sàng để tải và mở trên Drive.',
+                'run' => $publicPostProcessRun,
+            ];
+        }
+
+        $postProcessStatus = Str::lower(trim((string) ($postProcessRun['status'] ?? '')));
+        if ($postProcessStatus === 'queued') {
+            return [
+                'state' => 'queued',
+                'message' => $publicPostProcessRun['user_message']
+                    ?? 'Snapshot an toàn đã xong. Readable export đang chờ được xử lý.',
+                'run' => $publicPostProcessRun,
+            ];
+        }
+
+        if ($postProcessStatus === 'running') {
+            return [
+                'state' => 'running',
+                'message' => $publicPostProcessRun['user_message']
+                    ?? 'Snapshot an toàn đã xong. Readable export đang được tạo ở nền.',
+                'run' => $publicPostProcessRun,
+            ];
+        }
+
+        if ($postProcessStatus === 'failed') {
+            return [
+                'state' => 'failed',
+                'message' => $publicPostProcessRun['user_message']
+                    ?? 'Snapshot an toàn đã hoàn tất nhưng readable export chưa thể hoàn thiện.',
+                'run' => $publicPostProcessRun,
+            ];
+        }
+
+        if ($postProcessStatus === 'success') {
+            return [
+                'state' => 'finalizing',
+                'message' => 'Readable export đã xử lý xong, đang chờ công bố đầy đủ trên giao diện.',
+                'run' => $publicPostProcessRun,
+            ];
+        }
+
+        if ($safeStatus === 'success' && $exportsEnabled) {
+            return [
+                'state' => 'pending',
+                'message' => 'Snapshot an toàn đã hoàn tất. Readable export sẽ tiếp tục được xử lý ở nền.',
+                'run' => $publicPostProcessRun,
+            ];
+        }
+
+        if (! $exportsEnabled) {
+            return [
+                'state' => 'disabled',
+                'message' => 'Readable export đang tắt theo cấu hình hệ thống.',
+                'run' => $publicPostProcessRun,
+            ];
+        }
+
+        return [
+            'state' => 'unavailable',
+            'message' => 'Readable export chưa sẵn sàng.',
+            'run' => $publicPostProcessRun,
         ];
     }
 
@@ -1015,6 +1171,12 @@ class AdminBackupController extends Controller
             'started_at' => $run['started_at'] ?? null,
             'finished_at' => $run['finished_at'] ?? null,
             'snapshot_id' => $run['snapshot_id'] ?? null,
+            'snapshot_ids' => is_array($run['snapshot_ids'] ?? null)
+                ? array_values(array_map(
+                    static fn ($snapshotId): string => (string) $snapshotId,
+                    array_values((array) $run['snapshot_ids'])
+                ))
+                : null,
             'scope' => $run['scope'] ?? null,
             'target' => $run['target'] ?? null,
         ];
@@ -1062,6 +1224,8 @@ class AdminBackupController extends Controller
         if ($status === 'queued') {
             return match ($operation) {
                 'backup' => 'Đã tiếp nhận yêu cầu sao lưu.',
+                'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
+                'backup_check' => 'Đã tiếp nhận yêu cầu kiểm tra repository backup.',
                 'prune' => 'Đã tiếp nhận yêu cầu dọn bản sao lưu cũ.',
                 'forget' => 'Đã tiếp nhận yêu cầu xóa bản sao lưu.',
                 'restore' => 'Đã tiếp nhận yêu cầu khôi phục dữ liệu.',
@@ -1073,6 +1237,8 @@ class AdminBackupController extends Controller
         if ($status === 'running') {
             return match ($operation) {
                 'backup' => 'Đang sao lưu dữ liệu...',
+                'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
+                'backup_check' => 'Đang kiểm tra tính toàn vẹn repository backup...',
                 'prune' => 'Đang dọn bản sao lưu cũ...',
                 'forget' => 'Đang xóa bản sao lưu...',
                 'restore' => 'Đang khôi phục dữ liệu...',
@@ -1082,8 +1248,14 @@ class AdminBackupController extends Controller
         }
 
         if ($status === 'success') {
+            if ($fallbackMessage !== '' && ! $this->isTechnicalMessage($fallbackMessage)) {
+                return $fallbackMessage;
+            }
+
             return match ($operation) {
                 'backup' => 'Sao lưu dữ liệu hoàn tất.',
+                'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
+                'backup_check' => 'Kiểm tra repository backup hoàn tất.',
                 'prune' => 'Dọn bản sao lưu cũ hoàn tất.',
                 'forget' => 'Đã xóa bản sao lưu thành công.',
                 'restore' => 'Khôi phục dữ liệu hoàn tất.',
@@ -1094,7 +1266,26 @@ class AdminBackupController extends Controller
 
         if ($status === 'failed') {
             if ($errorCode === 'BACKUP_LOCKED') {
-                return 'Hệ thống đang có tiến trình khác giữ khóa sao lưu. Vui lòng đợi rồi thử lại.';
+                return match ($operation) {
+                    'forget' => 'Không thể xóa snapshot lúc này vì hệ thống sao lưu đang bận. Nếu snapshot vừa sao lưu xong, hãy đợi readable export hoàn tất rồi thử lại.',
+                    default => 'Hệ thống đang có tiến trình khác giữ khóa sao lưu. Vui lòng đợi rồi thử lại.',
+                };
+            }
+
+            if ($errorCode === 'DRIVE_AUTH_INVALID') {
+                return 'Không thể xác thực Google Drive cho backup. Hãy reconnect remote spnc_gdrive trong tệp rclone.conf dùng chung rồi thử lại.';
+            }
+
+            if ($errorCode === 'RCLONE_CONFIG_INVALID') {
+                return 'Không đọc được tệp rclone.conf dùng chung cho backup và minh chứng. Hãy kiểm tra SPNC_RCLONE_CONFIG.';
+            }
+
+            if ($errorCode === 'RCLONE_BINARY_INVALID') {
+                return 'Không thể chạy rclone để truy cập Google Drive. Hãy kiểm tra SPNC_RCLONE_BINARY.';
+            }
+
+            if ($errorCode === 'RCLONE_REMOTE_INVALID') {
+                return 'Remote Google Drive spnc_gdrive không hợp lệ hoặc không tồn tại trong tệp rclone.conf dùng chung.';
             }
 
             if ($errorCode === 'RUN_TIMEOUT') {
@@ -1106,6 +1297,7 @@ class AdminBackupController extends Controller
                     'forget' => 'Tiến trình xóa bản sao lưu bị quá thời gian. Vui lòng thử lại.',
                     'prune' => 'Tiến trình dọn bản sao lưu cũ bị quá thời gian. Vui lòng thử lại.',
                     'backup' => 'Tiến trình sao lưu bị quá thời gian. Vui lòng thử lại.',
+                    'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
                     'restore' => 'Tiến trình khôi phục bị quá thời gian. Vui lòng thử lại.',
                     default => 'Tiến trình xử lý bị quá thời gian. Vui lòng thử lại.',
                 };
@@ -1121,6 +1313,8 @@ class AdminBackupController extends Controller
 
             return match ($operation) {
                 'backup' => 'Không thể sao lưu dữ liệu. Vui lòng thử lại.',
+                'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
+                'backup_check' => 'Không thể kiểm tra repository backup. Vui lòng thử lại.',
                 'prune' => 'Không thể dọn bản sao lưu cũ. Vui lòng thử lại.',
                 'forget' => 'Không thể xóa bản sao lưu. Vui lòng thử lại.',
                 'restore' => 'Không thể khôi phục dữ liệu. Vui lòng thử lại.',
@@ -1161,6 +1355,22 @@ class AdminBackupController extends Controller
             return 'SNAPSHOT_NOT_FOUND';
         }
 
+        if ($this->containsDriveAuthHint($combined)) {
+            return 'DRIVE_AUTH_INVALID';
+        }
+
+        if ($this->containsRcloneConfigHint($combined)) {
+            return 'RCLONE_CONFIG_INVALID';
+        }
+
+        if ($this->containsRcloneBinaryHint($combined)) {
+            return 'RCLONE_BINARY_INVALID';
+        }
+
+        if ($this->containsRcloneRemoteHint($combined)) {
+            return 'RCLONE_REMOTE_INVALID';
+        }
+
         return null;
     }
 
@@ -1185,6 +1395,54 @@ class AdminBackupController extends Controller
             'exceeded the timeout',
             'quá thời gian',
             'qua thoi gian',
+        ]);
+    }
+
+    private function containsDriveAuthHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'invalid_grant',
+            'couldn\'t fetch token',
+            'could not fetch token',
+            'token expired',
+            'refresh token',
+            'reconnect spnc_gdrive',
+        ]);
+    }
+
+    private function containsRcloneConfigHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'rclone config file',
+            'rclone.conf',
+            'config file not found',
+            'failed to load config file',
+            'không đọc được tệp cấu hình rclone',
+            'khong doc duoc tep cau hinh rclone',
+        ]);
+    }
+
+    private function containsRcloneBinaryHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'failed to start process',
+            'the system cannot find the file specified',
+            'not recognized as an internal or external command',
+            'executable not found',
+            'không thể chạy rclone',
+            'khong the chay rclone',
+        ]);
+    }
+
+    private function containsRcloneRemoteHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'didn\'t find section in config file',
+            'config section',
+            'failed to create file system for',
+            'couldn\'t find root directory id',
+            'could not find root directory id',
+            'unknown backend',
         ]);
     }
 
@@ -1338,6 +1596,8 @@ class AdminBackupController extends Controller
         return ['run_id' => $runId];
     }
 }
+
+
 
 
 

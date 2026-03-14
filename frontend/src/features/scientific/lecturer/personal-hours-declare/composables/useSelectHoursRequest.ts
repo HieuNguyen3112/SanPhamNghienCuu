@@ -28,6 +28,7 @@ import {
   resolveApiErrorMessage,
   useActionFeedback,
 } from "@/shared/composables/useActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 export function useSelectHoursRequest() {
   const works = ref<ApprovedWorkRow[]>([]);
@@ -57,6 +58,7 @@ export function useSelectHoursRequest() {
   const submitting = ref(false);
   const submitError = ref<string | null>(null);
   const { runWithFeedback } = useActionFeedback();
+  const { runPageLoad } = usePageLoadFeedback();
 
   const evidenceFiles = ref<EvidenceFile[]>([]);
   const evidenceFileTypes = ref<EvidenceFileType[]>([]);
@@ -83,11 +85,11 @@ export function useSelectHoursRequest() {
       .filter(
         (work) =>
           work.hoursRequestState === "hours_not_submitted" &&
-          work.evidenceCount === 0
+          work.evidenceCount === 0,
       )
       .sort(
-        (a, b) => (b.effectiveHoursDisplay ?? 0) - (a.effectiveHoursDisplay ?? 0)
-      )
+        (a, b) => (b.effectiveHoursDisplay ?? 0) - (a.effectiveHoursDisplay ?? 0),
+      ),
   );
 
   const selectedIds = computed<number[]>(() => [...selectedWorkIdSet.value]);
@@ -96,14 +98,14 @@ export function useSelectHoursRequest() {
   const selectedHoursTotal = computed(() => {
     const selected = selectedWorkIdSet.value;
     return works.value
-      .filter((w) => selected.has(w.activityId))
-      .reduce((sum, w) => sum + (w.effectiveHoursDisplay ?? 0), 0);
+      .filter((work) => selected.has(work.activityId))
+      .reduce((sum, work) => sum + (work.effectiveHoursDisplay ?? 0), 0);
   });
 
   const selectableIds = computed<number[]>(() =>
     filteredWorks.value
-      .filter((w) => isWorkEligibleForSubmit(w))
-      .map((w) => w.activityId)
+      .filter((work) => isWorkEligibleForSubmit(work))
+      .map((work) => work.activityId),
   );
 
   const canUploadEvidence = computed(() => {
@@ -115,7 +117,7 @@ export function useSelectHoursRequest() {
     );
   });
 
-  async function loadApprovedWorks() {
+  async function loadApprovedWorksInternal() {
     loadingList.value = true;
     errorList.value = null;
 
@@ -133,19 +135,37 @@ export function useSelectHoursRequest() {
       totalApprovedCount.value = dtoList.summary.approved_count ?? 0;
 
       const selectable = new Set(
-        works.value.filter((w) => isWorkEligibleForSubmit(w)).map((w) => w.activityId)
+        works.value
+          .filter((work) => isWorkEligibleForSubmit(work))
+          .map((work) => work.activityId),
       );
 
-      const next = new Set<number>();
-      for (const id of selectedWorkIdSet.value) {
-        if (selectable.has(id)) next.add(id);
+      const nextSelected = new Set<number>();
+      for (const activityId of selectedWorkIdSet.value) {
+        if (selectable.has(activityId)) {
+          nextSelected.add(activityId);
+        }
       }
-      selectedWorkIdSet.value = next;
-    } catch (e) {
-      errorList.value = e instanceof Error ? e.message : String(e);
+      selectedWorkIdSet.value = nextSelected;
+    } catch (error) {
+      errorList.value = error instanceof Error ? error.message : String(error);
     } finally {
       loadingList.value = false;
     }
+  }
+
+  async function loadApprovedWorks(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadApprovedWorksInternal();
+      return;
+    }
+
+    await runPageLoad(loadApprovedWorksInternal, {
+      loading: {
+        title: "Đang tải danh sách công trình",
+        message: "Hệ thống đang cập nhật dữ liệu giờ NCKH cá nhân...",
+      },
+    });
   }
 
   async function loadDetail(activityId: number) {
@@ -158,7 +178,12 @@ export function useSelectHoursRequest() {
   function applyFilter(partial: Partial<WorksFilterState>) {
     filter.value = { ...filter.value, ...partial };
     currentPageNumber.value = 1;
-    loadApprovedWorks();
+
+    const partialKeys = Object.keys(partial).filter(
+      (key) => partial[key as keyof WorksFilterState] !== undefined,
+    );
+    const keywordOnly = partialKeys.length === 1 && partialKeys[0] === "keyword";
+    void loadApprovedWorks({ withFeedback: !keywordOnly });
   }
 
   function resetFilter() {
@@ -168,7 +193,7 @@ export function useSelectHoursRequest() {
       keyword: "",
     };
     currentPageNumber.value = 1;
-    loadApprovedWorks();
+    void loadApprovedWorks();
   }
 
   async function loadAcademicYears() {
@@ -178,11 +203,11 @@ export function useSelectHoursRequest() {
       academicYearOptions.value = rows.map(academicYearOptionFromDto);
 
       if (!filter.value.academicYearId) {
-        const current =
+        const currentAcademicYear =
           academicYearOptions.value.find((item) => item.isActive) ??
           academicYearOptions.value.find((item) => item.isCurrent) ??
           academicYearOptions.value[0];
-        filter.value.academicYearId = current?.id ?? null;
+        filter.value.academicYearId = currentAcademicYear?.id ?? null;
       }
     } finally {
       loadingAcademicYears.value = false;
@@ -192,39 +217,45 @@ export function useSelectHoursRequest() {
   function updateCurrentPageNumber(nextPage: number) {
     if (nextPage === currentPageNumber.value) return;
     currentPageNumber.value = nextPage;
-    loadApprovedWorks();
+    void loadApprovedWorks();
   }
 
   function updatePageSize(nextPageSize: number) {
     if (nextPageSize === pageSize.value) return;
     pageSize.value = nextPageSize;
     currentPageNumber.value = 1;
-    loadApprovedWorks();
+    void loadApprovedWorks();
   }
 
   function toggleWorkSelection(payload: {
     activityId: number;
     nextChecked: boolean;
   }) {
-    const row = works.value.find((w) => w.activityId === payload.activityId);
+    const row = works.value.find((work) => work.activityId === payload.activityId);
     if (!row || !isWorkEligibleForSubmit(row)) return;
 
-    const next = new Set(selectedWorkIdSet.value);
-    if (payload.nextChecked) next.add(payload.activityId);
-    else next.delete(payload.activityId);
-    selectedWorkIdSet.value = next;
+    const nextSelected = new Set(selectedWorkIdSet.value);
+    if (payload.nextChecked) {
+      nextSelected.add(payload.activityId);
+    } else {
+      nextSelected.delete(payload.activityId);
+    }
+    selectedWorkIdSet.value = nextSelected;
   }
 
   function toggleSelectAll(payload: {
     selectableIds: number[];
     nextChecked: boolean;
   }) {
-    const next = new Set(selectedWorkIdSet.value);
-    for (const id of payload.selectableIds) {
-      if (payload.nextChecked) next.add(id);
-      else next.delete(id);
+    const nextSelected = new Set(selectedWorkIdSet.value);
+    for (const activityId of payload.selectableIds) {
+      if (payload.nextChecked) {
+        nextSelected.add(activityId);
+      } else {
+        nextSelected.delete(activityId);
+      }
     }
-    selectedWorkIdSet.value = next;
+    selectedWorkIdSet.value = nextSelected;
   }
 
   async function loadEvidenceTypesIfNeeded() {
@@ -239,8 +270,8 @@ export function useSelectHoursRequest() {
         code: item.code,
         name: item.name,
       }));
-    } catch (e) {
-      evidenceError.value = e instanceof Error ? e.message : String(e);
+    } catch (error) {
+      evidenceError.value = error instanceof Error ? error.message : String(error);
     } finally {
       loadingEvidenceTypes.value = false;
     }
@@ -259,8 +290,8 @@ export function useSelectHoursRequest() {
           evidenceFiles: [...evidenceFiles.value],
         };
       }
-    } catch (e) {
-      evidenceError.value = e instanceof Error ? e.message : String(e);
+    } catch (error) {
+      evidenceError.value = error instanceof Error ? error.message : String(error);
       evidenceFiles.value = [];
     } finally {
       loadingEvidence.value = false;
@@ -281,8 +312,8 @@ export function useSelectHoursRequest() {
     try {
       await loadDetail(activityId);
       await Promise.all([loadEvidenceTypesIfNeeded(), loadEvidence(activityId)]);
-    } catch (e) {
-      errorDetail.value = e instanceof Error ? e.message : String(e);
+    } catch (error) {
+      errorDetail.value = error instanceof Error ? error.message : String(error);
     } finally {
       loadingDetail.value = false;
     }
@@ -306,8 +337,7 @@ export function useSelectHoursRequest() {
     submitError.value = null;
 
     if (selectedWorkIdSet.value.size === 0) {
-      const message = "Bạn chưa chọn công trình nào.";
-      submitError.value = message;
+      submitError.value = "Bạn chưa chọn công trình nào.";
       return;
     }
 
@@ -318,7 +348,7 @@ export function useSelectHoursRequest() {
           const activityIds = [...selectedWorkIdSet.value];
           await submitHoursApprovalRequestDTO({ activity_ids: activityIds });
           selectedWorkIdSet.value = new Set();
-          await loadApprovedWorks();
+          await loadApprovedWorks({ withFeedback: false });
         },
         {
           loading: {
@@ -334,17 +364,16 @@ export function useSelectHoursRequest() {
             message: (error) =>
               resolveFriendlyErrorMessage(
                 error,
-                "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại."
+                "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại.",
               ),
           },
-        }
+        },
       );
-    } catch (e) {
-      const message = resolveFriendlyErrorMessage(
-        e,
-        "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại."
+    } catch (error) {
+      submitError.value = resolveFriendlyErrorMessage(
+        error,
+        "Không thể gửi duyệt giờ lên khoa. Vui lòng thử lại.",
       );
-      submitError.value = message;
     } finally {
       submitting.value = false;
     }
@@ -364,8 +393,8 @@ export function useSelectHoursRequest() {
     if (uploadingEvidence.value) return;
 
     if (!workDetail.value || !selectedEvidenceFile.value || !selectedEvidenceTypeId.value) {
-      const message = "Bạn cần chọn loại minh chứng và tệp trước khi tải lên.";
-      uploadEvidenceError.value = message;
+      uploadEvidenceError.value =
+        "Bạn cần chọn loại minh chứng và tệp trước khi tải lên.";
       return;
     }
 
@@ -383,7 +412,7 @@ export function useSelectHoursRequest() {
           selectedEvidenceFile.value = null;
           await Promise.all([
             loadEvidence(workDetail.value!.activityId),
-            loadApprovedWorks(),
+            loadApprovedWorks({ withFeedback: false }),
           ]);
         },
         {
@@ -400,17 +429,16 @@ export function useSelectHoursRequest() {
             message: (error) =>
               resolveFriendlyErrorMessage(
                 error,
-                "Không thể tải lên minh chứng. Vui lòng thử lại."
+                "Không thể tải lên minh chứng. Vui lòng thử lại.",
               ),
           },
-        }
+        },
       );
-    } catch (e) {
-      const message = resolveFriendlyErrorMessage(
-        e,
-        "Không thể tải lên minh chứng. Vui lòng thử lại."
+    } catch (error) {
+      uploadEvidenceError.value = resolveFriendlyErrorMessage(
+        error,
+        "Không thể tải lên minh chứng. Vui lòng thử lại.",
       );
-      uploadEvidenceError.value = message;
     } finally {
       uploadingEvidence.value = false;
     }
@@ -429,7 +457,7 @@ export function useSelectHoursRequest() {
           await deleteHoursEvidenceDTO(evidenceId);
           await Promise.all([
             loadEvidence(workDetail.value!.activityId),
-            loadApprovedWorks(),
+            loadApprovedWorks({ withFeedback: false }),
           ]);
         },
         {
@@ -446,25 +474,40 @@ export function useSelectHoursRequest() {
             message: (error) =>
               resolveFriendlyErrorMessage(
                 error,
-                "Không thể xóa minh chứng. Vui lòng thử lại."
+                "Không thể xóa minh chứng. Vui lòng thử lại.",
               ),
           },
-        }
+        },
       );
-    } catch (e) {
-      const message = resolveFriendlyErrorMessage(
-        e,
-        "Không thể xóa minh chứng. Vui lòng thử lại."
+    } catch (error) {
+      uploadEvidenceError.value = resolveFriendlyErrorMessage(
+        error,
+        "Không thể xóa minh chứng. Vui lòng thử lại.",
       );
-      uploadEvidenceError.value = message;
     } finally {
       deletingEvidenceId.value = null;
     }
   }
 
-  async function initialize() {
-    await loadAcademicYears();
-    await loadApprovedWorks();
+  async function initialize(options?: {
+    defaultHoursMode?: WorksFilterState["hoursMode"];
+  }) {
+    if (options?.defaultHoursMode) {
+      filter.value.hoursMode = options.defaultHoursMode;
+    }
+
+    await runPageLoad(
+      async () => {
+        await loadAcademicYears();
+        await loadApprovedWorksInternal();
+      },
+      {
+        loading: {
+          title: "Đang khởi tạo kê khai giờ NCKH",
+          message: "Hệ thống đang chuẩn bị danh sách công trình và năm học...",
+        },
+      },
+    );
   }
 
   return {
@@ -528,4 +571,3 @@ export function useSelectHoursRequest() {
     deleteEvidence,
   };
 }
-

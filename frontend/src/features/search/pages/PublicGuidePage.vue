@@ -41,15 +41,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
+import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
 
 import PublicHomeTopHeader from "@/features/search/components/PublicHomeTopHeader.vue";
 import PublicHomeNavBar from "@/features/search/components/PublicHomeNavBar.vue";
 import PublicHomeFooter from "@/features/search/components/PublicHomeFooter.vue";
 
-const router = useRouter();
 const userStore = useUserStore();
+const { logoutWithFeedback } = useLogoutFeedback("/");
 
 onMounted(async () => {
   if (!userStore.isInitialized) {
@@ -71,7 +71,6 @@ const userInitials = computed(() => {
 });
 
 async function handleLogout() {
-  await userStore.logout();
-  await router.replace("/");
+  await logoutWithFeedback();
 }
 </script>

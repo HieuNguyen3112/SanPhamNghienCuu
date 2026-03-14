@@ -37,15 +37,15 @@
           <select
             class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm focus:border-slate-300 focus:outline-none"
             :disabled="loading"
-            :value="filter.selectedAcademicYearIdentifier"
+            :value="safeAcademicYearValue"
             @change="onChangeYear"
           >
             <option
-              v-for="y in academicYearOptions"
+              v-for="y in sortedAcademicYearOptions"
               :key="y.academicYearIdentifier"
               :value="y.academicYearIdentifier"
             >
-              {{ y.label }}
+              {{ y.label }}{{ y.isActive ? " (đang hoạt động)" : "" }}
             </option>
           </select>
           <ChevronDown
@@ -77,9 +77,9 @@
 
       <!-- Notification state -->
       <div class="md:col-span-2">
-        <label class="text-xs font-medium text-slate-600"
-          >Trạng thái cảnh báo</label
-        >
+        <label class="text-xs font-medium text-slate-600">
+          Trạng thái cảnh báo
+        </label>
         <div class="relative mt-1">
           <select
             class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm focus:border-slate-300 focus:outline-none"
@@ -123,7 +123,7 @@
           @click="emit('reset')"
         >
           <RotateCcw class="h-4 w-4" />
-          Đặt lại
+          Xóa lọc
         </button>
       </div>
     </div>
@@ -131,6 +131,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { ChevronDown, RotateCcw, Search } from "lucide-vue-next";
 import type {
   AcademicYearOption,
@@ -138,10 +139,9 @@ import type {
 } from "../contracts/lecturerResearchHourWarning.contract";
 import type { ResearchHourWarningFilterState } from "../composables/useResearchHourWarningManagement";
 
-defineProps<{
+const props = defineProps<{
   filter: ResearchHourWarningFilterState;
   loading: boolean;
-
   facultyOptions: FacultyOption[];
   academicYearOptions: AcademicYearOption[];
   facultySelectLocked: boolean;
@@ -151,6 +151,22 @@ const emit = defineEmits<{
   (e: "update:filter", partial: Partial<ResearchHourWarningFilterState>): void;
   (e: "reset"): void;
 }>();
+
+const sortedAcademicYearOptions = computed(() => {
+  return [...props.academicYearOptions].sort((a, b) => {
+    if (a.isActive === b.isActive) return 0;
+    return a.isActive ? -1 : 1;
+  });
+});
+
+const safeAcademicYearValue = computed(() => {
+  if (props.filter.selectedAcademicYearIdentifier) {
+    return props.filter.selectedAcademicYearIdentifier;
+  }
+
+  const activeYear = sortedAcademicYearOptions.value.find((y) => y.isActive);
+  return activeYear?.academicYearIdentifier ?? "";
+});
 
 function onChangeFaculty(e: Event) {
   const v = (e.target as HTMLSelectElement)

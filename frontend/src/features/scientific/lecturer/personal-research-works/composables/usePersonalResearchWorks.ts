@@ -7,6 +7,7 @@ import {
   type PersonalWorkRow,
 } from "../contracts/personalResearchWorksContracts";
 import { personalResearchWorksService } from "../services/personalResearchWorksService";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 type SortKey = "updatedAt" | "title" | "workYear" | "roleName";
 type SortOrder = "asc" | "desc";
@@ -19,6 +20,8 @@ const sortKeyMap: Record<SortKey, string> = {
 };
 
 export function usePersonalResearchWorks() {
+  const { runPageLoad } = usePageLoadFeedback();
+
   const stats = ref<PersonalStats>({
     totalCount: 0,
     approvedCount: 0,
@@ -51,23 +54,23 @@ export function usePersonalResearchWorks() {
 
   const activeRow = computed(() => {
     if (!selectedWorkId.value) return null;
-    return rows.value.find((r) => r.activityId === selectedWorkId.value) ?? null;
+    return rows.value.find((row) => row.activityId === selectedWorkId.value) ?? null;
   });
 
   const buildSortParam = () => {
     const key = sortKeyMap[sortKey.value] ?? "updated_at";
-    const dir = sortOrder.value === "asc" ? "asc" : "desc";
-    return `${key}:${dir}`;
+    const direction = sortOrder.value === "asc" ? "asc" : "desc";
+    return `${key}:${direction}`;
   };
 
-  async function loadWorks() {
+  async function loadWorksInternal() {
     loadingList.value = true;
     errorList.value = null;
 
     try {
-      const tabDto = mapper.tab.toDto(filterTab.value);
+      const status = mapper.tab.toDto(filterTab.value);
       const dto = await personalResearchWorksService.getIndex({
-        status: tabDto,
+        status,
         page: currentPageNumber.value,
         per_page: pageSize.value,
         sort: buildSortParam(),
@@ -76,12 +79,35 @@ export function usePersonalResearchWorks() {
       stats.value = mapper.statsFromDto(dto.stats);
       rows.value = dto.items.map(mapper.rowFromDto);
       totalItemCount.value = dto.pagination.total;
-    } catch (err) {
+    } catch (error) {
       errorList.value =
-        err instanceof Error ? err.message : "Không tải được danh sách công trình.";
+        error instanceof Error ? error.message : "Không tải được danh sách công trình.";
     } finally {
       loadingList.value = false;
     }
+  }
+
+  async function loadWorks(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadWorksInternal();
+      return;
+    }
+
+    await runPageLoad(loadWorksInternal, {
+      loading: {
+        title: "Đang tải công trình của tôi",
+        message: "Hệ thống đang cập nhật danh sách công trình nghiên cứu...",
+      },
+    });
+  }
+
+  async function bootstrap() {
+    await runPageLoad(loadWorksInternal, {
+      loading: {
+        title: "Đang khởi tạo công trình của tôi",
+        message: "Hệ thống đang chuẩn bị dữ liệu công trình nghiên cứu cá nhân...",
+      },
+    });
   }
 
   async function changeTab(nextTab: PersonalWorkFilterTab) {
@@ -114,17 +140,17 @@ export function usePersonalResearchWorks() {
     try {
       const dto = await personalResearchWorksService.getDetail(workId);
       selectedWorkDetail.value = mapper.detailFromDto(dto);
-    } catch (err) {
+    } catch (error) {
       errorDetail.value =
-        err instanceof Error ? err.message : "Không tải được chi tiết công trình.";
+        error instanceof Error ? error.message : "Không tải được chi tiết công trình.";
     } finally {
       loadingDetail.value = false;
     }
   }
 
   function findKindCode(workId: number): string | null {
-    const fromRow = rows.value.find((r) => r.activityId === workId)?.kindCode;
-    if (fromRow) return fromRow;
+    const rowKindCode = rows.value.find((row) => row.activityId === workId)?.kindCode;
+    if (rowKindCode) return rowKindCode;
     if (selectedWorkDetail.value?.activityId === workId) {
       return selectedWorkDetail.value.kindCode;
     }
@@ -194,21 +220,35 @@ export function usePersonalResearchWorks() {
     if (!selectedWorkDetail.value) return;
 
     noticeMessage.value = null;
+
     try {
-      await personalResearchWorksService.reinviteMember(
-        selectedWorkDetail.value.activityId,
-        memberId
+      await runPageLoad(
+        async () => {
+          await personalResearchWorksService.reinviteMember(
+            selectedWorkDetail.value!.activityId,
+            memberId,
+          );
+        },
+        {
+          loading: {
+            title: "Đang gửi lại yêu cầu xác nhận",
+            message: "Hệ thống đang cập nhật trạng thái thành viên tham gia...",
+          },
+          rethrow: true,
+        },
       );
+
       noticeTone.value = "success";
-      noticeMessage.value = "Đã gửi lại yêu cầu xác nhận tham gia cho thành viên.";
+      noticeMessage.value =
+        "Đã gửi lại yêu cầu xác nhận tham gia cho thành viên.";
       await Promise.all([
-        loadWorks(),
+        loadWorks({ withFeedback: false }),
         loadDetail(selectedWorkDetail.value.activityId),
       ]);
-    } catch (err) {
+    } catch (error) {
       noticeTone.value = "error";
       noticeMessage.value =
-        err instanceof Error ? err.message : "Không thể gửi lại yêu cầu xác nhận.";
+        error instanceof Error ? error.message : "Không thể gửi lại yêu cầu xác nhận.";
     }
   }
 
@@ -231,7 +271,6 @@ export function usePersonalResearchWorks() {
   }
 
   return {
-    // state
     stats,
     filterTab,
     rows,
@@ -255,7 +294,7 @@ export function usePersonalResearchWorks() {
 
     activeRow,
 
-    // actions
+    bootstrap,
     loadWorks,
     changeTab,
     selectCard,

@@ -16,10 +16,10 @@
           </label>
           <select
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-            :value="safeFilter.academicYearId ?? ''"
+            :value="safeAcademicYearValue"
             @change="onAcademicYearChange"
           >
-            <option value="">Tất cả</option>
+            <option value="ALL">Tất cả</option>
             <option
               v-for="year in academicYearOptions"
               :key="year.id"
@@ -67,7 +67,7 @@
           title="Xóa bộ lọc"
           aria-label="Xóa bộ lọc"
         >
-          <RotateCcw class="h-5 w-5 text-slate-700" />
+          <RotateCcw class="h-5 w-5 text-slate-700" />Xóa lọc
         </button>
       </div>
     </div>
@@ -104,6 +104,11 @@ const props = withDefaults(defineProps<FilterPanelProps>(), {
 const emit = defineEmits<FilterPanelEmits>();
 
 const safeFilter = computed(() => props.filter);
+const safeAcademicYearValue = computed(() =>
+  safeFilter.value.academicYearId == null
+    ? "ALL"
+    : String(safeFilter.value.academicYearId),
+);
 
 function emitUpdateFilter(partial: Partial<FilterState>) {
   emit("update-filter", partial);
@@ -115,7 +120,7 @@ function emitReset() {
 
 function onAcademicYearChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value;
-  emitUpdateFilter({ academicYearId: value ? Number(value) : null });
+  emitUpdateFilter({ academicYearId: value === "ALL" ? null : Number(value) });
 }
 
 function onLecturerNameInput(event: Event) {

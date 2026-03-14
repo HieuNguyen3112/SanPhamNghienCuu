@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "check:utf8": "node scripts/check-utf8.mjs src",
-    "check:mojibake": "node scripts/check-mojibake.mjs"
+    "check:utf8": "node scripts/check-utf8.mjs src ../backend/resources/views ../backend/app/Exports",
+    "check:mojibake": "node scripts/check-mojibake.mjs src ../backend/app ../backend/routes ../backend/tests ../backend/database/seeders ../backend/resources/views"
   },
   "engines": {
     "node": ">=20.19.0"

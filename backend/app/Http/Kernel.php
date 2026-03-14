@@ -45,6 +45,7 @@ class Kernel extends HttpKernel
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
+            \App\Http\Middleware\EnsurePasswordChanged::class,
         ],
     ];
 
@@ -71,5 +72,6 @@ class Kernel extends HttpKernel
         'auto.rotate.sanctum' => \App\Http\Middleware\AutoRotateSanctumToken::class,
         'force.json' => \App\Http\Middleware\ForceJsonResponse::class,
         'audit.export' => \App\Http\Middleware\AuditExportAction::class,
+        'must.change.password' => \App\Http\Middleware\EnsurePasswordChanged::class,
     ];
 }

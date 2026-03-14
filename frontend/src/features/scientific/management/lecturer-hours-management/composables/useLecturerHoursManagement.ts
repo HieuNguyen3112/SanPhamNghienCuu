@@ -11,11 +11,12 @@ import {
   type LecturerHoursFilterModel,
   type KpiStatusFilter,
 } from "../services/lecturerHoursService";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 interface LecturerHoursServiceLike {
   loadOverview: (
     filter: LecturerHoursFilterModel,
-    pagination: { page: number; perPage: number }
+    pagination: { page: number; perPage: number },
   ) => Promise<{
     overview: LecturerHoursOverview[];
     totals: {
@@ -44,9 +45,10 @@ interface LecturerHoursServiceLike {
       };
     };
   }>;
-  loadDetail: (lecturerId: number, yearId: number) => Promise<
-    LecturerHoursDetailRow[]
-  >;
+  loadDetail: (
+    lecturerId: number,
+    yearId: number,
+  ) => Promise<LecturerHoursDetailRow[]>;
 }
 
 export interface UseLecturerHoursManagementOptions {
@@ -61,9 +63,10 @@ function clampPercent(value: number) {
 }
 
 export function useLecturerHoursManagement(
-  options: UseLecturerHoursManagementOptions
+  options: UseLecturerHoursManagementOptions,
 ) {
   const service = options.service ?? lecturerHoursService;
+  const { runPageLoad } = usePageLoadFeedback();
   const filter = reactive<LecturerHoursFilterModel>({
     yearId: options.initialYearId ?? null,
     facultyId: options.initialFacultyId,
@@ -101,14 +104,14 @@ export function useLecturerHoursManagement(
     if (selectedLecturerId.value === null) return null;
     return (
       overview.value.find(
-        (row) => row.lecturerId === selectedLecturerId.value
+        (row) => row.lecturerId === selectedLecturerId.value,
       ) ?? null
     );
   });
 
   let keywordTimer: number | null = null;
 
-  async function loadOverview() {
+  async function loadOverviewInternal() {
     loadingOverview.value = true;
     errorOverview.value = null;
 
@@ -128,12 +131,17 @@ export function useLecturerHoursManagement(
       facultyOptions.value = payload.options.faculties;
       kpiStatusOptions.value = payload.options.kpiStatuses;
 
-      if (!defaultYearId.value && payload.meta.filters.yearId) {
-        defaultYearId.value = payload.meta.filters.yearId;
+      const activeYearId =
+        payload.options.academicYears.find((year) => year.isActive)?.id ?? null;
+      const preferredYearId =
+        activeYearId ?? payload.meta.filters.yearId ?? null;
+
+      if (!defaultYearId.value && preferredYearId) {
+        defaultYearId.value = preferredYearId;
       }
 
-      if (!filter.yearId && payload.meta.filters.yearId) {
-        filter.yearId = payload.meta.filters.yearId;
+      if (!filter.yearId && preferredYearId) {
+        filter.yearId = preferredYearId;
       }
 
       if (payload.meta.pagination) {
@@ -161,6 +169,20 @@ export function useLecturerHoursManagement(
     }
   }
 
+  async function loadOverview(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadOverviewInternal();
+      return;
+    }
+
+    await runPageLoad(loadOverviewInternal, {
+      loading: {
+        title: "Đang tải quản lý giờ NCKH",
+        message: "Hệ thống đang cập nhật dữ liệu giờ nghiên cứu khoa học...",
+      },
+    });
+  }
+
   async function loadDetail(lecturerId: number) {
     loadingDetail.value = true;
     errorDetail.value = null;
@@ -170,10 +192,7 @@ export function useLecturerHoursManagement(
         detailRows.value = [];
         return;
       }
-      detailRows.value = await service.loadDetail(
-        lecturerId,
-        filter.yearId
-      );
+      detailRows.value = await service.loadDetail(lecturerId, filter.yearId);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(e);
@@ -188,7 +207,7 @@ export function useLecturerHoursManagement(
     if (keywordTimer) window.clearTimeout(keywordTimer);
     keywordTimer = window.setTimeout(() => {
       keywordTimer = null;
-      loadOverview();
+      void loadOverview({ withFeedback: false });
     }, delayMs);
   }
 
@@ -201,7 +220,7 @@ export function useLecturerHoursManagement(
       return;
     }
 
-    loadOverview();
+    void loadOverview();
   }
 
   function resetFilter() {
@@ -210,7 +229,7 @@ export function useLecturerHoursManagement(
     filter.kpiStatus = "all" as KpiStatusFilter;
     filter.keyword = "";
     currentPageNumber.value = 1;
-    loadOverview();
+    void loadOverview();
   }
 
   function openDrawer(lecturerId: number) {
@@ -229,14 +248,14 @@ export function useLecturerHoursManagement(
   function updatePage(nextPage: number) {
     const normalized = Math.min(Math.max(1, nextPage), lastPageNumber.value);
     currentPageNumber.value = normalized;
-    loadOverview();
+    void loadOverview();
   }
 
   function updatePageSize(nextPageSize: number) {
     if (!Number.isFinite(nextPageSize) || nextPageSize <= 0) return;
     pageSize.value = nextPageSize;
     currentPageNumber.value = 1;
-    loadOverview();
+    void loadOverview();
   }
 
   return {

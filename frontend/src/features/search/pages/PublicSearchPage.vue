@@ -66,9 +66,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import { useUserStore } from "@/app/stores/userStore";
+import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
 import { usePublicResearch } from "@/features/public-research/composables/usePublicResearch";
 import type { PublicResearchWorkType } from "@/features/public-research/models/publicResearchModels";
 
@@ -84,7 +85,7 @@ type Preset = "lecturer" | "article" | "project" | "book" | "conference";
 
 const props = defineProps<{ preset: Preset }>();
 const route = useRoute();
-const router = useRouter();
+const { logoutWithFeedback } = useLogoutFeedback("/");
 
 const userStore = useUserStore();
 onMounted(async () => {
@@ -107,8 +108,7 @@ const userInitials = computed(() => {
 });
 
 async function handleLogout() {
-  await userStore.logout();
-  await router.replace("/");
+  await logoutWithFeedback();
 }
 
 const {

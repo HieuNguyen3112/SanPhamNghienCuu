@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Backup\BackupRunStateStore;
+use App\Services\Backup\BackupRunLauncher;
 use App\Services\Backup\BackupSnapshotStore;
 use App\Services\Backup\ResticBackupManager;
 use Illuminate\Console\Command;
@@ -15,23 +16,25 @@ class SpncBackupRun extends Command
     protected $signature = 'spnc:backup:run
         {--run-id= : Mã run để theo dõi trạng thái}
         {--trigger=manual : Nguồn kích hoạt backup (manual/schedule)}
-        {--initiated-by= : user_id kích hoạt}
-        {--skip-prune : Bỏ qua bước dọn snapshot cũ}';
+        {--initiated-by= : user_id kích hoạt}';
 
     protected $description = 'Chạy backup SPNC (DB + tệp nhạy cảm) bằng restic.';
 
     private ResticBackupManager $backupManager;
     private BackupRunStateStore $stateStore;
+    private BackupRunLauncher $launcher;
     private BackupSnapshotStore $snapshotStore;
 
     public function __construct(
         ResticBackupManager $backupManager,
         BackupRunStateStore $stateStore,
+        BackupRunLauncher $launcher,
         BackupSnapshotStore $snapshotStore
     ) {
         parent::__construct();
         $this->backupManager = $backupManager;
         $this->stateStore = $stateStore;
+        $this->launcher = $launcher;
         $this->snapshotStore = $snapshotStore;
     }
 
@@ -45,8 +48,6 @@ class SpncBackupRun extends Command
         $initiatedBy = $this->option('initiated-by') !== null
             ? (int) $this->option('initiated-by')
             : null;
-        $skipPrune = (bool) $this->option('skip-prune');
-
         try {
             $this->stateStore->assertValidRunId($runId);
         } catch (\Throwable $exception) {
@@ -128,43 +129,86 @@ class SpncBackupRun extends Command
                     'Tóm tắt backup: ' . json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
                 );
             }
-            $export = $result['export'] ?? null;
-            if (is_array($export)) {
-                if ((bool) ($export['available'] ?? false)) {
+            $snapshot = is_array($result['snapshot'] ?? null) ? $result['snapshot'] : null;
+            $snapshotId = trim((string) ($snapshot['snapshot_id'] ?? $snapshot['snapshot_id_full'] ?? ''));
+            if ($snapshot) {
+                $runningState = $this->stateStore->get($runId);
+                $this->snapshotStore->upsert(
+                    array_merge($snapshot, $this->buildSnapshotCachePatch($result, $runningState)),
+                    $runId
+                );
+                $this->stateStore->appendLog($runId, 'Đã ghi thẳng snapshot mới vào cache cục bộ, không cần quét lại toàn bộ repository.');
+            }
+
+            $postProcess = [
+                'scheduled' => false,
+                'status' => 'disabled',
+                'run_id' => null,
+            ];
+            if ((bool) config('backup.exports.enabled', true) && $snapshotId !== '') {
+                $postProcessRunId = $this->stateStore->generateRunId();
+                $this->stateStore->initialize($postProcessRunId, [
+                    'status' => 'queued',
+                    'operation' => 'backup_postprocess',
+                    'trigger' => $trigger,
+                    'requested_by_user_id' => $initiatedBy,
+                    'requested_at' => now()->toIso8601String(),
+                    'parent_run_id' => $runId,
+                    'snapshot_id' => $snapshotId,
+                    'message' => 'Đã xếp lịch hoàn thiện export sao lưu.',
+                ]);
+
+                try {
+                    $this->launcher->launchBackupPostProcess($postProcessRunId, (int) ($initiatedBy ?? 0), $snapshotId, $trigger);
+                    $postProcess = [
+                        'scheduled' => true,
+                        'status' => 'queued',
+                        'run_id' => $postProcessRunId,
+                        'operation' => 'backup_postprocess',
+                        'status_url' => '/api/admin/backups/runs/' . $postProcessRunId,
+                    ];
                     $this->stateStore->appendLog(
                         $runId,
-                        'Đã tạo export dễ đọc: ' . (string) ($export['export_path'] ?? 'không rõ đường dẫn')
+                        'Đã chuyển bước export readable và đồng bộ Drive sang child run ' . $postProcessRunId . '.'
                     );
-                } else {
+                } catch (\Throwable $exception) {
+                    $this->stateStore->update($postProcessRunId, [
+                        'status' => 'failed',
+                        'operation' => 'backup_postprocess',
+                        'step' => 'failed',
+                        'finished_at' => now()->toIso8601String(),
+                        'message' => 'Không thể khởi chạy hoàn thiện export sao lưu.',
+                        'error_message' => $exception->getMessage(),
+                    ]);
                     $this->stateStore->appendLog(
                         $runId,
-                        'Không thể tạo export dễ đọc: ' . (string) ($export['error'] ?? 'lỗi không xác định'),
+                        'Không thể khởi chạy hậu xử lý export: ' . $exception->getMessage(),
                         'warning'
                     );
+                    Log::warning('backup.postprocess_launch_failed', [
+                        'run_id' => $runId,
+                        'postprocess_run_id' => $postProcessRunId,
+                        'snapshot_id' => $snapshotId,
+                        'message' => $exception->getMessage(),
+                    ]);
+                    $postProcess = [
+                        'scheduled' => false,
+                        'status' => 'failed_to_launch',
+                        'run_id' => $postProcessRunId,
+                        'operation' => 'backup_postprocess',
+                        'error_message' => $exception->getMessage(),
+                    ];
                 }
             }
-
-            $pruneResult = null;
-            if (! $skipPrune) {
-                $this->stateStore->update($runId, [
-                    'step' => 'pruning',
-                    'message' => 'Đang dọn snapshot cũ theo retention policy...',
-                ]);
-                $this->stateStore->appendLog($runId, 'Đang chạy prune theo retention policy...');
-                $pruneResult = $this->backupManager->pruneBackups();
-                $this->stateStore->appendLog($runId, 'Prune hoàn tất.');
-            }
-
-            $limit = max(10, (int) config('backup.snapshot_cache.max_items', 200));
-            $snapshots = $this->backupManager->listSnapshots($limit);
-            $this->snapshotStore->replace($snapshots, $runId);
-            $this->stateStore->appendLog($runId, 'Đã đồng bộ cache snapshot sau backup.');
 
             $payload = [
                 'status' => 'success',
                 'operation' => 'backup',
                 'step' => 'completed',
-                'message' => 'Backup hoàn tất.',
+                'snapshot_id' => $snapshotId !== '' ? $snapshotId : null,
+                'message' => $postProcess['scheduled']
+                    ? 'Backup an toàn đã hoàn tất. Export readable đang tiếp tục ở nền.'
+                    : 'Backup hoàn tất.',
                 'finished_at' => now()->toIso8601String(),
                 'result' => [
                     'snapshot' => $result['snapshot'] ?? null,
@@ -174,11 +218,21 @@ class SpncBackupRun extends Command
                     'workspace_relative_path' => $result['workspace_relative_path'] ?? null,
                     'verification' => $result['verification'] ?? null,
                     'check' => $result['check'] ?? null,
-                    'export' => $result['export'] ?? null,
-                    'prune' => $pruneResult,
+                    'export' => $postProcess,
                 ],
             ];
-            $this->stateStore->update($runId, $payload);
+            $finalState = $this->stateStore->update($runId, $payload);
+            if ($snapshotId !== '') {
+                $this->snapshotStore->mergeBySnapshotId(
+                    $snapshotId,
+                    $this->buildSnapshotCachePatch($result, $finalState),
+                    $runId
+                );
+                $this->stateStore->appendLog(
+                    $runId,
+                    'Da dong bo snapshot cache voi trang thai hoan tat, kich thuoc va metadata xac minh cuoi cung.'
+                );
+            }
 
             $this->info('Backup hoàn tất. run_id=' . $runId);
             return self::SUCCESS;
@@ -289,5 +343,80 @@ class SpncBackupRun extends Command
         }
 
         return null;
+    }
+
+    private function buildSnapshotCachePatch(array $result, ?array $state): array
+    {
+        $patch = [];
+
+        $status = strtolower(trim((string) ($state['status'] ?? '')));
+        if ($status !== '') {
+            $patch['run_state'] = $status;
+            $patch['status'] = $status;
+        }
+
+        $trigger = trim((string) ($state['trigger'] ?? ''));
+        if ($trigger !== '') {
+            $patch['trigger'] = $trigger;
+        }
+
+        $sizeBytes = $this->resolveSnapshotSizeBytes(
+            is_array($result['summary'] ?? null)
+                ? $result['summary']
+                : (is_array($state['result']['summary'] ?? null) ? $state['result']['summary'] : null)
+        );
+        if ($sizeBytes !== null) {
+            $patch['size_bytes'] = $sizeBytes;
+        }
+
+        $verification = is_array($result['verification'] ?? null)
+            ? $result['verification']
+            : (is_array($state['result']['verification'] ?? null) ? $state['result']['verification'] : null);
+        if (is_array($verification)) {
+            if (array_key_exists('contains_db_dump', $verification)) {
+                $patch['contains_db_dump'] = (bool) $verification['contains_db_dump'];
+            }
+            if (array_key_exists('contains_files', $verification)) {
+                $patch['contains_files'] = (bool) $verification['contains_files'];
+            }
+            if (array_key_exists('contains_db_dump', $patch) || array_key_exists('contains_files', $patch)) {
+                $patch['backup_type'] = $this->resolveBackupType(
+                    (bool) ($patch['contains_db_dump'] ?? false),
+                    (bool) ($patch['contains_files'] ?? false)
+                );
+            }
+        }
+
+        return $patch;
+    }
+
+    private function resolveSnapshotSizeBytes(?array $summary): ?int
+    {
+        if (! is_array($summary)) {
+            return null;
+        }
+
+        foreach (['data_added', 'total_bytes_processed'] as $key) {
+            if (isset($summary[$key]) && is_numeric($summary[$key])) {
+                return (int) $summary[$key];
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveBackupType(bool $containsDbDump, bool $containsFiles): string
+    {
+        if ($containsDbDump && $containsFiles) {
+            return 'full';
+        }
+        if ($containsDbDump) {
+            return 'db_only';
+        }
+        if ($containsFiles) {
+            return 'files_only';
+        }
+
+        return 'unknown';
     }
 }

@@ -1,0 +1,42 @@
+- generic [ref=e1]:
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - generic "University introduction" [ref=e9]:
+        - link "Về trang chủ" [ref=e11] [cursor=pointer]:
+          - /url: /
+          - img "University logo" [ref=e12]
+        - generic [ref=e13]:
+          - heading "TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH" [level=1] [ref=e14]:
+            - text: TRƯỜNG ĐẠI HỌC SƯ PHẠM
+            - text: THÀNH PHỐ HỒ CHÍ MINH
+          - heading "Quản lý công trình nghiên cứu khoa học" [level=2] [ref=e15]
+      - region "Sign in form" [ref=e17]:
+        - generic [ref=e18]:
+          - heading "ĐĂNG NHẬP" [level=2] [ref=e19]
+          - generic [ref=e20]:
+            - generic [ref=e21]: Tên đăng nhập *
+            - textbox "Tên đăng nhập *" [ref=e22]:
+              - /placeholder: Nhập tên đăng nhập
+              - text: khoa@local.test
+          - generic [ref=e23]:
+            - generic [ref=e24]: Mật khẩu *
+            - textbox "Mật khẩu *" [ref=e25]:
+              - /placeholder: Nhập mật khẩu
+              - text: Password!123
+          - generic [ref=e26]:
+            - generic [ref=e27]: Vai trò
+            - combobox [ref=e28]:
+              - option "Giảng viên"
+              - option "Ban chủ nhiệm khoa" [selected]
+              - option "Phòng quản lý khoa học"
+          - button "Đăng nhập" [disabled] [ref=e30]:
+            - generic [ref=e31]: Đăng nhập
+          - separator [ref=e32]
+          - button "Quên mật khẩu?" [ref=e33]
+  - dialog "Đang xác thực" [ref=e36]:
+    - generic [active] [ref=e37]:
+      - banner [ref=e38]:
+        - heading "Đang xác thực" [level=2] [ref=e39]
+      - generic [ref=e41]:
+        - img [ref=e43]
+        - paragraph [ref=e45]: Đang đăng nhập vào hệ thống...

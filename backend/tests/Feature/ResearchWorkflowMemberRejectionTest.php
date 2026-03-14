@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Notifications\WorkflowDatabaseNotification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -212,6 +214,80 @@ class ResearchWorkflowMemberRejectionTest extends TestCase
             ->assertOk();
         $filteredActiveYearIds = collect($filteredActiveYear->json('data'))->pluck('activity_id')->all();
         $this->assertNotContains($pendingFacultyActivityId, $filteredActiveYearIds);
+    }
+
+    public function test_faculty_rejection_notifies_owner_and_all_accepted_members(): void
+    {
+        Notification::fake();
+
+        [$activityId] = $this->createActivityWithMember('pending_faculty_review', 'accepted');
+
+        Sanctum::actingAs($this->facultyUser);
+
+        $this->putJson("/api/faculty/works/approvals/{$activityId}/reject", [
+            'reason_type' => 'MISSING_EVIDENCE',
+            'reason_detail' => 'Cần bổ sung tệp PDF.',
+        ])->assertOk();
+
+        $expectedNote = 'MISSING_EVIDENCE: Cần bổ sung tệp PDF.';
+
+        Notification::assertSentTo(
+            [$this->ownerUser, $this->memberUser],
+            WorkflowDatabaseNotification::class,
+            function (WorkflowDatabaseNotification $notification, array $channels) use ($activityId, $expectedNote) {
+                $payload = $notification->toArray(null);
+
+                return $channels === ['database']
+                    && ($payload['event_key'] ?? null) === 'work_rejected'
+                    && ($payload['activity_id'] ?? null) === $activityId
+                    && ($payload['rejection_note'] ?? null) === $expectedNote
+                    && ($payload['target_url'] ?? null) === "/works/personal?activity_id={$activityId}";
+            }
+        );
+    }
+
+    public function test_accepted_member_can_rework_faculty_rejected_activity_and_see_same_reason(): void
+    {
+        [$activityId] = $this->createActivityWithMember('pending_faculty_review', 'accepted');
+
+        Sanctum::actingAs($this->facultyUser);
+        $this->putJson("/api/faculty/works/approvals/{$activityId}/reject", [
+            'reason_type' => 'MISSING_EVIDENCE',
+            'reason_detail' => 'Cần bổ sung tệp PDF.',
+        ])->assertOk();
+
+        Sanctum::actingAs($this->memberUser);
+
+        $indexResponse = $this->getJson('/api/lecturer/works/my?status=rejected')
+            ->assertOk();
+
+        $memberRow = collect($indexResponse->json('data.items'))
+            ->firstWhere('activity_id', $activityId);
+
+        $this->assertNotNull($memberRow);
+        $this->assertSame('rejected', $memberRow['status_code'] ?? null);
+        $this->assertTrue((bool) data_get($memberRow, 'actions.can_edit'));
+        $this->assertTrue((bool) data_get($memberRow, 'actions.can_submit'));
+        $this->assertFalse((bool) data_get($memberRow, 'actions.can_reinvite'));
+
+        $this->getJson("/api/lecturer/works/my/{$activityId}")
+            ->assertOk()
+            ->assertJsonPath('data.rejection_note', 'MISSING_EVIDENCE: Cần bổ sung tệp PDF.')
+            ->assertJsonPath('data.actions.can_edit', true)
+            ->assertJsonPath('data.actions.can_submit', true);
+
+        $this->getJson("/api/research-activities/{$activityId}")
+            ->assertOk()
+            ->assertJsonPath('data.activity.id', $activityId);
+
+        $this->putJson("/api/research-activities/{$activityId}", [
+            'title' => 'Cong trinh test da duoc thanh vien cap nhat',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('research_activities', [
+            'id' => $activityId,
+            'title' => 'Cong trinh test da duoc thanh vien cap nhat',
+        ]);
     }
 
     private function seedLookups(): void

@@ -13,6 +13,7 @@ const textExtensions = new Set([
   ".css",
   ".scss",
   ".md",
+  ".php",
 ]);
 const skipDirs = new Set(["node_modules", "dist", ".git", ".vite", "public"]);
 

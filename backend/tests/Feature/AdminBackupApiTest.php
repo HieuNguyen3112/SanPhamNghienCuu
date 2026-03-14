@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\Backup\BackupRunLauncher;
 use App\Services\Backup\BackupRunStateStore;
+use App\Services\Backup\ReadableExportPdfRenderer;
 use App\Services\Backup\BackupSnapshotStore;
 use App\Services\Backup\ResticBackupManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,6 +90,134 @@ class AdminBackupApiTest extends TestCase
             ]);
     }
 
+    public function test_index_exposes_running_export_state_for_successful_snapshot(): void
+    {
+        $this->actingAsScienceOffice();
+
+        /** @var BackupSnapshotStore $snapshotStore */
+        $snapshotStore = app(BackupSnapshotStore::class);
+        /** @var BackupRunStateStore $stateStore */
+        $stateStore = app(BackupRunStateStore::class);
+
+        $snapshotStore->replace([
+            [
+                'snapshot_id' => 'snap-running-export',
+                'short_id' => 'snaprun1',
+                'backup_name' => 'Backup 14/03/2026 13:53:09',
+                'created_at' => '2026-03-14T13:53:09+07:00',
+                'run_id' => 'parent-export-running',
+                'run_state' => 'success',
+                'status' => 'success',
+                'trigger' => 'manual',
+                'size_bytes' => 1153433,
+                'backup_type' => 'full',
+                'contains_db_dump' => true,
+                'contains_files' => true,
+                'export_available' => false,
+                'export_path' => null,
+                'export_drive_path' => null,
+                'export_generated_at' => null,
+                'export_bundle_filename' => null,
+                'export_artifacts' => [],
+            ],
+        ], 'parent-export-running');
+
+        $stateStore->initialize('parent-export-running', [
+            'status' => 'success',
+            'operation' => 'backup',
+            'trigger' => 'manual',
+            'requested_at' => now()->subMinutes(2)->toIso8601String(),
+            'finished_at' => now()->subMinute()->toIso8601String(),
+            'result' => [
+                'export' => [
+                    'run_id' => 'postproc-running-1',
+                ],
+            ],
+        ]);
+        $stateStore->initialize('postproc-running-1', [
+            'status' => 'running',
+            'operation' => 'backup_postprocess',
+            'trigger' => 'manual',
+            'snapshot_id' => 'snap-running-export',
+            'requested_at' => now()->subMinute()->toIso8601String(),
+            'started_at' => now()->subSeconds(45)->toIso8601String(),
+            'message' => '�ang t?o readable export v� d?ng b? l�n Drive...',
+        ]);
+
+        $this->getJson('/api/admin/backups')
+            ->assertStatus(200)
+            ->assertJsonPath('data.items.0.snapshot_id', 'snap-running-export')
+            ->assertJsonPath('data.items.0.status', 'success')
+            ->assertJsonPath('data.items.0.export_available', false)
+            ->assertJsonPath('data.items.0.export_state', 'running')
+            ->assertJsonPath('data.items.0.export_run.operation', 'backup_postprocess')
+            ->assertJsonPath('data.items.0.export_run.status', 'running');
+    }
+
+    public function test_index_exposes_failed_export_state_without_marking_snapshot_failed(): void
+    {
+        $this->actingAsScienceOffice();
+
+        /** @var BackupSnapshotStore $snapshotStore */
+        $snapshotStore = app(BackupSnapshotStore::class);
+        /** @var BackupRunStateStore $stateStore */
+        $stateStore = app(BackupRunStateStore::class);
+
+        $snapshotStore->replace([
+            [
+                'snapshot_id' => 'snap-failed-export',
+                'short_id' => 'snapfail',
+                'backup_name' => 'Backup 14/03/2026 14:10:00',
+                'created_at' => '2026-03-14T14:10:00+07:00',
+                'run_id' => 'parent-export-failed',
+                'run_state' => 'success',
+                'status' => 'success',
+                'trigger' => 'manual',
+                'size_bytes' => 2048,
+                'backup_type' => 'full',
+                'contains_db_dump' => true,
+                'contains_files' => true,
+                'export_available' => false,
+                'export_path' => null,
+                'export_drive_path' => null,
+                'export_generated_at' => null,
+                'export_bundle_filename' => null,
+                'export_artifacts' => [],
+            ],
+        ], 'parent-export-failed');
+
+        $stateStore->initialize('parent-export-failed', [
+            'status' => 'success',
+            'operation' => 'backup',
+            'trigger' => 'manual',
+            'requested_at' => now()->subMinutes(5)->toIso8601String(),
+            'finished_at' => now()->subMinutes(4)->toIso8601String(),
+            'result' => [
+                'export' => [
+                    'run_id' => 'postproc-failed-1',
+                ],
+            ],
+        ]);
+        $stateStore->initialize('postproc-failed-1', [
+            'status' => 'failed',
+            'operation' => 'backup_postprocess',
+            'trigger' => 'manual',
+            'snapshot_id' => 'snap-failed-export',
+            'requested_at' => now()->subMinutes(4)->toIso8601String(),
+            'finished_at' => now()->subMinutes(3)->toIso8601String(),
+            'message' => 'Kh�ng th? ho�n thi?n readable export. Vui l�ng th? l?i.',
+        ]);
+
+        $this->getJson('/api/admin/backups')
+            ->assertStatus(200)
+            ->assertJsonPath('data.items.0.snapshot_id', 'snap-failed-export')
+            ->assertJsonPath('data.items.0.status', 'success')
+            ->assertJsonPath('data.items.0.export_available', false)
+            ->assertJsonPath('data.items.0.export_state', 'failed')
+            ->assertJsonPath('data.items.0.export_run.operation', 'backup_postprocess')
+            ->assertJsonPath('data.items.0.export_run.status', 'failed');
+    }
+
     public function test_index_does_not_auto_trigger_snapshot_refresh_on_page_load(): void
     {
         $this->actingAsScienceOffice();
@@ -129,7 +258,7 @@ class AdminBackupApiTest extends TestCase
             'trigger' => 'schedule',
             'requested_at' => now()->subMinute()->toIso8601String(),
             'started_at' => now()->subSeconds(45)->toIso8601String(),
-            'message' => 'Đang tạo snapshot backup...',
+            'message' => '�ang t?o snapshot backup...',
         ]);
 
         $response = $this->getJson('/api/admin/backups')
@@ -154,7 +283,7 @@ class AdminBackupApiTest extends TestCase
             'trigger' => 'schedule',
             'requested_at' => now()->subMinute()->toIso8601String(),
             'started_at' => now()->subSeconds(30)->toIso8601String(),
-            'message' => 'Đang tạo snapshot backup...',
+            'message' => '�ang t?o snapshot backup...',
         ]);
         $snapshotStore->markRefreshing($runId);
 
@@ -179,7 +308,7 @@ class AdminBackupApiTest extends TestCase
             'trigger' => 'schedule',
             'requested_at' => now()->subMinute()->toIso8601String(),
             'started_at' => now()->subSeconds(30)->toIso8601String(),
-            'message' => 'Đang tạo snapshot backup...',
+            'message' => '�ang t?o snapshot backup...',
         ]);
 
         $launcher = \Mockery::mock(BackupRunLauncher::class);
@@ -189,6 +318,39 @@ class AdminBackupApiTest extends TestCase
         $this->postJson('/api/admin/backups/run')
             ->assertStatus(409)
             ->assertJsonPath('data.conflict_run.run_id', $conflictRunId);
+    }
+
+    public function test_forget_is_rejected_while_backup_postprocess_is_active(): void
+    {
+        $this->actingAsScienceOffice();
+
+        /** @var BackupRunStateStore $stateStore */
+        $stateStore = app(BackupRunStateStore::class);
+        $conflictRunId = 'postproc01';
+        $stateStore->initialize($conflictRunId, [
+            'status' => 'running',
+            'operation' => 'backup_postprocess',
+            'trigger' => 'manual',
+            'snapshot_id' => 'abcdef123456',
+            'requested_at' => now()->subMinute()->toIso8601String(),
+            'started_at' => now()->subSeconds(20)->toIso8601String(),
+            'message' => 'Dang tao readable export va dong bo len Drive...',
+        ]);
+
+        $launcher = \Mockery::mock(BackupRunLauncher::class);
+        $launcher->shouldReceive('launchForget')->never();
+        $this->app->instance(BackupRunLauncher::class, $launcher);
+
+        $this->postJson('/api/admin/backups/forget', [
+            'snapshot_ids' => ['abcdef123456'],
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('data.conflict_run.run_id', $conflictRunId)
+            ->assertJsonPath('data.conflict_run.operation', 'backup_postprocess')
+            ->assertJsonPath(
+                'message',
+                'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.'
+            );
     }
 
     public function test_science_office_can_unlock_stale_repository_lock(): void
@@ -326,11 +488,11 @@ class AdminBackupApiTest extends TestCase
 
         $this->postJson('/api/admin/backups/forget', [
             'snapshot_ids' => ['a1b2c3d4e5f6'],
-            'prune_after' => false,
         ])->assertStatus(202)
             ->assertJsonPath('data.accepted', true)
             ->assertJsonPath('data.operation', 'forget')
-            ->assertJsonPath('data.snapshot_ids.0', 'a1b2c3d4e5f6');
+            ->assertJsonPath('data.snapshot_ids.0', 'a1b2c3d4e5f6')
+            ->assertJsonMissingPath('data.prune_after');
     }
 
     public function test_index_marks_stale_snapshot_refresh_run_as_failed_and_non_blocking(): void
@@ -351,7 +513,7 @@ class AdminBackupApiTest extends TestCase
             'operation' => 'snapshot_refresh',
             'requested_at' => now()->subMinutes(10)->toIso8601String(),
             'updated_at' => now()->subMinutes(10)->toIso8601String(),
-            'message' => 'Đang chờ đồng bộ snapshot.',
+            'message' => '�ang ch? d?ng b? snapshot.',
         ]);
 
         $response = $this->getJson('/api/admin/backups')
@@ -385,13 +547,14 @@ class AdminBackupApiTest extends TestCase
             'requested_at' => now()->subMinutes(5)->toIso8601String(),
             'updated_at' => now()->subMinutes(5)->toIso8601String(),
             'snapshot_ids' => ['a1b2c3d4e5f6'],
-            'message' => 'Đã xếp lịch xóa snapshot đã chọn.',
+            'message' => '�� x?p l?ch x�a snapshot d� ch?n.',
         ]);
 
         $this->getJson('/api/admin/backups/runs/' . $runId)
             ->assertStatus(200)
             ->assertJsonPath('data.status', 'failed')
             ->assertJsonPath('data.step', 'timeout')
+            ->assertJsonPath('data.snapshot_ids.0', 'a1b2c3d4e5f6')
             ->assertJsonPath('data.message', 'Tiến trình xóa snapshot bị quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.');
     }
 
@@ -405,7 +568,7 @@ class AdminBackupApiTest extends TestCase
         $stateStore->initialize($runId, [
             'status' => 'failed',
             'operation' => 'forget',
-            'message' => 'Đang xóa snapshot đã chọn khỏi repository restic...',
+            'message' => '�ang x�a snapshot d� ch?n kh?i repository restic...',
             'error_message' => 'unable to create lock in backend: repository is already locked by PID 1234',
             'finished_at' => now()->toIso8601String(),
         ]);
@@ -428,7 +591,7 @@ class AdminBackupApiTest extends TestCase
         $stateStore->initialize($runId, [
             'status' => 'failed',
             'operation' => 'forget',
-            'message' => 'Xóa snapshot thất bại.',
+            'message' => 'X�a snapshot th?t b?i.',
             'error_message' => 'unable to create lock in backend: repository is already locked by PID 4321',
             'finished_at' => now()->toIso8601String(),
         ]);
@@ -461,7 +624,11 @@ class AdminBackupApiTest extends TestCase
         $this->postJson('/api/admin/backups/forget', [
             'snapshot_ids' => ['a1b2c3d4e5f6'],
             'prune_after' => true,
-        ])->assertStatus(422);
+        ])->assertStatus(422)
+            ->assertJsonPath(
+                'message',
+                'Xóa snapshot chỉ hỗ trợ forget. Việc dọn dung lượng được hệ thống xử lý riêng theo bảo trì.'
+            );
     }
 
     public function test_forget_command_can_fallback_snapshot_ids_from_existing_run_state(): void
@@ -475,7 +642,7 @@ class AdminBackupApiTest extends TestCase
             'trigger' => 'manual',
             'requested_at' => now()->toIso8601String(),
             'snapshot_ids' => ['a1b2c3d4e5f6'],
-            'message' => 'Đã xếp lịch xóa snapshot đã chọn.',
+            'message' => '�� x?p l?ch x�a snapshot d� ch?n.',
         ]);
 
         $manager = \Mockery::mock(ResticBackupManager::class);
@@ -517,7 +684,7 @@ class AdminBackupApiTest extends TestCase
             'requested_at' => now()->subHour()->toIso8601String(),
             'started_at' => now()->subHour()->toIso8601String(),
             'finished_at' => now()->subMinutes(50)->toIso8601String(),
-            'message' => 'Backup hoàn tất.',
+            'message' => 'Backup ho�n t?t.',
         ]);
 
         $manager = \Mockery::mock(ResticBackupManager::class);
@@ -529,13 +696,251 @@ class AdminBackupApiTest extends TestCase
         $this->artisan('spnc:backup:run', [
             '--run-id' => 'schedskip1',
             '--trigger' => 'schedule',
-            '--skip-prune' => true,
         ])->assertExitCode(0);
 
         $state = $stateStore->get('schedskip1');
         $this->assertIsArray($state);
         $this->assertSame('success', $state['status'] ?? null);
         $this->assertSame('skipped_schedule_window', $state['step'] ?? null);
+    }
+
+    public function test_completed_backup_reconciles_new_snapshot_cache_row_immediately(): void
+    {
+        config()->set('backup.exports.enabled', false);
+
+        $manager = \Mockery::mock(ResticBackupManager::class);
+        $manager->shouldReceive('runBackup')
+            ->once()
+            ->with('runbkcache1', 'manual', null)
+            ->andReturn([
+                'snapshot' => [
+                    'snapshot_id' => 'snapnew1234567890',
+                    'snapshot_id_full' => 'snapnew1234567890',
+                    'short_id' => 'snapnew1',
+                    'backup_name' => 'Backup 14/03/2026 10:30:00',
+                    'created_at' => '2026-03-14T10:30:00+07:00',
+                    'hostname' => 'server-01',
+                    'paths' => ['storage/app/backup-workspace/runbkcache1'],
+                    'tags' => ['spnc_backup', 'run_id:runbkcache1', 'trigger:manual'],
+                    'run_id' => 'runbkcache1',
+                    'trigger' => 'manual',
+                    'workspace_path' => 'testing/backup-workspace/runbkcache1',
+                    'contains_db_dump' => true,
+                    'contains_files' => true,
+                    'backup_type' => 'full',
+                    'export_available' => false,
+                    'export_path' => null,
+                    'export_drive_path' => null,
+                    'export_generated_at' => null,
+                    'export_bundle_filename' => null,
+                    'export_artifacts' => [],
+                ],
+                'summary' => [
+                    'data_added' => 2048,
+                ],
+                'verification' => [
+                    'contains_db_dump' => true,
+                    'contains_files' => true,
+                ],
+                'check' => [
+                    'scheduled' => true,
+                    'deferred' => true,
+                ],
+                'manifest_relative_path' => 'testing/backup-workspace/runbkcache1/manifest.json',
+                'db_dump_relative_path' => 'testing/backup-workspace/runbkcache1/db/mysql.sql',
+                'workspace_relative_path' => 'testing/backup-workspace/runbkcache1',
+            ]);
+        $manager->shouldReceive('buildScheduleMeta')
+            ->andReturn([
+                'mode' => 'fixed',
+                'description_vi' => 'Lich co dinh',
+                'interval_weeks' => 1,
+                'weekday' => 1,
+                'days' => [1, 4],
+                'time' => '02:00',
+            ]);
+        $manager->shouldReceive('buildRetentionMeta')
+            ->andReturn([
+                'keep_last' => 12,
+                'keep_weekly' => 8,
+                'keep_monthly' => 6,
+            ]);
+        $manager->shouldReceive('buildExportOverview')
+            ->andReturn([
+                'enabled' => false,
+                'sync_to_drive' => false,
+                'repository_type' => 'rclone',
+                'export_root' => 'spnc-backups/exports',
+                'export_folder_name' => 'exports',
+                'note' => 'test',
+            ]);
+        $this->app->instance(ResticBackupManager::class, $manager);
+
+        $this->artisan('spnc:backup:run', [
+            '--run-id' => 'runbkcache1',
+            '--trigger' => 'manual',
+        ])->assertExitCode(0);
+
+        /** @var BackupSnapshotStore $snapshotStore */
+        $snapshotStore = app(BackupSnapshotStore::class);
+        $snapshot = $snapshotStore->findBySnapshotId('snapnew1234567890');
+        $this->assertIsArray($snapshot);
+        $this->assertSame('success', $snapshot['status'] ?? null);
+        $this->assertSame('success', $snapshot['run_state'] ?? null);
+        $this->assertSame(2048, $snapshot['size_bytes'] ?? null);
+        $this->assertSame('full', $snapshot['backup_type'] ?? null);
+
+        $this->actingAsScienceOffice();
+        $this->getJson('/api/admin/backups')
+            ->assertStatus(200)
+            ->assertJsonPath('data.items.0.snapshot_id', 'snapnew1234567890')
+            ->assertJsonPath('data.items.0.status', 'success')
+            ->assertJsonPath('data.items.0.run_state', 'success')
+            ->assertJsonPath('data.items.0.size_bytes', 2048)
+            ->assertJsonPath('data.items.0.backup_type', 'full');
+    }
+
+    public function test_work_summary_pdf_renderer_accepts_structured_file_type_metadata(): void
+    {
+        /** @var ReadableExportPdfRenderer $renderer */
+        $renderer = app(ReadableExportPdfRenderer::class);
+
+        $pdf = $renderer->renderWorkSummary([
+            'snapshot' => [
+                'generated_at' => '2026-03-14T10:30:00+07:00',
+            ],
+            'activity' => [
+                'activity_code' => 'RA-001',
+                'title' => 'Bao cao tong hop',
+                'kind' => ['name' => 'Hoi thao'],
+                'type' => ['name' => 'Bao cao'],
+                'status' => ['name' => 'Da duyet'],
+                'academic_year' => ['code' => '2025-2026'],
+                'total_hours_calc' => 8,
+            ],
+            'owner' => [
+                'full_name' => 'Nguyen Van A',
+                'code' => 'GV-001',
+                'faculty' => ['name' => 'Khoa CNTT'],
+                'department' => ['name' => 'Bo mon KTPM'],
+            ],
+            'participants' => [],
+            'evidence_files' => [
+                [
+                    'stored_filename' => 'minh-chung-001.pdf',
+                    'file_type' => [
+                        'id' => 1,
+                        'name' => 'PDF minh chung',
+                    ],
+                    'uploaded_by' => [
+                        'full_name' => 'Nguyen Van A',
+                        'code' => 'GV-001',
+                    ],
+                    'uploaded_at' => '2026-03-14T10:35:00+07:00',
+                    'size_bytes' => 4096,
+                    'export_status' => 'copied',
+                ],
+            ],
+            'stats' => [
+                'participant_count' => 0,
+                'evidence_file_count' => 1,
+                'copied_evidence_count' => 1,
+                'metadata_only_evidence_count' => 0,
+            ],
+        ]);
+
+        $this->assertIsString($pdf);
+        $this->assertNotSame('', $pdf);
+        $this->assertStringStartsWith('%PDF-', $pdf);
+    }
+
+    public function test_backup_postprocess_finalizes_export_metadata_after_success(): void
+    {
+        /** @var BackupSnapshotStore $snapshotStore */
+        $snapshotStore = app(BackupSnapshotStore::class);
+        $snapshotStore->replace([
+            [
+                'snapshot_id' => 'snapexport123456',
+                'snapshot_id_full' => 'snapexport123456',
+                'short_id' => 'snapexpo',
+                'backup_name' => 'Backup 14/03/2026 11:00:00',
+                'created_at' => '2026-03-14T11:00:00+07:00',
+                'run_id' => 'parentrun1',
+                'run_state' => 'success',
+                'status' => 'success',
+                'trigger' => 'manual',
+                'size_bytes' => 1024,
+                'backup_type' => 'full',
+                'contains_db_dump' => true,
+                'contains_files' => true,
+                'export_available' => false,
+                'export_path' => null,
+                'export_drive_path' => null,
+                'export_generated_at' => null,
+                'export_bundle_filename' => null,
+                'export_artifacts' => [],
+            ],
+        ], 'parentrun1');
+
+        $manager = \Mockery::mock(ResticBackupManager::class);
+        $manager->shouldReceive('assertValidSnapshotId')
+            ->once()
+            ->with('snapexport123456');
+        $manager->shouldReceive('generateReadableExportForSnapshot')
+            ->once()
+            ->with('snapexport123456', 'postproc1', 'manual', null)
+            ->andReturn([
+                'available' => true,
+                'snapshot_id' => 'snapexport123456',
+                'folder_name' => '14-03-2026_11-00-00_Sao-luu-snapexpo',
+                'export_path' => 'spnc_gdrive:spnc-backups/exports/14-03-2026_11-00-00_Sao-luu-snapexpo',
+                'drive_path' => 'rclone:spnc_gdrive:spnc-backups/exports/14-03-2026_11-00-00_Sao-luu-snapexpo',
+                'bundle_filename' => 'goi-sao-luu.zip',
+                'generated_at' => '2026-03-14T11:05:00+07:00',
+                'artifacts' => [
+                    'README.txt',
+                    'tong-quan.json',
+                    'database/du-lieu.sql.gz',
+                    'cong-trinh/',
+                    'giang-vien/',
+                ],
+            ]);
+        $this->app->instance(ResticBackupManager::class, $manager);
+
+        $this->artisan('spnc:backup:post-process', [
+            '--run-id' => 'postproc1',
+            '--snapshot-id' => 'snapexport123456',
+            '--trigger' => 'manual',
+        ])->assertExitCode(0);
+
+        /** @var BackupRunStateStore $stateStore */
+        $stateStore = app(BackupRunStateStore::class);
+        $run = $stateStore->get('postproc1');
+        $this->assertIsArray($run);
+        $this->assertSame('success', $run['status'] ?? null);
+        $this->assertSame('backup_postprocess', $run['operation'] ?? null);
+        $this->assertSame('snapexport123456', $run['snapshot_id'] ?? null);
+
+        $snapshot = $snapshotStore->findBySnapshotId('snapexport123456');
+        $this->assertIsArray($snapshot);
+        $this->assertTrue((bool) ($snapshot['export_available'] ?? false));
+        $this->assertSame(
+            'spnc_gdrive:spnc-backups/exports/14-03-2026_11-00-00_Sao-luu-snapexpo',
+            $snapshot['export_path'] ?? null
+        );
+        $this->assertSame(
+            'rclone:spnc_gdrive:spnc-backups/exports/14-03-2026_11-00-00_Sao-luu-snapexpo',
+            $snapshot['export_drive_path'] ?? null
+        );
+        $this->assertSame('2026-03-14T11:05:00+07:00', $snapshot['export_generated_at'] ?? null);
+        $this->assertSame('goi-sao-luu.zip', $snapshot['export_bundle_filename'] ?? null);
+        $this->assertSame([
+            'README.txt',
+            'tong-quan.json',
+            'database/du-lieu.sql.gz',
+            'cong-trinh/',
+            'giang-vien/',
+        ], $snapshot['export_artifacts'] ?? null);
     }
 
     private function actingAsScienceOffice(): void

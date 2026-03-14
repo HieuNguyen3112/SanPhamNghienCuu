@@ -1,9 +1,9 @@
 import { computed, ref } from "vue";
 import type {
+  HoursAlertActionSuggestion,
   HoursAlertItem,
   HoursAlertsFilter,
   HoursAlertsSummary,
-  HoursAlertActionSuggestion,
 } from "../contracts/hoursWarning.contract";
 import {
   hoursAlertActionSuggestionFromDto,
@@ -15,10 +15,13 @@ import {
   fetchHoursWarnings,
   markHoursWarningSeen,
 } from "../services/hoursWarningService";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 const defaultCounts = { all: 0, danger: 0, warning: 0, done: 0 };
 
 export function useHoursWarning() {
+  const { runPageLoad } = usePageLoadFeedback();
+
   const summaryStatus = ref<HoursAlertsSummary | null>(null);
   const alerts = ref<HoursAlertItem[]>([]);
   const actionSuggestions = ref<HoursAlertActionSuggestion[]>([]);
@@ -39,7 +42,7 @@ export function useHoursWarning() {
 
   const filteredAlerts = computed(() => alerts.value);
 
-  async function loadAlerts() {
+  async function loadAlertsInternal() {
     loadingSummary.value = true;
     loadingAlerts.value = true;
     loadingSuggestions.value = true;
@@ -58,7 +61,7 @@ export function useHoursWarning() {
       alerts.value = dto.items.map(hoursAlertItemFromDto);
       counts.value = { ...defaultCounts, ...dto.tab_counts };
       actionSuggestions.value = dto.suggestions.map(
-        hoursAlertActionSuggestionFromDto
+        hoursAlertActionSuggestionFromDto,
       );
       pagination.value = {
         page: dto.pagination.page,
@@ -66,8 +69,8 @@ export function useHoursWarning() {
         total: dto.pagination.total,
         lastPage: dto.pagination.last_page,
       };
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       errorSummary.value = message;
       errorAlerts.value = message;
       errorSuggestions.value = message;
@@ -78,27 +81,72 @@ export function useHoursWarning() {
     }
   }
 
+  async function loadAlerts(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadAlertsInternal();
+      return;
+    }
+
+    await runPageLoad(loadAlertsInternal, {
+      loading: {
+        title: "Đang tải cảnh báo giờ NCKH",
+        message: "Hệ thống đang cập nhật các cảnh báo và gợi ý xử lý...",
+      },
+    });
+  }
+
+  async function bootstrap() {
+    await runPageLoad(loadAlertsInternal, {
+      loading: {
+        title: "Đang khởi tạo cảnh báo giờ NCKH",
+        message: "Hệ thống đang chuẩn bị dữ liệu cảnh báo cá nhân...",
+      },
+    });
+  }
+
   function changeFilter(next: HoursAlertsFilter) {
     filterStatus.value = next;
     pagination.value.page = 1;
-    loadAlerts();
+    void loadAlerts();
   }
 
   async function markAsSeen(alertId: string) {
     try {
-      await markHoursWarningSeen(alertId);
-      await loadAlerts();
-    } catch (e) {
-      errorAlerts.value = e instanceof Error ? e.message : String(e);
+      await runPageLoad(
+        async () => {
+          await markHoursWarningSeen(alertId);
+          await loadAlertsInternal();
+        },
+        {
+          loading: {
+            title: "Đang cập nhật cảnh báo",
+            message: "Hệ thống đang ghi nhận trạng thái đã xem...",
+          },
+          rethrow: true,
+        },
+      );
+    } catch (error) {
+      errorAlerts.value = error instanceof Error ? error.message : String(error);
     }
   }
 
   async function deleteAlert(alertId: string) {
     try {
-      await deleteHoursWarning(alertId);
-      await loadAlerts();
-    } catch (e) {
-      errorAlerts.value = e instanceof Error ? e.message : String(e);
+      await runPageLoad(
+        async () => {
+          await deleteHoursWarning(alertId);
+          await loadAlertsInternal();
+        },
+        {
+          loading: {
+            title: "Đang xóa cảnh báo",
+            message: "Hệ thống đang cập nhật danh sách cảnh báo...",
+          },
+          rethrow: true,
+        },
+      );
+    } catch (error) {
+      errorAlerts.value = error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -118,6 +166,7 @@ export function useHoursWarning() {
     loadingSuggestions,
     errorSuggestions,
 
+    bootstrap,
     loadAlerts,
     changeFilter,
     markAsSeen,

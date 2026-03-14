@@ -8,6 +8,11 @@ import type {
 } from "../contracts/hourApproval.contract";
 import { hourApprovalMappers } from "../contracts/hourApproval.contract";
 import type { HourApprovalService } from "../services/hourApprovalService";
+import {
+  resolveApiErrorMessage,
+  useActionFeedback,
+} from "@/shared/composables/useActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 export function createDefaultHourApprovalFilter(): HourApprovalFilter {
   return {
@@ -24,6 +29,9 @@ export function useHourApprovalManagement(
   service: HourApprovalService,
   initialFilter?: Partial<HourApprovalFilter>
 ) {
+  const { runWithFeedback } = useActionFeedback();
+  const { runPageLoad } = usePageLoadFeedback();
+
   const filter = reactive<HourApprovalFilter>({
     ...createDefaultHourApprovalFilter(),
     ...initialFilter,
@@ -49,19 +57,23 @@ export function useHourApprovalManagement(
   const errorApprove = ref<string | null>(null);
   const errorReject = ref<string | null>(null);
 
-  async function loadRequests() {
+  async function loadRequestsInternal() {
     loadingList.value = true;
     errorList.value = null;
     try {
-      const response = await service.getRequests({ ...filter }, page.value, perPage.value);
+      const response = await service.getRequests(
+        { ...filter },
+        page.value,
+        perPage.value
+      );
       rows.value = response.data.items.map(hourApprovalMappers.summaryFromDto);
       total.value = response.data.pagination.total;
       lastPage.value = response.data.pagination.last_page;
       page.value = response.data.pagination.page;
       perPage.value = response.data.pagination.per_page;
-    } catch (e) {
+    } catch (error) {
       // eslint-disable-next-line no-console
-      console.error(e);
+      console.error(error);
       errorList.value = "Không tải được dữ liệu. Vui lòng thử lại.";
       rows.value = [];
       total.value = 0;
@@ -71,10 +83,35 @@ export function useHourApprovalManagement(
     }
   }
 
+  async function loadRequests(options?: { withFeedback?: boolean }) {
+    if (options?.withFeedback === false) {
+      await loadRequestsInternal();
+      return;
+    }
+
+    await runPageLoad(loadRequestsInternal, {
+      loading: {
+        title: "Đang tải xét duyệt giờ NCKH",
+        message: "Hệ thống đang cập nhật danh sách yêu cầu giờ nghiên cứu khoa học...",
+      },
+    });
+  }
+
   async function applyFilter(nextFilter: Partial<HourApprovalFilter>) {
+    const keywordOnly =
+      Object.prototype.hasOwnProperty.call(nextFilter, "searchText") &&
+      (nextFilter.searchText ?? "") !== filter.searchText &&
+      (nextFilter.facultyId ?? filter.facultyId) === filter.facultyId &&
+      (nextFilter.academicYearId ?? filter.academicYearId) ===
+        filter.academicYearId &&
+      (nextFilter.status ?? filter.status) === filter.status &&
+      (nextFilter.submittedFrom ?? filter.submittedFrom) ===
+        filter.submittedFrom &&
+      (nextFilter.submittedTo ?? filter.submittedTo) === filter.submittedTo;
+
     Object.assign(filter, nextFilter);
     page.value = 1;
-    await loadRequests();
+    await loadRequests({ withFeedback: !keywordOnly });
   }
 
   async function resetFilter() {
@@ -93,9 +130,9 @@ export function useHourApprovalManagement(
     try {
       const dto = await service.getRequestDetail(requestId);
       requestDetail.value = hourApprovalMappers.detailFromDto(dto);
-    } catch (e) {
+    } catch (error) {
       // eslint-disable-next-line no-console
-      console.error(e);
+      console.error(error);
       errorDetail.value = "Không tải được chi tiết. Vui lòng thử lại.";
       requestDetail.value = null;
     } finally {
@@ -113,19 +150,45 @@ export function useHourApprovalManagement(
   async function approveRequest(requestId: number, payload?: ApprovePayload) {
     loadingApprove.value = true;
     errorApprove.value = null;
+
     try {
-      await service.approve(
-        requestId,
-        payload ? hourApprovalMappers.approvePayloadToDto(payload) : undefined
+      await runWithFeedback(
+        async () => {
+          await service.approve(
+            requestId,
+            payload ? hourApprovalMappers.approvePayloadToDto(payload) : undefined
+          );
+          await loadRequests({ withFeedback: false });
+          if (selectedRequestId.value === requestId) {
+            await openRequestDetail(requestId);
+          }
+        },
+        {
+          loading: {
+            title: "Đang duyệt yêu cầu",
+            message: "Hệ thống đang cập nhật kết quả xét duyệt...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã duyệt yêu cầu giờ NCKH.",
+          },
+          error: {
+            title: "Duyệt yêu cầu thất bại",
+            message: (error) =>
+              resolveApiErrorMessage(
+                error,
+                "Không thể duyệt yêu cầu. Vui lòng thử lại."
+              ),
+          },
+        }
       );
-      await loadRequests();
-      if (selectedRequestId.value === requestId) {
-        await openRequestDetail(requestId);
-      }
-    } catch (e) {
+    } catch (error) {
       // eslint-disable-next-line no-console
-      console.error(e);
-      errorApprove.value = "Không thể duyệt yêu cầu. Vui lòng thử lại.";
+      console.error(error);
+      errorApprove.value = resolveApiErrorMessage(
+        error,
+        "Không thể duyệt yêu cầu. Vui lòng thử lại."
+      );
     } finally {
       loadingApprove.value = false;
     }
@@ -134,19 +197,45 @@ export function useHourApprovalManagement(
   async function rejectRequest(requestId: number, payload: RejectPayload) {
     loadingReject.value = true;
     errorReject.value = null;
+
     try {
-      await service.reject(
-        requestId,
-        hourApprovalMappers.rejectPayloadToDto(payload)
+      await runWithFeedback(
+        async () => {
+          await service.reject(
+            requestId,
+            hourApprovalMappers.rejectPayloadToDto(payload)
+          );
+          await loadRequests({ withFeedback: false });
+          if (selectedRequestId.value === requestId) {
+            await openRequestDetail(requestId);
+          }
+        },
+        {
+          loading: {
+            title: "Đang xử lý từ chối",
+            message: "Hệ thống đang cập nhật kết quả xét duyệt...",
+          },
+          success: {
+            title: "Thành công",
+            message: "Đã từ chối yêu cầu giờ NCKH.",
+          },
+          error: {
+            title: "Từ chối yêu cầu thất bại",
+            message: (error) =>
+              resolveApiErrorMessage(
+                error,
+                "Không thể từ chối yêu cầu. Vui lòng thử lại."
+              ),
+          },
+        }
       );
-      await loadRequests();
-      if (selectedRequestId.value === requestId) {
-        await openRequestDetail(requestId);
-      }
-    } catch (e) {
+    } catch (error) {
       // eslint-disable-next-line no-console
-      console.error(e);
-      errorReject.value = "Không thể từ chối yêu cầu. Vui lòng thử lại.";
+      console.error(error);
+      errorReject.value = resolveApiErrorMessage(
+        error,
+        "Không thể từ chối yêu cầu. Vui lòng thử lại."
+      );
     } finally {
       loadingReject.value = false;
     }

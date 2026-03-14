@@ -1,0 +1,11 @@
+[GET] http://localhost:8000/api/auth/me => [200] OK
+[GET] http://localhost:8000/api/faculty/notifications?page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts/lookups => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts?page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts?keyword=GV-003&page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts?page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts?status=inactive&page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts?page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts?page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts?role_keys%5B%5D=DEPARTMENT_BOARD&page=1&per_page=12 => [200] OK
+[GET] http://localhost:8000/api/faculty/users/lecturer-accounts?role_keys%5B%5D=DEPARTMENT_BOARD&status=active&page=1&per_page=12 => [200] OK

@@ -85,6 +85,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { AlertTriangle, Info } from "lucide-vue-next";
+import {
+  focusModalElement,
+  restoreModalFocus,
+} from "@/shared/utils/modalFocus";
 
 type ConfirmModalVariant = "danger" | "warning" | "primary" | "info";
 
@@ -180,14 +184,14 @@ function trapFocus(event: KeyboardEvent) {
   if (event.shiftKey) {
     if (active === first || !panelRef.value?.contains(active)) {
       event.preventDefault();
-      last.focus();
+      focusModalElement(last, { preventScroll: true });
     }
     return;
   }
 
   if (active === last || !panelRef.value?.contains(active)) {
     event.preventDefault();
-    first.focus();
+    focusModalElement(first, { preventScroll: true });
   }
 }
 
@@ -214,16 +218,16 @@ watch(
       await nextTick();
 
       if (props.variant === "danger" || props.variant === "warning") {
-        cancelButtonRef.value?.focus();
+        focusModalElement(cancelButtonRef.value, { preventScroll: true });
       } else {
-        confirmButtonRef.value?.focus();
+        focusModalElement(confirmButtonRef.value, { preventScroll: true });
       }
 
       return;
     }
 
     window.removeEventListener("keydown", onWindowKeydown);
-    previousFocusedElement?.focus?.();
+    restoreModalFocus(previousFocusedElement, { preventScroll: true });
     previousFocusedElement = null;
   }
 );

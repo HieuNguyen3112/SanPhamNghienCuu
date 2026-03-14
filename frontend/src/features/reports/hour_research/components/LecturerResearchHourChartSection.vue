@@ -45,10 +45,10 @@
 </template>
 
 <script setup lang="ts">
-import { Chart } from "chart.js/auto";
-import type { ChartOptions } from "chart.js";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, ref } from "vue";
+import type { ChartConfiguration, ChartOptions } from "chart.js";
 import type { HourResearchReportCharts } from "../hourResearchReportTypes";
+import { useChartJs } from "@/features/reports/research/useChartJs";
 
 const componentProperties = defineProps<{
   charts: HourResearchReportCharts;
@@ -60,102 +60,49 @@ const lecturerDistributionDoughnutChartCanvasElement =
   ref<HTMLCanvasElement | null>(null);
 const researchHoursByAcademicYearBarChartCanvasElement =
   ref<HTMLCanvasElement | null>(null);
-const lecturerStandardPieChartCanvasElement = ref<HTMLCanvasElement | null>(
-  null
-);
+const lecturerStandardPieChartCanvasElement = ref<HTMLCanvasElement | null>(null);
 
-const researchHoursByFacultyBarChartInstance = ref<Chart | null>(null);
-const lecturerDistributionDoughnutChartInstance = ref<Chart | null>(null);
-const researchHoursByAcademicYearBarChartInstance = ref<Chart | null>(null);
-const lecturerStandardPieChartInstance = ref<Chart | null>(null);
-
-function destroyAllChartInstances(): void {
-  researchHoursByFacultyBarChartInstance.value?.destroy();
-  lecturerDistributionDoughnutChartInstance.value?.destroy();
-  researchHoursByAcademicYearBarChartInstance.value?.destroy();
-  lecturerStandardPieChartInstance.value?.destroy();
-
-  researchHoursByFacultyBarChartInstance.value = null;
-  lecturerDistributionDoughnutChartInstance.value = null;
-  researchHoursByAcademicYearBarChartInstance.value = null;
-  lecturerStandardPieChartInstance.value = null;
-}
-
-const researchHoursByFacultyChartConfiguration = computed(() => ({
-  labels: componentProperties.charts.hoursByFaculty.labels,
-  datasets: [
-    {
-      label: "Tổng giờ NCKH",
-      backgroundColor: "rgba(30, 41, 59, 0.85)",
-      borderColor: "rgba(30, 41, 59, 1)",
-      borderWidth: 1,
-      data: componentProperties.charts.hoursByFaculty.values,
-    },
-  ],
-}));
-
-const researchHoursByAcademicYearChartConfiguration = computed(() => ({
-  labels: componentProperties.charts.hoursByYear.labels,
-  datasets: [
-    {
-      label: "Tổng giờ NCKH",
-      backgroundColor: "rgba(51, 65, 85, 0.85)",
-      borderColor: "rgba(51, 65, 85, 1)",
-      borderWidth: 1,
-      data: componentProperties.charts.hoursByYear.values,
-    },
-  ],
-}));
-
-const lecturerStandardDistributionChartConfiguration = computed(() => ({
-  labels: componentProperties.charts.statusDistribution.labels,
-  datasets: [
-    {
-      label: "Số giảng viên",
-      backgroundColor: [
-        "rgba(16, 185, 129, 0.25)",
-        "rgba(244, 63, 94, 0.22)",
-      ],
-      borderColor: ["rgba(16, 185, 129, 0.9)", "rgba(244, 63, 94, 0.9)"],
-      borderWidth: 1,
-      data: componentProperties.charts.statusDistribution.values,
-    },
-  ],
-}));
-
-const researchHourBarChartDisplayOptions: ChartOptions<"bar"> = {
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: false,
-  plugins: {
-    legend: {
-      position: "bottom",
-      labels: {
-        boxWidth: 12,
-        boxHeight: 12,
-        usePointStyle: true,
-      },
-    },
-    tooltip: { enabled: true },
-  },
-  scales: {
-    x: {
-      grid: { color: "rgba(148, 163, 184, 0.25)" },
-      ticks: { color: "rgba(15, 23, 42, 0.85)" },
-    },
-    y: {
-      beginAtZero: true,
-      grid: { color: "rgba(148, 163, 184, 0.25)" },
-      ticks: { color: "rgba(15, 23, 42, 0.85)" },
-    },
-  },
+const chartAnimationOptions = {
+  duration: 650,
+  easing: "easeOutQuart" as const,
 };
 
-const lecturerDistributionDoughnutChartDisplayOptions: ChartOptions<"doughnut"> =
-  {
+function createBarOptions(): ChartOptions<"bar"> {
+  return {
     responsive: true,
     maintainAspectRatio: false,
-    animation: false,
+    animation: chartAnimationOptions,
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: {
+          boxWidth: 12,
+          boxHeight: 12,
+          usePointStyle: true,
+        },
+      },
+      tooltip: { enabled: true },
+    },
+    scales: {
+      x: {
+        grid: { color: "rgba(148, 163, 184, 0.25)" },
+        ticks: { color: "rgba(15, 23, 42, 0.85)" },
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: "rgba(148, 163, 184, 0.25)" },
+        ticks: { color: "rgba(15, 23, 42, 0.85)" },
+      },
+    },
+  };
+}
+
+function createDoughnutOptions(): ChartOptions<"doughnut"> {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: chartAnimationOptions,
+    cutout: "62%",
     plugins: {
       legend: {
         position: "bottom",
@@ -168,85 +115,125 @@ const lecturerDistributionDoughnutChartDisplayOptions: ChartOptions<"doughnut"> 
       tooltip: { enabled: true },
     },
   };
-
-const lecturerStandardPieChartDisplayOptions: ChartOptions<"pie"> = {
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: false,
-  plugins: {
-    legend: {
-      position: "bottom",
-      labels: {
-        boxWidth: 12,
-        boxHeight: 12,
-        usePointStyle: true,
-      },
-    },
-    tooltip: { enabled: true },
-  },
-};
-
-function renderAllCharts(): void {
-  destroyAllChartInstances();
-
-  if (researchHoursByFacultyBarChartCanvasElement.value) {
-    researchHoursByFacultyBarChartInstance.value = new Chart(
-      researchHoursByFacultyBarChartCanvasElement.value,
-      {
-        type: "bar",
-        data: researchHoursByFacultyChartConfiguration.value,
-        options: researchHourBarChartDisplayOptions,
-      }
-    );
-  }
-
-  if (lecturerDistributionDoughnutChartCanvasElement.value) {
-    lecturerDistributionDoughnutChartInstance.value = new Chart(
-      lecturerDistributionDoughnutChartCanvasElement.value,
-      {
-        type: "doughnut",
-        data: lecturerStandardDistributionChartConfiguration.value,
-        options: lecturerDistributionDoughnutChartDisplayOptions,
-      }
-    );
-  }
-
-  if (researchHoursByAcademicYearBarChartCanvasElement.value) {
-    researchHoursByAcademicYearBarChartInstance.value = new Chart(
-      researchHoursByAcademicYearBarChartCanvasElement.value,
-      {
-        type: "bar",
-        data: researchHoursByAcademicYearChartConfiguration.value,
-        options: researchHourBarChartDisplayOptions,
-      }
-    );
-  }
-
-  if (lecturerStandardPieChartCanvasElement.value) {
-    lecturerStandardPieChartInstance.value = new Chart(
-      lecturerStandardPieChartCanvasElement.value,
-      {
-        type: "pie",
-        data: lecturerStandardDistributionChartConfiguration.value,
-        options: lecturerStandardPieChartDisplayOptions,
-      }
-    );
-  }
 }
 
-onMounted(() => {
-  renderAllCharts();
-});
+function createPieOptions(): ChartOptions<"pie"> {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: chartAnimationOptions,
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: {
+          boxWidth: 12,
+          boxHeight: 12,
+          usePointStyle: true,
+        },
+      },
+      tooltip: { enabled: true },
+    },
+  };
+}
 
-watch(
-  () => componentProperties.charts,
-  () => {
-    renderAllCharts();
+const statusDatasetPalette = {
+  backgroundColor: [
+    "rgba(16, 185, 129, 0.25)",
+    "rgba(244, 63, 94, 0.22)",
+  ],
+  borderColor: ["rgba(16, 185, 129, 0.9)", "rgba(244, 63, 94, 0.9)"],
+};
+
+const researchHoursByFacultyChartConfiguration = computed<
+  ChartConfiguration<"bar">
+>(() => ({
+  type: "bar",
+  data: {
+    labels: componentProperties.charts.hoursByFaculty.labels,
+    datasets: [
+      {
+        label: "Tổng giờ NCKH",
+        backgroundColor: "rgba(30, 41, 59, 0.85)",
+        borderColor: "rgba(30, 41, 59, 1)",
+        borderWidth: 1,
+        data: componentProperties.charts.hoursByFaculty.values,
+      },
+    ],
   },
-  { deep: true }
+  options: createBarOptions(),
+}));
+
+const lecturerDistributionDoughnutChartConfiguration = computed<
+  ChartConfiguration<"doughnut">
+>(() => ({
+  type: "doughnut",
+  data: {
+    labels: componentProperties.charts.statusDistribution.labels,
+    datasets: [
+      {
+        label: "Số giảng viên",
+        backgroundColor: statusDatasetPalette.backgroundColor,
+        borderColor: statusDatasetPalette.borderColor,
+        borderWidth: 1,
+        data: componentProperties.charts.statusDistribution.values,
+      },
+    ],
+  },
+  options: createDoughnutOptions(),
+}));
+
+const researchHoursByAcademicYearChartConfiguration = computed<
+  ChartConfiguration<"bar">
+>(() => ({
+  type: "bar",
+  data: {
+    labels: componentProperties.charts.hoursByYear.labels,
+    datasets: [
+      {
+        label: "Tổng giờ NCKH",
+        backgroundColor: "rgba(51, 65, 85, 0.85)",
+        borderColor: "rgba(51, 65, 85, 1)",
+        borderWidth: 1,
+        data: componentProperties.charts.hoursByYear.values,
+      },
+    ],
+  },
+  options: createBarOptions(),
+}));
+
+const lecturerStandardPieChartConfiguration = computed<ChartConfiguration<"pie">>(
+  () => ({
+    type: "pie",
+    data: {
+      labels: componentProperties.charts.statusDistribution.labels,
+      datasets: [
+        {
+          label: "Số giảng viên",
+          backgroundColor: statusDatasetPalette.backgroundColor,
+          borderColor: statusDatasetPalette.borderColor,
+          borderWidth: 1,
+          data: componentProperties.charts.statusDistribution.values,
+        },
+      ],
+    },
+    options: createPieOptions(),
+  }),
 );
 
-onBeforeUnmount(() => {
-  destroyAllChartInstances();
-});
+useChartJs(
+  researchHoursByFacultyBarChartCanvasElement,
+  () => researchHoursByFacultyChartConfiguration.value,
+);
+useChartJs(
+  lecturerDistributionDoughnutChartCanvasElement,
+  () => lecturerDistributionDoughnutChartConfiguration.value,
+);
+useChartJs(
+  researchHoursByAcademicYearBarChartCanvasElement,
+  () => researchHoursByAcademicYearChartConfiguration.value,
+);
+useChartJs(
+  lecturerStandardPieChartCanvasElement,
+  () => lecturerStandardPieChartConfiguration.value,
+);
 </script>

@@ -11,8 +11,10 @@ import {
   type AcademicYearOption,
   type HoursOverviewFilter,
 } from "../services/HoursOverviewService";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 export function useLecturerHoursOverview() {
+  const { runPageLoad } = usePageLoadFeedback();
   const overview = ref<HoursOverview | null>(null);
   const distribution = ref<HoursDistributionItem[]>([]);
   const batches = ref<HoursApprovalBatchSummary[]>([]);
@@ -144,13 +146,37 @@ export function useLecturerHoursOverview() {
     }
   }
 
-  async function reloadAll(): Promise<void> {
+  async function reloadAllInternal(): Promise<void> {
     await Promise.all([loadOverview(), loadDistribution(), loadBatches()]);
   }
 
+  async function reloadAll(options?: { withFeedback?: boolean }): Promise<void> {
+    if (options?.withFeedback === false) {
+      await reloadAllInternal();
+      return;
+    }
+
+    await runPageLoad(reloadAllInternal, {
+      loading: {
+        title: "Đang tải giờ NCKH cá nhân",
+        message: "Hệ thống đang cập nhật tổng quan và lịch sử xét duyệt...",
+      },
+    });
+  }
+
   async function initialize(): Promise<void> {
-    await loadAcademicYears();
-    await reloadAll();
+    await runPageLoad(
+      async () => {
+        await loadAcademicYears();
+        await reloadAllInternal();
+      },
+      {
+        loading: {
+          title: "Đang khởi tạo giờ NCKH cá nhân",
+          message: "Hệ thống đang chuẩn bị dữ liệu tổng quan giờ NCKH...",
+        },
+      }
+    );
   }
 
   async function changeScope(value: string): Promise<void> {

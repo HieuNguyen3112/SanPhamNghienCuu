@@ -5,7 +5,7 @@ namespace App\Services\Backup;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
@@ -16,18 +16,29 @@ class ResticBackupManager
     private const DB_DUMP_RELATIVE_PATH = 'db/mysql.sql';
     private const MANIFEST_FILENAME = 'manifest.json';
 
-    private const EXPORT_METADATA_FILENAME = 'thong-tin-sao-luu.json';
-    private const EXPORT_SUMMARY_FILENAME = 'bao-cao-tom-tat.json';
-    private const EXPORT_DB_DUMP_FILENAME = 'co-so-du-lieu.sql.gz';
-    private const EXPORT_FILES_ARCHIVE_FILENAME = 'minh-chung.zip';
+    private const EXPORT_README_FILENAME = 'README.txt';
+    private const EXPORT_OVERVIEW_FILENAME = 'tong-quan.json';
+    private const EXPORT_DATABASE_DIR = 'database';
+    private const EXPORT_DB_DUMP_FILENAME = 'du-lieu.sql.gz';
+    private const EXPORT_SYSTEM_DIR = '_he-thong';
+    private const EXPORT_STAGING_DIR = '_dang-xu-ly';
     private const EXPORT_MANIFEST_FILENAME = 'danh-sach-tep.json';
-    private const EXPORT_INTERNAL_DIR = '__internal';
     private const EXPORT_BUNDLE_FILENAME = 'goi-sao-luu.zip';
+    private const EXPORT_WORKS_DIR = 'cong-trinh';
+    private const EXPORT_LECTURERS_DIR = 'giang-vien';
+    private const EXPORT_EVIDENCE_DIR = 'minh-chung';
+    private const EXPORT_WORK_INFO_FILENAME = 'thong-tin-cong-trinh.json';
+    private const EXPORT_WORK_INFO_PDF_FILENAME = 'thong-tin-cong-trinh.pdf';
+    private const EXPORT_LECTURER_SUMMARY_FILENAME = 'tong-hop.json';
+    private const EXPORT_LECTURER_SUMMARY_PDF_FILENAME = 'tong-hop-giang-vien.pdf';
 
-    private const LEGACY_EXPORT_METADATA_FILENAME = 'metadata.json';
-    private const LEGACY_EXPORT_SUMMARY_FILENAME = 'summary_report.json';
-    private const LEGACY_EXPORT_DB_DUMP_FILENAME = 'database.sql.gz';
-    private const LEGACY_EXPORT_FILES_ARCHIVE_FILENAME = 'evidence_files.zip';
+    private const LEGACY_EXPORT_METADATA_FILENAME = 'thong-tin-sao-luu.json';
+    private const LEGACY_EXPORT_SUMMARY_FILENAME = 'bao-cao-tom-tat.json';
+    private const LEGACY_EXPORT_DB_DUMP_FILENAME = 'co-so-du-lieu.sql.gz';
+    private const LEGACY_EXPORT_FILES_ARCHIVE_FILENAME = 'minh-chung.zip';
+    private const LEGACY_EXPORT_INTERNAL_DIR = '__internal';
+    private const LEGACY_EXPORT_READABLE_ROOT_DIR = 'readable_exports';
+    private const LEGACY_EXPORT_READABLE_INDEX_FILENAME = 'index.json';
 
     private ?array $exportIndexCache = null;
 
@@ -149,46 +160,8 @@ class ResticBackupManager
             $summary = $this->extractBackupSummary($backupResult['stdout']);
             $snapshot = $this->findLatestSnapshotForRunId($runId);
             $snapshotId = trim((string) (($snapshot['snapshot_id'] ?? $snapshot['snapshot_id_full'] ?? '')));
-
-            $checkResult = null;
-            if ((bool) config('backup.restic.check_after_backup', true)) {
-                $checkResult = $this->runRestic([
-                    'check',
-                    '--read-data-subset',
-                    '1/20',
-                ], false, 1800);
-            }
-
-            $export = null;
-            if ((bool) config('backup.exports.enabled', true)) {
-                if ($snapshotId === '') {
-                    $export = [
-                        'available' => false,
-                        'error' => 'Không xác định được snapshot ID để tạo export dễ đọc.',
-                    ];
-                } else {
-                    try {
-                        $export = $this->createReadableExport(
-                            $snapshotId,
-                            $runId,
-                            $trigger,
-                            $workspaceAbsolute,
-                            $dbDumpAbsolute,
-                            $manifestAbsolute,
-                            $includePaths,
-                            $excludePaths,
-                            $includedPathStats,
-                            $initiatedBy,
-                            $summary
-                        );
-                    } catch (\Throwable $exception) {
-                        $export = [
-                            'available' => false,
-                            'snapshot_id' => $snapshotId,
-                            'error' => $exception->getMessage(),
-                        ];
-                    }
-                }
+            if ($snapshotId === '') {
+                throw new BackupRuntimeException('Không xác định được snapshot ID sau khi restic backup hoàn tất.');
             }
 
             return [
@@ -199,16 +172,22 @@ class ResticBackupManager
                 'workspace_relative_path' => $workspaceRelative,
                 'verification' => [
                     'contains_db_dump' => true,
-                    'contains_files' => $includedPathStats['file_count'] > 0,
+                    'contains_files' => $includedPathStats['has_included_content'],
                     'db_dump_size_bytes' => $dbDumpSize,
                     'included_file_count' => $includedPathStats['file_count'],
                     'included_directory_count' => $includedPathStats['directory_count'],
+                    'included_path_count' => $includedPathStats['path_count'],
+                    'stats_are_estimated' => true,
                 ],
                 'check' => [
-                    'ok' => $checkResult ? $checkResult['successful'] : true,
-                    'stderr' => $checkResult ? trim((string) $checkResult['stderr']) : null,
+                    'scheduled' => (bool) config('backup.verification.enabled', true),
+                    'deferred' => true,
                 ],
-                'export' => $export,
+                'export' => [
+                    'available' => false,
+                    'status' => (bool) config('backup.exports.enabled', true) ? 'queued' : 'disabled',
+                    'snapshot_id' => $snapshotId,
+                ],
             ];
         } finally {
             // Không giữ DB dump tạm tại local sau khi đã snapshot thành công/thất bại.
@@ -216,6 +195,87 @@ class ResticBackupManager
                 File::deleteDirectory($workspaceAbsolute);
             }
         }
+    }
+
+    public function generateReadableExportForSnapshot(
+        string $snapshotId,
+        string $runId,
+        string $trigger = 'manual',
+        ?int $initiatedBy = null
+    ): array {
+        $this->assertConfigured();
+        $this->ensureRepositoryReady();
+        $this->assertValidSnapshotId($snapshotId);
+
+        $snapshot = $this->findSnapshotById($snapshotId);
+        if (! $snapshot) {
+            throw new BackupRuntimeException('Không tìm thấy snapshot để tạo export dễ đọc.');
+        }
+
+        $manifest = $this->extractManifestFromSnapshot($snapshotId);
+        $dbDump = $this->extractDatabaseDumpFromSnapshot($snapshotId);
+
+        try {
+            $generatedAt = null;
+            $createdAt = trim((string) ($snapshot['created_at'] ?? ''));
+            if ($createdAt !== '') {
+                try {
+                    $generatedAt = Carbon::parse($createdAt);
+                } catch (\Throwable) {
+                    $generatedAt = null;
+                }
+            }
+
+            return $this->createReadableExport(
+                $snapshotId,
+                $runId,
+                $trigger,
+                (string) $dbDump['absolute_path'],
+                (string) $manifest['absolute_path'],
+                $initiatedBy,
+                $generatedAt
+            );
+        } finally {
+            $manifestRoot = trim((string) ($manifest['relative_root'] ?? ''), "/\\");
+            if ($manifestRoot !== '') {
+                $manifestAbsoluteRoot = $this->basePathFromRelative($manifestRoot);
+                if (File::exists($manifestAbsoluteRoot)) {
+                    File::deleteDirectory($manifestAbsoluteRoot);
+                }
+            }
+
+            $dbDumpRoot = trim((string) ($dbDump['relative_root'] ?? ''), "/\\");
+            if ($dbDumpRoot !== '' && $dbDumpRoot !== $manifestRoot) {
+                $dbDumpAbsoluteRoot = $this->basePathFromRelative($dbDumpRoot);
+                if (File::exists($dbDumpAbsoluteRoot)) {
+                    File::deleteDirectory($dbDumpAbsoluteRoot);
+                }
+            }
+        }
+    }
+
+    public function runRepositoryCheck(): array
+    {
+        $this->assertConfigured();
+        $this->ensureRepositoryReady();
+
+        $subset = trim((string) config('backup.verification.read_data_subset', '1/20'));
+        if ($subset === '') {
+            $subset = '1/20';
+        }
+
+        $result = $this->runRestic([
+            'check',
+            '--read-data-subset',
+            $subset,
+        ], false, 1800);
+
+        return [
+            'ok' => (bool) $result['successful'],
+            'stdout' => trim((string) $result['stdout']),
+            'stderr' => trim((string) $result['stderr']),
+            'read_data_subset' => $subset,
+        ];
     }
 
     public function pruneBackups(): array
@@ -382,7 +442,7 @@ class ResticBackupManager
             'repository_type' => $destination['repository_type'],
             'export_root' => $destination['display_root'],
             'export_folder_name' => (string) config('backup.exports.folder_name', 'exports'),
-            'note' => 'Thư mục restic-repo chứa dữ liệu kỹ thuật (dedupe + mã hóa). Tệp dễ đọc nằm ở exports/<dd-mm-yyyy_HH-mm-ss_Sao-luu>.',
+            'note' => "Th\u{01B0} m\u{1EE5}c restic-repo gi\u{1EEF} l\u{1EDB}p sao l\u{01B0}u k\u{1EF9} thu\u{1EAD}t. L\u{1EDB}p exports ch\u{1EC9} ch\u{1EE9}a README.txt, tong-quan.json, database/, cong-trinh/, giang-vien/ v\u{00E0} _he-thong/.",
         ];
     }
 
@@ -412,21 +472,17 @@ class ResticBackupManager
 
         $export = $this->resolveExportMetadata($snapshotId);
         $artifacts = array_values((array) ($export['artifacts'] ?? []));
-        $visibleArtifacts = array_values(array_filter($artifacts, static function ($name): bool {
-            $normalized = str_replace('\\', '/', trim((string) $name));
-            return $normalized !== '' && ! str_starts_with($normalized, self::EXPORT_INTERNAL_DIR . '/');
-        }));
-        $technicalArtifacts = array_values(array_filter($artifacts, static function ($name): bool {
-            $normalized = str_replace('\\', '/', trim((string) $name));
-            return $normalized !== '' && str_starts_with($normalized, self::EXPORT_INTERNAL_DIR . '/');
-        }));
+        $visibleArtifacts = array_values(array_filter($artifacts, fn ($name): bool => ! $this->isSystemArtifactPath((string) $name)));
+        $technicalArtifacts = array_values(array_filter($artifacts, fn ($name): bool => $this->isSystemArtifactPath((string) $name)));
 
-        $filesArchivedCount = (int) ($export['stats']['files_archived_count'] ?? 0);
-        $hasEvidenceArchive = $this->artifactExists($artifacts, [
-            self::EXPORT_FILES_ARCHIVE_FILENAME,
-            self::LEGACY_EXPORT_FILES_ARCHIVE_FILENAME,
-        ]);
-        $containsEvidenceFiles = (bool) ($snapshot['contains_files'] ?? false) || $filesArchivedCount > 0 || $hasEvidenceArchive;
+        $readableStats = is_array($export['stats']['readable_exports'] ?? null)
+            ? $export['stats']['readable_exports']
+            : [];
+        $totalEvidenceFiles = (int) ($readableStats['total_evidence_files'] ?? 0);
+        $hasLegacyEvidenceArchive = $this->artifactExists($artifacts, [self::LEGACY_EXPORT_FILES_ARCHIVE_FILENAME]);
+        $containsEvidenceFiles = (bool) ($snapshot['contains_files'] ?? false)
+            || $totalEvidenceFiles > 0
+            || $hasLegacyEvidenceArchive;
 
         return [
             'snapshot' => $snapshot,
@@ -434,11 +490,11 @@ class ResticBackupManager
                 'database_dump' => (bool) ($snapshot['contains_db_dump'] ?? false),
                 'evidence_files' => $containsEvidenceFiles,
                 'summary' => $this->artifactExists($artifacts, [
-                    self::EXPORT_SUMMARY_FILENAME,
+                    self::EXPORT_OVERVIEW_FILENAME,
                     self::LEGACY_EXPORT_SUMMARY_FILENAME,
                 ]),
                 'metadata' => $this->artifactExists($artifacts, [
-                    self::EXPORT_METADATA_FILENAME,
+                    self::EXPORT_OVERVIEW_FILENAME,
                     self::LEGACY_EXPORT_METADATA_FILENAME,
                 ]),
             ],
@@ -465,18 +521,42 @@ class ResticBackupManager
     {
         $metadata = $this->getSnapshotExportMetadata($snapshotId);
         $relativePath = trim((string) ($metadata['local_bundle_relative_path'] ?? ''));
-        if ($relativePath === '') {
-            throw new BackupRuntimeException('Không tìm thấy đường dẫn gói export.');
+        if ($relativePath !== '') {
+            $absolutePath = $this->basePathFromRelative($relativePath);
+            if (File::exists($absolutePath)) {
+                return [
+                    'absolute_path' => $absolutePath,
+                    'filename' => (string) ($metadata['bundle_filename'] ?? self::EXPORT_BUNDLE_FILENAME),
+                    'metadata' => $metadata,
+                ];
+            }
         }
 
-        $absolutePath = $this->basePathFromRelative($relativePath);
-        if (! File::exists($absolutePath)) {
-            throw new BackupRuntimeException('Không tìm thấy tệp export trên máy chủ.');
+        $localRootRelative = trim((string) ($metadata['local_root_relative_path'] ?? ''));
+        if ($localRootRelative === '') {
+            throw new BackupRuntimeException('Không tìm thấy thư mục export để đóng gói tải xuống.');
         }
+
+        $localRootAbsolute = $this->basePathFromRelative($localRootRelative);
+        if (! File::isDirectory($localRootAbsolute)) {
+            throw new BackupRuntimeException('Không tìm thấy thư mục export trên máy chủ.');
+        }
+
+        $token = 'export_' . Str::uuid();
+        $downloadRelativeRoot = $this->downloadRelativePath($token);
+        $downloadAbsoluteRoot = $this->basePathFromRelative($downloadRelativeRoot);
+        if (File::exists($downloadAbsoluteRoot)) {
+            File::deleteDirectory($downloadAbsoluteRoot);
+        }
+        File::ensureDirectoryExists($downloadAbsoluteRoot);
+
+        $filename = (string) ($metadata['bundle_filename'] ?? ('backup_export_' . $snapshotId . '.zip'));
+        $absolutePath = $downloadAbsoluteRoot . DIRECTORY_SEPARATOR . $filename;
+        $this->buildExportBundle($localRootAbsolute, $absolutePath);
 
         return [
             'absolute_path' => $absolutePath,
-            'filename' => (string) ($metadata['bundle_filename'] ?? self::EXPORT_BUNDLE_FILENAME),
+            'filename' => $filename,
             'metadata' => $metadata,
         ];
     }
@@ -501,7 +581,7 @@ class ResticBackupManager
             throw new BackupRuntimeException('Danh sách snapshot cần xóa không hợp lệ.');
         }
 
-        $args = ['forget', '--tag', 'spnc_backup'];
+        $args = ['forget'];
         foreach ($normalized as $snapshotId) {
             $args[] = $snapshotId;
         }
@@ -881,6 +961,17 @@ class ResticBackupManager
 
         return false;
     }
+
+    private function isSystemArtifactPath(string $path): bool
+    {
+        $normalized = str_replace('\\', '/', trim($path));
+        if ($normalized === '') {
+            return false;
+        }
+
+        return str_starts_with($normalized, self::EXPORT_SYSTEM_DIR . '/')
+            || str_starts_with($normalized, self::LEGACY_EXPORT_INTERNAL_DIR . '/');
+    }
     private function applyVerificationFromRunState(array $payload, ?array $state): array
     {
         $verification = is_array($state['result']['verification'] ?? null)
@@ -1020,6 +1111,7 @@ class ResticBackupManager
     {
         $fileCount = 0;
         $directoryCount = 0;
+        $pathCount = 0;
 
         foreach ($includePaths as $relativePath) {
             $absolute = $this->basePathFromRelative((string) $relativePath);
@@ -1027,10 +1119,9 @@ class ResticBackupManager
                 continue;
             }
 
+            $pathCount++;
             if (File::isDirectory($absolute)) {
                 $directoryCount++;
-                $files = File::allFiles($absolute);
-                $fileCount += count($files);
                 continue;
             }
 
@@ -1040,6 +1131,8 @@ class ResticBackupManager
         return [
             'file_count' => $fileCount,
             'directory_count' => $directoryCount,
+            'path_count' => $pathCount,
+            'has_included_content' => $pathCount > 0,
         ];
     }
 
@@ -1114,17 +1207,13 @@ class ResticBackupManager
         string $snapshotId,
         string $runId,
         string $trigger,
-        string $workspaceAbsolute,
         string $dbDumpAbsolute,
         string $manifestAbsolute,
-        array $includePaths,
-        array $excludePaths,
-        array $includedPathStats,
         ?int $initiatedBy,
-        ?array $backupSummary
+        ?\DateTimeInterface $generatedAt = null
     ): array {
         $destination = $this->deriveExportDestination((string) config('backup.restic.repository', ''));
-        $generatedAt = now();
+        $generatedAt ??= now();
         $folderName = $this->buildFriendlyExportFolderName($generatedAt, $snapshotId);
 
         $localRootRelative = $this->exportRelativePath($snapshotId);
@@ -1135,10 +1224,13 @@ class ResticBackupManager
         }
         File::ensureDirectoryExists($localRootAbsolute);
 
-        $dbDumpExportAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_DB_DUMP_FILENAME;
+        $databaseRelativePath = self::EXPORT_DATABASE_DIR . '/' . self::EXPORT_DB_DUMP_FILENAME;
+        $dbDumpExportAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $databaseRelativePath);
+        File::ensureDirectoryExists(dirname($dbDumpExportAbsolute));
         $this->gzipFile($dbDumpAbsolute, $dbDumpExportAbsolute);
 
-        $manifestRelativePath = self::EXPORT_INTERNAL_DIR . '/' . self::EXPORT_MANIFEST_FILENAME;
+        $manifestRelativePath = self::EXPORT_SYSTEM_DIR . '/' . self::EXPORT_MANIFEST_FILENAME;
         $manifestExportAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR
             . str_replace('/', DIRECTORY_SEPARATOR, $manifestRelativePath);
         File::ensureDirectoryExists(dirname($manifestExportAbsolute));
@@ -1148,28 +1240,44 @@ class ResticBackupManager
             File::put($manifestExportAbsolute, "{}\n");
         }
 
-        $filesArchiveAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_FILES_ARCHIVE_FILENAME;
-        $filesArchiveStats = $this->buildFilesArchive($filesArchiveAbsolute, $includePaths);
+        $readableExport = $this->buildReadableEvidenceExport($localRootAbsolute);
+        $readmeRelativePath = self::EXPORT_README_FILENAME;
+        $readmeAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_README_FILENAME;
+        $this->writeTextFile($readmeAbsolute, $this->buildExportReadme($snapshotId, $folderName, $generatedAt, $readableExport));
 
-        $summaryPayload = $this->buildSummaryReportData();
-        $summaryPayload['backup_context'] = [
+        $overviewRelativePath = self::EXPORT_OVERVIEW_FILENAME;
+        $overviewAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_OVERVIEW_FILENAME;
+        $overviewPayload = [
             'snapshot_id' => $snapshotId,
             'run_id' => $runId,
+            'created_at' => $generatedAt->toIso8601String(),
+            'backup_type' => 'full',
             'trigger' => $trigger,
-            'workspace_absolute' => $workspaceAbsolute,
-            'included_paths' => array_values($includePaths),
-            'excluded_paths' => array_values($excludePaths),
-            'verification' => [
-                'included_file_count' => (int) ($includedPathStats['file_count'] ?? 0),
-                'included_directory_count' => (int) ($includedPathStats['directory_count'] ?? 0),
+            'generated_by_user_id' => $initiatedBy,
+            'folder_name' => $folderName,
+            'database' => [
+                'path' => $databaseRelativePath,
+                'gzip_size_bytes' => $this->resolveFileSize($dbDumpExportAbsolute),
             ],
-            'restic_summary' => $backupSummary,
+            'totals' => [
+                'cong_trinh' => (int) ($readableExport['stats']['works_count'] ?? 0),
+                'giang_vien' => (int) ($readableExport['stats']['lecturers_count'] ?? 0),
+                'minh_chung' => (int) ($readableExport['stats']['total_evidence_files'] ?? 0),
+                'minh_chung_da_sao_chep' => (int) ($readableExport['stats']['copied_evidence_files'] ?? 0),
+                'minh_chung_chi_co_metadata' => (int) ($readableExport['stats']['metadata_only_evidence_files'] ?? 0),
+            ],
+            'duong_dan' => [
+                'cong_trinh' => self::EXPORT_WORKS_DIR,
+                'giang_vien' => self::EXPORT_LECTURERS_DIR,
+                'he_thong' => self::EXPORT_SYSTEM_DIR,
+            ],
+            'ghi_chu' => [
+                'exports_only' => 'Đây là lớp export dễ đọc để tra cứu nhanh trên Drive.',
+                'official_restore' => 'Khôi phục chính thức vẫn phải thực hiện bằng chức năng Khôi phục của hệ thống.',
+                'live_evidence' => 'Tệp PDF dưới cong-trinh/ chỉ là bản export dễ đọc, không phải nguồn runtime của chức năng xem minh chứng.',
+            ],
         ];
-        $summaryAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_SUMMARY_FILENAME;
-        $this->writeJsonFile($summaryAbsolute, $summaryPayload);
-
-        $bundleFilename = self::EXPORT_BUNDLE_FILENAME;
-        $bundleAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . $bundleFilename;
+        $this->writeJsonFile($overviewAbsolute, $overviewPayload);
 
         $metadata = [
             'snapshot_id' => $snapshotId,
@@ -1178,7 +1286,7 @@ class ResticBackupManager
             'created_at' => $generatedAt->toIso8601String(),
             'generated_by_user_id' => $initiatedBy,
             'folder_name' => $folderName,
-            'description_vi' => 'Bản sao lưu 2 lớp: lớp an toàn (restic) và lớp dễ đọc (exports).',
+            'description_vi' => 'Lớp exports đã được tối giản cho mục đích tra cứu, còn khôi phục chính thức vẫn dựa vào restic-repo.',
             'friendly_messages' => [
                 'safe' => 'Hệ thống đã sao lưu an toàn.',
                 'drive' => 'Bạn có thể mở thư mục Backup trên Google Drive để xem bản sao lưu dễ đọc.',
@@ -1191,53 +1299,61 @@ class ResticBackupManager
                 'target_root' => $destination['display_root'],
             ],
             'artifacts' => [
-                'metadata' => self::EXPORT_METADATA_FILENAME,
-                'database_dump' => self::EXPORT_DB_DUMP_FILENAME,
-                'files_archive' => self::EXPORT_FILES_ARCHIVE_FILENAME,
-                'summary_report' => self::EXPORT_SUMMARY_FILENAME,
-                'bundle' => $bundleFilename,
-                'internal_manifest' => $manifestRelativePath,
+                'readme' => $readmeRelativePath,
+                'overview' => $overviewRelativePath,
+                'database_dump' => $databaseRelativePath,
+                'works_dir' => self::EXPORT_WORKS_DIR . '/',
+                'lecturers_dir' => self::EXPORT_LECTURERS_DIR . '/',
+                'system_manifest' => $manifestRelativePath,
             ],
             'visible_artifacts' => [
-                self::EXPORT_METADATA_FILENAME,
-                self::EXPORT_DB_DUMP_FILENAME,
-                self::EXPORT_FILES_ARCHIVE_FILENAME,
-                self::EXPORT_SUMMARY_FILENAME,
-                $bundleFilename,
+                $readmeRelativePath,
+                $overviewRelativePath,
+                $databaseRelativePath,
+                self::EXPORT_WORKS_DIR . '/',
+                self::EXPORT_LECTURERS_DIR . '/',
             ],
             'technical_artifacts' => [$manifestRelativePath],
             'stats' => [
                 'database_dump_gzip_bytes' => $this->resolveFileSize($dbDumpExportAbsolute),
-                'files_archive_bytes' => $this->resolveFileSize($filesArchiveAbsolute),
-                'files_archived_count' => (int) ($filesArchiveStats['file_count'] ?? 0),
-                'paths_missing_from_archive' => $filesArchiveStats['missing_paths'] ?? [],
+                'readable_exports' => $readableExport['stats'],
+            ],
+            'readable_exports' => [
+                'works_dir' => $readableExport['works_relative_path'],
+                'lecturers_dir' => $readableExport['lecturers_relative_path'],
+                'system_dir' => self::EXPORT_SYSTEM_DIR,
+                'strategy' => [
+                    'live_evidence_storage_is_unchanged' => true,
+                    'works_view_contains_physical_files' => true,
+                    'lecturers_view_uses_summary_references_only' => true,
+                    'presentation_pdfs_enabled' => (bool) config('backup.exports.pdf_enabled', true),
+                    'remote_drive_fetch_is_skipped_during_backup' => true,
+                    'zip_bundles_are_not_synced_to_drive' => true,
+                ],
+            ],
+            'bundle' => [
+                'filename' => self::EXPORT_BUNDLE_FILENAME,
+                'generated_on_demand' => true,
+                'synced_to_drive' => false,
             ],
         ];
-        $metadataAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_METADATA_FILENAME;
-        $this->writeJsonFile($metadataAbsolute, $metadata);
 
-        $this->buildExportBundle($localRootAbsolute, $bundleAbsolute);
-
-        $sync = $this->syncExportToDestination($destination, $localRootAbsolute, $folderName, $bundleFilename);
+        $sync = $this->syncExportToDestination($destination, $localRootAbsolute, $folderName);
         $payload = [
             'available' => true,
             'snapshot_id' => $snapshotId,
             'folder_name' => $folderName,
             'export_path' => (string) ($sync['export_path'] ?? ''),
             'drive_path' => (string) ($sync['drive_path'] ?? ''),
-            'remote_bundle_path' => $sync['remote_bundle_path'] ?? null,
-            'bundle_filename' => $bundleFilename,
+            'remote_bundle_path' => null,
+            'bundle_filename' => self::EXPORT_BUNDLE_FILENAME,
             'local_root_relative_path' => $localRootRelative,
-            'local_bundle_relative_path' => str_replace('\\', '/', $localRootRelative . '/' . $bundleFilename),
+            'local_bundle_relative_path' => null,
             'generated_at' => $generatedAt->toIso8601String(),
-            'artifacts' => [
-                self::EXPORT_METADATA_FILENAME,
-                self::EXPORT_DB_DUMP_FILENAME,
-                self::EXPORT_FILES_ARCHIVE_FILENAME,
-                self::EXPORT_SUMMARY_FILENAME,
-                $manifestRelativePath,
-                $bundleFilename,
-            ],
+            'artifacts' => array_values(array_unique(array_merge(
+                $metadata['visible_artifacts'],
+                $metadata['technical_artifacts']
+            ))),
             'visible_artifacts' => $metadata['visible_artifacts'],
             'technical_artifacts' => $metadata['technical_artifacts'],
             'stats' => $metadata['stats'],
@@ -1248,129 +1364,997 @@ class ResticBackupManager
         return $payload;
     }
 
-    private function buildSummaryReportData(): array
+    private function buildReadableEvidenceExport(string $exportRootAbsolutePath): array
     {
-        $report = [
-            'generated_at' => now()->toIso8601String(),
-            'tables' => [],
-        ];
+        $dataset = $this->buildReadableExportDataset();
+        $pdfRenderer = (bool) config('backup.exports.pdf_enabled', true)
+            ? app(ReadableExportPdfRenderer::class)
+            : null;
+        $worksRootRelative = self::EXPORT_WORKS_DIR;
+        $lecturersRootRelative = self::EXPORT_LECTURERS_DIR;
+        File::ensureDirectoryExists($exportRootAbsolutePath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $worksRootRelative));
+        File::ensureDirectoryExists($exportRootAbsolutePath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $lecturersRootRelative));
 
-        $report['tables']['research_activities'] = $this->buildTableSummary(
-            'research_activities',
-            ['id', 'academic_year_id', 'owner_lecturer_id', 'created_at']
-        );
-        $report['tables']['research_activity_members'] = $this->buildTableSummary(
-            'research_activity_members',
-            ['id', 'activity_id', 'lecturer_id', 'role', 'created_at']
-        );
-        $report['tables']['evidence_files'] = $this->buildTableSummary(
-            'evidence_files',
-            ['id', 'activity_id', 'disk', 'path', 'original_name', 'size_bytes', 'uploaded_at', 'created_at']
-        );
-        $report['tables']['lecturer_yearly_hours'] = $this->buildTableSummary(
-            'lecturer_yearly_hours',
-            ['id', 'lecturer_id', 'academic_year_id', 'created_at']
-        );
+        $processedWorks = [];
+        $processedLecturers = [];
+        $copiedFiles = 0;
+        $metadataOnlyFiles = 0;
+        $copiedBytes = 0;
+        $totalEvidenceFiles = 0;
 
-        return $report;
-    }
+        foreach ($dataset['works'] as $work) {
+            $workRelativeBase = $worksRootRelative . '/' . $work['folder_name'];
+            $workAbsoluteBase = $exportRootAbsolutePath . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $workRelativeBase);
+            File::ensureDirectoryExists($workAbsoluteBase);
 
-    private function buildTableSummary(string $table, array $preferredColumns, int $previewLimit = 200): array
-    {
-        if (! Schema::hasTable($table)) {
-            return [
-                'exists' => false,
-                'total_rows' => 0,
-                'preview_columns' => [],
-                'preview_rows' => [],
+            $evidenceDirRelativePath = $workRelativeBase . '/' . self::EXPORT_EVIDENCE_DIR;
+            $evidenceDirAbsolutePath = $exportRootAbsolutePath . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $evidenceDirRelativePath);
+            File::ensureDirectoryExists($evidenceDirAbsolutePath);
+
+            $processedFiles = [];
+            foreach ($work['lecturer_groups'] as $group) {
+                foreach ($group['files'] as $file) {
+                    $totalEvidenceFiles++;
+                    $exportRelativePath = null;
+                    $exportStatus = 'metadata_only';
+                    $exportBytes = 0;
+
+                    if ((bool) ($file['source']['available'] ?? false) && ! empty($file['source']['absolute_path'])) {
+                        $exportRelativePath = $evidenceDirRelativePath . '/' . $file['export_filename'];
+                        $evidenceAbsolutePath = $exportRootAbsolutePath . DIRECTORY_SEPARATOR
+                            . str_replace('/', DIRECTORY_SEPARATOR, $exportRelativePath);
+                        $exportBytes = $this->copyReadableExportFile(
+                            (string) $file['source']['absolute_path'],
+                            $evidenceAbsolutePath
+                        );
+                        $exportStatus = 'copied';
+                        $copiedFiles++;
+                        $copiedBytes += $exportBytes;
+                    } else {
+                        $metadataOnlyFiles++;
+                    }
+
+                    $processedFiles[] = [
+                        'evidence_id' => $file['evidence_id'],
+                        'file_type' => $file['file_type'],
+                        'original_name' => $file['original_name'],
+                        'stored_filename' => $file['export_filename'],
+                        'disk' => $file['disk'],
+                        'path' => $file['path'],
+                        'mime_type' => $file['mime_type'],
+                        'size_bytes' => $file['size_bytes'],
+                        'sha256' => $file['sha256'],
+                        'uploaded_at' => $file['uploaded_at'],
+                        'uploaded_by_user_id' => $file['uploaded_by_user_id'],
+                        'uploaded_by' => [
+                            'identity_key' => $group['lecturer']['identity_key'] ?? null,
+                            'lecturer_id' => $group['lecturer']['lecturer_id'] ?? null,
+                            'code' => $group['lecturer']['code'] ?? null,
+                            'full_name' => $group['lecturer']['full_name'] ?? null,
+                            'folder_name' => $group['lecturer']['folder_name'] ?? null,
+                        ],
+                        'export_status' => $exportStatus,
+                        'export_relative_path' => $exportRelativePath,
+                        'source' => $file['source'],
+                        'exported_size_bytes' => $exportBytes > 0 ? $exportBytes : null,
+                    ];
+                }
+            }
+
+            usort($processedFiles, static function (array $left, array $right): int {
+                return strcmp(
+                    (string) ($left['uploaded_by']['full_name'] ?? ''),
+                    (string) ($right['uploaded_by']['full_name'] ?? '')
+                );
+            });
+
+            $workInfoRelativePath = $workRelativeBase . '/' . self::EXPORT_WORK_INFO_FILENAME;
+            $workInfoAbsolutePath = $exportRootAbsolutePath . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $workInfoRelativePath);
+            $workInfoPayload = [
+                'snapshot' => [
+                    'generated_at' => $dataset['generated_at'],
+                ],
+                'activity' => $work['activity'],
+                'owner' => $work['owner'],
+                'participants' => array_values($work['participants']),
+                'evidence_files' => $processedFiles,
+                'stats' => [
+                    'participant_count' => count($work['participants']),
+                    'evidence_file_count' => count($processedFiles),
+                    'copied_evidence_count' => count(array_filter(
+                        $processedFiles,
+                        static fn (array $item): bool => ($item['export_status'] ?? '') === 'copied'
+                    )),
+                    'metadata_only_evidence_count' => count(array_filter(
+                        $processedFiles,
+                        static fn (array $item): bool => ($item['export_status'] ?? '') !== 'copied'
+                    )),
+                ],
+            ];
+            $this->writeJsonFile($workInfoAbsolutePath, $workInfoPayload);
+
+            $workInfoPdfRelativePath = null;
+            if ($pdfRenderer instanceof ReadableExportPdfRenderer) {
+                $workInfoPdfRelativePath = $workRelativeBase . '/' . self::EXPORT_WORK_INFO_PDF_FILENAME;
+                $workInfoPdfAbsolutePath = $exportRootAbsolutePath . DIRECTORY_SEPARATOR
+                    . str_replace('/', DIRECTORY_SEPARATOR, $workInfoPdfRelativePath);
+                $this->writeBinaryFile($workInfoPdfAbsolutePath, $pdfRenderer->renderWorkSummary($workInfoPayload));
+            }
+
+            $processedWorks[$work['activity']['activity_id']] = [
+                'activity' => $work['activity'],
+                'owner' => $work['owner'],
+                'folder_name' => $work['folder_name'],
+                'relative_base_path' => $workRelativeBase,
+                'work_info_relative_path' => $workInfoRelativePath,
+                'work_info_pdf_relative_path' => $workInfoPdfRelativePath,
+                'participants' => array_values($work['participants']),
+                'evidence_files' => $processedFiles,
             ];
         }
 
-        $columns = Schema::getColumnListing($table);
-        $selected = array_values(array_filter(
-            $preferredColumns,
-            static fn (string $column): bool => in_array($column, $columns, true)
-        ));
+        foreach ($dataset['lecturers'] as $lecturer) {
+            $lecturerRelativeBase = $lecturersRootRelative . '/' . $lecturer['folder_name'];
+            $lecturerAbsoluteBase = $exportRootAbsolutePath . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $lecturerRelativeBase);
+            File::ensureDirectoryExists($lecturerAbsoluteBase);
 
-        if ($selected === []) {
-            $selected = array_slice($columns, 0, 8);
-        }
-
-        $query = DB::table($table)->select($selected);
-        if (in_array('id', $columns, true)) {
-            $query->orderByDesc('id');
-        } elseif (in_array('created_at', $columns, true)) {
-            $query->orderByDesc('created_at');
-        }
-
-        $rows = $query->limit($previewLimit)->get()->map(static function ($row): array {
-            $payload = [];
-            foreach ((array) $row as $key => $value) {
-                if ($value instanceof \DateTimeInterface) {
-                    $payload[(string) $key] = $value->format(DATE_ATOM);
+            $workEntries = [];
+            foreach ($lecturer['works'] as $activityId => $workReference) {
+                $processedWork = $processedWorks[$activityId] ?? null;
+                if (! is_array($processedWork)) {
                     continue;
                 }
-                $payload[(string) $key] = $value;
+
+                $evidenceReferences = array_values(array_filter(
+                    $processedWork['evidence_files'],
+                    static fn (array $item): bool => ($item['uploaded_by']['identity_key'] ?? null) === ($lecturer['identity_key'] ?? null)
+                ));
+
+                $workEntries[] = [
+                    'activity_id' => $processedWork['activity']['activity_id'],
+                    'activity_code' => $processedWork['activity']['activity_code'],
+                    'title' => $processedWork['activity']['title'],
+                    'folder_name' => $processedWork['folder_name'],
+                    'cong_trinh_relative_path' => $processedWork['relative_base_path'],
+                    'thong_tin_cong_trinh' => $processedWork['work_info_relative_path'],
+                    'thong_tin_cong_trinh_tham_chieu' => $this->buildRelativeExportPath(
+                        $lecturerRelativeBase . '/' . self::EXPORT_LECTURER_SUMMARY_FILENAME,
+                        $processedWork['work_info_relative_path']
+                    ),
+                    'thong_tin_cong_trinh_pdf' => $processedWork['work_info_pdf_relative_path'],
+                    'thong_tin_cong_trinh_pdf_tham_chieu' => is_string($processedWork['work_info_pdf_relative_path'] ?? null)
+                        ? $this->buildRelativeExportPath(
+                            $lecturerRelativeBase . '/' . self::EXPORT_LECTURER_SUMMARY_FILENAME,
+                            $processedWork['work_info_pdf_relative_path']
+                        )
+                        : null,
+                    'participation' => $workReference['participation'],
+                    'uploaded_evidence_count' => count($evidenceReferences),
+                    'uploaded_evidence_files' => array_map(
+                        fn (array $file): array => [
+                            'evidence_id' => $file['evidence_id'],
+                            'original_name' => $file['original_name'],
+                            'stored_filename' => $file['stored_filename'],
+                            'file_type' => $file['file_type'],
+                            'uploaded_at' => $file['uploaded_at'],
+                            'export_status' => $file['export_status'],
+                            'work_evidence_relative_path' => $file['export_relative_path'],
+                            'work_evidence_reference' => is_string($file['export_relative_path']) && $file['export_relative_path'] !== ''
+                                ? $this->buildRelativeExportPath(
+                                    $lecturerRelativeBase . '/' . self::EXPORT_LECTURER_SUMMARY_FILENAME,
+                                    $file['export_relative_path']
+                                )
+                                : null,
+                        ],
+                        $evidenceReferences
+                    ),
+                ];
             }
-            return $payload;
-        })->all();
+
+            usort($workEntries, static function (array $left, array $right): int {
+                return strcmp((string) ($left['title'] ?? ''), (string) ($right['title'] ?? ''));
+            });
+
+            $lecturerSummaryRelativePath = $lecturerRelativeBase . '/' . self::EXPORT_LECTURER_SUMMARY_FILENAME;
+            $lecturerSummaryAbsolutePath = $exportRootAbsolutePath . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $lecturerSummaryRelativePath);
+            $uploadedEvidenceCount = array_sum(array_map(
+                static fn (array $item): int => (int) ($item['uploaded_evidence_count'] ?? 0),
+                $workEntries
+            ));
+            $lecturerSummaryPayload = [
+                'lecturer' => $lecturer['lecturer'],
+                'snapshot' => [
+                    'generated_at' => $dataset['generated_at'],
+                    'works_count' => count($workEntries),
+                    'uploaded_evidence_count' => $uploadedEvidenceCount,
+                ],
+                'works' => $workEntries,
+            ];
+            $this->writeJsonFile($lecturerSummaryAbsolutePath, $lecturerSummaryPayload);
+
+            $lecturerSummaryPdfRelativePath = null;
+            if ($pdfRenderer instanceof ReadableExportPdfRenderer) {
+                $lecturerSummaryPdfRelativePath = $lecturerRelativeBase . '/' . self::EXPORT_LECTURER_SUMMARY_PDF_FILENAME;
+                $lecturerSummaryPdfAbsolutePath = $exportRootAbsolutePath . DIRECTORY_SEPARATOR
+                    . str_replace('/', DIRECTORY_SEPARATOR, $lecturerSummaryPdfRelativePath);
+                $this->writeBinaryFile($lecturerSummaryPdfAbsolutePath, $pdfRenderer->renderLecturerSummary($lecturerSummaryPayload));
+            }
+
+            $processedLecturers[] = [
+                'lecturer_id' => $lecturer['lecturer']['lecturer_id'],
+                'code' => $lecturer['lecturer']['code'],
+                'full_name' => $lecturer['lecturer']['full_name'],
+                'folder_name' => $lecturer['folder_name'],
+                'summary_relative_path' => $lecturerSummaryRelativePath,
+                'summary_pdf_relative_path' => $lecturerSummaryPdfRelativePath,
+                'works_count' => count($workEntries),
+                'uploaded_evidence_count' => $uploadedEvidenceCount,
+            ];
+        }
+
+        usort($processedLecturers, static function (array $left, array $right): int {
+            return strcmp((string) ($left['full_name'] ?? ''), (string) ($right['full_name'] ?? ''));
+        });
+
+        $workEntries = array_map(static function (array $work): array {
+            return [
+                'activity_id' => $work['activity']['activity_id'],
+                'activity_code' => $work['activity']['activity_code'],
+                'title' => $work['activity']['title'],
+                'folder_name' => $work['folder_name'],
+                'cong_trinh_relative_path' => $work['relative_base_path'],
+                'thong_tin_cong_trinh' => $work['work_info_relative_path'],
+                'thong_tin_cong_trinh_pdf' => $work['work_info_pdf_relative_path'],
+                'participant_count' => count($work['participants']),
+                'evidence_file_count' => count($work['evidence_files']),
+            ];
+        }, array_values($processedWorks));
+
+        usort($workEntries, static function (array $left, array $right): int {
+            return strcmp((string) ($left['title'] ?? ''), (string) ($right['title'] ?? ''));
+        });
 
         return [
-            'exists' => true,
-            'total_rows' => (int) DB::table($table)->count(),
-            'preview_columns' => $selected,
-            'preview_rows' => $rows,
+            'works_relative_path' => $worksRootRelative,
+            'lecturers_relative_path' => $lecturersRootRelative,
+            'works' => $workEntries,
+            'lecturers' => $processedLecturers,
+            'stats' => [
+                'works_count' => count($workEntries),
+                'lecturers_count' => count($processedLecturers),
+                'total_evidence_files' => $totalEvidenceFiles,
+                'copied_evidence_files' => $copiedFiles,
+                'metadata_only_evidence_files' => $metadataOnlyFiles,
+                'copied_evidence_bytes' => $copiedBytes,
+            ],
         ];
     }
 
-    private function buildFilesArchive(string $targetZipAbsolutePath, array $includePaths): array
+    private function buildReadableExportDataset(): array
     {
-        if (File::exists($targetZipAbsolutePath)) {
-            File::delete($targetZipAbsolutePath);
+        $generatedAt = now()->toIso8601String();
+        $lecturerRows = $this->fetchReadableLecturers();
+        $lecturers = [];
+        foreach ($lecturerRows as $row) {
+            $descriptor = $this->mapReadableLecturerDescriptor([
+                'lecturer_id' => (int) $row->lecturer_id,
+                'code' => $row->lecturer_code,
+                'full_name' => $row->lecturer_full_name,
+                'email' => $row->lecturer_email,
+                'department_id' => $row->department_id,
+                'department_code' => $row->department_code,
+                'department_name' => $row->department_name,
+                'faculty_id' => $row->faculty_id,
+                'faculty_code' => $row->faculty_code,
+                'faculty_name' => $row->faculty_name,
+            ]);
+            $lecturers[$descriptor['identity_key']] = $this->initializeReadableLecturerPayload($descriptor);
         }
 
-        $zip = new ZipArchive();
-        $openResult = $zip->open($targetZipAbsolutePath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-        if ($openResult !== true) {
-            throw new BackupRuntimeException('Không thể tạo tệp nén evidence_files.zip.');
+        $activityRows = $this->fetchReadableActivities();
+        $works = [];
+        foreach ($activityRows as $row) {
+            $ownerDescriptor = $this->mapReadableLecturerDescriptor([
+                'lecturer_id' => (int) $row->owner_lecturer_id,
+                'code' => $row->owner_lecturer_code,
+                'full_name' => $row->owner_lecturer_name,
+                'email' => $row->owner_lecturer_email,
+                'department_id' => $row->owner_department_id,
+                'department_code' => $row->owner_department_code,
+                'department_name' => $row->owner_department_name,
+                'faculty_id' => $row->owner_faculty_id,
+                'faculty_code' => $row->owner_faculty_code,
+                'faculty_name' => $row->owner_faculty_name,
+            ]);
+
+            if (! isset($lecturers[$ownerDescriptor['identity_key']])) {
+                $lecturers[$ownerDescriptor['identity_key']] = $this->initializeReadableLecturerPayload($ownerDescriptor);
+            }
+
+            $activityId = (int) $row->activity_id;
+            $work = [
+                'activity' => [
+                    'activity_id' => $activityId,
+                    'activity_code' => (string) $row->activity_code,
+                    'title' => (string) $row->title,
+                    'abstract' => $row->abstract,
+                    'start_date' => $row->start_date,
+                    'end_date' => $row->end_date,
+                    'submitted_at' => $row->submitted_at,
+                    'approved_at' => $row->approved_at,
+                    'total_hours_calc' => $row->total_hours_calc,
+                    'academic_year' => [
+                        'id' => $row->academic_year_id ? (int) $row->academic_year_id : null,
+                        'code' => $row->academic_year_code,
+                    ],
+                    'kind' => [
+                        'id' => $row->kind_id ? (int) $row->kind_id : null,
+                        'code' => $row->kind_code,
+                        'name' => $row->kind_name,
+                    ],
+                    'type' => [
+                        'id' => $row->type_id ? (int) $row->type_id : null,
+                        'code' => $row->type_code,
+                        'name' => $row->type_name,
+                    ],
+                    'status' => [
+                        'id' => $row->status_id ? (int) $row->status_id : null,
+                        'code' => $row->status_code,
+                        'name' => $row->status_name,
+                    ],
+                ],
+                'owner' => $ownerDescriptor,
+                'folder_name' => $this->buildReadableFolderName(
+                    trim((string) $row->activity_code . ' ' . (string) $row->title),
+                    'cong-trinh',
+                    $activityId
+                ),
+                'participants' => [
+                    $ownerDescriptor['identity_key'] => $this->buildReadableParticipantEntry(
+                        $ownerDescriptor,
+                        true,
+                        'Chủ nhiệm',
+                        null,
+                        null
+                    ),
+                ],
+                'lecturer_groups' => [],
+            ];
+            $works[$activityId] = $work;
+
+            $this->attachLecturerWorkReference(
+                $lecturers[$ownerDescriptor['identity_key']],
+                $work,
+                true,
+                'Chủ nhiệm',
+                null,
+                null
+            );
         }
 
-        $fileCount = 0;
-        $missingPaths = [];
-        foreach ($includePaths as $relativePath) {
-            $relative = str_replace('\\', '/', trim((string) $relativePath, "/\\"));
-            if ($relative === '' || ! $this->isSafeRelativePath($relative)) {
+        if ($works === []) {
+            return [
+                'generated_at' => $generatedAt,
+                'works' => [],
+                'lecturers' => array_values($lecturers),
+            ];
+        }
+
+        $memberRows = $this->fetchReadableActivityMembers(array_keys($works));
+        foreach ($memberRows as $row) {
+            $descriptor = $this->mapReadableLecturerDescriptor([
+                'lecturer_id' => (int) $row->lecturer_id,
+                'code' => $row->lecturer_code,
+                'full_name' => $row->lecturer_full_name,
+                'email' => $row->lecturer_email,
+                'department_id' => $row->department_id,
+                'department_code' => $row->department_code,
+                'department_name' => $row->department_name,
+                'faculty_id' => $row->faculty_id,
+                'faculty_code' => $row->faculty_code,
+                'faculty_name' => $row->faculty_name,
+            ]);
+            if (! isset($lecturers[$descriptor['identity_key']])) {
+                $lecturers[$descriptor['identity_key']] = $this->initializeReadableLecturerPayload($descriptor);
+            }
+
+            $activityId = (int) $row->activity_id;
+            if (! isset($works[$activityId])) {
                 continue;
             }
 
-            $absolute = $this->basePathFromRelative($relative);
-            if (! File::exists($absolute)) {
-                $missingPaths[] = $relative;
+            if (! isset($works[$activityId]['participants'][$descriptor['identity_key']])) {
+                $works[$activityId]['participants'][$descriptor['identity_key']] = $this->buildReadableParticipantEntry(
+                    $descriptor,
+                    false,
+                    $row->member_role_name,
+                    $row->contribution_share,
+                    $row->hours_assigned
+                );
+            }
+
+            $this->attachLecturerWorkReference(
+                $lecturers[$descriptor['identity_key']],
+                $works[$activityId],
+                false,
+                $row->member_role_name,
+                $row->contribution_share,
+                $row->hours_assigned
+            );
+        }
+
+        $evidenceRows = $this->fetchReadableEvidenceFiles(array_keys($works));
+        foreach ($evidenceRows as $row) {
+            $activityId = (int) $row->activity_id;
+            if (! isset($works[$activityId])) {
                 continue;
             }
 
-            if (File::isDirectory($absolute)) {
-                foreach (File::allFiles($absolute) as $file) {
-                    $relativeInDir = str_replace('\\', '/', $file->getRelativePathname());
-                    $archivePath = trim($relative . '/' . $relativeInDir, '/');
-                    if ($zip->addFile($file->getPathname(), $archivePath)) {
-                        $fileCount++;
-                    }
-                }
-                continue;
+            $uploaderDescriptor = $row->uploader_lecturer_id
+                ? $this->mapReadableLecturerDescriptor([
+                    'lecturer_id' => (int) $row->uploader_lecturer_id,
+                    'code' => $row->uploader_lecturer_code,
+                    'full_name' => $row->uploader_lecturer_name,
+                    'email' => $row->uploader_lecturer_email,
+                    'department_id' => $row->uploader_department_id,
+                    'department_code' => $row->uploader_department_code,
+                    'department_name' => $row->uploader_department_name,
+                    'faculty_id' => $row->uploader_faculty_id,
+                    'faculty_code' => $row->uploader_faculty_code,
+                    'faculty_name' => $row->uploader_faculty_name,
+                ])
+                : $this->mapReadableExternalUploaderDescriptor([
+                    'uploaded_by_user_id' => (int) $row->uploaded_by_user_id,
+                    'name' => $row->uploader_user_name,
+                    'email' => $row->uploader_user_email,
+                ]);
+
+            if ($uploaderDescriptor['lecturer_id'] !== null && ! isset($lecturers[$uploaderDescriptor['identity_key']])) {
+                $lecturers[$uploaderDescriptor['identity_key']] = $this->initializeReadableLecturerPayload($uploaderDescriptor);
             }
 
-            if ($zip->addFile($absolute, $relative)) {
-                $fileCount++;
+            if (! isset($works[$activityId]['lecturer_groups'][$uploaderDescriptor['identity_key']])) {
+                $works[$activityId]['lecturer_groups'][$uploaderDescriptor['identity_key']] = [
+                    'lecturer' => $uploaderDescriptor,
+                    'files' => [],
+                ];
+            }
+
+            $works[$activityId]['lecturer_groups'][$uploaderDescriptor['identity_key']]['files'][] = [
+                'evidence_id' => (int) $row->evidence_id,
+                'file_type' => [
+                    'id' => $row->file_type_id ? (int) $row->file_type_id : null,
+                    'name' => $row->file_type_name,
+                ],
+                'original_name' => (string) $row->original_name,
+                'export_filename' => $this->buildReadableEvidenceFilename(
+                    (int) $row->evidence_id,
+                    (string) $row->original_name,
+                    (string) $row->mime_type
+                ),
+                'disk' => (string) $row->disk,
+                'path' => (string) $row->path,
+                'mime_type' => (string) $row->mime_type,
+                'size_bytes' => (int) $row->size_bytes,
+                'sha256' => (string) $row->sha256,
+                'uploaded_at' => $row->uploaded_at,
+                'uploaded_by_user_id' => (int) $row->uploaded_by_user_id,
+                'source' => $this->resolveEvidenceExportSource((string) $row->disk, (string) $row->path),
+            ];
+
+            if ($uploaderDescriptor['lecturer_id'] !== null) {
+                $existingParticipation = $lecturers[$uploaderDescriptor['identity_key']]['works'][$activityId]['participation'] ?? [];
+                $this->attachLecturerWorkReference(
+                    $lecturers[$uploaderDescriptor['identity_key']],
+                    $works[$activityId],
+                    (bool) ($works[$activityId]['owner']['identity_key'] === $uploaderDescriptor['identity_key']),
+                    $existingParticipation['member_role_name'] ?? null,
+                    $existingParticipation['contribution_share'] ?? null,
+                    $existingParticipation['hours_assigned'] ?? null
+                );
             }
         }
 
-        $zip->close();
+        foreach ($works as &$work) {
+            uasort($work['participants'], static function (array $left, array $right): int {
+                return strcmp((string) ($left['full_name'] ?? ''), (string) ($right['full_name'] ?? ''));
+            });
+            uasort($work['lecturer_groups'], static function (array $left, array $right): int {
+                return strcmp(
+                    (string) ($left['lecturer']['full_name'] ?? ''),
+                    (string) ($right['lecturer']['full_name'] ?? '')
+                );
+            });
+        }
+        unset($work);
+
+        foreach ($lecturers as &$lecturer) {
+            uasort($lecturer['works'], static function (array $left, array $right): int {
+                return strcmp((string) ($left['title'] ?? ''), (string) ($right['title'] ?? ''));
+            });
+        }
+        unset($lecturer);
+
+        $lecturerValues = array_values($lecturers);
+        usort($lecturerValues, static function (array $left, array $right): int {
+            return strcmp(
+                (string) ($left['lecturer']['full_name'] ?? ''),
+                (string) ($right['lecturer']['full_name'] ?? '')
+            );
+        });
+
+        $workValues = array_values($works);
+        usort($workValues, static function (array $left, array $right): int {
+            return strcmp((string) ($left['activity']['title'] ?? ''), (string) ($right['activity']['title'] ?? ''));
+        });
 
         return [
-            'file_count' => $fileCount,
-            'missing_paths' => array_values(array_unique($missingPaths)),
+            'generated_at' => $generatedAt,
+            'works' => $workValues,
+            'lecturers' => $lecturerValues,
         ];
+    }
+
+    private function fetchReadableLecturers(): array
+    {
+        return DB::table('lecturers as l')
+            ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
+            ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
+            ->orderBy('l.full_name')
+            ->orderBy('l.id')
+            ->select([
+                'l.id as lecturer_id',
+                'l.code as lecturer_code',
+                'l.full_name as lecturer_full_name',
+                'l.email as lecturer_email',
+                'd.id as department_id',
+                'd.code as department_code',
+                'd.name as department_name',
+                'f.id as faculty_id',
+                'f.code as faculty_code',
+                'f.name as faculty_name',
+            ])
+            ->get()
+            ->all();
+    }
+
+    private function fetchReadableActivities(): array
+    {
+        return DB::table('research_activities as ra')
+            ->join('lecturers as owner_l', 'ra.owner_lecturer_id', '=', 'owner_l.id')
+            ->leftJoin('departments as owner_d', 'owner_l.department_id', '=', 'owner_d.id')
+            ->leftJoin('faculties as owner_f', 'owner_d.faculty_id', '=', 'owner_f.id')
+            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+            ->leftJoin('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
+            ->leftJoin('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->orderBy('ra.id')
+            ->select([
+                'ra.id as activity_id',
+                'ra.activity_code',
+                'ra.title',
+                'ra.abstract',
+                'ra.start_date',
+                'ra.end_date',
+                'ra.submitted_at',
+                'ra.approved_at',
+                'ra.total_hours_calc',
+                'ay.id as academic_year_id',
+                'ay.code as academic_year_code',
+                'ak.id as kind_id',
+                'ak.code as kind_code',
+                'ak.name as kind_name',
+                'at.id as type_id',
+                'at.code as type_code',
+                'at.name as type_name',
+                'ast.id as status_id',
+                'ast.code as status_code',
+                'ast.name as status_name',
+                'owner_l.id as owner_lecturer_id',
+                'owner_l.code as owner_lecturer_code',
+                'owner_l.full_name as owner_lecturer_name',
+                'owner_l.email as owner_lecturer_email',
+                'owner_d.id as owner_department_id',
+                'owner_d.code as owner_department_code',
+                'owner_d.name as owner_department_name',
+                'owner_f.id as owner_faculty_id',
+                'owner_f.code as owner_faculty_code',
+                'owner_f.name as owner_faculty_name',
+            ])
+            ->get()
+            ->all();
+    }
+
+    private function fetchReadableActivityMembers(array $activityIds): array
+    {
+        if ($activityIds === []) {
+            return [];
+        }
+
+        return DB::table('research_activity_members as ram')
+            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
+            ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
+            ->whereIn('ram.activity_id', $activityIds)
+            ->orderBy('ram.activity_id')
+            ->orderBy('ram.id')
+            ->select([
+                'ram.activity_id',
+                'ram.lecturer_id',
+                'ram.contribution_share',
+                'ram.hours_assigned',
+                'mr.name as member_role_name',
+                'l.code as lecturer_code',
+                'l.full_name as lecturer_full_name',
+                'l.email as lecturer_email',
+                'd.id as department_id',
+                'd.code as department_code',
+                'd.name as department_name',
+                'f.id as faculty_id',
+                'f.code as faculty_code',
+                'f.name as faculty_name',
+            ])
+            ->get()
+            ->all();
+    }
+
+    private function fetchReadableEvidenceFiles(array $activityIds): array
+    {
+        if ($activityIds === []) {
+            return [];
+        }
+
+        return DB::table('evidence_files as ef')
+            ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
+            ->leftJoin('users as uploader_u', 'ef.uploaded_by_user_id', '=', 'uploader_u.id')
+            ->leftJoin('lecturers as uploader_l', 'uploader_l.user_id', '=', 'uploader_u.id')
+            ->leftJoin('departments as uploader_d', 'uploader_l.department_id', '=', 'uploader_d.id')
+            ->leftJoin('faculties as uploader_f', 'uploader_d.faculty_id', '=', 'uploader_f.id')
+            ->whereIn('ef.activity_id', $activityIds)
+            ->orderBy('ef.activity_id')
+            ->orderBy('ef.uploaded_at')
+            ->orderBy('ef.id')
+            ->select([
+                'ef.id as evidence_id',
+                'ef.activity_id',
+                'ef.file_type_id',
+                'eft.name as file_type_name',
+                'ef.disk',
+                'ef.path',
+                'ef.original_name',
+                'ef.mime_type',
+                'ef.size_bytes',
+                'ef.sha256',
+                'ef.uploaded_at',
+                'ef.uploaded_by_user_id',
+                'uploader_u.name as uploader_user_name',
+                'uploader_u.email as uploader_user_email',
+                'uploader_l.id as uploader_lecturer_id',
+                'uploader_l.code as uploader_lecturer_code',
+                'uploader_l.full_name as uploader_lecturer_name',
+                'uploader_l.email as uploader_lecturer_email',
+                'uploader_d.id as uploader_department_id',
+                'uploader_d.code as uploader_department_code',
+                'uploader_d.name as uploader_department_name',
+                'uploader_f.id as uploader_faculty_id',
+                'uploader_f.code as uploader_faculty_code',
+                'uploader_f.name as uploader_faculty_name',
+            ])
+            ->get()
+            ->all();
+    }
+
+    private function mapReadableLecturerDescriptor(array $payload): array
+    {
+        $lecturerId = isset($payload['lecturer_id']) ? (int) $payload['lecturer_id'] : 0;
+        $code = trim((string) ($payload['code'] ?? ''));
+        $fullName = trim((string) ($payload['full_name'] ?? ''));
+        $email = trim((string) ($payload['email'] ?? ''));
+        $label = trim($code . ' ' . $fullName);
+
+        return [
+            'identity_key' => 'lecturer:' . $lecturerId,
+            'lecturer_id' => $lecturerId > 0 ? $lecturerId : null,
+            'uploaded_by_user_id' => null,
+            'code' => $code !== '' ? $code : ('GV-' . $lecturerId),
+            'full_name' => $fullName !== '' ? $fullName : ('Giảng viên #' . $lecturerId),
+            'email' => $email !== '' ? $email : null,
+            'department' => [
+                'id' => ! empty($payload['department_id']) ? (int) $payload['department_id'] : null,
+                'code' => $payload['department_code'] ?? null,
+                'name' => $payload['department_name'] ?? null,
+            ],
+            'faculty' => [
+                'id' => ! empty($payload['faculty_id']) ? (int) $payload['faculty_id'] : null,
+                'code' => $payload['faculty_code'] ?? null,
+                'name' => $payload['faculty_name'] ?? null,
+            ],
+            'folder_name' => $this->buildReadableFolderName($label, 'giang-vien', $lecturerId > 0 ? $lecturerId : sha1($label)),
+        ];
+    }
+
+    private function mapReadableExternalUploaderDescriptor(array $payload): array
+    {
+        $userId = isset($payload['uploaded_by_user_id']) ? (int) $payload['uploaded_by_user_id'] : 0;
+        $name = trim((string) ($payload['name'] ?? ''));
+        $email = trim((string) ($payload['email'] ?? ''));
+        $label = $name !== '' ? $name : ('Tai-khoan-' . $userId);
+
+        return [
+            'identity_key' => 'user:' . $userId,
+            'lecturer_id' => null,
+            'uploaded_by_user_id' => $userId > 0 ? $userId : null,
+            'code' => 'USER-' . ($userId > 0 ? $userId : 'unknown'),
+            'full_name' => $label,
+            'email' => $email !== '' ? $email : null,
+            'department' => [
+                'id' => null,
+                'code' => null,
+                'name' => null,
+            ],
+            'faculty' => [
+                'id' => null,
+                'code' => null,
+                'name' => null,
+            ],
+            'folder_name' => $this->buildReadableFolderName($label, 'tai-khoan', $userId > 0 ? $userId : sha1($label)),
+        ];
+    }
+
+    private function initializeReadableLecturerPayload(array $descriptor): array
+    {
+        return [
+            'identity_key' => $descriptor['identity_key'],
+            'folder_name' => $descriptor['folder_name'],
+            'lecturer' => $descriptor,
+            'works' => [],
+        ];
+    }
+
+    private function buildReadableParticipantEntry(
+        array $descriptor,
+        bool $isOwner,
+        ?string $memberRoleName,
+        $contributionShare,
+        $hoursAssigned
+    ): array {
+        return [
+            'identity_key' => $descriptor['identity_key'],
+            'lecturer_id' => $descriptor['lecturer_id'],
+            'code' => $descriptor['code'],
+            'full_name' => $descriptor['full_name'],
+            'email' => $descriptor['email'],
+            'department' => $descriptor['department'],
+            'faculty' => $descriptor['faculty'],
+            'is_owner' => $isOwner,
+            'member_role_name' => $memberRoleName !== null ? trim((string) $memberRoleName) : null,
+            'contribution_share' => $contributionShare !== null ? (float) $contributionShare : null,
+            'hours_assigned' => $hoursAssigned !== null ? (float) $hoursAssigned : null,
+        ];
+    }
+
+    private function attachLecturerWorkReference(
+        array &$lecturer,
+        array $work,
+        bool $isOwner,
+        ?string $memberRoleName,
+        $contributionShare,
+        $hoursAssigned
+    ): void {
+        $activityId = (int) ($work['activity']['activity_id'] ?? 0);
+        if ($activityId <= 0) {
+            return;
+        }
+
+        if (! isset($lecturer['works'][$activityId])) {
+            $lecturer['works'][$activityId] = [
+                'activity_id' => $activityId,
+                'activity_code' => $work['activity']['activity_code'] ?? null,
+                'title' => $work['activity']['title'] ?? null,
+                'folder_name' => $work['folder_name'] ?? null,
+                'participation' => [
+                    'is_owner' => false,
+                    'member_role_name' => null,
+                    'contribution_share' => null,
+                    'hours_assigned' => null,
+                ],
+            ];
+        }
+
+        $lecturer['works'][$activityId]['participation']['is_owner'] = (bool) (
+            ($lecturer['works'][$activityId]['participation']['is_owner'] ?? false) || $isOwner
+        );
+        if ($memberRoleName !== null && trim($memberRoleName) !== '') {
+            $lecturer['works'][$activityId]['participation']['member_role_name'] = trim($memberRoleName);
+        }
+        if ($contributionShare !== null) {
+            $lecturer['works'][$activityId]['participation']['contribution_share'] = (float) $contributionShare;
+        }
+        if ($hoursAssigned !== null) {
+            $lecturer['works'][$activityId]['participation']['hours_assigned'] = (float) $hoursAssigned;
+        }
+    }
+
+    private function resolveEvidenceExportSource(string $disk, string $path): array
+    {
+        $normalizedDisk = Str::lower(trim($disk));
+        $normalizedPath = trim($path);
+        if ($normalizedPath === '') {
+            return [
+                'available' => false,
+                'mode' => 'metadata_only',
+                'storage' => $normalizedDisk !== '' ? $normalizedDisk : 'unknown',
+                'absolute_path' => null,
+                'reason' => 'missing_path',
+            ];
+        }
+
+        if ($normalizedDisk === 'rclone_drive') {
+            $absolutePath = $this->resolveEvidenceHotAbsolutePath($normalizedPath);
+            if ($absolutePath !== null && is_file($absolutePath) && is_readable($absolutePath)) {
+                return [
+                    'available' => true,
+                    'mode' => 'copy_from_hot_cache',
+                    'storage' => 'rclone_drive',
+                    'absolute_path' => $absolutePath,
+                    'reason' => null,
+                ];
+            }
+
+            return [
+                'available' => false,
+                'mode' => 'metadata_only',
+                'storage' => 'rclone_drive',
+                'absolute_path' => null,
+                'reason' => 'hot_cache_missing',
+            ];
+        }
+
+        $absolutePath = $this->resolveEvidenceLocalAbsolutePath($disk, $normalizedPath);
+        if ($absolutePath !== null && is_file($absolutePath) && is_readable($absolutePath)) {
+            return [
+                'available' => true,
+                'mode' => 'copy_from_local_disk',
+                'storage' => $normalizedDisk !== '' ? $normalizedDisk : 'local',
+                'absolute_path' => $absolutePath,
+                'reason' => null,
+            ];
+        }
+
+        return [
+            'available' => false,
+            'mode' => 'metadata_only',
+            'storage' => $normalizedDisk !== '' ? $normalizedDisk : 'unknown',
+            'absolute_path' => null,
+            'reason' => 'local_file_missing',
+        ];
+    }
+
+    private function resolveEvidenceHotAbsolutePath(string $coldPath): ?string
+    {
+        $disk = trim((string) config('evidence.storage.hot_disk', 'local'));
+        if ($disk === '' || ! config("filesystems.disks.{$disk}")) {
+            $disk = 'local';
+        }
+
+        $adapter = Storage::disk($disk);
+        if (! method_exists($adapter, 'path')) {
+            return null;
+        }
+
+        return $adapter->path($this->buildEvidenceHotRelativePathFromColdPath($coldPath));
+    }
+
+    private function buildEvidenceHotRelativePathFromColdPath(string $coldPath): string
+    {
+        $hash = sha1(trim($coldPath));
+        $baseDir = trim((string) config('evidence.storage.hot_dir', 'evidence/hot-cache'), "/\\");
+        if ($baseDir === '') {
+            $baseDir = 'evidence/hot-cache';
+        }
+
+        return $baseDir . '/' . substr($hash, 0, 2) . '/' . $hash . '.pdf';
+    }
+
+    private function resolveEvidenceLocalAbsolutePath(string $disk, string $path): ?string
+    {
+        $normalizedDisk = trim($disk);
+        if ($normalizedDisk === '' || ! config("filesystems.disks.{$normalizedDisk}")) {
+            return null;
+        }
+
+        $adapter = Storage::disk($normalizedDisk);
+        if (! method_exists($adapter, 'path')) {
+            return null;
+        }
+
+        return $adapter->path($path);
+    }
+
+    private function copyReadableExportFile(string $sourceAbsolutePath, string $targetAbsolutePath): int
+    {
+        File::ensureDirectoryExists(dirname($targetAbsolutePath));
+        if (File::exists($targetAbsolutePath)) {
+            File::delete($targetAbsolutePath);
+        }
+
+        if (! File::copy($sourceAbsolutePath, $targetAbsolutePath)) {
+            throw new BackupRuntimeException('Không thể sao chép tệp minh chứng vào readable export.');
+        }
+
+        return $this->resolveFileSize($targetAbsolutePath);
+    }
+
+    private function buildReadableFolderName(string $label, string $fallbackPrefix, $stableId): string
+    {
+        $normalized = trim($label);
+        $slug = Str::slug($normalized, '-');
+        if ($slug === '') {
+            $slug = Str::slug($fallbackPrefix, '-');
+        }
+        if ($slug === '') {
+            $slug = 'item';
+        }
+
+        if (strlen($slug) > 72) {
+            $slug = rtrim(substr($slug, 0, 72), '-');
+        }
+
+        $suffix = trim((string) $stableId);
+        if ($suffix === '') {
+            return $slug;
+        }
+
+        return $slug . '-' . Str::lower($suffix);
+    }
+
+    private function buildReadableEvidenceFilename(int $evidenceId, string $originalName, string $mimeType): string
+    {
+        $base = pathinfo($originalName, PATHINFO_FILENAME);
+        $base = trim($base);
+        $slug = Str::slug($base, '-');
+        if ($slug === '') {
+            $slug = 'minh-chung';
+        }
+        if (strlen($slug) > 80) {
+            $slug = rtrim(substr($slug, 0, 80), '-');
+        }
+
+        $extension = Str::lower((string) pathinfo($originalName, PATHINFO_EXTENSION));
+        if ($extension === '') {
+            $extension = Str::contains(Str::lower($mimeType), 'pdf') ? 'pdf' : 'bin';
+        }
+
+        return str_pad((string) $evidenceId, 6, '0', STR_PAD_LEFT) . '_' . $slug . '.' . $extension;
+    }
+
+    private function buildRelativeExportPath(string $fromRelativePath, string $toRelativePath): ?string
+    {
+        $from = trim(str_replace('\\', '/', $fromRelativePath), '/');
+        $to = trim(str_replace('\\', '/', $toRelativePath), '/');
+        if ($from === '' || $to === '') {
+            return null;
+        }
+
+        $fromParts = explode('/', $from);
+        array_pop($fromParts);
+        $toParts = explode('/', $to);
+
+        while ($fromParts !== [] && $toParts !== [] && $fromParts[0] === $toParts[0]) {
+            array_shift($fromParts);
+            array_shift($toParts);
+        }
+
+        $prefix = $fromParts === [] ? '' : str_repeat('../', count($fromParts));
+        $suffix = implode('/', $toParts);
+
+        return $prefix . $suffix;
     }
 
     private function buildExportBundle(string $exportRootAbsolutePath, string $bundleAbsolutePath): void
@@ -1379,31 +2363,20 @@ class ResticBackupManager
             File::delete($bundleAbsolutePath);
         }
 
+        File::ensureDirectoryExists(dirname($bundleAbsolutePath));
+
         $zip = new ZipArchive();
         $openResult = $zip->open($bundleAbsolutePath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
         if ($openResult !== true) {
             throw new BackupRuntimeException('Không thể tạo gói export ZIP.');
         }
 
-        $allowedFiles = [
-            self::EXPORT_METADATA_FILENAME,
-            self::EXPORT_DB_DUMP_FILENAME,
-            self::EXPORT_FILES_ARCHIVE_FILENAME,
-            self::EXPORT_SUMMARY_FILENAME,
-            self::EXPORT_BUNDLE_FILENAME,
-            self::EXPORT_INTERNAL_DIR . '/' . self::EXPORT_MANIFEST_FILENAME,
-        ];
-
-        foreach ($allowedFiles as $name) {
-            $normalized = str_replace('\\', '/', $name);
-            if ($normalized === self::EXPORT_BUNDLE_FILENAME) {
+        foreach (File::allFiles($exportRootAbsolutePath) as $file) {
+            $normalized = str_replace('\\', '/', $file->getRelativePathname());
+            if ($normalized === self::EXPORT_BUNDLE_FILENAME || str_ends_with($normalized, '/' . self::EXPORT_BUNDLE_FILENAME)) {
                 continue;
             }
-            $absolute = $exportRootAbsolutePath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
-            if (! File::exists($absolute)) {
-                continue;
-            }
-            $zip->addFile($absolute, $normalized);
+            $zip->addFile($file->getPathname(), $normalized);
         }
 
         $zip->close();
@@ -1452,17 +2425,55 @@ class ResticBackupManager
         File::put($absolutePath, $encoded . PHP_EOL);
     }
 
+    private function writeTextFile(string $absolutePath, string $content): void
+    {
+        File::put($absolutePath, rtrim($content) . PHP_EOL);
+    }
+
+    private function writeBinaryFile(string $absolutePath, string $content): void
+    {
+        File::put($absolutePath, $content);
+    }
+
+    private function buildExportReadme(
+        string $snapshotId,
+        string $folderName,
+        \DateTimeInterface $generatedAt,
+        array $readableExport
+    ): string {
+        $lines = [
+            'SPNC - EXPORT SAO LUU DE DOC',
+            '',
+            'Thu muc nay la lop export de doc nhanh tren Google Drive.',
+            'Khoi phuc chinh thuc van phai thuc hien bang chuc nang Khoi phuc cua he thong va du lieu ky thuat trong restic-repo.',
+            '',
+            'Thong tin nhanh:',
+            '- Snapshot ID: ' . $snapshotId,
+            '- Thu muc export: ' . $folderName,
+            '- Thoi diem tao: ' . $generatedAt->format('Y-m-d H:i:s'),
+            '- So cong trinh: ' . (string) ($readableExport['stats']['works_count'] ?? 0),
+            '- So giang vien: ' . (string) ($readableExport['stats']['lecturers_count'] ?? 0),
+            '- So minh chung: ' . (string) ($readableExport['stats']['total_evidence_files'] ?? 0),
+            '',
+            'Cau truc chinh:',
+            '- database/du-lieu.sql.gz: ban xuat co so du lieu de doi chieu nhanh.',
+            '- cong-trinh/: gom thong-tin-cong-trinh.pdf, thong-tin-cong-trinh.json va thu muc minh-chung/.',
+            '- giang-vien/: gom tong-hop-giang-vien.pdf, tong-hop.json va cac tham chieu tong hop.',
+            '- _he-thong/: tep ky thuat phuc vu doi chieu/export, khong phai lop runtime.',
+        ];
+
+        return implode(PHP_EOL, $lines);
+    }
+
     private function syncExportToDestination(
         array $destination,
         string $localRootAbsolute,
-        string $folderName,
-        string $bundleFilename
+        string $folderName
     ): array {
         if (! (bool) config('backup.exports.sync_to_drive', true)) {
             return [
                 'export_path' => $localRootAbsolute,
                 'drive_path' => null,
-                'remote_bundle_path' => null,
             ];
         }
 
@@ -1472,19 +2483,23 @@ class ResticBackupManager
                 throw new BackupRuntimeException('Không xác định được đích rclone cho export.');
             }
 
+            $stagingRoot = $targetRoot . '/' . self::EXPORT_STAGING_DIR;
+            $stagingDir = $stagingRoot . '/' . $folderName;
             $remoteDir = $targetRoot . '/' . $folderName;
-            $this->runRclone(['mkdir', $remoteDir], true, 120);
-
-            foreach (File::allFiles($localRootAbsolute) as $file) {
-                $relative = str_replace('\\', '/', $file->getRelativePathname());
-                $remoteFile = $remoteDir . '/' . $relative;
-                $this->runRclone(['copyto', $file->getPathname(), $remoteFile], false, 3600);
-            }
+            $this->runRclone(['purge', $stagingDir], true, 1800);
+            $this->runRclone([
+                'sync',
+                $localRootAbsolute,
+                $stagingDir,
+                '--create-empty-src-dirs',
+                '--fast-list',
+            ], false, 3600);
+            $this->runRclone(['purge', $remoteDir], true, 1800);
+            $this->runRclone(['moveto', $stagingDir, $remoteDir, '--fast-list'], false, 1800);
 
             return [
                 'export_path' => $remoteDir,
                 'drive_path' => 'rclone:' . $remoteDir,
-                'remote_bundle_path' => $remoteDir . '/' . $bundleFilename,
             ];
         }
 
@@ -1494,25 +2509,31 @@ class ResticBackupManager
                 throw new BackupRuntimeException('Không xác định được thư mục local đích cho export.');
             }
 
+            $stagingRoot = rtrim($targetRoot, '/\\') . DIRECTORY_SEPARATOR . self::EXPORT_STAGING_DIR;
+            $stagingDir = $stagingRoot . DIRECTORY_SEPARATOR . $folderName;
             $targetDir = rtrim($targetRoot, '/\\') . DIRECTORY_SEPARATOR . $folderName;
+            if (File::exists($stagingDir)) {
+                File::deleteDirectory($stagingDir);
+            }
+            File::ensureDirectoryExists(dirname($stagingDir));
+            File::copyDirectory($localRootAbsolute, $stagingDir);
             if (File::exists($targetDir)) {
                 File::deleteDirectory($targetDir);
             }
             File::ensureDirectoryExists(dirname($targetDir));
-            File::copyDirectory($localRootAbsolute, $targetDir);
+            if (! File::moveDirectory($stagingDir, $targetDir, true)) {
+                throw new BackupRuntimeException('Kh�ng th? c�ng b? export local t? thu m?c staging.');
+            }
 
-            $bundlePath = $targetDir . DIRECTORY_SEPARATOR . $bundleFilename;
             return [
                 'export_path' => str_replace('\\', '/', $targetDir),
                 'drive_path' => str_replace('\\', '/', $targetDir),
-                'remote_bundle_path' => str_replace('\\', '/', $bundlePath),
             ];
         }
 
         return [
             'export_path' => $localRootAbsolute,
             'drive_path' => null,
-            'remote_bundle_path' => null,
         ];
     }
 
@@ -2002,16 +3023,16 @@ class ResticBackupManager
             $days
         )));
         if ($labels === []) {
-            return 'Tự động: lịch cố định theo cấu hình hệ thống.';
+            return "T\u{1EF1} \u{0111}\u{1ED9}ng: l\u{1ECB}ch c\u{1ED1} \u{0111}\u{1ECB}nh theo c\u{1EA5}u h\u{00EC}nh h\u{1EC7} th\u{1ED1}ng.";
         }
 
         $dayPart = count($labels) === 1
             ? $labels[0]
-            : (implode(', ', array_slice($labels, 0, -1)) . ' và ' . $labels[count($labels) - 1]);
+            : (implode(', ', array_slice($labels, 0, -1)) . " v\u{00E0} " . $labels[count($labels) - 1]);
 
         return $timePart !== null
-            ? "Tự động: {$dayPart} lúc {$timePart}"
-            : "Tự động: {$dayPart}";
+            ? "T\u{1EF1} \u{0111}\u{1ED9}ng: {$dayPart} l\u{00FA}c {$timePart}"
+            : "T\u{1EF1} \u{0111}\u{1ED9}ng: {$dayPart}";
     }
 
     private function normalizeScheduleTimeForDisplay(string $time): ?string
@@ -2027,16 +3048,16 @@ class ResticBackupManager
     private function scheduleWeekdayLabelVi(int $weekday): string
     {
         $map = [
-            0 => 'Chủ nhật',
-            1 => 'Thứ 2',
-            2 => 'Thứ 3',
-            3 => 'Thứ 4',
-            4 => 'Thứ 5',
-            5 => 'Thứ 6',
-            6 => 'Thứ 7',
+            0 => "Ch\u{1EE7} nh\u{1EAD}t",
+            1 => "Th\u{1EE9} 2",
+            2 => "Th\u{1EE9} 3",
+            3 => "Th\u{1EE9} 4",
+            4 => "Th\u{1EE9} 5",
+            5 => "Th\u{1EE9} 6",
+            6 => "Th\u{1EE9} 7",
         ];
 
-        return $map[$weekday] ?? 'Thứ 2';
+        return $map[$weekday] ?? "Th\u{1EE9} 2";
     }
 
     private function parseTime(string $time): array
@@ -2279,7 +3300,7 @@ class ResticBackupManager
 
         $rcloneConfig = trim((string) config('backup.restic.rclone_config_path', ''));
         if ($rcloneConfig !== '') {
-            $env['RCLONE_CONFIG'] = $rcloneConfig;
+            $env['RCLONE_CONFIG'] = $this->resolveAbsolutePath($rcloneConfig);
         }
 
         $httpProxy = trim((string) config('backup.network.http_proxy', ''));

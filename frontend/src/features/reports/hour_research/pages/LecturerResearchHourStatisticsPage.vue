@@ -49,7 +49,6 @@
         @pageChanged="changePage"
         @pageSizeChanged="changePageSize"
       />
-
     </div>
   </div>
 </template>
@@ -63,6 +62,7 @@ import LecturerResearchHourChartSection from "../components/LecturerResearchHour
 import LecturerResearchHourStatisticsTable from "../components/LecturerResearchHourStatisticsTable.vue";
 import { useUserStore } from "@/app/stores/userStore";
 import { useExportActionFeedback } from "@/shared/composables/useExportActionFeedback";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 import {
   exportHourResearchReportExcel,
   exportHourResearchReportPdf,
@@ -86,6 +86,7 @@ import type {
 const userStore = useUserStore();
 const isFacultyScope = computed(() => userStore.role === "DEPARTMENT_BOARD");
 const scopeFacultyId = ref<number | null>(null);
+const suppressFilterWatch = ref(true);
 
 const selectedFacultyId = ref<number | "ALL">("ALL");
 const selectedAcademicYearId = ref<number | "ALL">("ALL");
@@ -97,6 +98,7 @@ const pageSize = ref(12);
 const isLoading = ref(false);
 const errorMessage = ref("");
 const { exporting, runExport } = useExportActionFeedback();
+const { runPageLoad } = usePageLoadFeedback();
 
 const filterOptions = ref<HourResearchReportFiltersResponse>({
   faculties: [],
@@ -168,7 +170,7 @@ async function loadFilters() {
       if (scopeFacultyId.value) {
         selectedFacultyId.value = scopeFacultyId.value;
       } else if (result.filters.faculties.length === 1) {
-        selectedFacultyId.value = result.filters.faculties[0].id;
+        selectedFacultyId.value = result.filters.faculties[0]?.id ?? "ALL";
       }
       return;
     }
@@ -202,7 +204,22 @@ async function loadReport() {
   }
 }
 
+async function refreshReportWithFeedback() {
+  await runPageLoad(loadReport, {
+    loading: {
+      title: "Đang tải thống kê giờ NCKH",
+      message:
+        "Hệ thống đang cập nhật dữ liệu thống kê giờ nghiên cứu khoa học...",
+    },
+  });
+}
+
 function resetFilters() {
+  const previousFacultyId = selectedFacultyId.value;
+  const previousAcademicYearId = selectedAcademicYearId.value;
+  const previousStatus = selectedStatus.value;
+  const previousPage = page.value;
+
   if (isFacultyScope.value && scopeFacultyId.value) {
     selectedFacultyId.value = scopeFacultyId.value;
   } else {
@@ -211,45 +228,68 @@ function resetFilters() {
   selectedAcademicYearId.value = "ALL";
   selectedStatus.value = "all";
   page.value = 1;
-  void loadReport();
+
+  const filtersChanged =
+    previousFacultyId !== selectedFacultyId.value ||
+    previousAcademicYearId !== selectedAcademicYearId.value ||
+    previousStatus !== selectedStatus.value;
+
+  if (!filtersChanged && previousPage !== page.value) {
+    void refreshReportWithFeedback();
+  }
 }
 
 function changePage(nextPage: number) {
   page.value = nextPage;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 function changePageSize(nextPageSize: number) {
   pageSize.value = nextPageSize;
   page.value = 1;
-  void loadReport();
+  void refreshReportWithFeedback();
 }
 
 async function handleExport(type: "pdf" | "excel") {
   await runExport(type, async () => {
     const params = buildExportParams();
-    return (
-      type === "excel"
-        ? isFacultyScope.value
-          ? await exportFacultyHourResearchReportExcel(params)
-          : await exportHourResearchReportExcel(params)
-        : isFacultyScope.value
-          ? await exportFacultyHourResearchReportPdf(params)
-          : await exportHourResearchReportPdf(params)
-    );
+    return type === "excel"
+      ? isFacultyScope.value
+        ? await exportFacultyHourResearchReportExcel(params)
+        : await exportHourResearchReportExcel(params)
+      : isFacultyScope.value
+        ? await exportFacultyHourResearchReportPdf(params)
+        : await exportHourResearchReportPdf(params);
   });
 }
 
-watch(
-  [selectedFacultyId, selectedAcademicYearId, selectedStatus],
-  () => {
-    page.value = 1;
-    void loadReport();
+watch([selectedFacultyId, selectedAcademicYearId, selectedStatus], () => {
+  if (suppressFilterWatch.value) {
+    return;
   }
-);
+
+  page.value = 1;
+  void refreshReportWithFeedback();
+});
 
 onMounted(async () => {
-  await loadFilters();
-  await loadReport();
+  suppressFilterWatch.value = true;
+  try {
+    await runPageLoad(
+      async () => {
+        await loadFilters();
+        await loadReport();
+      },
+      {
+        loading: {
+          title: "Đang khởi tạo thống kê giờ NCKH",
+          message:
+            "Hệ thống đang chuẩn bị dữ liệu thống kê giờ nghiên cứu khoa học...",
+        },
+      },
+    );
+  } finally {
+    suppressFilterWatch.value = false;
+  }
 });
 </script>

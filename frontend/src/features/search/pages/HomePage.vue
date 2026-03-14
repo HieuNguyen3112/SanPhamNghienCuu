@@ -106,6 +106,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { useUserStore } from "@/app/stores/userStore";
+import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
 import { usePublicResearch } from "@/features/public-research/composables/usePublicResearch";
 
 import PublicHomeTopHeader from "@/features/search/components/PublicHomeTopHeader.vue";
@@ -117,6 +118,7 @@ type CategoryKey = "lecturer" | "article" | "project" | "book" | "conference";
 
 const router = useRouter();
 const userStore = useUserStore();
+const { logoutWithFeedback } = useLogoutFeedback("/");
 
 onMounted(async () => {
   if (!userStore.isInitialized) {
@@ -138,8 +140,7 @@ const userInitials = computed(() => {
 });
 
 async function handleLogout() {
-  await userStore.logout();
-  await router.replace("/");
+  await logoutWithFeedback();
 }
 
 /** ✅ research_works từ backend thật */

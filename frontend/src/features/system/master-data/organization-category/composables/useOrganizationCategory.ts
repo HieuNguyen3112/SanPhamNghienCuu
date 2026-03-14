@@ -12,12 +12,14 @@ import {
   facultyOptionFromDto,
 } from "../contracts/organizationCategory.contract";
 import { OrganizationCategoryService } from "../services/organizationCategoryService";
+import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 type Scope = "FACULTY" | "UNIVERSITY";
 
 export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
   const isFacultyScope = scope === "FACULTY";
   const service = new OrganizationCategoryService(scope);
+  const { runPageLoad } = usePageLoadFeedback();
 
   const activeTab = ref<TabKey>("faculties");
 
@@ -28,12 +30,10 @@ export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
   const facultyOptions = ref<FacultyOption[]>([]);
   const departments = ref<Department[]>([]);
 
-  // Filters
   const facultySearch = ref("");
   const departmentSearch = ref("");
   const departmentFacultyId = ref<number | "ALL">("ALL");
 
-  // Pagination
   const facultyPageSize = ref(12);
   const facultyCurrentPageNumber = ref(1);
   const facultyTotalItemCount = ref(0);
@@ -42,7 +42,6 @@ export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
   const departmentCurrentPageNumber = ref(1);
   const departmentTotalItemCount = ref(0);
 
-  // Modals
   const facultyFormOpen = ref(false);
   const editingFaculty = ref<Faculty | null>(null);
 
@@ -52,23 +51,34 @@ export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
   let ignoreDepartmentFacultyWatch = false;
 
   async function withLoading(task: () => Promise<void>) {
-    loading.value = true;
-    error.value = null;
-    try {
-      await task();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : "Không tải được dữ liệu.";
-    } finally {
-      loading.value = false;
-    }
+    const execute = async () => {
+      loading.value = true;
+      error.value = null;
+      try {
+        await task();
+      } catch (e) {
+        error.value =
+          e instanceof Error ? e.message : "Không tải được dữ liệu.";
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    await runPageLoad(execute, {
+      loading: {
+        title: "Đang tải danh mục tổ chức",
+        message: "Hệ thống đang cập nhật dữ liệu cơ cấu tổ chức...",
+      },
+    });
   }
 
   async function loadFacultyOptions() {
     const list = await service.listFacultyOptions();
     facultyOptions.value = list.map(facultyOptionFromDto);
 
-    if (isFacultyScope && facultyOptions.value.length) {
-      const scopedId = facultyOptions.value[0].id;
+    const scopedOption = facultyOptions.value[0];
+    if (isFacultyScope && scopedOption) {
+      const scopedId = scopedOption.id;
       if (departmentFacultyId.value !== scopedId) {
         ignoreDepartmentFacultyWatch = true;
         departmentFacultyId.value = scopedId;
@@ -120,7 +130,6 @@ export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
     });
   }
 
-  // ===== Search debounce =====
   let facultySearchTimer: number | null = null;
   watch(facultySearch, () => {
     if (facultySearchTimer) window.clearTimeout(facultySearchTimer);
@@ -150,7 +159,6 @@ export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
     if (departmentSearchTimer) window.clearTimeout(departmentSearchTimer);
   });
 
-  // ===== Actions =====
   function openCreateFaculty() {
     editingFaculty.value = null;
     facultyFormOpen.value = true;
@@ -248,12 +256,10 @@ export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
     facultyOptions,
     departments,
 
-    // filters
     facultySearch,
     departmentSearch,
     departmentFacultyId,
 
-    // pagination
     facultyPageSize,
     facultyCurrentPageNumber,
     facultyTotalItemCount,
@@ -262,13 +268,11 @@ export function useOrganizationCategory(scope: Scope = "UNIVERSITY") {
     departmentCurrentPageNumber,
     departmentTotalItemCount,
 
-    // modals
     facultyFormOpen,
     editingFaculty,
     departmentFormOpen,
     editingDepartment,
 
-    // actions
     refreshAll,
 
     openCreateFaculty,

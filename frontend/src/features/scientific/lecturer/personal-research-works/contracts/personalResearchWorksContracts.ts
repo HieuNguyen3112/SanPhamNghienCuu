@@ -72,6 +72,15 @@ export interface PersonalWorkRowDTO {
   submitted_at: string | null;
   approved_at: string | null;
   updated_at: string;
+  actions?: PersonalWorkActionsDTO;
+}
+
+export interface PersonalWorkActionsDTO {
+  can_edit?: boolean;
+  can_submit?: boolean;
+  can_delete?: boolean;
+  can_view?: boolean;
+  can_reinvite?: boolean;
 }
 
 export interface PersonalWorkAuthorDTO {
@@ -183,6 +192,7 @@ export interface PersonalWorkDetailDTO {
 
   approvals: PersonalWorkApprovalDTO[];
   status_histories: PersonalWorkStatusHistoryDTO[];
+  actions?: PersonalWorkActionsDTO;
 }
 
 // =====================
@@ -234,6 +244,15 @@ export interface PersonalWorkRow {
   submittedAt: string | null;
   approvedAt: string | null;
   updatedAt: string;
+  actions: PersonalWorkActions;
+}
+
+export interface PersonalWorkActions {
+  canEdit: boolean;
+  canSubmit: boolean;
+  canDelete: boolean;
+  canView: boolean;
+  canReinvite: boolean;
 }
 
 export interface PersonalWorkAuthor {
@@ -343,6 +362,7 @@ export interface PersonalWorkDetail {
 
   approvals: PersonalWorkApproval[];
   statusHistories: PersonalWorkStatusHistory[];
+  actions: PersonalWorkActions;
 }
 
 // =====================
@@ -397,6 +417,7 @@ export const mapper = {
       submittedAt: dto.submitted_at,
       approvedAt: dto.approved_at,
       updatedAt: dto.updated_at,
+      actions: mapActionsFromDto(dto.actions),
     };
   },
 
@@ -504,6 +525,17 @@ export const mapper = {
         toStatusCode: h.to_status_code,
         note: h.note,
       })),
+      actions: mapActionsFromDto(dto.actions),
     };
   },
 };
+
+function mapActionsFromDto(dto?: PersonalWorkActionsDTO | null): PersonalWorkActions {
+  return {
+    canEdit: dto?.can_edit ?? false,
+    canSubmit: dto?.can_submit ?? false,
+    canDelete: dto?.can_delete ?? false,
+    canView: dto?.can_view ?? true,
+    canReinvite: dto?.can_reinvite ?? false,
+  };
+}

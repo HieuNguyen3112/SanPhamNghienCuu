@@ -283,12 +283,12 @@
               </button>
 
               <button
-                v-if="work && ['draft', 'member_rejected'].includes(work.statusCode)"
+                v-if="work && work.actions.canEdit"
                 type="button"
                 class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
                 @click="emit('edit-draft', work.activityId)"
               >
-                Chỉnh sửa công trình
+                {{ editActionLabel(work) }}
               </button>
             </div>
           </div>
@@ -380,6 +380,12 @@ function badgeClass(statusCode: PersonalWorkStatusCode): string {
     default:
       return "bg-slate-100 text-slate-700 ring-1 ring-slate-200";
   }
+}
+
+function editActionLabel(work: PersonalWorkDetail): string {
+  if (work.statusCode === "member_rejected") return "Chỉnh sửa thành viên";
+  if (work.statusCode === "rejected") return "Mở lại để chỉnh sửa";
+  return "Chỉnh sửa công trình";
 }
 
 function formatDateTime(value: string | null): string {
