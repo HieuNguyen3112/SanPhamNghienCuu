@@ -14,16 +14,16 @@ class RoleMapper
 
     /**
      * Map canonical role -> list of backend (Spatie) role codes.
-     * IMPORTANT: Backend now uses canonical role names directly.
+     * Backend uses canonical role names directly.
      */
     public static function canonicalToBackend(string $role): array
     {
         $r = strtoupper($role);
 
         return match ($r) {
-            'LECTURER' => ['LECTURER', 'GV'],
-            'DEPARTMENT_BOARD' => ['DEPARTMENT_BOARD', 'DL'],
-            'SCIENCE_OFFICE' => ['SCIENCE_OFFICE', 'QL', 'ADMIN'],
+            'LECTURER' => ['LECTURER'],
+            'DEPARTMENT_BOARD' => ['DEPARTMENT_BOARD'],
+            'SCIENCE_OFFICE' => ['SCIENCE_OFFICE'],
             default => [],
         };
     }
@@ -31,14 +31,13 @@ class RoleMapper
 
     /**
      * Map backend role -> canonical role (first match); null if unknown.
-     * IMPORTANT: Backend now uses canonical role names directly.
      */
     public static function backendToCanonical(string $role): ?string
     {
         return match (strtoupper($role)) {
-            'LECTURER', 'GV' => 'LECTURER',
-            'DEPARTMENT_BOARD', 'DL' => 'DEPARTMENT_BOARD',
-            'SCIENCE_OFFICE', 'QL', 'ADMIN' => 'SCIENCE_OFFICE',
+            'LECTURER' => 'LECTURER',
+            'DEPARTMENT_BOARD' => 'DEPARTMENT_BOARD',
+            'SCIENCE_OFFICE' => 'SCIENCE_OFFICE',
             default => null,
         };
     }

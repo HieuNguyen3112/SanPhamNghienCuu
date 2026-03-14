@@ -22,7 +22,7 @@ class FacultyLecturerAccountCreationTest extends TestCase
         Role::findOrCreate('LECTURER', 'web');
     }
 
-    public function test_department_board_can_create_lecturer_account_in_own_department_only(): void
+    public function test_department_board_can_create_lecturer_account_in_selected_unit_within_same_faculty(): void
     {
         [$facultyId, $departmentA, $departmentB] = $this->seedFacultyDepartments();
 
@@ -48,6 +48,7 @@ class FacultyLecturerAccountCreationTest extends TestCase
             'lecturer_code' => 'GV900',
             'full_name' => 'Nguyen Van Lecturer',
             'email' => 'gv900@uni.test',
+            'unit_id' => $departmentB,
             'phone_number' => '0988999777',
             'academic_title' => 'Giang vien',
             'degree_id' => null,
@@ -57,13 +58,12 @@ class FacultyLecturerAccountCreationTest extends TestCase
             'role' => 'DEPARTMENT_BOARD',
             'role_keys' => ['DEPARTMENT_BOARD'],
             'department_id' => $departmentB,
-            'unit_id' => $departmentB,
         ]);
 
         $response->assertStatus(201)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.lecturer_code', 'GV900')
-            ->assertJsonPath('data.unit_id', $departmentA)
+            ->assertJsonPath('data.unit_id', $departmentB)
             ->assertJsonPath('data.status', 'ACTIVE')
             ->assertJsonPath('data.role_keys.0', 'LECTURER');
 
@@ -72,13 +72,13 @@ class FacultyLecturerAccountCreationTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $createdUserId,
             'email' => 'gv900@uni.test',
-            'must_change_password' => true,
+            'must_change_password' => false,
         ]);
 
         $this->assertDatabaseHas('lecturers', [
             'user_id' => $createdUserId,
             'code' => 'GV900',
-            'department_id' => $departmentA,
+            'department_id' => $departmentB,
             'active' => true,
         ]);
 
@@ -132,8 +132,50 @@ class FacultyLecturerAccountCreationTest extends TestCase
             'lecturer_code' => 'GV_EXIST',
             'full_name' => 'Will Fail',
             'email' => 'dup-email@uni.test',
+            'unit_id' => $departmentA,
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['lecturer_code', 'email']);
+    }
+
+    public function test_create_lecturer_rejects_unit_outside_faculty_scope(): void
+    {
+        [, $departmentA] = $this->seedFacultyDepartments();
+
+        $outsideFacultyId = DB::table('faculties')->insertGetId([
+            'code' => 'KT',
+            'name' => 'Khoa Ke toan',
+        ]);
+        $outsideDepartmentId = DB::table('departments')->insertGetId([
+            'faculty_id' => $outsideFacultyId,
+            'code' => 'KT01',
+            'name' => 'Bo mon Ke toan doanh nghiep',
+        ]);
+
+        $departmentAdmin = User::factory()->create([
+            'email' => 'dept-admin-3@uni.test',
+            'email_verified_at' => now(),
+        ]);
+        $departmentAdmin->assignRole('DEPARTMENT_BOARD');
+
+        Lecturer::create([
+            'user_id' => $departmentAdmin->id,
+            'code' => 'DL003',
+            'full_name' => 'Department Admin 3',
+            'email' => 'dept-admin-3@uni.test',
+            'department_id' => $departmentA,
+            'active' => true,
+        ]);
+
+        Sanctum::actingAs($departmentAdmin);
+
+        $this->postJson('/api/faculty/users/lecturer-accounts', [
+            'lecturer_code' => 'GV901',
+            'full_name' => 'Ngoai Pham Vi',
+            'email' => 'gv901@uni.test',
+            'unit_id' => $outsideDepartmentId,
+            'status' => 'ACTIVE',
+        ])->assertStatus(403)
+            ->assertJsonPath('message', 'unit not in scope');
     }
 
     private function seedFacultyDepartments(): array

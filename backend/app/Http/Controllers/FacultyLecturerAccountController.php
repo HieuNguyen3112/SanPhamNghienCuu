@@ -30,10 +30,16 @@ class FacultyLecturerAccountController extends Controller
             return response()->json(['message' => 'department scope not found'], Response::HTTP_FORBIDDEN);
         }
 
+        $validated = $request->validated();
+        $unitId = (int) $validated['unit_id'];
+        if (! $this->unitInScope($unitId, $departmentScope['faculty_id'])) {
+            return response()->json(['message' => 'unit not in scope'], Response::HTTP_FORBIDDEN);
+        }
+
         $data = CreateLecturerAccountData::fromFacultyRequest(
-            payload: $request->validated(),
+            payload: $validated,
             creatorUserId: (int) $request->user()->id,
-            departmentId: $departmentScope['department_id'],
+            departmentId: $unitId,
             facultyId: $departmentScope['faculty_id'],
         );
 

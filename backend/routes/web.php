@@ -30,16 +30,16 @@ Route::middleware(['web'])->group(function () {
     Route::post('/logout', [SessionAuthController::class, 'logout'])->middleware('auth');
 
     // Profile: /me tra JSON ke ca loi (auth/verified/role) de tranh redirect/HTML
-    Route::middleware(['force.json', 'auth', 'verified', 'role:LECTURER|DEPARTMENT_BOARD|SCIENCE_OFFICE|GV|DL|QL|ADMIN'])->group(function () {
+    Route::middleware(['force.json', 'auth', 'verified', 'role:LECTURER|DEPARTMENT_BOARD|SCIENCE_OFFICE'])->group(function () {
         Route::get('/me', [ProfileController::class, 'me']);
     });
 
-    Route::middleware(['auth', 'verified', 'role:LECTURER|DEPARTMENT_BOARD|SCIENCE_OFFICE|GV|DL|QL|ADMIN'])->group(function () {
+    Route::middleware(['auth', 'verified', 'role:LECTURER|DEPARTMENT_BOARD|SCIENCE_OFFICE'])->group(function () {
         Route::put('/profile', [ProfileController::class, 'updateProfile']);
         Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
 
         // Nhom placeholder cho cac module web rieng theo role (them sau)
-        Route::middleware('role:SCIENCE_OFFICE|QL|ADMIN')->group(function () {
+        Route::middleware('role:SCIENCE_OFFICE')->group(function () {
             // TODO: them route quan tri web (neu can) - giu trong de sap xep middleware
         });
     });

@@ -18,6 +18,11 @@ class RepairRolesCommand extends Command
     {
         $canonicalRoles = RoleMapper::canonicalRoles();
         $legacyRoles = ['GV', 'DL', 'QL', 'ADMIN'];
+        $migrationSourceRoleNames = [
+            'LECTURER' => ['LECTURER', 'GV'],
+            'DEPARTMENT_BOARD' => ['DEPARTMENT_BOARD', 'DL'],
+            'SCIENCE_OFFICE' => ['SCIENCE_OFFICE', 'QL', 'ADMIN'],
+        ];
 
         $createdRoles = 0;
         $migratedAssignments = [];
@@ -62,11 +67,14 @@ class RepairRolesCommand extends Command
                     continue;
                 }
 
-                $sourceNames = array_values(array_unique(array_map('strtoupper', RoleMapper::canonicalToBackend($canonicalRole))));
+                $sourceNames = array_values(array_unique(array_map(
+                    'strtoupper',
+                    $migrationSourceRoleNames[$canonicalRole] ?? [$canonicalRole]
+                )));
                 $sourceRoleIds = $roles
-                    ->filter(fn ($role) => in_array(strtoupper((string) $role->name), $sourceNames, true))
+                    ->filter(fn($role) => in_array(strtoupper((string) $role->name), $sourceNames, true))
                     ->pluck('id')
-                    ->map(fn ($id) => (int) $id)
+                    ->map(fn($id) => (int) $id)
                     ->all();
 
                 if (count($sourceRoleIds) === 0) {
@@ -78,7 +86,7 @@ class RepairRolesCommand extends Command
                     ->whereIn('role_id', $sourceRoleIds)
                     ->select(['model_type', 'model_id'])
                     ->get()
-                    ->unique(fn ($row) => $row->model_type . '#' . $row->model_id)
+                    ->unique(fn($row) => $row->model_type . '#' . $row->model_id)
                     ->values();
 
                 if ($assignments->isEmpty()) {
@@ -87,7 +95,7 @@ class RepairRolesCommand extends Command
                 }
 
                 $rowsToInsert = $assignments
-                    ->map(fn ($row) => [
+                    ->map(fn($row) => [
                         'role_id' => $targetRoleId,
                         'model_type' => $row->model_type,
                         'model_id' => $row->model_id,
@@ -127,9 +135,9 @@ class RepairRolesCommand extends Command
 
             if ($this->option('prune-legacy')) {
                 $legacyRoleIds = $roles
-                    ->filter(fn ($role) => in_array(strtoupper((string) $role->name), $legacyRoles, true))
+                    ->filter(fn($role) => in_array(strtoupper((string) $role->name), $legacyRoles, true))
                     ->pluck('id')
-                    ->map(fn ($id) => (int) $id)
+                    ->map(fn($id) => (int) $id)
                     ->all();
 
                 if (count($legacyRoleIds) > 0) {
@@ -162,4 +170,3 @@ class RepairRolesCommand extends Command
         return self::SUCCESS;
     }
 }
-

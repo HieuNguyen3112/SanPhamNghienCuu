@@ -15,12 +15,11 @@
           />
 
           <button
-            v-if="isFacultyScope"
             type="button"
             class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
             @click="openCreate"
           >
-            + Thêm giảng viên
+            {{ isFacultyScope ? "+ Thêm giảng viên" : "+ Thêm BCN khoa" }}
           </button>
         </div>
       </div>
@@ -28,7 +27,8 @@
       <!-- Filter -->
       <LecturerAccountFilterBar
         :filter="filter"
-        :unit-options="unitOptions"
+        :unit-options="filterOptions"
+        :unit-label="isFacultyScope ? 'Đơn vị' : 'Khoa'"
         :role-options="roleOptions"
         :loading="loading"
         :result-count="resultCount"
@@ -45,6 +45,7 @@
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
         :total-item-count="totalItems"
+        :unit-label="isFacultyScope ? 'Đơn vị' : 'Khoa'"
         :can-manage-roles="!isFacultyScope"
         @edit="openEdit"
         @roles="openRoles"
@@ -58,6 +59,8 @@
         :open="createOpen"
         :saving="savingEdit"
         :error="savingError"
+        :unit-options="isFacultyScope ? unitOptions : filterOptions"
+        :organization-label="isFacultyScope ? 'Đơn vị' : 'Khoa'"
         @close="closeAllModals"
         @save="saveCreate"
       />
@@ -115,6 +118,7 @@ const isFacultyScope = computed(() => scope.value === "FACULTY");
 
 const {
   filter,
+  filterOptions,
   unitOptions,
   roleOptions,
 

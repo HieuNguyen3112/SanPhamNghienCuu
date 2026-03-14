@@ -21,7 +21,7 @@ class SessionAuthController extends Controller
     /**
      * POST /login (session + CSRF)
      *
-     * Payload: email, password, remember?
+     * Payload: email(identifier), password, remember?
      * Success response: { success, message, token: null, user: { id, name, email, roles } }
      * Lưu ý: không phát hành Sanctum PAT cho SPA login; field token luôn null để giữ nguyên schema phản hồi.
      */
@@ -52,7 +52,7 @@ class SessionAuthController extends Controller
         if ($incomingRole) {
             $normalizedRole = strtoupper((string) $incomingRole);
 
-            // Chấp nhận cả mã backend (GV/DL/QL/ADMIN) lẫn role canonical (LECTURER/DEPARTMENT_BOARD/SCIENCE_OFFICE)
+            // Chỉ chấp nhận role canonical (LECTURER/DEPARTMENT_BOARD/SCIENCE_OFFICE)
             if ($canonicalRole = RoleMapper::backendToCanonical($normalizedRole)) {
                 $request->merge(['role' => $canonicalRole]);
             } elseif (in_array($normalizedRole, $allowedRoles, true)) {
@@ -61,16 +61,16 @@ class SessionAuthController extends Controller
         }
 
         $data = $request->validate([
-            'email'    => ['required', 'email'],
+            'email'    => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
             'role'     => ['nullable', 'string', Rule::in($allowedRoles)],
             'remember' => ['sometimes', 'boolean'],
         ]);
 
-        if (! Auth::guard('web')->attempt(
-            ['email' => $data['email'], 'password' => $data['password']],
-            $data['remember'] ?? false
-        )) {
+        $identifier = trim((string) $data['email']);
+        $remember = (bool) ($data['remember'] ?? false);
+
+        if (! $this->attemptWithIdentifier($identifier, (string) $data['password'], $remember)) {
             AuditLogger::log($request, [
                 'action_group' => 'auth',
                 'action_code' => 'LOGIN_FAILED',
@@ -156,8 +156,7 @@ class SessionAuthController extends Controller
                 ], Response::HTTP_FORBIDDEN);
             }
 
-            // Backward-compatibility: user DB cũ chỉ có role legacy (GV/DL/QL/ADMIN)
-            // -> tự gán thêm canonical role để qua middleware role:LECTURER|... ở API mới.
+            // Đảm bảo user luôn có role canonical tương ứng với role đã chọn lúc đăng nhập.
             if (! $user->hasRole($requestedRole, 'web')) {
                 Role::findOrCreate($requestedRole, 'web');
                 $user->assignRole($requestedRole);
@@ -253,8 +252,7 @@ class SessionAuthController extends Controller
     }
 
     /**
-     * Accept both canonical + legacy role rows, regardless of old guard mismatch.
-     * Once accepted, caller will attach canonical web role.
+     * Check whether user has any accepted canonical role.
      */
     private function userHasAnyAcceptedRole(User $user, array $acceptedRoles): bool
     {
@@ -272,5 +270,34 @@ class SessionAuthController extends Controller
             ->where('mhr.model_id', $user->id)
             ->whereIn('r.name', $acceptedRoles)
             ->exists();
+    }
+
+    /**
+     * Accept login identifier as email or lecturer code.
+     */
+    private function attemptWithIdentifier(string $identifier, string $password, bool $remember): bool
+    {
+        if ($identifier === '') {
+            return false;
+        }
+
+        if (Auth::guard('web')->attempt(['email' => $identifier, 'password' => $password], $remember)) {
+            return true;
+        }
+
+        $emailByLecturerCode = DB::table('lecturers as l')
+            ->join('users as u', 'u.id', '=', 'l.user_id')
+            ->whereRaw('UPPER(l.code) = ?', [strtoupper($identifier)])
+            ->value('u.email');
+
+        if (! is_string($emailByLecturerCode) || $emailByLecturerCode === '') {
+            return false;
+        }
+
+        if (strcasecmp($emailByLecturerCode, $identifier) === 0) {
+            return false;
+        }
+
+        return Auth::guard('web')->attempt(['email' => $emailByLecturerCode, 'password' => $password], $remember);
     }
 }

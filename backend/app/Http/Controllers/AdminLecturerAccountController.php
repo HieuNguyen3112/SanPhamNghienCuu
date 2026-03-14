@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\DTO\UserManagement\CreateLecturerAccountData;
 use App\Models\Department;
 use App\Models\Lecturer;
 use App\Models\LecturerProfile;
+use App\Services\UserManagement\CreateFacultyLecturerAccountService;
 use App\Support\RoleMapper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +18,87 @@ class AdminLecturerAccountController extends Controller
 {
     private const ASSIGNABLE_ROLE_KEYS = ['LECTURER', 'DEPARTMENT_BOARD'];
 
+    public function __construct(
+        private readonly CreateFacultyLecturerAccountService $createFacultyLecturerAccountService,
+    ) {}
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'lecturer_code' => ['required', 'string', 'max:50', Rule::unique('lecturers', 'code')],
+            'full_name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
+            'phone_number' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+().\-\s]{8,30}$/'],
+            'academic_title' => ['nullable', 'string', 'max:255'],
+            'degree_id' => ['nullable', 'integer', 'exists:degrees,id'],
+            'academic_rank_id' => ['nullable', 'integer', 'exists:academic_ranks,id'],
+            'unit_id' => ['nullable', 'integer', 'exists:departments,id', 'required_without:faculty_id'],
+            'faculty_id' => ['nullable', 'integer', 'exists:faculties,id'],
+            'status' => ['nullable', Rule::in(['ACTIVE', 'INACTIVE'])],
+        ]);
+
+        $inputFacultyId = isset($validated['faculty_id']) ? (int) $validated['faculty_id'] : null;
+        $inputUnitId = isset($validated['unit_id']) ? (int) $validated['unit_id'] : null;
+
+        $unitId = $inputUnitId;
+        $facultyId = $inputFacultyId;
+
+        if ($inputFacultyId) {
+            if ($inputUnitId) {
+                $belongs = DB::table('departments')
+                    ->where('id', $inputUnitId)
+                    ->where('faculty_id', $inputFacultyId)
+                    ->exists();
+                if (! $belongs) {
+                    return response()->json(['message' => 'unit not in faculty'], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+            } else {
+                $resolvedUnitId = DB::table('departments')
+                    ->where('faculty_id', $inputFacultyId)
+                    ->orderBy('name')
+                    ->value('id');
+                if (! $resolvedUnitId) {
+                    return response()->json(['message' => 'faculty has no unit'], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $unitId = (int) $resolvedUnitId;
+            }
+        }
+
+        if (! $facultyId && $unitId) {
+            $facultyId = DB::table('departments')->where('id', $unitId)->value('faculty_id');
+        }
+
+        if (! $facultyId || ! $unitId) {
+            return response()->json(['message' => 'unit not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $data = CreateLecturerAccountData::fromFacultyRequest(
+            payload: $validated,
+            creatorUserId: (int) $request->user()->id,
+            departmentId: $unitId,
+            facultyId: (int) $facultyId,
+        );
+
+        $lecturer = $this->createFacultyLecturerAccountService->handle(
+            data: $data,
+            request: $request,
+            assignedRole: 'DEPARTMENT_BOARD',
+            auditOverrides: [
+                'action_group' => 'admin.lecturer_accounts',
+                'action_code' => 'ADMIN_DEPARTMENT_BOARD_ACCOUNT_CREATED',
+                'action_label' => 'Truong tao tai khoan BCN khoa',
+            ],
+        );
+
+        $lecturer->load(['user.roles', 'department', 'profile']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'created',
+            'data' => $this->buildRowPayload($lecturer),
+        ], Response::HTTP_CREATED);
+    }
+
     public function index(Request $request)
     {
         $validated = $this->validateListRequest($request);
@@ -25,22 +108,33 @@ class AdminLecturerAccountController extends Controller
 
         $keyword = trim((string) ($validated['keyword'] ?? ''));
         $unitId = $validated['unit_id'] ?? null;
+        $facultyId = $validated['faculty_id'] ?? null;
         $status = $this->normalizeStatusFilter($validated['status'] ?? null);
         $roleKeys = $this->normalizeRoleKeys($validated['role_keys'] ?? [], $validated['role'] ?? null);
 
         $query = Lecturer::query()
+            ->select([
+                'lecturers.*',
+                'departments.faculty_id as faculty_id',
+                'faculties.name as faculty_name',
+            ])
+            ->leftJoin('departments', 'departments.id', '=', 'lecturers.department_id')
+            ->leftJoin('faculties', 'faculties.id', '=', 'departments.faculty_id')
             ->with(['user.roles', 'department', 'profile'])
             ->when($unitId, function ($q, $unitId) {
-                $q->where('department_id', $unitId);
+                $q->where('lecturers.department_id', $unitId);
+            })
+            ->when($facultyId, function ($q, $facultyId) {
+                $q->where('departments.faculty_id', $facultyId);
             })
             ->when($status, function ($q, $status) {
-                $q->where('active', $status === 'active');
+                $q->where('lecturers.active', $status === 'active');
             })
             ->when($keyword !== '', function ($q) use ($keyword) {
                 $q->where(function ($sub) use ($keyword) {
-                    $sub->where('code', 'like', '%' . $keyword . '%')
-                        ->orWhere('full_name', 'like', '%' . $keyword . '%')
-                        ->orWhere('email', 'like', '%' . $keyword . '%')
+                    $sub->where('lecturers.code', 'like', '%' . $keyword . '%')
+                        ->orWhere('lecturers.full_name', 'like', '%' . $keyword . '%')
+                        ->orWhere('lecturers.email', 'like', '%' . $keyword . '%')
                         ->orWhereHas('user', function ($userQuery) use ($keyword) {
                             $userQuery->where('email', 'like', '%' . $keyword . '%')
                                 ->orWhere('name', 'like', '%' . $keyword . '%');
@@ -80,6 +174,7 @@ class AdminLecturerAccountController extends Controller
                 'filters' => [
                     'keyword' => $keyword,
                     'unit_id' => $unitId,
+                    'faculty_id' => $facultyId,
                     'status' => $status ?? 'all',
                     'role_keys' => $roleKeys,
                 ],
@@ -96,6 +191,14 @@ class AdminLecturerAccountController extends Controller
             ->map(fn(Department $d) => ['id' => (int) $d->id, 'name' => $d->name])
             ->all();
 
+        $faculties = DB::table('faculties')
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn($f) => ['id' => (int) $f->id, 'name' => (string) $f->name])
+            ->values()
+            ->all();
+
         $roles = $this->roleOptions();
 
         $statuses = [
@@ -108,6 +211,7 @@ class AdminLecturerAccountController extends Controller
             'message' => 'ok',
             'data' => [
                 'units' => $units,
+                'faculties' => $faculties,
                 'roles' => $roles,
                 'statuses' => $statuses,
             ],
@@ -217,6 +321,7 @@ class AdminLecturerAccountController extends Controller
         return $request->validate([
             'keyword' => ['nullable', 'string', 'max:255'],
             'unit_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'faculty_id' => ['nullable', 'integer', 'exists:faculties,id'],
             'status' => ['nullable', 'string', 'max:20'],
             'role' => ['nullable', 'string', 'max:50'],
             'role_keys' => ['nullable', 'array'],
@@ -281,10 +386,10 @@ class AdminLecturerAccountController extends Controller
         $field = ltrim($raw, '-');
 
         $allowed = [
-            'updated_at' => 'updated_at',
-            'full_name' => 'full_name',
-            'lecturer_code' => 'code',
-            'email' => 'email',
+            'updated_at' => 'lecturers.updated_at',
+            'full_name' => 'lecturers.full_name',
+            'lecturer_code' => 'lecturers.code',
+            'email' => 'lecturers.email',
         ];
 
         if (! $field || ! array_key_exists($field, $allowed)) {
@@ -308,6 +413,8 @@ class AdminLecturerAccountController extends Controller
             'username' => $user?->name ?? '',
             'unit_id' => (int) $lecturer->department_id,
             'unit_name' => $lecturer->department?->name ?? '',
+            'faculty_id' => isset($lecturer->faculty_id) ? (int) $lecturer->faculty_id : null,
+            'faculty_name' => isset($lecturer->faculty_name) ? (string) $lecturer->faculty_name : null,
             'role_keys' => RoleMapper::backendListToCanonical($backendRoles),
             'status' => $lecturer->active ? 'ACTIVE' : 'INACTIVE',
             'position_title' => $profile?->current_position,

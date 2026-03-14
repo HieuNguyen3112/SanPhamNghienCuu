@@ -13,23 +13,43 @@ use Spatie\Permission\Models\Role;
 
 class CreateFacultyLecturerAccountService
 {
+    private const ALLOWED_ASSIGNED_ROLES = ['LECTURER', 'DEPARTMENT_BOARD'];
+
     public function __construct(
         private readonly LecturerAccountRepository $lecturerAccountRepository,
     ) {}
 
-    public function handle(CreateLecturerAccountData $data, Request $request): Lecturer
-    {
-        return DB::transaction(function () use ($data, $request) {
+    /**
+     * @param  array<string, mixed>  $auditOverrides
+     */
+    public function handle(
+        CreateLecturerAccountData $data,
+        Request $request,
+        string $assignedRole = 'LECTURER',
+        array $auditOverrides = [],
+    ): Lecturer {
+        return DB::transaction(function () use ($data, $request, $assignedRole, $auditOverrides) {
+            $normalizedRole = strtoupper($assignedRole);
+            if (! in_array($normalizedRole, self::ALLOWED_ASSIGNED_ROLES, true)) {
+                $normalizedRole = 'LECTURER';
+            }
+
             $user = $this->lecturerAccountRepository->createUser([
                 'name' => $data->fullName,
                 'email' => $data->email,
                 'password' => Hash::make((string) config('users_management.default_lecturer_password', 'Password!123')),
-                'must_change_password' => true,
+                'must_change_password' => false,
                 'email_verified_at' => now(),
             ]);
 
-            Role::findOrCreate('LECTURER', 'web');
-            $user->syncRoles(['LECTURER']);
+            // `email_verified_at` may be ignored by mass-assignment rules on User.
+            // Force set it to keep faculty-created internal accounts login-ready.
+            if (! $user->email_verified_at) {
+                $user->forceFill(['email_verified_at' => now()])->save();
+            }
+
+            Role::findOrCreate($normalizedRole, 'web');
+            $user->syncRoles([$normalizedRole]);
 
             $lecturer = $this->lecturerAccountRepository->createLecturer([
                 'user_id' => $user->id,
@@ -47,7 +67,7 @@ class CreateFacultyLecturerAccountService
                 'current_position' => $data->academicTitle,
             ]);
 
-            AuditLogger::log($request, [
+            AuditLogger::log($request, array_merge([
                 'action_group' => 'faculty.lecturer_accounts',
                 'action_code' => 'FACULTY_LECTURER_ACCOUNT_CREATED',
                 'action_label' => 'Khoa tạo tài khoản giảng viên',
@@ -60,10 +80,10 @@ class CreateFacultyLecturerAccountService
                 'changes' => [
                     'lecturer_code' => $data->lecturerCode,
                     'department_id' => $data->departmentId,
-                    'assigned_role' => 'LECTURER',
-                    'must_change_password' => true,
+                    'assigned_role' => $normalizedRole,
+                    'must_change_password' => false,
                 ],
-            ], $request->user());
+            ], $auditOverrides), $request->user());
 
             return $lecturer;
         });

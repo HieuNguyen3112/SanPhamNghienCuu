@@ -11,7 +11,8 @@
               Quản lý tài khoản giảng viên (BCN Khoa)
             </div>
             <div class="mt-1 text-sm text-slate-600">
-              Phạm vi: giảng viên thuộc khoa của bạn. Không thể xem khoa khác.
+              Phạm vi: giảng viên thuộc khoa của bạn. Bổ nhiệm vai trò BCN khoa
+              thực hiện ở cấp trường (Phòng KHCN).
             </div>
           </div>
 
@@ -29,6 +30,7 @@
       <LecturerAccountFilterBar
         :filter="filter"
         :unit-options="unitOptions"
+        unit-label="Đơn vị"
         :role-options="roleOptions"
         :loading="loading"
         :result-count="resultCount"
@@ -42,6 +44,8 @@
         :rows="rows"
         :loading="loading"
         :error="error"
+        unit-label="Đơn vị"
+        :can-manage-roles="false"
         :current-page-number="currentPageNumber"
         :page-size="pageSize"
         :total-item-count="totalItems"
@@ -57,6 +61,8 @@
         :open="createOpen"
         :saving="savingEdit"
         :error="savingError"
+        :unit-options="unitOptions"
+        organization-label="Đơn vị"
         @close="closeAllModals"
         @save="saveCreate"
       />

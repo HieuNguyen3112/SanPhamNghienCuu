@@ -32,6 +32,8 @@ export interface LecturerAccountDTO {
 
   unit_id: number;
   unit_name: string;
+  faculty_id?: number | null;
+  faculty_name?: string | null;
 
   role_keys: RoleKey[];
 
@@ -55,6 +57,8 @@ export interface LecturerAccount {
 
   unitId: number;
   unitName: string;
+  facultyId: number | null;
+  facultyName: string | null;
 
   roleKeys: RoleKey[];
 
@@ -110,6 +114,7 @@ export function defaultFilterState(): LecturerAccountFilterState {
 export interface LecturerAccountSearchQueryDTO {
   keyword: string;
   unit_id: number | null;
+  faculty_id?: number | null;
   role_keys: RoleKey[];
   status: AccountStatusFilter;
 }
@@ -138,6 +143,8 @@ export interface CreateLecturerAccountPayload {
   lecturer_code: string;
   full_name: string;
   email: string;
+  unit_id?: number | null;
+  faculty_id?: number | null;
   phone_number: string | null;
   academic_title: string | null;
   status: AccountStatus;
@@ -173,6 +180,7 @@ export interface StatusOption {
 
 export interface LecturerAccountLookupsDTO {
   units: UnitOptionDTO[];
+  faculties?: UnitOptionDTO[];
   roles: RoleOption[];
   statuses: StatusOption[];
 }
@@ -189,6 +197,8 @@ export function lecturerAccountFromDto(
     username: dto.username,
     unitId: dto.unit_id,
     unitName: dto.unit_name,
+    facultyId: dto.faculty_id ?? null,
+    facultyName: dto.faculty_name ?? null,
     roleKeys: dto.role_keys,
     status: dto.status,
     positionTitle: dto.position_title,

@@ -21,6 +21,7 @@ import {
   updateLecturerStatusApi,
   updateFacultyLecturerStatusApi,
   createFacultyLecturerAccountApi,
+  createLecturerAccountApi,
 } from "../api/lecturerAccountsApi";
 
 function resolveApiErrorMessage(error: unknown, fallback: string): string {
@@ -76,8 +77,16 @@ export function createLecturerAccountManagementService(_params: {
           per_page: options.per_page,
           sort: options.sort,
         };
+
+        if (!isFacultyScope) {
+          query.faculty_id = query.unit_id ?? null;
+          delete query.unit_id;
+        }
+
         if (!query.keyword) delete query.keyword;
-        if (query.unit_id == null) delete query.unit_id;
+        if (isFacultyScope && query.unit_id == null) delete query.unit_id;
+        if (!isFacultyScope && query.faculty_id == null)
+          delete query.faculty_id;
         if (Array.isArray(query.role_keys) && query.role_keys.length === 0) {
           delete query.role_keys;
         }
@@ -108,10 +117,11 @@ export function createLecturerAccountManagementService(_params: {
 
     async createLecturerAccountDTO(payload) {
       try {
-        if (!isFacultyScope) {
-          throw new Error("Chức năng tạo tài khoản chỉ áp dụng cho cấp khoa.");
+        if (isFacultyScope) {
+          await createFacultyLecturerAccountApi(payload);
+          return;
         }
-        await createFacultyLecturerAccountApi(payload);
+        await createLecturerAccountApi(payload);
       } catch (error) {
         throw new Error(
           resolveApiErrorMessage(error, "Không thể tạo tài khoản giảng viên."),

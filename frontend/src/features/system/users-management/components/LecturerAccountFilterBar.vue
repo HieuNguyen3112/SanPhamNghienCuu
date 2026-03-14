@@ -35,7 +35,9 @@
 
       <!-- unit -->
       <div v-if="showUnitFilter">
-        <label class="text-xs font-medium text-slate-600">Đơn vị</label>
+        <label class="text-xs font-medium text-slate-600">{{
+          unitLabel
+        }}</label>
         <div class="relative mt-1">
           <Building2
             class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -233,6 +235,7 @@ const props = defineProps<{
   roleOptions: RoleOption[];
   loading: boolean;
   resultCount: number;
+  unitLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -242,6 +245,7 @@ const emit = defineEmits<{
 }>();
 
 const showUnitFilter = computed(() => props.unitOptions.length > 1);
+const unitLabel = computed(() => props.unitLabel ?? "Đơn vị");
 const selectedRoleSet = computed(() => new Set(props.filter.roleKeys));
 
 function update<K extends keyof LecturerAccountFilterState>(
