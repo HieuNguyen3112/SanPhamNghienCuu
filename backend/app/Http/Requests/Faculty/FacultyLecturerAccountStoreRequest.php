@@ -21,6 +21,7 @@ class FacultyLecturerAccountStoreRequest extends FormRequest
             'phone_number' => is_string($this->phone_number) ? trim($this->phone_number) : $this->phone_number,
             'academic_title' => is_string($this->academic_title) ? trim($this->academic_title) : $this->academic_title,
             'status' => is_string($this->status) ? strtoupper(trim($this->status)) : $this->status,
+            'unit_id' => isset($this->unit_id) ? (int) $this->unit_id : $this->unit_id,
         ]);
     }
 
@@ -34,6 +35,7 @@ class FacultyLecturerAccountStoreRequest extends FormRequest
             'academic_title' => ['nullable', 'string', 'max:255'],
             'degree_id' => ['nullable', 'integer', 'exists:degrees,id'],
             'academic_rank_id' => ['nullable', 'integer', 'exists:academic_ranks,id'],
+            'unit_id' => ['required', 'integer', 'exists:departments,id'],
             'status' => ['nullable', Rule::in(['ACTIVE', 'INACTIVE'])],
         ];
     }

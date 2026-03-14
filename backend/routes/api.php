@@ -368,6 +368,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SC
     ->prefix('admin/lecturer-accounts')
     ->group(function () {
         Route::get('/', [AdminLecturerAccountController::class, 'index']);
+        Route::post('/', [AdminLecturerAccountController::class, 'store']);
         Route::get('/lookups', [AdminLecturerAccountController::class, 'lookups']);
         Route::put('/{lecturer}', [AdminLecturerAccountController::class, 'update']);
         Route::put('/{lecturer}/roles', [AdminLecturerAccountController::class, 'updateRoles']);

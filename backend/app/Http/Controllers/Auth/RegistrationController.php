@@ -27,7 +27,7 @@ class RegistrationController extends Controller
             'password' => Hash::make($data['password']),
         ]);
 
-        // Gán role mặc định GV (nếu có)
+        // Gán role mặc định LECTURER (nếu có)
         if (class_exists(\Spatie\Permission\Models\Role::class)) {
             $user->assignRole('LECTURER');
         }

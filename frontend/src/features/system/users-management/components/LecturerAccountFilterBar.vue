@@ -33,7 +33,9 @@
       </div>
 
       <div v-if="showUnitFilter" ref="unitMenuWrapRef">
-        <label class="text-xs font-medium text-slate-600">Đơn vị</label>
+        <label class="text-xs font-medium text-slate-600">{{
+          unitLabel
+        }}</label>
         <div class="relative mt-1">
           <button
             type="button"
@@ -353,6 +355,7 @@ const props = defineProps<{
   roleOptions: RoleOption[];
   loading: boolean;
   resultCount: number;
+  unitLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -383,6 +386,7 @@ const isRoleMenuOpen = computed(() => openMenu.value === "role");
 const hasUnitSelection = computed(() => props.filter.unitId !== "ALL");
 const hasStatusSelection = computed(() => props.filter.status !== "all");
 const hasRoleSelection = computed(() => props.filter.roleKeys.length > 0);
+const unitLabel = computed(() => props.unitLabel ?? "Đơn vị");
 const selectedRoleSet = computed(() => new Set(props.filter.roleKeys));
 
 const filteredUnitOptions = computed<UnitOption[]>(() => {

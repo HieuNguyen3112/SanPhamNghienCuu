@@ -35,7 +35,7 @@
             <th class="w-[280px]">Giảng viên</th>
             <th>Email</th>
             <th>Tài khoản</th>
-            <th>Đơn vị</th>
+            <th>{{ unitLabel }}</th>
             <th>Vai trò</th>
             <th class="text-center">Trạng thái</th>
             <th class="w-12 text-right"></th>
@@ -77,7 +77,7 @@
             </td>
 
             <td class="px-3 py-2 text-slate-700">
-              <div class="truncate">{{ row.unitName }}</div>
+              <div class="truncate">{{ organizationName(row) }}</div>
             </td>
 
             <td class="px-3 py-2">
@@ -213,8 +213,11 @@ const props = defineProps<{
   currentPageNumber: number;
   pageSize: number;
   totalItemCount: number;
+  unitLabel?: string;
   canManageRoles?: boolean;
 }>();
+
+const unitLabel = computed(() => props.unitLabel ?? "Đơn vị");
 
 const emit = defineEmits<{
   (e: "edit", id: number): void;
@@ -355,5 +358,13 @@ function formatDate(iso: string) {
     month: "2-digit",
     year: "numeric",
   }).format(d);
+}
+
+function organizationName(row: LecturerAccount) {
+  if (unitLabel.value === "Khoa") {
+    return row.facultyName ?? "";
+  }
+
+  return row.unitName;
 }
 </script>

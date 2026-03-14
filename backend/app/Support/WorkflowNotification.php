@@ -116,13 +116,13 @@ class WorkflowNotification
             })
             ->join('roles as r', 'r.id', '=', 'mhr.role_id')
             ->where('d.faculty_id', $facultyId)
-            ->whereIn('r.name', ['DEPARTMENT_BOARD', 'DL'])
+            ->where('r.name', 'DEPARTMENT_BOARD')
             ->when($excludeUserId, function ($query, $excluded) {
                 $query->where('u.id', '<>', (int) $excluded);
             })
             ->distinct()
             ->pluck('u.id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         if (empty($userIds)) {

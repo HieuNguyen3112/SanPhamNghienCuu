@@ -98,6 +98,17 @@ export async function updateLecturerStatusApi(
   return data.data;
 }
 
+export async function createLecturerAccountApi(
+  payload: CreateLecturerAccountPayload,
+): Promise<LecturerAccountDTO> {
+  await ensureCsrfCookie();
+  const { data } = await http.post<LecturerAccountItemApiResponse>(
+    "/api/admin/lecturer-accounts",
+    payload,
+  );
+  return data.data;
+}
+
 export async function updateFacultyLecturerAccountApi(
   lecturerId: number,
   payload: UpdateLecturerAccountPayload,

@@ -17,10 +17,9 @@ class AdminLecturerAccountsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Role::findOrCreate('GV', 'web');
-        Role::findOrCreate('DL', 'web');
-        Role::findOrCreate('QL', 'web');
-        Role::findOrCreate('ADMIN', 'web');
+        Role::findOrCreate('LECTURER', 'web');
+        Role::findOrCreate('DEPARTMENT_BOARD', 'web');
+        Role::findOrCreate('SCIENCE_OFFICE', 'web');
     }
 
     public function test_list_requires_authentication(): void
@@ -32,7 +31,7 @@ class AdminLecturerAccountsTest extends TestCase
     public function test_list_forbidden_for_non_admin_role(): void
     {
         $user = User::factory()->create();
-        $user->assignRole('GV');
+        $user->assignRole('LECTURER');
 
         Sanctum::actingAs($user);
 
@@ -43,7 +42,7 @@ class AdminLecturerAccountsTest extends TestCase
     public function test_admin_can_list_with_filters(): void
     {
         $admin = User::factory()->create();
-        $admin->assignRole('ADMIN');
+        $admin->assignRole('SCIENCE_OFFICE');
         Sanctum::actingAs($admin);
 
         [$deptA, $deptB] = $this->seedDepartments();
@@ -52,7 +51,7 @@ class AdminLecturerAccountsTest extends TestCase
             'name' => 'gv001',
             'email' => 'gv001@uni.test',
         ]);
-        $lecturerUserA->assignRole('GV');
+        $lecturerUserA->assignRole('LECTURER');
 
         $lecturerA = Lecturer::create([
             'user_id' => $lecturerUserA->id,
@@ -67,7 +66,7 @@ class AdminLecturerAccountsTest extends TestCase
             'name' => 'gv002',
             'email' => 'gv002@uni.test',
         ]);
-        $lecturerUserB->assignRole('DL');
+        $lecturerUserB->assignRole('DEPARTMENT_BOARD');
 
         Lecturer::create([
             'user_id' => $lecturerUserB->id,
@@ -90,10 +89,99 @@ class AdminLecturerAccountsTest extends TestCase
             ]);
     }
 
+    public function test_admin_can_filter_list_by_faculty(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('SCIENCE_OFFICE');
+        Sanctum::actingAs($admin);
+
+        $facultyA = DB::table('faculties')->insertGetId([
+            'code' => 'CNTT',
+            'name' => 'Khoa Cong nghe thong tin',
+        ]);
+        $facultyB = DB::table('faculties')->insertGetId([
+            'code' => 'KTXD',
+            'name' => 'Khoa Ky thuat xay dung',
+        ]);
+
+        $deptA = DB::table('departments')->insertGetId([
+            'faculty_id' => $facultyA,
+            'code' => 'BM01',
+            'name' => 'Bo mon A',
+        ]);
+        $deptB = DB::table('departments')->insertGetId([
+            'faculty_id' => $facultyB,
+            'code' => 'BM02',
+            'name' => 'Bo mon B',
+        ]);
+
+        $userA = User::factory()->create(['email' => 'gv-a@uni.test']);
+        $userA->assignRole('LECTURER');
+        Lecturer::create([
+            'user_id' => $userA->id,
+            'code' => 'GVA',
+            'full_name' => 'Lecturer A',
+            'email' => 'gv-a@uni.test',
+            'department_id' => $deptA,
+            'active' => true,
+        ]);
+
+        $userB = User::factory()->create(['email' => 'gv-b@uni.test']);
+        $userB->assignRole('LECTURER');
+        Lecturer::create([
+            'user_id' => $userB->id,
+            'code' => 'GVB',
+            'full_name' => 'Lecturer B',
+            'email' => 'gv-b@uni.test',
+            'department_id' => $deptB,
+            'active' => true,
+        ]);
+
+        $this->getJson('/api/admin/lecturer-accounts?faculty_id=' . $facultyA)
+            ->assertStatus(200)
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonFragment(['lecturer_code' => 'GVA'])
+            ->assertJsonMissing(['lecturer_code' => 'GVB']);
+    }
+
+    public function test_admin_create_account_assigns_department_board_role(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('SCIENCE_OFFICE');
+        Sanctum::actingAs($admin);
+
+        [$deptA] = $this->seedDepartments();
+        $facultyId = (int) DB::table('departments')->where('id', $deptA)->value('faculty_id');
+
+        $payload = [
+            'lecturer_code' => 'GV900',
+            'full_name' => 'BCN Dot Xuat',
+            'email' => 'bcn900@uni.test',
+            'faculty_id' => $facultyId,
+            'status' => 'ACTIVE',
+        ];
+
+        $response = $this->postJson('/api/admin/lecturer-accounts', $payload)
+            ->assertStatus(201)
+            ->assertJsonPath('data.lecturer_code', 'GV900');
+
+        $lecturerId = (int) $response->json('data.id');
+        $lecturer = Lecturer::query()->findOrFail($lecturerId);
+        $this->assertNotNull($lecturer->user_id);
+        $this->assertDatabaseHas('departments', [
+            'id' => $lecturer->department_id,
+            'faculty_id' => $facultyId,
+        ]);
+
+        $user = User::query()->findOrFail($lecturer->user_id);
+        $this->assertTrue($user->hasRole('DEPARTMENT_BOARD'));
+        $this->assertFalse($user->hasRole('LECTURER'));
+    }
+
     public function test_admin_can_update_info(): void
     {
         $admin = User::factory()->create();
-        $admin->assignRole('ADMIN');
+        $admin->assignRole('SCIENCE_OFFICE');
         Sanctum::actingAs($admin);
 
         [$deptA, $deptB] = $this->seedDepartments();
@@ -102,7 +190,7 @@ class AdminLecturerAccountsTest extends TestCase
             'name' => 'gv010',
             'email' => 'gv010@uni.test',
         ]);
-        $lecturerUser->assignRole('GV');
+        $lecturerUser->assignRole('LECTURER');
 
         $lecturer = Lecturer::create([
             'user_id' => $lecturerUser->id,
@@ -146,7 +234,7 @@ class AdminLecturerAccountsTest extends TestCase
     public function test_admin_update_rejects_duplicate_email(): void
     {
         $admin = User::factory()->create();
-        $admin->assignRole('ADMIN');
+        $admin->assignRole('SCIENCE_OFFICE');
         Sanctum::actingAs($admin);
 
         $dept = $this->seedDepartments()[0];
@@ -159,7 +247,7 @@ class AdminLecturerAccountsTest extends TestCase
             'name' => 'gv011',
             'email' => 'gv011@uni.test',
         ]);
-        $lecturerUser->assignRole('GV');
+        $lecturerUser->assignRole('LECTURER');
 
         $lecturer = Lecturer::create([
             'user_id' => $lecturerUser->id,
@@ -181,7 +269,7 @@ class AdminLecturerAccountsTest extends TestCase
     public function test_admin_can_sync_roles(): void
     {
         $admin = User::factory()->create();
-        $admin->assignRole('ADMIN');
+        $admin->assignRole('SCIENCE_OFFICE');
         Sanctum::actingAs($admin);
 
         $dept = $this->seedDepartments()[0];
@@ -190,7 +278,7 @@ class AdminLecturerAccountsTest extends TestCase
             'name' => 'gv020',
             'email' => 'gv020@uni.test',
         ]);
-        $lecturerUser->assignRole('GV');
+        $lecturerUser->assignRole('LECTURER');
 
         $lecturer = Lecturer::create([
             'user_id' => $lecturerUser->id,
@@ -206,14 +294,14 @@ class AdminLecturerAccountsTest extends TestCase
         ])->assertStatus(200);
 
         $lecturerUser->refresh();
-        $this->assertTrue($lecturerUser->hasRole('GV'));
-        $this->assertTrue($lecturerUser->hasRole('DL'));
+        $this->assertTrue($lecturerUser->hasRole('LECTURER'));
+        $this->assertTrue($lecturerUser->hasRole('DEPARTMENT_BOARD'));
     }
 
     public function test_admin_can_toggle_status(): void
     {
         $admin = User::factory()->create();
-        $admin->assignRole('ADMIN');
+        $admin->assignRole('SCIENCE_OFFICE');
         Sanctum::actingAs($admin);
 
         $dept = $this->seedDepartments()[0];

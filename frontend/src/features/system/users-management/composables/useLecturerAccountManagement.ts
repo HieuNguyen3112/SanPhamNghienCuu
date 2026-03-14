@@ -46,6 +46,7 @@ export function useLecturerAccountManagement(
 
   const filter = ref<LecturerAccountFilterState>(defaultFilterState());
   const unitOptions = ref<UnitOptionDTO[]>([]);
+  const facultyOptions = ref<UnitOptionDTO[]>([]);
   const roleOptions = ref<RoleOption[]>(DEFAULT_ROLE_OPTIONS);
   const rowsDto = ref<LecturerAccountDTO[]>([]);
   const rows = computed<LecturerAccount[]>(() =>
@@ -85,9 +86,6 @@ export function useLecturerAccountManagement(
 
   function resetFilter() {
     filter.value = defaultFilterState();
-    if (scope === "FACULTY") {
-      filter.value.unitId = "ALL";
-    }
   }
 
   async function fetchList() {
@@ -140,6 +138,7 @@ export function useLecturerAccountManagement(
     try {
       const lookups = await service.getLookupsDTO();
       unitOptions.value = lookups.units;
+      facultyOptions.value = lookups.faculties ?? [];
       roleOptions.value = lookups.roles.length
         ? lookups.roles
         : DEFAULT_ROLE_OPTIONS;
@@ -272,7 +271,9 @@ export function useLecturerAccountManagement(
           success: {
             title: "Thành công",
             message:
-              "Đã tạo tài khoản giảng viên. Giảng viên cần đổi mật khẩu ở lần đăng nhập đầu tiên.",
+              scope === "FACULTY"
+                ? "Đã tạo tài khoản giảng viên. Giảng viên có thể đổi mật khẩu sau khi đăng nhập (không bắt buộc lần đầu)."
+                : "Đã tạo tài khoản BCN khoa.",
           },
           error: {
             title: "Tạo tài khoản thất bại",
@@ -380,6 +381,12 @@ export function useLecturerAccountManagement(
   const unitOptionsUi = computed(() =>
     unitOptions.value.map(unitOptionFromDto),
   );
+  const facultyOptionsUi = computed(() =>
+    facultyOptions.value.map(unitOptionFromDto),
+  );
+  const filterOptions = computed(() =>
+    scope === "FACULTY" ? unitOptionsUi.value : facultyOptionsUi.value,
+  );
 
   onMounted(() => {
     void bootstrap();
@@ -388,6 +395,7 @@ export function useLecturerAccountManagement(
   return {
     scope,
     filter,
+    filterOptions,
     unitOptions: unitOptionsUi,
     roleOptions,
     rows,
