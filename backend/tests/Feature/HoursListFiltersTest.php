@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\Evidence\ResearchEvidenceStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -337,6 +338,122 @@ class HoursListFiltersTest extends TestCase
             ->all();
 
         $this->assertContains($activityId, $activityIds);
+    }
+
+    public function test_calculate_endpoint_normalizes_keyword_whitespace_before_filtering(): void
+    {
+        $activityId = DB::table('research_activities')->insertGetId([
+            'activity_code' => 'ACT-KEYWORD-NORMALIZE',
+            'owner_lecturer_id' => $this->lecturerId,
+            'kind_id' => $this->kindId,
+            'type_id' => $this->typeId,
+            'academic_year_id' => $this->academicYearId,
+            'status_id' => $this->approvedStatusId,
+            'title' => 'De tai machine learning ung dung',
+            'abstract' => null,
+            'start_date' => null,
+            'end_date' => null,
+            'quantity' => 1,
+            'submitted_at' => now(),
+            'approved_at' => now(),
+            'total_hours_calc' => 300,
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('research_activity_members')->insert([
+            'activity_id' => $activityId,
+            'lecturer_id' => $this->lecturerId,
+            'member_role_id' => $this->memberRoleId,
+            'contribution_share' => 1,
+            'hours_assigned' => 300,
+            'confirmation_status' => 'accepted',
+            'responded_at' => now(),
+            'confirmation_note' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->lecturerUser);
+
+        $response = $this->getJson(
+            '/api/lecturer/hours/calculate?q=' . urlencode('  machine    learning   ')
+        )->assertOk();
+
+        $activityIds = collect($response->json('data.items'))
+            ->pluck('activity_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $this->assertContains($activityId, $activityIds);
+    }
+
+    public function test_missing_evidence_only_filter_is_stable_across_pagination(): void
+    {
+        $missingA = $this->createApprovedActivityForYear('ACT-MISSING-A', $this->academicYearId);
+        $missingB = $this->createApprovedActivityForYear('ACT-MISSING-B', $this->academicYearId);
+        $linkOnly = $this->createApprovedActivityForYear('ACT-LINK-ONLY', $this->academicYearId);
+        $withPdf = $this->createApprovedActivityForYear('ACT-WITH-PDF', $this->academicYearId);
+
+        DB::table('evidence_files')->insert([
+            'activity_id' => $linkOnly,
+            'file_type_id' => $this->evidenceFileTypeId,
+            'disk' => ResearchEvidenceStorageService::LINK_DISK,
+            'path' => 'https://drive.google.com/mock-evidence/' . $linkOnly,
+            'original_name' => 'link-only',
+            'mime_type' => 'text/uri-list',
+            'size_bytes' => 0,
+            'sha256' => hash('sha256', 'link-only-' . $linkOnly),
+            'uploaded_by_user_id' => $this->lecturerUser->id,
+            'uploaded_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('evidence_files')->insert([
+            'activity_id' => $withPdf,
+            'file_type_id' => $this->evidenceFileTypeId,
+            'disk' => 'local',
+            'path' => 'evidence/test/with-pdf.pdf',
+            'original_name' => 'with-pdf.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 1024,
+            'sha256' => hash('sha256', 'with-pdf-' . $withPdf),
+            'uploaded_by_user_id' => $this->lecturerUser->id,
+            'uploaded_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->lecturerUser);
+
+        $pageOne = $this->getJson('/api/lecturer/hours/calculate?status=hours_not_submitted&missing_evidence_only=1&page=1&per_page=1')
+            ->assertOk();
+        $pageTwo = $this->getJson('/api/lecturer/hours/calculate?status=hours_not_submitted&missing_evidence_only=1&page=2&per_page=1')
+            ->assertOk();
+        $widePage = $this->getJson('/api/lecturer/hours/calculate?status=hours_not_submitted&missing_evidence_only=1&page=1&per_page=10')
+            ->assertOk();
+
+        foreach ([$pageOne, $pageTwo, $widePage] as $response) {
+            $response
+                ->assertJsonPath('data.pagination.total', 3)
+                ->assertJsonPath('data.summary.missing_evidence_count', 3);
+
+            $this->assertSame(900.0, (float) $response->json('data.summary.missing_evidence_hours_total'));
+        }
+
+        $this->assertCount(1, $pageOne->json('data.items'));
+        $this->assertCount(1, $pageTwo->json('data.items'));
+
+        $items = collect($widePage->json('data.items'));
+        $activityIds = $items->pluck('activity_id')->map(fn ($id) => (int) $id)->all();
+
+        $this->assertContains($missingA, $activityIds);
+        $this->assertContains($missingB, $activityIds);
+        $this->assertContains($linkOnly, $activityIds);
+        $this->assertNotContains($withPdf, $activityIds);
+        $this->assertTrue($items->every(fn (array $item) => (int) ($item['evidence_count'] ?? -1) === 0));
     }
 
     private function seedBaseData(): void

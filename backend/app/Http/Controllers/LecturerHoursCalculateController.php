@@ -79,6 +79,12 @@ class LecturerHoursCalculateController extends Controller
 
         $query = $this->baseQuery($lecturer->id, $hoursStageId, $approvedStatusId);
         $this->applyFilters($query, $filters);
+        $missingEvidenceSummary = $this->buildMissingEvidenceSummary(
+            (int) $lecturer->id,
+            $hoursStageId,
+            $approvedStatusId,
+            $filters
+        );
 
         $query->orderByDesc('ra.updated_at');
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
@@ -100,6 +106,8 @@ class LecturerHoursCalculateController extends Controller
                 ],
                 'summary' => [
                     'approved_count' => $approvedCount,
+                    'missing_evidence_count' => $missingEvidenceSummary['missing_evidence_count'],
+                    'missing_evidence_hours_total' => $missingEvidenceSummary['missing_evidence_hours_total'],
                 ],
                 'academic_year' => $responseAcademicYear
                     ? [
@@ -247,12 +255,7 @@ class LecturerHoursCalculateController extends Controller
             ->get()
             ->keyBy('activity_id');
 
-        $evidenceCountByActivity = DB::table('evidence_files')
-            ->selectRaw('activity_id, COUNT(*) as total')
-            ->whereIn('activity_id', $eligibleIds)
-            ->where('disk', '<>', ResearchEvidenceStorageService::LINK_DISK)
-            ->groupBy('activity_id')
-            ->pluck('total', 'activity_id');
+        $evidenceCountByActivity = $this->validEvidenceCountByActivity($eligibleIds);
 
         $missingHours = [];
         $missingEvidence = [];
@@ -793,7 +796,7 @@ class LecturerHoursCalculateController extends Controller
 
     private function baseQuery(int $lecturerId, int $hoursStageId, int $approvedStatusId)
     {
-        $evidenceCountSubQuery = DB::table('evidence_files')
+        $evidenceCountSubQuery = $this->validEvidenceBaseQuery()
             ->selectRaw('activity_id, COUNT(*) as evidence_count')
             ->groupBy('activity_id');
 
@@ -888,22 +891,15 @@ class LecturerHoursCalculateController extends Controller
 
     private function applyFilters($query, array $filters): void
     {
+        $this->applyScopeFilters($query, $filters);
+        $this->applyHoursStatusFilter($query, $filters['status'] ?? null);
+        $this->applyMissingEvidenceOnlyFilter($query, (bool) ($filters['missing_evidence_only'] ?? false));
+    }
+
+    private function applyScopeFilters($query, array $filters): void
+    {
         if (! empty($filters['academic_year_id'])) {
             $query->where('ra.academic_year_id', (int) $filters['academic_year_id']);
-        }
-
-        $status = $filters['status'] ?? null;
-        if ($status && $status !== 'all') {
-            $normalized = strtolower(trim((string) $status));
-            if (in_array($normalized, ['not_submitted', 'hours_not_submitted'], true)) {
-                $query->whereNull('aa_hours.status');
-            } elseif (in_array($normalized, ['pending', 'hours_pending_faculty'], true)) {
-                $query->where('aa_hours.status', 'pending');
-            } elseif (in_array($normalized, ['approved', 'hours_approved'], true)) {
-                $query->where('aa_hours.status', 'approved');
-            } elseif (in_array($normalized, ['rejected', 'hours_rejected'], true)) {
-                $query->where('aa_hours.status', 'rejected');
-            }
         }
 
         if (! empty($filters['q'])) {
@@ -913,6 +909,83 @@ class LecturerHoursCalculateController extends Controller
                     ->orWhere('ra.activity_code', 'like', $keyword);
             });
         }
+    }
+
+    private function applyHoursStatusFilter($query, ?string $status): void
+    {
+        if (! $status || $status === 'all') {
+            return;
+        }
+
+        $normalized = strtolower(trim($status));
+        if (in_array($normalized, ['not_submitted', 'hours_not_submitted'], true)) {
+            $query->whereNull('aa_hours.status');
+        } elseif (in_array($normalized, ['pending', 'hours_pending_faculty'], true)) {
+            $query->where('aa_hours.status', 'pending');
+        } elseif (in_array($normalized, ['approved', 'hours_approved'], true)) {
+            $query->where('aa_hours.status', 'approved');
+        } elseif (in_array($normalized, ['rejected', 'hours_rejected'], true)) {
+            $query->where('aa_hours.status', 'rejected');
+        }
+    }
+
+    private function applyMissingEvidenceOnlyFilter($query, bool $missingEvidenceOnly): void
+    {
+        if (! $missingEvidenceOnly) {
+            return;
+        }
+
+        $query
+            ->whereNull('aa_hours.status')
+            ->whereRaw('COALESCE(efc.evidence_count, 0) = 0');
+    }
+
+    private function buildMissingEvidenceSummary(
+        int $lecturerId,
+        int $hoursStageId,
+        int $approvedStatusId,
+        array $filters
+    ): array {
+        $query = $this->baseQuery($lecturerId, $hoursStageId, $approvedStatusId);
+        $this->applyScopeFilters($query, $filters);
+        $this->applyHoursStatusFilter($query, 'hours_not_submitted');
+        $this->applyMissingEvidenceOnlyFilter($query, true);
+
+        $items = $query
+            ->orderByDesc('ra.updated_at')
+            ->get()
+            ->map(fn ($row) => $this->mapListItem($row));
+
+        return [
+            'missing_evidence_count' => $items->count(),
+            'missing_evidence_hours_total' => round(
+                (float) $items->sum(fn (array $item) => (float) ($item['effective_hours_display'] ?? 0)),
+                2
+            ),
+        ];
+    }
+
+    private function validEvidenceBaseQuery(string $alias = 'evidence_files')
+    {
+        $table = $alias === 'evidence_files'
+            ? 'evidence_files'
+            : 'evidence_files as ' . $alias;
+
+        return DB::table($table)
+            ->where($alias . '.disk', '<>', ResearchEvidenceStorageService::LINK_DISK);
+    }
+
+    private function validEvidenceCountByActivity(array $activityIds)
+    {
+        if (empty($activityIds)) {
+            return collect();
+        }
+
+        return $this->validEvidenceBaseQuery()
+            ->selectRaw('activity_id, COUNT(*) as total')
+            ->whereIn('activity_id', $activityIds)
+            ->groupBy('activity_id')
+            ->pluck('total', 'activity_id');
     }
 
     private function approvedCount(int $lecturerId, int $approvedStatusId, ?int $academicYearId = null): int
@@ -1003,6 +1076,7 @@ class LecturerHoursCalculateController extends Controller
             $row->hours_approval_status ?? null,
             $row->hours_approval_note ?? null
         );
+        $evidenceCount = (int) ($row->evidence_count ?? 0);
         $hoursValues = $this->resolveHoursValues(
             (int) $row->kind_id,
             $row->type_id ? (int) $row->type_id : null,
@@ -1050,8 +1124,22 @@ class LecturerHoursCalculateController extends Controller
             'hours_rejection_reason' => $hoursMeta['rejection_reason'],
             'next_action_code' => $hoursMeta['next_action_code'],
             'next_action_text' => $hoursMeta['next_action_text'],
-            'evidence_count' => (int) ($row->evidence_count ?? 0),
+            'evidence_count' => $evidenceCount,
+            'valid_evidence_count' => $evidenceCount,
+            'has_valid_evidence' => $evidenceCount > 0,
+            'can_submit_hours' => $this->canSubmitHours(
+                $hoursMeta['state'],
+                $hoursValues['effective_hours_display'],
+                $evidenceCount
+            ),
         ];
+    }
+
+    private function canSubmitHours(string $hoursRequestState, ?float $effectiveHoursDisplay, int $evidenceCount): bool
+    {
+        return in_array($hoursRequestState, ['hours_not_submitted', 'hours_rejected'], true)
+            && $effectiveHoursDisplay !== null
+            && $evidenceCount > 0;
     }
 
     private function resolveHoursMeta(?string $hoursStatus, ?string $note): array
@@ -1664,10 +1752,9 @@ class LecturerHoursCalculateController extends Controller
 
     private function fetchEvidenceFiles(int $activityId): array
     {
-        return DB::table('evidence_files as ef')
+        return $this->validEvidenceBaseQuery('ef')
             ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
             ->where('ef.activity_id', $activityId)
-            ->where('ef.disk', '<>', ResearchEvidenceStorageService::LINK_DISK)
             ->select([
                 'ef.id',
                 'ef.activity_id',

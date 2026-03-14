@@ -16,16 +16,16 @@
 
       <HoursModuleTabs
         active-tab="evidence-missing"
-        :missing-evidence-count="worksMissingEvidence.length"
+        :missing-evidence-count="missingEvidenceCount"
       />
 
       <div class="rounded-2xl border border-slate-200 bg-white p-4">
         <div class="text-sm font-semibold text-slate-900">
-          Công trình chưa có minh chứng: {{ worksMissingEvidence.length }}
+          Công trình chưa có minh chứng: {{ missingEvidenceCount }}
         </div>
         <div class="mt-1 text-xs text-slate-600">
           Tổng giờ dự kiến của danh sách này:
-          {{ missingEvidenceHoursTotal }} giờ
+          {{ formatHours(missingEvidenceHoursTotal) }} giờ
         </div>
       </div>
 
@@ -55,25 +55,34 @@
         :evidence-file-types="evidenceFileTypes"
         :selected-evidence-type-id="selectedEvidenceTypeId"
         :selected-evidence-file="selectedEvidenceFile"
+        :evidence-file-input-reset-key="evidenceFileInputResetKey"
         :loading-evidence="loadingEvidence"
         :loading-evidence-types="loadingEvidenceTypes"
         :evidence-error="evidenceError"
-        :upload-evidence-error="uploadEvidenceError"
+        :evidence-type-error="evidenceTypeError"
+        :evidence-file-error="evidenceFileError"
+        :upload-request-error="uploadRequestError"
+        :duplicate-evidence-warning="duplicateEvidenceWarning"
         :uploading-evidence="uploadingEvidence"
         :deleting-evidence-id="deletingEvidenceId"
+        :drawer-actions-locked="drawerActionsLocked"
         :can-upload-evidence="canUploadEvidence"
+        :delete-evidence-confirm-open="deleteEvidenceConfirmOpen"
+        :delete-evidence-confirm-message="deleteEvidenceConfirmMessage"
         @close="closeWorkDetail"
         @update:evidenceTypeId="setSelectedEvidenceTypeId"
         @update:evidenceFile="setSelectedEvidenceFile"
         @upload-evidence="uploadEvidence"
-        @delete-evidence="deleteEvidence"
+        @request-delete-evidence="requestDeleteEvidence"
+        @confirm-delete-evidence="confirmDeleteEvidence"
+        @cancel-delete-evidence="cancelDeleteEvidence"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { onMounted } from "vue";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
 import HoursModuleTabs from "@/features/scientific/lecturer/personal-hours-declare/components/HoursModuleTabs.vue";
@@ -88,6 +97,8 @@ import { useSelectHoursRequest } from "@/features/scientific/lecturer/personal-h
 
 const {
   worksMissingEvidence,
+  missingEvidenceCount,
+  missingEvidenceHoursTotal,
   filter,
   academicYearOptions,
   drawerOpen,
@@ -100,13 +111,20 @@ const {
   evidenceFileTypes,
   selectedEvidenceTypeId,
   selectedEvidenceFile,
+  evidenceFileInputResetKey,
   loadingEvidence,
   loadingEvidenceTypes,
   evidenceError,
-  uploadEvidenceError,
+  evidenceTypeError,
+  evidenceFileError,
+  uploadRequestError,
+  duplicateEvidenceWarning,
   uploadingEvidence,
   deletingEvidenceId,
+  drawerActionsLocked,
   canUploadEvidence,
+  deleteEvidenceConfirmOpen,
+  deleteEvidenceConfirmMessage,
   loadingAcademicYears,
   initialize,
   applyFilter,
@@ -115,16 +133,10 @@ const {
   setSelectedEvidenceTypeId,
   setSelectedEvidenceFile,
   uploadEvidence,
-  deleteEvidence,
+  requestDeleteEvidence,
+  cancelDeleteEvidence,
+  confirmDeleteEvidence,
 } = useSelectHoursRequest();
-
-const missingEvidenceHoursTotal = computed(() => {
-  const total = worksMissingEvidence.value.reduce(
-    (sum, work) => sum + (work.effectiveHoursDisplay ?? 0),
-    0,
-  );
-  return formatHours(total);
-});
 
 function applyFilterWithDefaultStatus(partial: Partial<WorksFilterState>) {
   applyFilter({
@@ -147,6 +159,7 @@ function resetFilterWithDefaultStatus() {
 onMounted(async () => {
   await initialize({
     defaultHoursMode: "hours_not_submitted",
+    missingEvidenceOnly: true,
   });
 });
 </script>

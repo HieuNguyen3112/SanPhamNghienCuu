@@ -119,6 +119,9 @@ export interface ApprovedWorkRowDTO {
   formula_explanation?: FormulaExplanationDTO | null;
   can_edit_proposed_hours?: boolean;
   evidence_count?: number;
+  valid_evidence_count?: number;
+  has_valid_evidence?: boolean;
+  can_submit_hours?: boolean;
   activity_status_code: ActivityStatusCode;
   hours_request_state: HoursRequestState;
   hours_rejection_reason?: string | null;
@@ -135,6 +138,8 @@ export interface ApprovedWorkPaginationDTO {
 
 export interface ApprovedWorkListSummaryDTO {
   approved_count: number;
+  missing_evidence_count?: number;
+  missing_evidence_hours_total?: number;
 }
 
 export interface ApprovedWorkListResponseDTO {
@@ -187,6 +192,9 @@ export interface ApprovedWorkRow {
   formulaExplanation: FormulaExplanation | null;
   canEditProposedHours: boolean;
   evidenceCount: number;
+  validEvidenceCount: number;
+  hasValidEvidence: boolean;
+  canSubmitHours: boolean;
   activityStatusCode: ActivityStatusCode;
   hoursRequestState: HoursRequestState;
   hoursRejectionReason: string | null;
@@ -282,6 +290,14 @@ export function formulaExplanationFromDto(
 export function approvedWorkRowFromDto(
   dto: ApprovedWorkRowDTO
 ): ApprovedWorkRow {
+  const validEvidenceCount = dto.valid_evidence_count ?? dto.evidence_count ?? 0;
+  const evidenceCount = validEvidenceCount;
+  const hasValidEvidence =
+    dto.has_valid_evidence ?? validEvidenceCount > 0;
+  const hoursRequestState = dto.hours_request_state;
+  const effectiveHoursDisplay =
+    dto.effective_hours_display ?? dto.hours_assigned ?? null;
+
   return {
     activityId: dto.activity_id,
     activityCode: dto.activity_code,
@@ -294,14 +310,22 @@ export function approvedWorkRowFromDto(
     conversionRulePresent: dto.conversion_rule_present ?? false,
     calculatedHours: dto.calculated_hours ?? null,
     proposedHours: dto.proposed_hours ?? null,
-    effectiveHoursDisplay: dto.effective_hours_display ?? dto.hours_assigned ?? null,
+    effectiveHoursDisplay,
     totalHoursActivity: dto.total_hours_activity ?? null,
     memberHours: dto.member_hours ?? null,
     formulaExplanation: formulaExplanationFromDto(dto.formula_explanation),
     canEditProposedHours: dto.can_edit_proposed_hours ?? false,
-    evidenceCount: dto.evidence_count ?? 0,
+    evidenceCount,
+    validEvidenceCount,
+    hasValidEvidence,
+    canSubmitHours:
+      dto.can_submit_hours ??
+      ((hoursRequestState === "hours_not_submitted" ||
+        hoursRequestState === "hours_rejected") &&
+        effectiveHoursDisplay !== null &&
+        validEvidenceCount > 0),
     activityStatusCode: dto.activity_status_code,
-    hoursRequestState: dto.hours_request_state,
+    hoursRequestState,
     hoursRejectionReason: dto.hours_rejection_reason ?? null,
     nextActionCode: dto.next_action_code ?? null,
     nextActionText: dto.next_action_text ?? null,
@@ -353,13 +377,21 @@ export function formatBytes(sizeBytes: number): string {
 export function isWorkEligibleForSubmit(
   row: Pick<
     ApprovedWorkRow,
-    "hoursRequestState" | "effectiveHoursDisplay" | "evidenceCount"
+    | "hoursRequestState"
+    | "effectiveHoursDisplay"
+    | "validEvidenceCount"
+    | "evidenceCount"
+    | "canSubmitHours"
   >
 ): boolean {
+  if (typeof row.canSubmitHours === "boolean") {
+    return row.canSubmitHours;
+  }
+
   return (
     (row.hoursRequestState === "hours_not_submitted" ||
       row.hoursRequestState === "hours_rejected") &&
     row.effectiveHoursDisplay !== null &&
-    row.evidenceCount > 0
+    (row.validEvidenceCount ?? row.evidenceCount) > 0
   );
 }

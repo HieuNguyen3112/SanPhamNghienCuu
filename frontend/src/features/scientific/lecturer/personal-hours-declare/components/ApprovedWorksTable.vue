@@ -93,20 +93,15 @@
                 Lý do: {{ row.hoursRejectionReason }}
               </div>
               <div
-                v-if="row.effectiveHoursDisplay === null"
-                class="mt-1 text-xs text-amber-700"
+                v-if="validationMessages(row).length > 0"
+                class="mt-1 space-y-1 text-xs text-amber-700"
               >
-                {{
-                  row.conversionRulePresent
-                    ? "Hệ thống chưa tính được giờ quy đổi."
-                    : "Chưa có quy tắc quy đổi, vui lòng liên hệ Phòng quản lý khoa học."
-                }}
-              </div>
-              <div
-                v-if="row.evidenceCount === 0"
-                class="mt-1 text-xs text-amber-700"
-              >
-                Cần tải tối thiểu 1 minh chứng PDF trước khi gửi duyệt.
+                <div
+                  v-for="message in validationMessages(row)"
+                  :key="`${row.activityId}-${message}`"
+                >
+                  {{ message }}
+                </div>
               </div>
             </td>
 
@@ -191,6 +186,7 @@ const props = defineProps<{
   selectedHoursTotal: number;
   submitting: boolean;
   submitError: string | null;
+  submitItemErrorsByActivityId: Record<number, string[]>;
   loading: boolean;
   error: string | null;
   currentPageNumber: number;
@@ -259,6 +255,10 @@ function onToggleRow(row: ApprovedWorkRow, event: Event) {
 
 function isCheckboxDisabled(row: ApprovedWorkRow) {
   return !isWorkEligibleForSubmit(row);
+}
+
+function validationMessages(row: ApprovedWorkRow): string[] {
+  return props.submitItemErrorsByActivityId[row.activityId] ?? [];
 }
 
 function hoursStatusLabel(row: ApprovedWorkRow) {

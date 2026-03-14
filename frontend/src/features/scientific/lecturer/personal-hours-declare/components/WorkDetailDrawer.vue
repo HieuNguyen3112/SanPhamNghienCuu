@@ -223,19 +223,19 @@
                   Hồ sơ đã được duyệt giờ, không thể chỉnh sửa minh chứng.
                 </div>
 
-                <div
-                  v-else
-                  class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
-                >
-                  <div class="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-end">
-                    <div class="min-w-0 space-y-1">
-                      <label class="text-xs font-medium text-slate-600">Loại minh chứng</label>
-                      <select
-                        class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-slate-400 focus:ring-0"
-                        :value="selectedEvidenceTypeId ?? ''"
-                        :disabled="loadingEvidenceTypes || uploadingEvidence"
-                        @change="onChangeEvidenceType"
-                      >
+                  <div
+                    v-else
+                    class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                  >
+                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-end">
+                      <div class="min-w-0 space-y-1">
+                        <label class="text-xs font-medium text-slate-600">Loại minh chứng</label>
+                        <select
+                          class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-slate-400 focus:ring-0"
+                          :value="selectedEvidenceTypeId ?? ''"
+                          :disabled="loadingEvidenceTypes || drawerActionsLocked"
+                          @change="onChangeEvidenceType"
+                        >
                         <option value="">Chọn loại minh chứng</option>
                         <option
                           v-for="type in evidenceFileTypes"
@@ -245,23 +245,30 @@
                           {{ type.name }}
                         </option>
                       </select>
+                      <div
+                        v-if="evidenceTypeError"
+                        class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+                      >
+                        {{ evidenceTypeError }}
+                      </div>
                     </div>
 
                     <div class="min-w-0 space-y-1">
                       <label class="text-xs font-medium text-slate-600">Tệp minh chứng (PDF)</label>
                       <input
+                        :key="evidenceFileInputResetKey"
                         ref="evidenceFileInputRef"
                         type="file"
                         accept="application/pdf,.pdf"
                         class="sr-only"
-                        :disabled="uploadingEvidence"
+                        :disabled="drawerActionsLocked"
                         @change="onPickEvidenceFile"
                       />
                       <div class="flex min-w-0 items-center gap-2">
                         <button
                           type="button"
                           class="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-slate-100 px-4 text-sm font-semibold text-slate-800 hover:bg-slate-200 disabled:opacity-50"
-                          :disabled="uploadingEvidence"
+                          :disabled="drawerActionsLocked"
                           @click="triggerEvidenceFilePicker"
                         >
                           Chọn tệp
@@ -269,6 +276,18 @@
                         <span class="min-w-0 truncate text-xs text-slate-600">
                           {{ selectedEvidenceFile?.name ?? "Chưa chọn tệp" }}
                         </span>
+                      </div>
+                      <div
+                        v-if="evidenceFileError"
+                        class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+                      >
+                        {{ evidenceFileError }}
+                      </div>
+                      <div
+                        v-else-if="duplicateEvidenceWarning"
+                        class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                      >
+                        {{ duplicateEvidenceWarning }}
                       </div>
                     </div>
 
@@ -290,10 +309,10 @@
                     {{ evidenceError }}
                   </div>
                   <div
-                    v-if="uploadEvidenceError"
+                    v-if="uploadRequestError"
                     class="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
                   >
-                    {{ uploadEvidenceError }}
+                    {{ uploadRequestError }}
                   </div>
                 </div>
 
@@ -332,15 +351,15 @@
                         class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
                       >
                         <Download class="h-3.5 w-3.5" />
-                        Xem
+                        Tải xuống
                       </a>
 
                       <button
                         v-if="detail.hoursRequestState !== 'hours_approved'"
                         type="button"
                         class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100 disabled:opacity-50"
-                        :disabled="deletingEvidenceId === file.id"
-                        @click="emit('delete-evidence', file.id)"
+                        :disabled="drawerActionsLocked"
+                        @click="emit('request-delete-evidence', file.id)"
                       >
                         <Trash2 class="h-3.5 w-3.5" />
                         {{ deletingEvidenceId === file.id ? "Đang xóa..." : "Xóa" }}
@@ -364,6 +383,24 @@
         </div>
       </aside>
     </Transition>
+
+    <ConfirmActionModal
+      :open="deleteEvidenceConfirmOpen"
+      title="Xác nhận xóa minh chứng"
+      :message="deleteEvidenceConfirmMessage"
+      confirm-text="Xóa minh chứng"
+      cancel-text="Hủy"
+      loading-text="Đang xóa..."
+      variant="danger"
+      :loading="deletingEvidenceId !== null"
+      @confirm="emit('confirm-delete-evidence')"
+      @cancel="emit('cancel-delete-evidence')"
+      @update:open="
+        (value) => {
+          if (!value) emit('cancel-delete-evidence');
+        }
+      "
+    />
   </Teleport>
 </template>
 
@@ -382,6 +419,7 @@ import {
   User,
   X,
 } from "lucide-vue-next";
+import ConfirmActionModal from "@/shared/components/modals/ConfirmActionModal.vue";
 import type {
   EvidenceFile,
   EvidenceFileType,
@@ -398,21 +436,30 @@ defineProps<{
   evidenceFileTypes: EvidenceFileType[];
   selectedEvidenceTypeId: number | null;
   selectedEvidenceFile: File | null;
+  evidenceFileInputResetKey: number;
   loadingEvidence: boolean;
   loadingEvidenceTypes: boolean;
   evidenceError: string | null;
-  uploadEvidenceError: string | null;
+  evidenceTypeError: string | null;
+  evidenceFileError: string | null;
+  uploadRequestError: string | null;
+  duplicateEvidenceWarning: string | null;
   uploadingEvidence: boolean;
   deletingEvidenceId: number | null;
+  drawerActionsLocked: boolean;
   canUploadEvidence: boolean;
+  deleteEvidenceConfirmOpen: boolean;
+  deleteEvidenceConfirmMessage: string;
 }>();
 
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "update:evidenceTypeId", value: number | null): void;
-  (e: "update:evidenceFile", file: File | null): void;
+  (e: "update:evidenceFile", files: FileList | null): void;
   (e: "upload-evidence"): void;
-  (e: "delete-evidence", evidenceId: number): void;
+  (e: "request-delete-evidence", evidenceId: number): void;
+  (e: "confirm-delete-evidence"): void;
+  (e: "cancel-delete-evidence"): void;
 }>();
 
 const evidenceFileInputRef = ref<HTMLInputElement | null>(null);
@@ -447,8 +494,7 @@ function onChangeEvidenceType(event: Event) {
 
 function onPickEvidenceFile(event: Event) {
   const input = event.target as HTMLInputElement;
-  const file = input.files?.item(0) ?? null;
-  emit("update:evidenceFile", file);
+  emit("update:evidenceFile", input.files ?? null);
 }
 
 function triggerEvidenceFilePicker() {

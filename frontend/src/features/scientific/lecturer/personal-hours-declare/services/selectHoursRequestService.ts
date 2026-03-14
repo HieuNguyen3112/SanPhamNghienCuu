@@ -8,92 +8,161 @@ import type {
   WorkDetailDTO,
 } from "../contracts/selectHoursRequest.contract";
 
+type ApiValidationErrors = Record<string, string[]>;
+
+export interface HoursRequestApiErrorShape {
+  status: number;
+  code: string | null;
+  message: string;
+  errors: ApiValidationErrors;
+  invalidActivityIds: number[];
+  invalidItems: unknown[];
+}
+
+export class HoursRequestApiError extends Error {
+  status: number;
+
+  code: string | null;
+
+  errors: ApiValidationErrors;
+
+  invalidActivityIds: number[];
+
+  invalidItems: unknown[];
+
+  constructor(payload: HoursRequestApiErrorShape) {
+    super(payload.message);
+    this.name = "HoursRequestApiError";
+    this.status = payload.status;
+    this.code = payload.code;
+    this.errors = payload.errors;
+    this.invalidActivityIds = payload.invalidActivityIds;
+    this.invalidItems = payload.invalidItems;
+  }
+}
+
+export function isHoursRequestApiError(
+  error: unknown
+): error is HoursRequestApiError {
+  return error instanceof HoursRequestApiError;
+}
+
 export interface LoadApprovedWorksParams {
   academic_year_id?: number;
+  include_all_years?: boolean;
   status?: string;
   q?: string;
   page?: number;
   per_page?: number;
+  missing_evidence_only?: boolean;
 }
 
-const normalizeText = (value: string): string =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-
-const normalizeHoursStatusParam = (status?: string): string | undefined => {
-  if (!status || !status.trim()) return undefined;
-
-  const normalized = normalizeText(status);
-  switch (normalized) {
-    case "all":
-    case "tat_ca":
-      return "all";
-    case "not_submitted":
-    case "hours_not_submitted":
-    case "chua_gui_duyet_gio":
-      return "hours_not_submitted";
-    case "pending":
-    case "hours_pending_faculty":
-    case "cho_khoa_duyet_gio":
-      return "hours_pending_faculty";
-    case "approved":
-    case "hours_approved":
-    case "da_duyet_gio":
-      return "hours_approved";
-    case "rejected":
-    case "hours_rejected":
-    case "khoa_tu_choi_gio":
-      return "hours_rejected";
-    default:
-      return status;
+function extractValidationErrors(data: unknown): ApiValidationErrors {
+  if (!data || typeof data !== "object") {
+    return {};
   }
-};
 
-const extractErrorMessage = (err: unknown, fallback: string) => {
+  const candidate = (data as { errors?: unknown }).errors;
+  if (!candidate || typeof candidate !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(candidate as Record<string, unknown>).map(([key, value]) => [
+      key,
+      Array.isArray(value)
+        ? value.filter((item): item is string => typeof item === "string")
+        : [],
+    ])
+  );
+}
+
+function extractMessageFromValidationErrors(
+  errors: ApiValidationErrors
+): string | null {
+  const firstFieldErrors = Object.values(errors)[0];
+  if (!Array.isArray(firstFieldErrors) || firstFieldErrors.length === 0) {
+    return null;
+  }
+
+  const firstMessage = firstFieldErrors.find(
+    (item) => typeof item === "string" && item.trim()
+  );
+
+  return firstMessage?.trim() ?? null;
+}
+
+function toNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item > 0);
+}
+
+function toHoursRequestApiError(
+  err: unknown,
+  fallback: string
+): HoursRequestApiError {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status ?? 0;
-    if (status >= 500) return fallback;
+    const data = err.response?.data;
+    const payload =
+      data && typeof data === "object"
+        ? (data as Record<string, unknown>)
+        : null;
+    const errors = extractValidationErrors(data);
+    const messageFromErrors = extractMessageFromValidationErrors(errors);
+    const messageFromResponse =
+      payload && typeof payload.message === "string"
+        ? payload.message.trim()
+        : "";
 
-    const validationErrors = err.response?.data?.errors;
-    if (validationErrors && typeof validationErrors === "object") {
-      const firstFieldErrors = Object.values(validationErrors)[0];
-      if (Array.isArray(firstFieldErrors) && firstFieldErrors.length > 0) {
-        const firstMessage = firstFieldErrors.find(
-          (item) => typeof item === "string" && item.trim()
-        );
-        if (firstMessage) return firstMessage;
-      }
-    }
-
-    const message = err.response?.data?.message;
-    if (typeof message === "string" && message.trim()) return message;
+    return new HoursRequestApiError({
+      status,
+      code: payload && typeof payload.code === "string" ? payload.code : null,
+      message:
+        messageFromErrors ||
+        messageFromResponse ||
+        err.message ||
+        fallback,
+      errors,
+      invalidActivityIds: payload ? toNumberArray(payload.invalid_activity_ids) : [],
+      invalidItems:
+        payload && Array.isArray(payload.invalid_items)
+          ? payload.invalid_items
+          : [],
+    });
   }
 
-  return err instanceof Error ? err.message : fallback;
-};
+  if (err instanceof HoursRequestApiError) {
+    return err;
+  }
+
+  return new HoursRequestApiError({
+    status: 0,
+    code: null,
+    message: err instanceof Error && err.message.trim() ? err.message : fallback,
+    errors: {},
+    invalidActivityIds: [],
+    invalidItems: [],
+  });
+}
 
 export async function loadApprovedWorksDTO(
   params: LoadApprovedWorksParams
 ): Promise<ApprovedWorkListResponseDTO> {
   try {
-    const statusParam = normalizeHoursStatusParam(params.status);
-    const normalizedStatus =
-      !statusParam || statusParam === "all" ? undefined : statusParam;
-    const includeAllYears =
-      params.academic_year_id === undefined || params.academic_year_id === null;
-
     const cleanedParams: Record<string, unknown> = {
       academic_year_id: params.academic_year_id,
-      include_all_years: includeAllYears ? 1 : undefined,
-      status: normalizedStatus,
-      q: params.q?.trim() || undefined,
+      include_all_years: params.include_all_years ? 1 : undefined,
+      status: params.status,
+      q: params.q,
       page: params.page,
       per_page: params.per_page,
+      missing_evidence_only: params.missing_evidence_only ? 1 : undefined,
     };
 
     const response = await http.get<{ data: ApprovedWorkListResponseDTO }>(
@@ -103,7 +172,7 @@ export async function loadApprovedWorksDTO(
 
     return response.data.data;
   } catch (err) {
-    throw new Error(extractErrorMessage(err, "Không tải được danh sách."));
+    throw toHoursRequestApiError(err, "Không tải được danh sách.");
   }
 }
 
@@ -112,9 +181,10 @@ export async function loadAcademicYearsDTO(): Promise<AcademicYearOptionDTO[]> {
     const response = await http.get<{ data: AcademicYearOptionDTO[] }>(
       "/api/lookups/academic-years"
     );
+
     return response.data.data ?? [];
   } catch (err) {
-    throw new Error(extractErrorMessage(err, "Không tải được năm học."));
+    throw toHoursRequestApiError(err, "Không tải được năm học.");
   }
 }
 
@@ -126,7 +196,7 @@ export async function loadWorkDetailDTO(activityId: number): Promise<WorkDetailD
 
     return response.data.data;
   } catch (err) {
-    throw new Error(extractErrorMessage(err, "Không tải được chi tiết."));
+    throw toHoursRequestApiError(err, "Không tải được chi tiết.");
   }
 }
 
@@ -137,8 +207,9 @@ export async function submitHoursApprovalRequestDTO(payload: {
     await ensureCsrfCookie();
     await http.post("/api/lecturer/hours/submit", payload);
   } catch (err) {
-    throw new Error(
-      extractErrorMessage(err, "Không gửi được yêu cầu xét duyệt giờ NCKH.")
+    throw toHoursRequestApiError(
+      err,
+      "Không gửi được yêu cầu xét duyệt giờ NCKH."
     );
   }
 }
@@ -148,9 +219,10 @@ export async function loadEvidenceFileTypesDTO(): Promise<EvidenceFileTypeDTO[]>
     const response = await http.get<{ data: EvidenceFileTypeDTO[] }>(
       "/api/lookups/evidence-file-types"
     );
+
     return response.data.data ?? [];
   } catch (err) {
-    throw new Error(extractErrorMessage(err, "Không tải được loại minh chứng."));
+    throw toHoursRequestApiError(err, "Không tải được loại minh chứng.");
   }
 }
 
@@ -159,9 +231,13 @@ export async function loadHoursEvidenceDTO(activityId: number): Promise<Evidence
     const response = await http.get<{ data: EvidenceFileDTO[] }>(
       `/api/lecturer/hours/calculate/${activityId}/evidence`
     );
+
     return response.data.data ?? [];
   } catch (err) {
-    throw new Error(extractErrorMessage(err, "Không tải được danh sách minh chứng."));
+    throw toHoursRequestApiError(
+      err,
+      "Không tải được danh sách minh chứng."
+    );
   }
 }
 
@@ -188,7 +264,7 @@ export async function uploadHoursEvidenceDTO(payload: {
 
     return response.data.data;
   } catch (err) {
-    throw new Error(extractErrorMessage(err, "Không tải lên được minh chứng."));
+    throw toHoursRequestApiError(err, "Không tải lên được minh chứng.");
   }
 }
 
@@ -197,6 +273,6 @@ export async function deleteHoursEvidenceDTO(evidenceId: number): Promise<void> 
     await ensureCsrfCookie();
     await http.delete(`/api/lecturer/hours/evidence/${evidenceId}`);
   } catch (err) {
-    throw new Error(extractErrorMessage(err, "Không xóa được minh chứng."));
+    throw toHoursRequestApiError(err, "Không xóa được minh chứng.");
   }
 }

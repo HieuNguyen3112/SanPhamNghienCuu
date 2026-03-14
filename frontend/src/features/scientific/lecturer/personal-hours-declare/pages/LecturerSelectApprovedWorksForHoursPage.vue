@@ -14,7 +14,7 @@
 
       <HoursModuleTabs
         active-tab="calculate"
-        :missing-evidence-count="worksMissingEvidence.length"
+        :missing-evidence-count="missingEvidenceCount"
       />
 
       <GuidanceAlert />
@@ -39,7 +39,7 @@
           :to="{ name: 'hours.calculate.evidence_missing' }"
           class="inline-flex items-center gap-2 font-medium text-slate-900 hover:underline"
         >
-          Xem công trình chưa có minh chứng ({{ worksMissingEvidence.length }})
+          Xem công trình chưa có minh chứng ({{ missingEvidenceCount }})
         </RouterLink>
         <div class="mt-1 text-xs text-slate-600">
           Trang này chỉ tập trung vào các công trình đang thiếu minh chứng để bạn xử lý nhanh.
@@ -54,6 +54,7 @@
         :selected-hours-total="selectedHoursTotal"
         :submitting="submitting"
         :submit-error="submitError"
+        :submit-item-errors-by-activity-id="submitItemErrorsByActivityId"
         :loading="loadingList"
         :error="errorList"
         :current-page-number="currentPageNumber"
@@ -76,18 +77,27 @@
         :evidence-file-types="evidenceFileTypes"
         :selected-evidence-type-id="selectedEvidenceTypeId"
         :selected-evidence-file="selectedEvidenceFile"
+        :evidence-file-input-reset-key="evidenceFileInputResetKey"
         :loading-evidence="loadingEvidence"
         :loading-evidence-types="loadingEvidenceTypes"
         :evidence-error="evidenceError"
-        :upload-evidence-error="uploadEvidenceError"
+        :evidence-type-error="evidenceTypeError"
+        :evidence-file-error="evidenceFileError"
+        :upload-request-error="uploadRequestError"
+        :duplicate-evidence-warning="duplicateEvidenceWarning"
         :uploading-evidence="uploadingEvidence"
         :deleting-evidence-id="deletingEvidenceId"
+        :drawer-actions-locked="drawerActionsLocked"
         :can-upload-evidence="canUploadEvidence"
+        :delete-evidence-confirm-open="deleteEvidenceConfirmOpen"
+        :delete-evidence-confirm-message="deleteEvidenceConfirmMessage"
         @close="closeWorkDetail"
         @update:evidenceTypeId="setSelectedEvidenceTypeId"
         @update:evidenceFile="setSelectedEvidenceFile"
         @upload-evidence="uploadEvidence"
-        @delete-evidence="deleteEvidence"
+        @request-delete-evidence="requestDeleteEvidence"
+        @confirm-delete-evidence="confirmDeleteEvidence"
+        @cancel-delete-evidence="cancelDeleteEvidence"
       />
     </div>
   </div>
@@ -108,11 +118,12 @@ import { useSelectHoursRequest } from "@/features/scientific/lecturer/personal-h
 
 const {
   filteredWorks,
-  worksMissingEvidence,
+  missingEvidenceCount,
   selectableIds,
   selectedIds,
   filter,
   academicYearOptions,
+  submitItemErrorsByActivityId,
 
   drawerOpen,
   workDetail,
@@ -136,13 +147,20 @@ const {
   evidenceFileTypes,
   selectedEvidenceTypeId,
   selectedEvidenceFile,
+  evidenceFileInputResetKey,
   loadingEvidence,
   loadingEvidenceTypes,
   evidenceError,
-  uploadEvidenceError,
+  evidenceTypeError,
+  evidenceFileError,
+  uploadRequestError,
+  duplicateEvidenceWarning,
   uploadingEvidence,
   deletingEvidenceId,
+  drawerActionsLocked,
   canUploadEvidence,
+  deleteEvidenceConfirmOpen,
+  deleteEvidenceConfirmMessage,
   loadingAcademicYears,
 
   initialize,
@@ -160,7 +178,9 @@ const {
   setSelectedEvidenceTypeId,
   setSelectedEvidenceFile,
   uploadEvidence,
-  deleteEvidence,
+  requestDeleteEvidence,
+  cancelDeleteEvidence,
+  confirmDeleteEvidence,
 } = useSelectHoursRequest();
 
 onMounted(() => {

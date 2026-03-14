@@ -15,16 +15,11 @@
         <div>
           <div class="text-2xl font-extrabold text-slate-900">{{ pageTitle }}</div>
           <div class="mt-1 text-sm text-slate-600">
-            Tra cứu theo mục (kết quả load ngay khi vào trang).
+            Tra cứu theo mục 
           </div>
         </div>
 
-        <RouterLink
-          to="/"
-          class="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-        >
-          Về trang chủ
-        </RouterLink>
+    
       </div>
 
       <div class="mt-5 space-y-4">
@@ -52,9 +47,7 @@
           @update-page-size="onUpdatePageSize"
         />
 
-        <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-          ⚠️ Chỉ hiển thị công trình đã được khoa và trường phê duyệt. Không hiển thị dữ liệu quản lý nội bộ.
-        </div>
+        
       </div>
     </main>
 

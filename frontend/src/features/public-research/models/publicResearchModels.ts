@@ -34,6 +34,7 @@ export type PublicResearchFilterState = {
   academicYearId: number | null;
   page: number;
   pageSize: number;
+  keyword: string;
 };
 
 export type LoadingState = "idle" | "loading" | "success" | "error";

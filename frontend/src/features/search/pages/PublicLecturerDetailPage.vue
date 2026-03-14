@@ -28,13 +28,25 @@
           </button>
         </div>
 
-        <div v-if="loading" class="mt-6 text-sm text-slate-600">Đang tải dữ liệu...</div>
-        <div v-else-if="error" class="mt-6 text-sm text-rose-700">{{ error }}</div>
+        <div v-if="loading" class="mt-6 text-sm text-slate-600">
+          Đang tải dữ liệu...
+        </div>
+        <div v-else-if="error" class="mt-6 text-sm text-rose-700">
+          {{ error }}
+        </div>
 
         <div v-else class="mt-6 grid gap-6 md:grid-cols-12">
           <!-- left: avatar + name -->
           <div class="md:col-span-4">
-            <div class="aspect-square w-full overflow-hidden rounded-2xl bg-slate-100" />
+            <div
+              class="aspect-square w-full overflow-hidden rounded-2xl bg-slate-100"
+            >
+              <img
+                src="/avatar.jpg"
+                alt="Avatar giảng viên"
+                class="h-full w-full object-cover"
+              />
+            </div>
             <div class="mt-4 text-center text-lg font-extrabold text-slate-900">
               {{ lecturer?.full_name ?? "—" }}
             </div>
@@ -50,62 +62,117 @@
           <div class="md:col-span-8">
             <!-- counters (giống Huế: 4 ô) -->
             <div class="grid gap-3 sm:grid-cols-4">
-              <button class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100" @click="goTo('paper')">
-                <div class="text-2xl font-extrabold text-[#e11d48]">{{ counts.paper }}</div>
+              <button
+                class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
+                @click="goTo('paper')"
+              >
+                <div class="text-2xl font-extrabold text-[#e11d48]">
+                  {{ counts.paper }}
+                </div>
                 <div class="mt-1 text-xs font-bold text-slate-700">BÀI BÁO</div>
               </button>
 
-              <button class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100" @click="goTo('book')">
-                <div class="text-2xl font-extrabold text-[#e11d48]">{{ counts.book_total }}</div>
-                <div class="mt-1 text-xs font-bold text-slate-700">SÁCH - GIÁO TRÌNH</div>
+              <button
+                class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
+                @click="goTo('book')"
+              >
+                <div class="text-2xl font-extrabold text-[#e11d48]">
+                  {{ counts.book_total }}
+                </div>
+                <div class="mt-1 text-xs font-bold text-slate-700">
+                  SÁCH - GIÁO TRÌNH
+                </div>
               </button>
 
-              <button class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100" @click="goTo('project')">
-                <div class="text-2xl font-extrabold text-[#e11d48]">{{ counts.project }}</div>
-                <div class="mt-1 text-xs font-bold text-slate-700">ĐỀ TÀI KHOA HỌC</div>
+              <button
+                class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
+                @click="goTo('project')"
+              >
+                <div class="text-2xl font-extrabold text-[#e11d48]">
+                  {{ counts.project }}
+                </div>
+                <div class="mt-1 text-xs font-bold text-slate-700">
+                  ĐỀ TÀI KHOA HỌC
+                </div>
               </button>
 
-              <button class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100" @click="goTo('conference')">
-                <div class="text-2xl font-extrabold text-[#e11d48]">{{ counts.conference }}</div>
-                <div class="mt-1 text-xs font-bold text-slate-700">HỘI THẢO</div>
+              <button
+                class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
+                @click="goTo('conference')"
+              >
+                <div class="text-2xl font-extrabold text-[#e11d48]">
+                  {{ counts.conference }}
+                </div>
+                <div class="mt-1 text-xs font-bold text-slate-700">
+                  HỘI THẢO
+                </div>
               </button>
             </div>
 
             <div class="mt-6 grid gap-4 md:grid-cols-2">
               <!-- Thông tin -->
               <div>
-                <div class="text-sm font-extrabold text-slate-900">Thông tin:</div>
+                <div class="text-sm font-extrabold text-slate-900">
+                  Thông tin:
+                </div>
                 <div class="mt-2 space-y-3">
-                  <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                    <div><b>Họ và tên:</b> {{ lecturer?.full_name ?? "—" }}</div>
+                  <div
+                    class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"
+                  >
+                    <div>
+                      <b>Họ và tên:</b> {{ lecturer?.full_name ?? "—" }}
+                    </div>
                     <div><b>Giới tính:</b> {{ profile?.gender ?? "—" }}</div>
                     <div><b>Năm sinh:</b> {{ birthYear }}</div>
                   </div>
 
-                  <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                  <div
+                    class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"
+                  >
                     <div><b>Địa chỉ:</b> {{ profile?.address ?? "—" }}</div>
                   </div>
 
-                  <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                  <div
+                    class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"
+                  >
                     <div><b>Liên hệ:</b></div>
                     <div>Điện thoại: {{ lecturer?.phone ?? "—" }}</div>
-                    <div>Email: {{ lecturer?.email ?? profile?.personal_email ?? "—" }}</div>
+                    <div>
+                      Email:
+                      {{ lecturer?.email ?? profile?.personal_email ?? "—" }}
+                    </div>
                   </div>
                 </div>
               </div>
 
               <!-- Chuyên môn -->
               <div>
-                <div class="text-sm font-extrabold text-slate-900">Chuyên môn:</div>
+                <div class="text-sm font-extrabold text-slate-900">
+                  Chuyên môn:
+                </div>
                 <div class="mt-2 space-y-3">
-                  <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                    <div><b>Chức danh:</b> {{ profile?.current_position ?? "—" }}</div>
-                    <div class="mt-2"><b>Đơn vị:</b> {{ profile?.current_unit ?? "—" }}</div>
+                  <div
+                    class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"
+                  >
+                    <div>
+                      <b>Chức danh:</b> {{ profile?.current_position ?? "—" }}
+                    </div>
+                    <div class="mt-2">
+                      <b>Đơn vị:</b> {{ profile?.current_unit ?? "—" }}
+                    </div>
                   </div>
 
-                  <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                    <div><b>Chuyên ngành giảng dạy:</b> {{ profile?.teaching_specialization ?? "—" }}</div>
-                    <div class="mt-2"><b>Lĩnh vực nghiên cứu:</b> {{ profile?.research_area ?? "—" }}</div>
+                  <div
+                    class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"
+                  >
+                    <div>
+                      <b>Chuyên ngành giảng dạy:</b>
+                      {{ profile?.teaching_specialization ?? "—" }}
+                    </div>
+                    <div class="mt-2">
+                      <b>Lĩnh vực nghiên cứu:</b>
+                      {{ profile?.research_area ?? "—" }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -114,8 +181,12 @@
             <!-- Process tables -->
             <div class="mt-8 space-y-6">
               <div>
-                <div class="text-sm font-extrabold text-slate-900">Quá trình công tác</div>
-                <div class="mt-2 overflow-hidden rounded-2xl border border-slate-200">
+                <div class="text-sm font-extrabold text-slate-900">
+                  Quá trình công tác
+                </div>
+                <div
+                  class="mt-2 overflow-hidden rounded-2xl border border-slate-200"
+                >
                   <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 text-slate-700">
                       <tr>
@@ -126,13 +197,23 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(w, idx) in workHistories" :key="idx" class="border-t">
+                      <tr
+                        v-for="(w, idx) in workHistories"
+                        :key="idx"
+                        class="border-t"
+                      >
                         <td class="px-4 py-3 text-slate-600">
-                          {{ formatRange(w.start_date, w.end_date, w.is_current) }}
+                          {{
+                            formatRange(w.start_date, w.end_date, w.is_current)
+                          }}
                         </td>
                         <td class="px-4 py-3">{{ w.position ?? "—" }}</td>
-                        <td class="px-4 py-3">{{ w.organization ?? w.workplace ?? "—" }}</td>
-                        <td class="px-4 py-3 text-slate-600">{{ w.notes ?? "—" }}</td>
+                        <td class="px-4 py-3">
+                          {{ w.organization ?? w.workplace ?? "—" }}
+                        </td>
+                        <td class="px-4 py-3 text-slate-600">
+                          {{ w.notes ?? "—" }}
+                        </td>
                       </tr>
                       <tr v-if="workHistories.length === 0">
                         <td class="px-4 py-3 text-slate-600" colspan="4">—</td>
@@ -143,8 +224,12 @@
               </div>
 
               <div>
-                <div class="text-sm font-extrabold text-slate-900">Quá trình đào tạo</div>
-                <div class="mt-2 overflow-hidden rounded-2xl border border-slate-200">
+                <div class="text-sm font-extrabold text-slate-900">
+                  Quá trình đào tạo
+                </div>
+                <div
+                  class="mt-2 overflow-hidden rounded-2xl border border-slate-200"
+                >
                   <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 text-slate-700">
                       <tr>
@@ -155,11 +240,21 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(e, idx) in educations" :key="idx" class="border-t">
-                        <td class="px-4 py-3">{{ e.degree_name ?? e.degree_title ?? "—" }}</td>
+                      <tr
+                        v-for="(e, idx) in educations"
+                        :key="idx"
+                        class="border-t"
+                      >
+                        <td class="px-4 py-3">
+                          {{ e.degree_name ?? e.degree_title ?? "—" }}
+                        </td>
                         <td class="px-4 py-3">{{ e.institution ?? "—" }}</td>
                         <td class="px-4 py-3">{{ e.major ?? "—" }}</td>
-                        <td class="px-4 py-3 text-slate-600">{{ formatRange(e.start_date, e.end_date, e.is_current) }}</td>
+                        <td class="px-4 py-3 text-slate-600">
+                          {{
+                            formatRange(e.start_date, e.end_date, e.is_current)
+                          }}
+                        </td>
                       </tr>
                       <tr v-if="educations.length === 0">
                         <td class="px-4 py-3 text-slate-600" colspan="4">—</td>
@@ -169,7 +264,6 @@
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -251,7 +345,10 @@ const meInitials = computed(() => {
   const name = meName.value.trim();
   if (!name) return "U";
   const parts = name.split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "U") + (parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "")).toUpperCase();
+  return (
+    (parts[0]?.[0] ?? "U") +
+    (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "")
+  ).toUpperCase();
 });
 async function handleLogout() {
   await logoutWithFeedback();
@@ -279,9 +376,13 @@ const birthYear = computed(() => {
   return String(dob).slice(0, 4);
 });
 
-function formatRange(start?: string | null, end?: string | null, isCurrent?: boolean) {
+function formatRange(
+  start?: string | null,
+  end?: string | null,
+  isCurrent?: boolean,
+) {
   const s = start ? start : "—";
-  const e = isCurrent ? "nay" : (end ? end : "—");
+  const e = isCurrent ? "nay" : end ? end : "—";
   return `${s} → ${e}`;
 }
 

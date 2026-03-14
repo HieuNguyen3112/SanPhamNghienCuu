@@ -75,6 +75,7 @@ class PublicResearchWorkController extends Controller
             'academic_year_id' => ['nullable', 'integer'],
             'page' => ['nullable', 'integer', 'min:1'],
             'page_size' => ['nullable', 'integer', 'min:5', 'max:50'],
+            'q' => ['nullable', 'string', 'max:255'],
         ]);
 
         $lecturerQuery = trim((string)($validated['lecturer_query'] ?? ''));
@@ -103,6 +104,16 @@ class PublicResearchWorkController extends Controller
         $hasFacultyJoin = Schema::hasTable('faculties') && Schema::hasColumn('departments', 'faculty_id');
         if ($hasFacultyJoin) {
             $query->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id');
+        }
+
+        $keyword = trim((string)($validated['q'] ?? ''));
+
+        if ($keyword !== '') {
+            $like = '%' . $keyword . '%';
+            $query->where(function ($sub) use ($like) {
+                $sub->where('ra.title', 'like', $like)
+                    ->orWhere('ra.activity_code', 'like', $like);
+            });
         }
 
         // ✅ Select (faculty_name đúng là KHOA)
@@ -322,6 +333,7 @@ class PublicResearchWorkController extends Controller
                 'activity_code' => (string)($row->activity_code ?? ''),
                 'title' => (string)$row->title,
                 'abstract' => '',
+                
 
                 'lecturer_id' => (int)$row->lecturer_id,
                 'lecturer_code' => (string)$row->lecturer_code,

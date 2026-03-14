@@ -15,7 +15,7 @@ class LecturerHoursCalculateIndexRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $fields = ['status', 'q', 'academic_year_id', 'academic_year', 'page', 'per_page', 'include_all_years'];
+        $fields = ['status', 'q', 'academic_year_id', 'academic_year', 'page', 'per_page', 'include_all_years', 'missing_evidence_only'];
         $normalized = [];
 
         foreach ($fields as $field) {
@@ -35,6 +35,18 @@ class LecturerHoursCalculateIndexRequest extends FormRequest
             $this->merge(['include_all_years' => $normalizedBool]);
         }
 
+        if ($this->has('missing_evidence_only')) {
+            $raw = $this->input('missing_evidence_only');
+            $value = filter_var($raw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            $normalizedBool = $value !== null ? $value : in_array((string) $raw, ['1', 'on', 'yes'], true);
+            $this->merge(['missing_evidence_only' => $normalizedBool]);
+        }
+
+        if ($this->filled('q')) {
+            $keyword = preg_replace('/\s+/u', ' ', trim((string) $this->input('q')));
+            $this->merge(['q' => $keyword !== '' ? $keyword : null]);
+        }
+
         $this->normalizeAcademicYearFilter();
         $this->normalizeStatusFilter();
     }
@@ -46,6 +58,7 @@ class LecturerHoursCalculateIndexRequest extends FormRequest
             'q' => ['nullable', 'string', 'max:255'],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
             'include_all_years' => ['nullable', 'boolean'],
+            'missing_evidence_only' => ['nullable', 'boolean'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];

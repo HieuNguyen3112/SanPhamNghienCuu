@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\Evidence\ResearchEvidenceStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -336,11 +337,15 @@ class HoursWorkflowTest extends TestCase
         $this->getJson("/api/lecturer/hours/calculate/{$activityId}/evidence")
             ->assertOk()
             ->assertJsonPath('data.0.id', $evidenceId)
-            ->assertJsonPath('data.0.file_type_id', $this->evidenceFileTypeId);
+            ->assertJsonPath('data.0.file_type_id', $this->evidenceFileTypeId)
+            ->assertJsonPath('data.0.download_url', url("/api/lecturer/hours/evidence/{$evidenceId}/download"))
+            ->assertJsonMissingPath('data.0.preview_url');
 
         $this->getJson('/api/lecturer/hours/calculate')
             ->assertOk()
-            ->assertJsonPath('data.items.0.evidence_count', 1);
+            ->assertJsonPath('data.items.0.evidence_count', 1)
+            ->assertJsonPath('data.items.0.valid_evidence_count', 1)
+            ->assertJsonPath('data.items.0.can_submit_hours', true);
 
         $this->get("/api/lecturer/hours/evidence/{$evidenceId}/download")
             ->assertOk();
@@ -350,6 +355,51 @@ class HoursWorkflowTest extends TestCase
             ->assertJsonPath('data.evidence_id', $evidenceId);
 
         $this->assertDatabaseMissing('evidence_files', ['id' => $evidenceId]);
+    }
+
+    public function test_link_disk_is_not_counted_as_valid_hours_evidence(): void
+    {
+        $activityId = $this->createActivity('approved');
+
+        DB::table('evidence_files')->insert([
+            'activity_id' => $activityId,
+            'file_type_id' => $this->evidenceFileTypeId,
+            'disk' => ResearchEvidenceStorageService::LINK_DISK,
+            'path' => 'https://drive.google.com/mock-evidence/' . $activityId,
+            'original_name' => 'drive-link-only',
+            'mime_type' => 'text/uri-list',
+            'size_bytes' => 0,
+            'sha256' => hash('sha256', 'link-only-' . $activityId),
+            'uploaded_by_user_id' => $this->lecturerUser->id,
+            'uploaded_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->lecturerUser);
+
+        $this->getJson('/api/lecturer/hours/calculate')
+            ->assertOk()
+            ->assertJsonPath('data.items.0.activity_id', $activityId)
+            ->assertJsonPath('data.items.0.evidence_count', 0)
+            ->assertJsonPath('data.items.0.valid_evidence_count', 0)
+            ->assertJsonPath('data.items.0.has_valid_evidence', false)
+            ->assertJsonPath('data.items.0.can_submit_hours', false);
+
+        $this->getJson("/api/lecturer/hours/calculate/{$activityId}")
+            ->assertOk()
+            ->assertJsonCount(0, 'data.evidence_files');
+
+        $this->getJson("/api/lecturer/hours/calculate/{$activityId}/evidence")
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->postJson('/api/lecturer/hours/calculate/submit', [
+            'activity_ids' => [$activityId],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'EVIDENCE_REQUIRED')
+            ->assertJsonPath('invalid_activity_ids.0', $activityId);
     }
 
     public function test_lecturer_can_upload_same_pdf_content_for_different_activities(): void
