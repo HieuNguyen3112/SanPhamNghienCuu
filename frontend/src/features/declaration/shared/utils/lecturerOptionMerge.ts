@@ -1,7 +1,7 @@
 import type { LecturerOptionDto } from "../contracts/declarationSharedContract";
 
 export type DraftMemberLecturerMeta = {
-  lecturer_id: number;
+  lecturer_id?: number | null;
   lecturer_code?: string | null;
   lecturer_full_name?: string | null;
   department_id?: number | null;
@@ -30,10 +30,13 @@ export function mergeLecturerOptionsFromMembers(
       id: member.lecturer_id,
       code,
       full_name: fullName,
-      department_id: Number.isFinite(departmentId) && departmentId > 0 ? departmentId : 0,
+      department_id:
+        Number.isFinite(departmentId) && departmentId > 0 ? departmentId : 0,
       department_name: member.department_name ?? undefined,
       faculty_id:
-        typeof member.member_faculty_id === "number" ? member.member_faculty_id : null,
+        typeof member.member_faculty_id === "number"
+          ? member.member_faculty_id
+          : null,
       faculty_name: member.faculty_name ?? null,
     });
   }

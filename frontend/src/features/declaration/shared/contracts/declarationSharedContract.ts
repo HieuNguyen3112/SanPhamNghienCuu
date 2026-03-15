@@ -68,10 +68,25 @@ export type LecturerOptionDto = {
   faculty_name?: string | null;
 };
 
+export type PublisherOptionDto = {
+  id: number;
+  name: string;
+  code: string;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  is_active?: boolean;
+};
+
 export type ResearchActivityMemberUpsertDto = {
-  lecturer_id: number;
+  lecturer_id?: number | null;
   member_role_id: number;
+  is_external?: boolean;
+  external_full_name?: string | null;
+  external_department_name?: string | null;
   contribution_share?: number | null; // DECIMAL(6,4) nullable
+  hours_assigned?: number | null;
 };
 
 export type EvidenceFileDto = {

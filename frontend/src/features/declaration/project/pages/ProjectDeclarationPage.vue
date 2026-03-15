@@ -145,6 +145,21 @@
                 </div>
               </div>
 
+              <div class="md:col-span-2">
+                <label class="text-xs font-medium text-slate-600"
+                  >Tóm tắt (abstract)</label
+                >
+                <textarea
+                  v-model.trim="form.abstract"
+                  :disabled="readOnly"
+                  placeholder="Tóm tắt ngắn mục tiêu/nội dung đề tài (tuỳ chọn)"
+                  class="mt-1 min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                />
+                <div class="mt-1 text-xs text-slate-500">
+                  Gợi ý: research_activities.abstract (TEXT, nullable)
+                </div>
+              </div>
+
               <div>
                 <label class="text-xs font-medium text-slate-600"
                   >Mã số đề tài</label
@@ -523,6 +538,7 @@ const form = reactive<ProjectDeclarationFormModel>({
   kindId: 0,
   typeId: null,
   title: "",
+  abstract: "",
   notes: "",
   startYear: null,
   endYear: null,
@@ -760,10 +776,12 @@ const canSubmit = computed(() => {
   if (!form.typeId) return false;
   if (!form.title.trim()) return false;
   // members must be valid
-  const validMembers = form.members.filter(
-    (m) =>
-      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number",
-  );
+  const validMembers = form.members.filter((m) => {
+    const hasRole = typeof m.member_role_id === "number";
+    if (!hasRole) return false;
+    if (m.is_external) return Boolean(m.external_full_name?.trim());
+    return typeof m.lecturer_id === "number";
+  });
   if (validMembers.length === 0) return false;
   // evidence pending files should have file_type_id selected (if any)
   const invalidPending = pendingEvidenceFiles.value.some(
@@ -825,7 +843,6 @@ async function loadCatalogs() {
       member_role_code: principalRole?.code ?? null,
     });
   }
-
 }
 
 async function onSearchLecturers(q: string) {
@@ -852,26 +869,29 @@ async function onRemoveExistingEvidence(_id: number) {
   deletingEvidenceFileId.value = _id;
 
   try {
-    await runWithFeedback(() => delete_evidence_file(form.activityId as number, _id), {
-      loading: {
-        enabled: true,
-        title: "Đang xoá minh chứng",
-        message: "Vui lòng đợi trong giây lát...",
-        delayMs: 450,
-        minShowMs: 250,
+    await runWithFeedback(
+      () => delete_evidence_file(form.activityId as number, _id),
+      {
+        loading: {
+          enabled: true,
+          title: "Đang xoá minh chứng",
+          message: "Vui lòng đợi trong giây lát...",
+          delayMs: 450,
+          minShowMs: 250,
+        },
+        success: {
+          enabled: true,
+          title: "Thành công",
+          message: "Đã xoá file minh chứng.",
+        },
+        error: {
+          enabled: true,
+          title: "Không thể xoá",
+          message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
+        },
+        rethrow: true,
       },
-      success: {
-        enabled: true,
-        title: "Thành công",
-        message: "Đã xoá file minh chứng.",
-      },
-      error: {
-        enabled: true,
-        title: "Không thể xoá",
-        message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
-      },
-      rethrow: true,
-    });
+    );
     existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
   } catch (err) {
     shell.error_message.value = normalizeErrorMessage(
@@ -1015,6 +1035,7 @@ async function loadDraftFromQuery() {
     form.kindId = activity.kind_id ?? form.kindId;
     form.typeId = activity.type_id ?? null;
     form.title = activity.title ?? "";
+    form.abstract = activity.abstract ?? "";
     form.notes = activity.notes ?? "";
     form.startYear = dateToYear(activity.start_date);
     form.endYear = dateToYear(activity.end_date);
@@ -1030,9 +1051,12 @@ async function loadDraftFromQuery() {
     }
 
     form.members = (data.members ?? []).map((member) => ({
-      lecturer_id: member.lecturer_id,
+      lecturer_id: member.lecturer_id ?? null,
       member_role_id: member.member_role_id,
       member_role_code: member.member_role_code ?? null,
+      is_external: !!member.is_external,
+      external_full_name: member.external_full_name ?? null,
+      external_department_name: member.external_department_name ?? null,
     }));
     lecturers.value = mergeLecturerOptionsFromMembers(
       lecturers.value,
@@ -1069,7 +1093,7 @@ const shell = useDeclarationFormShell({
         academic_year_id: form.academicYearId ?? 0,
         status_id: 100, // mock draft status id (from mock_statuses); TODO: lookup by code
         title: form.title,
-        abstract: null,
+        abstract: form.abstract || null,
         start_date: yearToDate(form.startYear),
         end_date: yearToDate(form.endYear),
         quantity: 1,
@@ -1097,14 +1121,21 @@ const shell = useDeclarationFormShell({
 
       // upsert members
       const upsertList = form.members
-        .filter(
-          (m) =>
-            typeof m.lecturer_id === "number" &&
-            typeof m.member_role_id === "number",
-        )
+        .filter((m) => {
+          if (typeof m.member_role_id !== "number") return false;
+          if (m.is_external) return Boolean(m.external_full_name?.trim());
+          return typeof m.lecturer_id === "number";
+        })
         .map((m) => ({
-          lecturer_id: m.lecturer_id as number,
+          lecturer_id: m.is_external ? null : (m.lecturer_id as number),
           member_role_id: m.member_role_id as number,
+          is_external: !!m.is_external,
+          external_full_name: m.is_external
+            ? (m.external_full_name?.trim() ?? null)
+            : null,
+          external_department_name: m.is_external
+            ? (m.external_department_name?.trim() ?? null)
+            : null,
           contribution_share: null,
         }));
       await upsert_members(saved.id, upsertList);
@@ -1151,16 +1182,19 @@ onBeforeUnmount(() => {
 });
 
 onMounted(async () => {
-  await runPageLoad(async () => {
-    await loadCatalogs();
-    await loadDraftFromQuery();
-    allowPreviewAutoRefresh.value = true;
-    scheduleProjectPreviewRefresh();
-  }, {
-    onError: (message) => {
-      shell.error_message.value = message;
+  await runPageLoad(
+    async () => {
+      await loadCatalogs();
+      await loadDraftFromQuery();
+      allowPreviewAutoRefresh.value = true;
+      scheduleProjectPreviewRefresh();
     },
-    fallbackMessage: "Không thể khởi tạo trang kê khai.",
-  });
+    {
+      onError: (message) => {
+        shell.error_message.value = message;
+      },
+      fallbackMessage: "Không thể khởi tạo trang kê khai.",
+    },
+  );
 });
 </script>

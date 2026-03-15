@@ -11,6 +11,7 @@ export type ProjectDeclarationFormModel = {
   kindId: number;
   typeId: number | null;
   title: string;
+  abstract: string;
   notes: string;
   startYear: number | null;
   endYear: number | null;
@@ -91,9 +92,11 @@ export function computeProjectHours(
     memberRoleNameById: Record<number, string>;
     memberRoleCodeById: Record<number, string>;
     currentLecturerId: number;
-  }
+  },
 ): ProjectHoursComputationResult {
-  const typeCode = model.typeId ? ctx.typeCodeById[model.typeId] ?? null : null;
+  const typeCode = model.typeId
+    ? (ctx.typeCodeById[model.typeId] ?? null)
+    : null;
   const rule = getRuleByTypeCode(typeCode);
   const participants = normalizeParticipantsForHours(model.members);
 
@@ -117,7 +120,7 @@ export function computeProjectHours(
   const memberPoolHours = rule?.member_pool_hours ?? 0;
 
   const explicitLeader = internal.find((member) =>
-    isLeaderRole(member.member_role_code)
+    isLeaderRole(member.member_role_code),
   );
   const fallbackLeader =
     explicitLeader ??
@@ -126,14 +129,14 @@ export function computeProjectHours(
     null;
 
   const poolMembers = internal.filter(
-    (member) => member.lecturer_id !== fallbackLeader?.lecturer_id
+    (member) => member.lecturer_id !== fallbackLeader?.lecturer_id,
   );
 
   const memberPoolCount = poolMembers.length;
   const memberPoolEach =
     memberPoolCount > 0 ? round2(memberPoolHours / memberPoolCount) : 0;
   const totalHours = round2(
-    leaderHours + (memberPoolCount > 0 ? memberPoolHours : 0)
+    leaderHours + (memberPoolCount > 0 ? memberPoolHours : 0),
   );
 
   const distribution: HoursDistributionItem[] = internal.map((member) => {
@@ -169,7 +172,7 @@ export function computeProjectHours(
           formula_text:
             memberPoolCount > 0
               ? `${rule.member_pool_hours} / ${memberPoolCount} = ${memberPoolEach.toFixed(
-                  2
+                  2,
                 )} giờ/người`
               : `${rule.member_pool_hours} / 0 = 0 giờ/người (chưa có thành viên)`,
         },
@@ -188,6 +191,7 @@ export function computeProjectHours(
     member_pool_count: memberPoolCount,
     member_pool_each: memberPoolEach,
     formula_rows: formulaRows,
-    progress_note: "Chưa áp dụng % tiến độ do chưa có trường dữ liệu trong hệ thống.",
+    progress_note:
+      "Chưa áp dụng % tiến độ do chưa có trường dữ liệu trong hệ thống.",
   };
 }

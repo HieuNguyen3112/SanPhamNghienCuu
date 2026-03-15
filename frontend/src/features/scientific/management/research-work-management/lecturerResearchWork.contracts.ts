@@ -59,6 +59,9 @@ export interface ApprovedSummaryDTO {
 
   title: string;
 
+  status_code?: string;
+  status_name?: string;
+
   kind_id: number;
   kind_name: string;
 
@@ -68,7 +71,9 @@ export interface ApprovedSummaryDTO {
   academic_year_id: number;
   academic_year_code: string;
 
-  approved_at: string;
+  submitted_at?: string | null;
+
+  approved_at: string | null;
 }
 
 export interface AuthorDTO {
@@ -123,6 +128,12 @@ export interface ApprovedDetailDTO {
 
   academic_year_id: number;
   academic_year_code: string;
+
+  work_year?: number | null;
+  venue_name?: string | null;
+  submitted_at?: string | null;
+  member_role_name?: string | null;
+  lecturer_hours?: string | null;
 
   approved_at: string;
 
@@ -196,6 +207,9 @@ export interface ApprovedSummary {
 
   title: string;
 
+  statusCode: string;
+  statusName: string;
+
   kindId: number;
   kindName: string;
 
@@ -205,7 +219,9 @@ export interface ApprovedSummary {
   academicYearId: number;
   academicYearCode: string;
 
-  approvedAt: string;
+  submittedAt: string | null;
+
+  approvedAt: string | null;
 }
 
 export interface Author {
@@ -259,6 +275,12 @@ export interface ApprovedDetail {
 
   academicYearId: number;
   academicYearCode: string;
+
+  workYear: number | null;
+  venueName: string | null;
+  submittedAt: string | null;
+  memberRoleName: string | null;
+  lecturerHours: string | null;
 
   approvedAt: string;
 
@@ -330,12 +352,15 @@ export const mapper = {
       activityId: dto.activity_id,
       activityCode: dto.activity_code,
       title: dto.title,
+      statusCode: dto.status_code ?? "approved",
+      statusName: dto.status_name ?? "Đã duyệt",
       kindId: dto.kind_id,
       kindName: dto.kind_name,
       typeId: dto.type_id,
       typeName: dto.type_name,
       academicYearId: dto.academic_year_id,
       academicYearCode: dto.academic_year_code,
+      submittedAt: dto.submitted_at ?? null,
       approvedAt: dto.approved_at,
     };
   },
@@ -352,6 +377,11 @@ export const mapper = {
       typeName: dto.type_name,
       academicYearId: dto.academic_year_id,
       academicYearCode: dto.academic_year_code,
+      workYear: dto.work_year ?? null,
+      venueName: dto.venue_name ?? null,
+      submittedAt: dto.submitted_at ?? null,
+      memberRoleName: dto.member_role_name ?? null,
+      lecturerHours: dto.lecturer_hours ?? null,
       approvedAt: dto.approved_at,
       authors: dto.authors.map((a) => ({
         lecturerId: a.lecturer_id,

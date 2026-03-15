@@ -12,6 +12,7 @@ export type BookDeclarationFormModel = {
   typeId: number | null; // textbook/reference
 
   title: string;
+  abstract: string;
   notes: string;
 
   publisher: string;

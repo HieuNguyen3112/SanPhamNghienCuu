@@ -160,7 +160,7 @@ class ResearchActivityController extends Controller
                 'request_http_status' => Response::HTTP_OK,
                 'changes' => collect($updates)
                     ->except('updated_at')
-                    ->map(fn ($value, $field) => [
+                    ->map(fn($value, $field) => [
                         'field' => $field,
                         'before' => $current->{$field} ?? null,
                         'after' => $value,
@@ -266,7 +266,8 @@ class ResearchActivityController extends Controller
             $itemsToSync = $items;
             $ownerInPayload = false;
             foreach ($itemsToSync as $memberItem) {
-                if ((int) ($memberItem['lecturer_id'] ?? 0) === $ownerLecturerId) {
+                $isExternal = (bool) ($memberItem['is_external'] ?? false);
+                if (! $isExternal && (int) ($memberItem['lecturer_id'] ?? 0) === $ownerLecturerId) {
                     $ownerInPayload = true;
                     break;
                 }
@@ -300,29 +301,101 @@ class ResearchActivityController extends Controller
                     $itemsToSync[] = [
                         'lecturer_id' => $ownerLecturerId,
                         'member_role_id' => (int) $ownerRoleId,
+                        'is_external' => false,
+                        'external_full_name' => null,
+                        'external_department_name' => null,
                         'contribution_share' => null,
                         'hours_assigned' => null,
                     ];
                 }
             }
 
-            $handled = [];
+            $existingRows = DB::table('research_activity_members')
+                ->where('activity_id', $activity)
+                ->get();
+
+            $existingByLecturer = [];
+            $existingExternal = [];
+            foreach ($existingRows as $existingRow) {
+                if ((bool) ($existingRow->is_external ?? false)) {
+                    $existingExternal[] = $existingRow;
+                    continue;
+                }
+
+                if ($existingRow->lecturer_id !== null) {
+                    $existingByLecturer[(int) $existingRow->lecturer_id] = $existingRow;
+                }
+            }
+
+            $handledLecturerIds = [];
+            $handledExternalIds = [];
+
             foreach ($itemsToSync as $item) {
+                $isExternal = (bool) ($item['is_external'] ?? false);
+                $externalFullName = $isExternal ? trim((string) ($item['external_full_name'] ?? '')) : null;
+                $externalDepartmentName = $isExternal ? trim((string) ($item['external_department_name'] ?? '')) : null;
+
+                if ($isExternal) {
+                    $existing = collect($existingExternal)
+                        ->first(function ($row) use ($item, $externalFullName, $externalDepartmentName, $handledExternalIds) {
+                            if (in_array((int) $row->id, $handledExternalIds, true)) {
+                                return false;
+                            }
+
+                            return (int) $row->member_role_id === (int) $item['member_role_id']
+                                && trim((string) ($row->external_full_name ?? '')) === $externalFullName
+                                && trim((string) ($row->external_department_name ?? '')) === $externalDepartmentName;
+                        });
+
+                    $payload = [
+                        'activity_id' => $activity,
+                        'lecturer_id' => null,
+                        'member_role_id' => $item['member_role_id'],
+                        'is_external' => true,
+                        'external_full_name' => $externalFullName !== '' ? $externalFullName : null,
+                        'external_department_name' => $externalDepartmentName !== '' ? $externalDepartmentName : null,
+                        'contribution_share' => $item['contribution_share'] ?? null,
+                        'hours_assigned' => $item['hours_assigned'] ?? null,
+                        'confirmation_status' => 'accepted',
+                        'responded_at' => $now,
+                        'confirmation_note' => null,
+                        'updated_at' => $now,
+                    ];
+
+                    if (! $existing) {
+                        $payload['created_at'] = $now;
+                        $insertedId = DB::table('research_activity_members')->insertGetId($payload);
+                        $handledExternalIds[] = (int) $insertedId;
+                        continue;
+                    }
+
+                    DB::table('research_activity_members')
+                        ->where('id', (int) $existing->id)
+                        ->update($payload);
+                    $handledExternalIds[] = (int) $existing->id;
+                    continue;
+                }
+
+                $lecturerId = (int) ($item['lecturer_id'] ?? 0);
+                if ($lecturerId <= 0) {
+                    continue;
+                }
+
                 $payload = [
                     'activity_id' => $activity,
-                    'lecturer_id' => $item['lecturer_id'],
+                    'lecturer_id' => $lecturerId,
                     'member_role_id' => $item['member_role_id'],
+                    'is_external' => false,
+                    'external_full_name' => null,
+                    'external_department_name' => null,
                     'contribution_share' => $item['contribution_share'] ?? null,
                     'hours_assigned' => $item['hours_assigned'] ?? null,
                     'updated_at' => $now,
                 ];
 
-                $existing = DB::table('research_activity_members')
-                    ->where('activity_id', $activity)
-                    ->where('lecturer_id', $item['lecturer_id'])
-                    ->first();
+                $existing = $existingByLecturer[$lecturerId] ?? null;
 
-                $isOwner = (int) $item['lecturer_id'] === $ownerLecturerId;
+                $isOwner = $lecturerId === $ownerLecturerId;
                 $statusPayload = [];
 
                 if ($isOwner) {
@@ -364,17 +437,48 @@ class ResearchActivityController extends Controller
                 } else {
                     DB::table('research_activity_members')
                         ->where('activity_id', $activity)
-                        ->where('lecturer_id', $item['lecturer_id'])
+                        ->where('lecturer_id', $lecturerId)
+                        ->where(function ($query) {
+                            $query->where('is_external', false)
+                                ->orWhereNull('is_external');
+                        })
                         ->update(array_merge($payload, $statusPayload));
                 }
 
-                $handled[] = $item['lecturer_id'];
+                $handledLecturerIds[] = $lecturerId;
             }
 
-            DB::table('research_activity_members')
-                ->where('activity_id', $activity)
-                ->whereNotIn('lecturer_id', $handled)
-                ->delete();
+            if (count($handledLecturerIds) > 0) {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activity)
+                    ->where(function ($query) {
+                        $query->where('is_external', false)
+                            ->orWhereNull('is_external');
+                    })
+                    ->whereNotIn('lecturer_id', $handledLecturerIds)
+                    ->delete();
+            } else {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activity)
+                    ->where(function ($query) {
+                        $query->where('is_external', false)
+                            ->orWhereNull('is_external');
+                    })
+                    ->delete();
+            }
+
+            if (count($handledExternalIds) > 0) {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activity)
+                    ->where('is_external', true)
+                    ->whereNotIn('id', $handledExternalIds)
+                    ->delete();
+            } else {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activity)
+                    ->where('is_external', true)
+                    ->delete();
+            }
 
             return DB::table('research_activity_members')
                 ->where('activity_id', $activity)
@@ -470,6 +574,7 @@ class ResearchActivityController extends Controller
                     'ram.id',
                     'ram.activity_id',
                     'ram.lecturer_id',
+                    'ram.is_external',
                     'ram.member_role_id',
                     'ram.confirmation_status',
                     'ram.confirmation_note',
@@ -487,6 +592,14 @@ class ResearchActivityController extends Controller
                     'error' => 'member not found in activity',
                     'code' => 'MEMBER_NOT_FOUND',
                     'status' => Response::HTTP_NOT_FOUND,
+                ];
+            }
+
+            if ((bool) ($memberRow->is_external ?? false) || ! $memberRow->lecturer_id) {
+                return [
+                    'error' => 'external member cannot be reinvited',
+                    'code' => 'EXTERNAL_MEMBER_CANNOT_REINVITE',
+                    'status' => Response::HTTP_UNPROCESSABLE_ENTITY,
                 ];
             }
 
@@ -642,6 +755,10 @@ class ResearchActivityController extends Controller
             ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activity)
+            ->where(function ($query) {
+                $query->where('ram.is_external', false)
+                    ->orWhereNull('ram.is_external');
+            })
             ->where('ram.lecturer_id', '!=', $ownerLecturerId)
             ->where('ram.confirmation_status', 'rejected')
             ->select([
@@ -703,6 +820,10 @@ class ResearchActivityController extends Controller
             ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activity)
+            ->where(function ($query) {
+                $query->where('ram.is_external', false)
+                    ->orWhereNull('ram.is_external');
+            })
             ->where('ram.lecturer_id', '!=', $ownerLecturerId)
             ->where('ram.confirmation_status', 'pending')
             ->select([
@@ -887,6 +1008,9 @@ class ResearchActivityController extends Controller
             ->select([
                 'ram.lecturer_id',
                 'ram.member_role_id',
+                'ram.is_external',
+                'ram.external_full_name',
+                'ram.external_department_name',
                 'ram.contribution_share',
                 'ram.hours_assigned',
                 'ram.confirmation_status',
@@ -904,9 +1028,17 @@ class ResearchActivityController extends Controller
             ->get()
             ->map(function ($row) use ($ownerFacultyId) {
                 $memberFacultyId = $row->member_faculty_id !== null ? (int) $row->member_faculty_id : null;
+                $isExternal = (bool) ($row->is_external ?? false);
                 return array_merge((array) $row, [
+                    'lecturer_full_name' => $isExternal
+                        ? ($row->external_full_name ?? null)
+                        : ($row->lecturer_full_name ?? null),
+                    'department_name' => $isExternal
+                        ? ($row->external_department_name ?? null)
+                        : ($row->department_name ?? null),
                     'owner_faculty_id' => $ownerFacultyId,
-                    'is_outside_faculty' => $ownerFacultyId !== null
+                    'is_outside_faculty' => ! $isExternal
+                        && $ownerFacultyId !== null
                         && $memberFacultyId !== null
                         && $ownerFacultyId !== $memberFacultyId,
                 ]);
@@ -2107,5 +2239,4 @@ class ResearchActivityController extends Controller
         $trimmed = trim((string) $name);
         return $trimmed !== '' ? $trimmed : null;
     }
-
 }

@@ -40,7 +40,9 @@
                 <div class="mt-1 text-sm text-slate-600">
                   {{ lecturerOverview?.facultyName ?? "-" }}
                   <span class="text-slate-300">•</span>
-                  <span>{{ lecturerOverview?.degreeName ?? "Chưa cập nhật học vị" }}</span>
+                  <span>{{
+                    lecturerOverview?.degreeName ?? "Chưa cập nhật học vị"
+                  }}</span>
                 </div>
               </div>
               <button
@@ -82,7 +84,7 @@
 
           <div class="flex-1 overflow-auto p-5">
             <div class="mb-3 text-sm font-semibold text-slate-900">
-              Danh sách công trình đã được phê duyệt
+              Danh sách công trình
             </div>
 
             <div v-if="isLoading" class="text-sm text-slate-600">
@@ -106,7 +108,9 @@
             <ApprovedResearchWorkList
               v-else
               :approved-items="approvedItems"
+              :scope="scope"
               @open-detail="emitOpenDetail"
+              @review-work="emitReviewWork"
             />
           </div>
 
@@ -144,6 +148,7 @@ import { X } from "lucide-vue-next";
 
 interface LecturerDrawerProps {
   isOpen: boolean;
+  scope: "faculty" | "university";
   lecturerOverview: OverviewItem | null;
   approvedItems: ApprovedSummary[];
   pagination: Pagination;
@@ -151,11 +156,12 @@ interface LecturerDrawerProps {
   errorMessage: string | null;
 }
 const approvedWorkEmptyStateMessage =
-  "Giảng viên chưa có công trình đã được phê duyệt.";
+  "Giảng viên chưa có công trình trong trạng thái đang lọc.";
 
 interface LecturerDrawerEmits {
   (e: "close"): void;
   (e: "open-detail", activityId: number): void;
+  (e: "review-work", activityId: number): void;
   (e: "update-page", page: number): void;
   (e: "update-page-size", perPage: number): void;
 }
@@ -171,6 +177,10 @@ function emitClose() {
 
 function emitOpenDetail(activityId: number) {
   emit("open-detail", activityId);
+}
+
+function emitReviewWork(activityId: number) {
+  emit("review-work", activityId);
 }
 
 function updatePage(page: number) {

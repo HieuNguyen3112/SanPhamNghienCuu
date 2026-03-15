@@ -12,6 +12,7 @@ export interface ConferenceOccurrenceFormItem {
   typeId: number | null;
 
   conferenceName: string;
+  abstract: string;
   heldOn: string | null; // yyyy-mm-dd
   location: string;
   notes: string;

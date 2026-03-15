@@ -212,6 +212,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])
         Route::get('/activity-statuses', [LookupController::class, 'activityStatuses']);
         Route::get('/lecturers', [LookupController::class, 'lecturers']);
         Route::get('/journals', [LookupController::class, 'journals']);
+        Route::get('/publishers', [LookupController::class, 'publishers']);
     });
 
 // SCIENCE_OFFICE only demo/ping
@@ -407,6 +408,11 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SC
         Route::put('/journals/{id}', [AdminWorkCatalogController::class, 'updateJournal']);
         Route::patch('/journals/{id}/status', [AdminWorkCatalogController::class, 'updateJournalStatus']);
         Route::post('/journals/{journalId}/rankings', [AdminWorkCatalogController::class, 'storeJournalRanking']);
+
+        Route::get('/publishers', [AdminWorkCatalogController::class, 'listPublishers']);
+        Route::post('/publishers', [AdminWorkCatalogController::class, 'storePublisher']);
+        Route::put('/publishers/{id}', [AdminWorkCatalogController::class, 'updatePublisher']);
+        Route::patch('/publishers/{id}/status', [AdminWorkCatalogController::class, 'updatePublisherStatus']);
 
         Route::get('/conferences', [AdminWorkCatalogController::class, 'listConferences']);
         Route::post('/conferences', [AdminWorkCatalogController::class, 'storeConference']);

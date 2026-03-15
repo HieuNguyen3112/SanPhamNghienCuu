@@ -61,6 +61,7 @@ type PaperDetailsDto = {
   page_start: number | null;
   page_end: number | null;
   year: number | null;
+  keywords?: string | null;
 };
 
 type BookDetailsDto = {
@@ -532,8 +533,11 @@ export type ResearchActivityDetailResponse = {
   detail_kind?: string | null;
   detail?: Record<string, unknown> | null;
   members?: Array<{
-    lecturer_id: number;
+    lecturer_id?: number | null;
     member_role_id: number;
+    is_external?: boolean;
+    external_full_name?: string | null;
+    external_department_name?: string | null;
     contribution_share: number | null;
     hours_assigned: number | null;
     member_role_code?: string | null;
@@ -663,7 +667,8 @@ export async function fetch_current_lecturer_option(): Promise<LecturerOptionDto
     id: lecturer.id,
     code,
     full_name: fullName,
-    department_id: Number.isFinite(departmentId) && departmentId > 0 ? departmentId : 0,
+    department_id:
+      Number.isFinite(departmentId) && departmentId > 0 ? departmentId : 0,
     department_name: lecturer.department_name ?? undefined,
     faculty_id: null,
     faculty_name: null,

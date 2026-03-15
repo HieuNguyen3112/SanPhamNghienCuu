@@ -9,7 +9,10 @@ import type {
   Pagination,
   PaginatedResult,
 } from "../lecturerResearchWork.contracts";
-import type { LecturerResearchWorkClient, PaginationRequest } from "../api/lecturerResearchWork.client";
+import type {
+  LecturerResearchWorkClient,
+  PaginationRequest,
+} from "../api/lecturerResearchWork.client";
 import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 
 export interface UseOptions {
@@ -59,7 +62,7 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
     if (!selectedLecturerId.value) return null;
     return (
       overviewItems.value.find(
-        (x) => x.lecturerId === selectedLecturerId.value
+        (x) => x.lecturerId === selectedLecturerId.value,
       ) ?? null
     );
   });
@@ -98,13 +101,12 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
       const result: PaginatedResult<OverviewItem> =
         await options.client.loadOverview(
           filter,
-          buildPaginationRequest(overviewPagination)
+          buildPaginationRequest(overviewPagination),
         );
       overviewItems.value = result.items;
       updatePagination(overviewPagination, result.pagination);
     } catch (error: any) {
-      overviewError.value =
-        error?.message || "Không tải được tổng quan.";
+      overviewError.value = error?.message || "Không tải được tổng quan.";
       overviewItems.value = [];
       updatePagination(overviewPagination, { ...defaultPagination });
     } finally {
@@ -121,7 +123,8 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
     await runPageLoad(loadOverviewInternal, {
       loading: {
         title: "Đang tải quản lý công trình",
-        message: "Hệ thống đang cập nhật danh sách công trình nghiên cứu khoa học...",
+        message:
+          "Hệ thống đang cập nhật danh sách công trình nghiên cứu khoa học...",
       },
     });
   }
@@ -156,14 +159,13 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
         await options.client.loadApprovedWorks(
           selectedLecturerId.value,
           filter,
-          buildPaginationRequest(approvedPagination)
+          buildPaginationRequest(approvedPagination),
         );
       approvedItems.value = result.items;
       updatePagination(approvedPagination, result.pagination);
     } catch (error: any) {
       approvedError.value =
-        error?.message ||
-        "Không tải được danh sách đã duyệt.";
+        error?.message || "Không tải được danh sách đã duyệt.";
       approvedItems.value = [];
       updatePagination(approvedPagination, { ...defaultPagination });
     } finally {
@@ -192,6 +194,13 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
   }
 
   async function openDetail(workId: number) {
+    const selectedItem = approvedItems.value.find(
+      (item) => item.activityId === workId,
+    );
+    if (selectedItem && selectedItem.statusCode !== "approved") {
+      return;
+    }
+
     selectedWorkId.value = workId;
 
     isDetailDrawerOpen.value = true;
@@ -202,11 +211,12 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
     isDetailLoading.value = true;
 
     try {
-      detail.value = await options.client.loadApprovedDetail(workId);
+      detail.value = await options.client.loadApprovedDetail(
+        workId,
+        selectedLecturerId.value,
+      );
     } catch (error: any) {
-      detailError.value =
-        error?.message ||
-        "Không tải được chi tiết đã duyệt.";
+      detailError.value = error?.message || "Không tải được chi tiết đã duyệt.";
       detail.value = null;
     } finally {
       isDetailLoading.value = false;
@@ -252,7 +262,8 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
       {
         loading: {
           title: "Đang khởi tạo quản lý công trình",
-          message: "Hệ thống đang chuẩn bị dữ liệu công trình nghiên cứu khoa học...",
+          message:
+            "Hệ thống đang chuẩn bị dữ liệu công trình nghiên cứu khoa học...",
         },
       },
     );

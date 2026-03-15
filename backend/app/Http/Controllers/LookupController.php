@@ -259,4 +259,36 @@ class LookupController extends Controller
 
         return response()->json(['data' => $query->get()], Response::HTTP_OK);
     }
+
+    public function publishers(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $activeOnly = $request->boolean('active', true);
+
+        $query = DB::table('publishers as p')
+            ->select([
+                'p.id',
+                'p.name',
+                'p.code',
+                'p.address',
+                'p.phone',
+                'p.email',
+                'p.website',
+                'p.is_active',
+            ])
+            ->when($activeOnly, fn($q) => $q->where('p.is_active', 1))
+            ->when($search !== '', function ($q) use ($search) {
+                $like = '%' . $search . '%';
+                $q->where(function ($sub) use ($like) {
+                    $sub->where('p.name', 'like', $like)
+                        ->orWhere('p.code', 'like', $like)
+                        ->orWhere('p.email', 'like', $like)
+                        ->orWhere('p.website', 'like', $like);
+                });
+            })
+            ->orderBy('p.name')
+            ->limit(50);
+
+        return response()->json(['data' => $query->get()], Response::HTTP_OK);
+    }
 }

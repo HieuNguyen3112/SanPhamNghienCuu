@@ -27,6 +27,7 @@ class ResearchActivityDetailRequest extends FormRequest
             'page_start',
             'page_end',
             'year',
+            'keywords',
             'publisher',
             'approval_decision_no',
             'approval_decision_date',
@@ -78,6 +79,7 @@ class ResearchActivityDetailRequest extends FormRequest
                     'page_start' => ['nullable', 'integer', 'min:1'],
                     'page_end' => ['nullable', 'integer', 'min:1'],
                     'year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+                    'keywords' => ['nullable', 'string', 'max:500'],
                 ];
                 break;
             case 'book_details':

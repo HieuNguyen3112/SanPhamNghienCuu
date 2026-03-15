@@ -6,6 +6,7 @@ import type {
   EvidenceFileTypeDto,
   LecturerOptionDto,
   MemberRoleDto,
+  PublisherOptionDto,
 } from "../contracts/declarationSharedContract";
 import http from "@/lib/http";
 
@@ -60,9 +61,15 @@ const activityStatusesCache: CacheState<ActivityStatusDto> = {
   promise: null,
 };
 const activityTypesByKindCache = new Map<number, ActivityTypeDto[]>();
-const activityTypesByKindPromise = new Map<number, Promise<ActivityTypeDto[]>>();
+const activityTypesByKindPromise = new Map<
+  number,
+  Promise<ActivityTypeDto[]>
+>();
 const lecturersBySearchCache = new Map<string, LecturerOptionDto[]>();
-const lecturersBySearchPromise = new Map<string, Promise<LecturerOptionDto[]>>();
+const lecturersBySearchPromise = new Map<
+  string,
+  Promise<LecturerOptionDto[]>
+>();
 
 export type JournalOptionDto = {
   id: number;
@@ -252,6 +259,16 @@ export async function search_journals(
 ): Promise<JournalOptionDto[]> {
   const { data } = await http.get<{ data: JournalOptionDto[] }>(
     "/api/lookups/journals",
+    { params: { search, active: 1 } },
+  );
+  return data.data;
+}
+
+export async function search_publishers(
+  search: string,
+): Promise<PublisherOptionDto[]> {
+  const { data } = await http.get<{ data: PublisherOptionDto[] }>(
+    "/api/lookups/publishers",
     { params: { search, active: 1 } },
   );
   return data.data;

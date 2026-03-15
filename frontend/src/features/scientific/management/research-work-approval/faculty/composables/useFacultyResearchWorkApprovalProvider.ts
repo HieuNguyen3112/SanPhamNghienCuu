@@ -212,6 +212,8 @@ export function useFacultyResearchWorkApprovalProvider() {
     return {
       researchWorkIdentifier: item.activity_id,
       researchWorkTitle: item.title,
+      researchWorkKindDisplayName: item.kind_name ?? null,
+      researchWorkCategoryDisplayName: item.type_name ?? null,
       submittingLecturerDisplayName: `${item.lecturer.full_name} (${item.lecturer.code})`,
       facultyIdentifier,
       facultyDisplayName:
@@ -220,8 +222,8 @@ export function useFacultyResearchWorkApprovalProvider() {
       researchWorkType: mapKindCodeToResearchWorkType(item.kind_code),
       submittedAtDateTimeString: item.submitted_at ?? "",
 
-      facultyReviewedAtDateTimeString: null,
-      facultyApprovedAtDateTimeString: null,
+      facultyReviewedAtDateTimeString: item.approved_at,
+      facultyApprovedAtDateTimeString: item.approved_at,
       facultyApprovalNote: null,
       facultyRejectionReasonType: null,
       facultyRejectionReasonDetail: null,
@@ -329,9 +331,22 @@ export function useFacultyResearchWorkApprovalProvider() {
         };
       });
 
+    const assistantReviewedAt =
+      detail.approvals.find(
+        (approval) =>
+          approval.stage_code === "assistant" && !!approval.decided_at,
+      )?.decided_at ?? null;
+    const managerReviewedAt =
+      detail.approvals.find(
+        (approval) =>
+          approval.stage_code === "manager" && !!approval.decided_at,
+      )?.decided_at ?? null;
+
     return {
       researchWorkIdentifier: item.activity_id,
       researchWorkTitle: item.title,
+      researchWorkKindDisplayName: item.kind_name ?? null,
+      researchWorkCategoryDisplayName: item.type_name ?? null,
       submittingLecturerDisplayName: `${item.lecturer.full_name} (${item.lecturer.code})`,
       facultyIdentifier,
       facultyDisplayName:
@@ -340,13 +355,14 @@ export function useFacultyResearchWorkApprovalProvider() {
       researchWorkType: mapKindCodeToResearchWorkType(item.kind_code),
       submittedAtDateTimeString: item.submitted_at ?? "",
 
-      facultyReviewedAtDateTimeString: null,
-      facultyApprovedAtDateTimeString: null,
+      facultyReviewedAtDateTimeString:
+        assistantReviewedAt ?? item.approved_at ?? null,
+      facultyApprovedAtDateTimeString: item.approved_at ?? assistantReviewedAt,
       facultyApprovalNote: null,
       facultyRejectionReasonType: null,
       facultyRejectionReasonDetail: null,
 
-      universityReviewedAtDateTimeString: null,
+      universityReviewedAtDateTimeString: managerReviewedAt,
       universityRejectionReasonType: null,
       universityRejectionReasonDetail: null,
 

@@ -62,6 +62,7 @@
 
       <LecturerApprovedResearchWorkDrawer
         :is-open="isLecturerDrawerOpen"
+        scope="university"
         :lecturer-overview="selectedLecturerOverview"
         :approved-items="approvedItems"
         :pagination="approvedPagination"
@@ -141,7 +142,7 @@ const { runExport } = useExportActionFeedback();
 
 function onFacultyChange(
   event: Event,
-  slotUpdateFilter: (partial: Partial<FilterState>) => void
+  slotUpdateFilter: (partial: Partial<FilterState>) => void,
 ) {
   const value = (event.target as HTMLSelectElement).value;
   slotUpdateFilter({ facultyId: value ? Number(value) : null });
@@ -157,7 +158,9 @@ function buildExportParams() {
 }
 
 async function handleExportExcel() {
-  await runExport("excel", () => exportLecturerSummaryExcel(buildExportParams()));
+  await runExport("excel", () =>
+    exportLecturerSummaryExcel(buildExportParams()),
+  );
 }
 
 async function handleExportPdf() {

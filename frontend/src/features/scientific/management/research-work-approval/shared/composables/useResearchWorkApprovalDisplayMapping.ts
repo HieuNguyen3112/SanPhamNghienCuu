@@ -4,12 +4,13 @@ import type {
   ResearchWorkRejectionReasonType,
   ResearchWorkType,
 } from "../models/researchWorkApprovalModels";
+import { parseBackendDateTime } from "../../../shared/utils/backendDateTime";
 
 export function useResearchWorkApprovalDisplayMapping(parameters: {
   approvalScopeIdentifier: ResearchWorkApprovalScopeIdentifier;
 }) {
   function mapResearchWorkTypeToDisplayName(
-    researchWorkType: ResearchWorkType
+    researchWorkType: ResearchWorkType,
   ): string {
     const mapping: Record<ResearchWorkType, string> = {
       JOURNAL_ARTICLE: "Bài báo",
@@ -56,7 +57,7 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
   }
 
   function mapApprovalStatusToDisplayName(
-    approvalStatus: ResearchWorkApprovalStatus
+    approvalStatus: ResearchWorkApprovalStatus,
   ): string {
     const mapping: Record<ResearchWorkApprovalStatus, string> = {
       PENDING_FACULTY_APPROVAL: "Chờ khoa duyệt",
@@ -73,7 +74,7 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
   }
 
   function mapApprovalStatusToBadgeClass(
-    approvalStatus: ResearchWorkApprovalStatus
+    approvalStatus: ResearchWorkApprovalStatus,
   ): string {
     const mapping: Record<ResearchWorkApprovalStatus, string> = {
       PENDING_FACULTY_APPROVAL:
@@ -120,7 +121,7 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
   }
 
   function mapRejectionReasonToDisplayName(
-    rejectionReasonType: ResearchWorkRejectionReasonType | null
+    rejectionReasonType: ResearchWorkRejectionReasonType | null,
   ): string {
     if (!rejectionReasonType) return "Không xác định";
 
@@ -144,13 +145,17 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
 
   function formatDateTimeDisplayValue(isoString: string | null): string {
     if (!isoString) return "—";
+
+    const dateValue = parseBackendDateTime(isoString);
+    if (!dateValue) return isoString;
+
     return new Intl.DateTimeFormat("vi-VN", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
-    }).format(new Date(isoString));
+    }).format(dateValue);
   }
 
   return {

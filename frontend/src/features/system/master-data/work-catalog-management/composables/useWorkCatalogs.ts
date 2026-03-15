@@ -4,6 +4,7 @@ import type { WorkCatalogTabKey } from "../contracts/workCatalogTabs.contract";
 import { useWorkTypeCatalog } from "./useWorkTypeCatalog";
 import { useWorkLevelCatalog } from "./useWorkLevelCatalog";
 import { useJournalCatalog } from "./useJournalCatalog";
+import { usePublisherCatalog } from "./usePublisherCatalog";
 import { useConferenceCatalog } from "./useConferenceCatalog";
 import { useResearchFieldCatalog } from "./useResearchFieldCatalog";
 
@@ -15,6 +16,7 @@ export function useWorkCatalogs() {
   const workType = useWorkTypeCatalog();
   const workLevel = useWorkLevelCatalog();
   const journal = useJournalCatalog();
+  const publisher = usePublisherCatalog();
   const conference = useConferenceCatalog();
   const researchField = useResearchFieldCatalog();
 
@@ -26,6 +28,7 @@ export function useWorkCatalogs() {
       if (activeTab.value === "work_type") await workType.load();
       else if (activeTab.value === "work_level") await workLevel.load();
       else if (activeTab.value === "journal") await journal.load();
+      else if (activeTab.value === "publisher") await publisher.load();
       else if (activeTab.value === "conference") await conference.load();
       else await researchField.load();
     } catch (e: any) {
@@ -44,6 +47,7 @@ export function useWorkCatalogs() {
   const workTypes = computed(() => workType.workTypes.value);
   const workLevels = computed(() => workLevel.workLevels.value);
   const journals = computed(() => journal.journals.value);
+  const publishers = computed(() => publisher.publishers.value);
   const conferences = computed(() => conference.conferences.value);
   const researchFields = computed(() => researchField.researchFields.value);
 
@@ -102,6 +106,22 @@ export function useWorkCatalogs() {
     saveJournal: journal.saveJournal,
     onUpdateJournalForm: journal.onUpdateJournalForm,
 
+    publishers,
+    publisherTotal: publisher.publisherTotal,
+    qPublisher: publisher.qPublisher,
+    pagePublisher: publisher.pagePublisher,
+    pageSizePublisher: publisher.pageSizePublisher,
+    filteredPublishers: publisher.filteredPublishers,
+    pagedPublishers: publisher.pagedPublishers,
+    modalPublisherOpen: publisher.modalPublisherOpen,
+    modalModePublisher: publisher.modalMode,
+    publisherForm: publisher.publisherForm,
+    publisherErrors: publisher.publisherErrors,
+    openCreatePublisher: publisher.openCreatePublisher,
+    openEditPublisher: publisher.openEditPublisher,
+    savePublisher: publisher.savePublisher,
+    onUpdatePublisherForm: publisher.onUpdatePublisherForm,
+
     conferences,
     conferenceTotal: conference.conferenceTotal,
     qConference: conference.qConference,
@@ -135,4 +155,3 @@ export function useWorkCatalogs() {
     onUpdateResearchFieldForm: researchField.onUpdateResearchFieldForm,
   };
 }
-
