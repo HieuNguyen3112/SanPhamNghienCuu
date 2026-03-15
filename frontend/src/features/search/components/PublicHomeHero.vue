@@ -4,14 +4,6 @@
       class="absolute inset-0 bg-gradient-to-br from-[#0b2f54] via-[#123e66] to-[#234a74]"
       aria-hidden="true"
     />
-    <div
-      class="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl"
-      aria-hidden="true"
-    />
-    <div
-      class="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-rose-500/20 blur-2xl"
-      aria-hidden="true"
-    />
 
     <div class="relative mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-14">
       <div class="grid gap-8 lg:grid-cols-12 lg:items-start">
@@ -62,10 +54,8 @@
 
           <!-- 4 nhóm dữ liệu -->
           <div class="mt-4 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              class="group rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15"
-              @click="emit('update:category', 'article')"
+            <div
+              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10"
             >
               <div class="flex items-start gap-3">
                 <span
@@ -85,12 +75,10 @@
                   </div>
                 </div>
               </div>
-            </button>
+            </div>
 
-            <button
-              type="button"
-              class="group rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15"
-              @click="emit('update:category', 'project')"
+            <div
+              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10"
             >
               <div class="flex items-start gap-3">
                 <span
@@ -105,17 +93,13 @@
                   <div class="mt-1 text-2xl font-extrabold text-rose-200">
                     {{ formatStatValue(overviewStats.projectCount) }}
                   </div>
-                  <div class="mt-1 text-xs text-white/70">
-                    Đề tài các cấp
-                  </div>
+                  <div class="mt-1 text-xs text-white/70">Đề tài các cấp</div>
                 </div>
               </div>
-            </button>
+            </div>
 
-            <button
-              type="button"
-              class="group rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15"
-              @click="emit('update:category', 'book')"
+            <div
+              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10"
             >
               <div class="flex items-start gap-3">
                 <span
@@ -135,12 +119,10 @@
                   </div>
                 </div>
               </div>
-            </button>
+            </div>
 
-            <button
-              type="button"
-              class="group rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15"
-              @click="emit('update:category', 'conference')"
+            <div
+              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10"
             >
               <div class="flex items-start gap-3">
                 <span
@@ -160,7 +142,7 @@
                   </div>
                 </div>
               </div>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -172,15 +154,7 @@
                 <div class="text-sm font-extrabold text-slate-900">
                   Tìm kiếm dữ liệu
                 </div>
-                <div class="mt-1 text-xs text-slate-500">
-                  Chọn nhóm dữ liệu và bấm tìm kiếm.
-                </div>
               </div>
-              <span
-                class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#234a74]/10 text-[#234a74]"
-              >
-                🔍
-              </span>
             </div>
 
             <form class="mt-4 space-y-3" @submit.prevent="emit('search')">
@@ -281,12 +255,7 @@ import type {
   SelectOption,
 } from "@/features/public-research/models/publicResearchModels";
 
-type CategoryKey =
-  | "lecturer"
-  | "article"
-  | "project"
-  | "book"
-  | "conference";
+type CategoryKey = "lecturer" | "article" | "project" | "book" | "conference";
 
 type OverviewStats = {
   lecturerCount: number;
@@ -312,7 +281,7 @@ const props = withDefaults(
       bookCount: 0,
       conferenceCount: 0,
     }),
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -365,13 +334,13 @@ const normalizedAcademicYearOptions = computed(() => {
 const selectedFacultyValue = computed(() =>
   props.filterState.facultyId == null
     ? ALL_OPTION_VALUE
-    : String(props.filterState.facultyId)
+    : String(props.filterState.facultyId),
 );
 
 const selectedAcademicYearValue = computed(() =>
   props.filterState.academicYearId == null
     ? ALL_OPTION_VALUE
-    : String(props.filterState.academicYearId)
+    : String(props.filterState.academicYearId),
 );
 
 const categoryItems: Array<{ key: CategoryKey; label: string }> = [

@@ -197,91 +197,75 @@ export function usePublicResearch() {
   }
 
   async function loadOverviewStats() {
-    const nextStats: PublicResearchOverviewStats = {
-      lecturerCount: 0,
-      articleCount: 0,
-      projectCount: 0,
-      bookCount: 0,
-      conferenceCount: 0,
-    };
+  const nextStats: PublicResearchOverviewStats = {
+    lecturerCount: 0,
+    articleCount: 0,
+    projectCount: 0,
+    bookCount: 0,
+    conferenceCount: 0,
+  };
 
-    const results = await Promise.allSettled([
-      fetchPublicLecturerTotal(),
-      loadPublicResearchItemsService({
-        q: null,
-        lecturer_query: "",
-        faculty_id: null,
-        work_type: "ARTICLE",
-        academic_year_id: null,
-        page: 1,
-        page_size: 1,
-      }),
-      loadPublicResearchItemsService({
-        q: null,
-        lecturer_query: "",
-        faculty_id: null,
-        work_type: "PROJECT",
-        academic_year_id: null,
-        page: 1,
-        page_size: 1,
-      }),
-      loadPublicResearchItemsService({
-        q: null,
-        lecturer_query: "",
-        faculty_id: null,
-        work_type: "BOOK",
-        academic_year_id: null,
-        page: 1,
-        page_size: 1,
-      }),
-      loadPublicResearchItemsService({
-        q: null,
-        lecturer_query: "",
-        faculty_id: null,
-        work_type: "CONFERENCE",
-        academic_year_id: null,
-        page: 1,
-        page_size: 1,
-      }),
-    ]);
+  const results = await Promise.allSettled([
+    fetchPublicLecturerTotal(),
+    loadPublicResearchItemsService({
+      work_type: "ARTICLE",
+      page: 1,
+      page_size: 5,
+    } as PublicResearchListQueryDto),
+    loadPublicResearchItemsService({
+      work_type: "PROJECT",
+      page: 1,
+      page_size: 5,
+    } as PublicResearchListQueryDto),
+    loadPublicResearchItemsService({
+      work_type: "BOOK",
+      page: 1,
+      page_size: 5,
+    } as PublicResearchListQueryDto),
+    loadPublicResearchItemsService({
+      work_type: "CONFERENCE",
+      page: 1,
+      page_size: 5,
+    } as PublicResearchListQueryDto),
+  ]);
 
-    if (results[0].status === "fulfilled") {
-      nextStats.lecturerCount = Number(results[0].value ?? 0);
-    } else {
-      console.error("loadOverviewStats lecturer failed:", results[0].reason);
-    }
-
-    if (results[1].status === "fulfilled") {
-      console.log("overview article raw:", results[1].value);
-      nextStats.articleCount = Number(results[1].value?.total ?? 0);
-    } else {
-      console.error("loadOverviewStats article failed:", results[1].reason);
-    }
-
-    if (results[2].status === "fulfilled") {
-      console.log("overview project raw:", results[2].value);
-      nextStats.projectCount = Number(results[2].value?.total ?? 0);
-    } else {
-      console.error("loadOverviewStats project failed:", results[2].reason);
-    }
-
-    if (results[3].status === "fulfilled") {
-      console.log("overview book raw:", results[3].value);
-      nextStats.bookCount = Number(results[3].value?.total ?? 0);
-    } else {
-      console.error("loadOverviewStats book failed:", results[3].reason);
-    }
-
-    if (results[4].status === "fulfilled") {
-      console.log("overview conference raw:", results[4].value);
-      nextStats.conferenceCount = Number(results[4].value?.total ?? 0);
-    } else {
-      console.error("loadOverviewStats conference failed:", results[4].reason);
-    }
-
-    overviewStats.value = nextStats;
-    console.log("overviewStats final:", overviewStats.value);
+  if (results[0].status === "fulfilled") {
+    nextStats.lecturerCount = Number(results[0].value ?? 0);
+  } else {
+    console.error("lecturer failed:", results[0].reason);
   }
+
+  if (results[1].status === "fulfilled") {
+    console.log("article raw:", results[1].value);
+    nextStats.articleCount = Number(results[1].value.total ?? 0);
+  } else {
+    console.error("article failed:", results[1].reason);
+  }
+
+  if (results[2].status === "fulfilled") {
+    console.log("project raw:", results[2].value);
+    nextStats.projectCount = Number(results[2].value.total ?? 0);
+  } else {
+    console.error("project failed:", results[2].reason);
+  }
+
+  if (results[3].status === "fulfilled") {
+    console.log("book raw:", results[3].value);
+    nextStats.bookCount = Number(results[3].value.total ?? 0);
+  } else {
+    console.error("book failed:", results[3].reason);
+  }
+
+  if (results[4].status === "fulfilled") {
+    console.log("conference raw:", results[4].value);
+    nextStats.conferenceCount = Number(results[4].value.total ?? 0);
+  } else {
+    console.error("conference failed:", results[4].reason);
+  }
+
+  overviewStats.value = nextStats;
+  console.log("overviewStats final:", overviewStats.value);
+}
 
   function updateFilterState(next: Partial<PublicResearchFilterState>) {
     Object.assign(filterState, next);
