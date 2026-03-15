@@ -14,15 +14,14 @@
     />
 
     <div class="relative mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-14">
-      <div class="grid gap-8 lg:grid-cols-12 lg:items-center">
-
+      <div class="grid gap-8 lg:grid-cols-12 lg:items-start">
         <!-- LEFT -->
         <div class="lg:col-span-7">
           <div
             class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90"
           >
             <span class="inline-flex h-2 w-2 rounded-full bg-rose-400" />
-            Hệ thống tra cứu công trình NCKH (Public)
+            Hệ thống tra cứu công trình NCKH
           </div>
 
           <h1
@@ -32,55 +31,136 @@
             <span class="text-rose-300">Khoa học &amp; Công nghệ</span>
           </h1>
 
-          <p class="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 md:text-base">
+          <p
+            class="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 md:text-base"
+          >
             Tra cứu nhanh các công trình đã được khoa và trường phê duyệt.
           </p>
 
-          <div class="mt-6 grid gap-3 sm:grid-cols-3">
-            <div class="flex items-start gap-3 rounded-2xl bg-white/10 p-4">
-              <span
-                class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/20 text-white"
-                >📚</span
-              >
-              <div>
-                <div class="text-sm font-extrabold text-white">
-                  Dữ liệu đã phê duyệt
-                </div>
-                <div class="mt-1 text-xs text-white/75">
-                  Chỉ hiển thị công trình hợp lệ.
+          <!-- Tổng giảng viên -->
+          <div class="mt-6">
+            <div
+              class="flex items-center justify-between rounded-2xl bg-white/12 px-5 py-4 ring-1 ring-white/10 backdrop-blur-sm"
+            >
+              <div class="flex items-center gap-3">
+                <span
+                  class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/20 text-xl text-white"
+                >
+                  👨‍🏫
+                </span>
+                <div>
+                  <div class="text-sm font-semibold text-white/80">
+                    Tổng số giảng viên
+                  </div>
+                  <div class="mt-1 text-2xl font-extrabold text-white">
+                    {{ formatStatValue(overviewStats.lecturerCount) }}
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div class="flex items-start gap-3 rounded-2xl bg-white/10 p-4">
-              <span
-                class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white"
-                >🔎</span
-              >
-              <div>
-                <div class="text-sm font-extrabold text-white">
-                  Tìm kiếm theo bộ lọc
-                </div>
-                <div class="mt-1 text-xs text-white/75">
-                  Giảng viên, khoa, năm học.
+          <!-- 4 nhóm dữ liệu -->
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              class="group rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15"
+              @click="emit('update:category', 'article')"
+            >
+              <div class="flex items-start gap-3">
+                <span
+                  class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/20 text-white"
+                >
+                  📄
+                </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-extrabold text-white">
+                    Bài báo khoa học
+                  </div>
+                  <div class="mt-1 text-2xl font-extrabold text-rose-200">
+                    {{ formatStatValue(overviewStats.articleCount) }}
+                  </div>
+                  <div class="mt-1 text-xs text-white/70">
+                    Công trình dạng bài báo
+                  </div>
                 </div>
               </div>
-            </div>
+            </button>
 
-            <div class="flex items-start gap-3 rounded-2xl bg-white/10 p-4">
-              <span
-                class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white"
-                >🧾</span
-              >
-              <div>
-                <div class="text-sm font-extrabold text-white">
-                  Xem chi tiết/PDF
-                </div>
-                <div class="mt-1 text-xs text-white/75">
-                  Mở drawer để xem thông tin.
+            <button
+              type="button"
+              class="group rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15"
+              @click="emit('update:category', 'project')"
+            >
+              <div class="flex items-start gap-3">
+                <span
+                  class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white"
+                >
+                  💡
+                </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-extrabold text-white">
+                    Đề tài nghiên cứu
+                  </div>
+                  <div class="mt-1 text-2xl font-extrabold text-rose-200">
+                    {{ formatStatValue(overviewStats.projectCount) }}
+                  </div>
+                  <div class="mt-1 text-xs text-white/70">
+                    Đề tài các cấp
+                  </div>
                 </div>
               </div>
-            </div>
+            </button>
+
+            <button
+              type="button"
+              class="group rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15"
+              @click="emit('update:category', 'book')"
+            >
+              <div class="flex items-start gap-3">
+                <span
+                  class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white"
+                >
+                  📚
+                </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-extrabold text-white">
+                    Sách - Giáo trình
+                  </div>
+                  <div class="mt-1 text-2xl font-extrabold text-rose-200">
+                    {{ formatStatValue(overviewStats.bookCount) }}
+                  </div>
+                  <div class="mt-1 text-xs text-white/70">
+                    Sách, giáo trình, tài liệu
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              class="group rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15"
+              @click="emit('update:category', 'conference')"
+            >
+              <div class="flex items-start gap-3">
+                <span
+                  class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white"
+                >
+                  🎤
+                </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-extrabold text-white">
+                    Hội thảo - Báo cáo
+                  </div>
+                  <div class="mt-1 text-2xl font-extrabold text-rose-200">
+                    {{ formatStatValue(overviewStats.conferenceCount) }}
+                  </div>
+                  <div class="mt-1 text-xs text-white/70">
+                    Báo cáo và hội thảo khoa học
+                  </div>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -98,32 +178,29 @@
               </div>
               <span
                 class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#234a74]/10 text-[#234a74]"
-                >🔍</span
               >
+                🔍
+              </span>
             </div>
 
-            <form class="mt-4 space-y-3" @submit.prevent="$emit('search')">
-              
-              <!-- Giảng viên -->
+            <form class="mt-4 space-y-3" @submit.prevent="emit('search')">
               <div>
-                <label class="text-xs font-semibold text-slate-600"
-                  >Giảng viên (tên/mã)</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Giảng viên (tên/mã)
+                </label>
                 <input
                   :value="filterState.lecturerQuery"
                   @input="onLecturerQueryInput"
                   type="text"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
                   placeholder="Nguyễn Văn An / GV-001"
-                  
                 />
               </div>
 
-              <!-- Nhóm dữ liệu -->
               <div>
-                <label class="text-xs font-semibold text-slate-600"
-                  >Nhóm dữ liệu</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Nhóm dữ liệu
+                </label>
                 <select
                   :value="category"
                   @change="onCategoryChange"
@@ -139,7 +216,6 @@
                 </select>
               </div>
 
-              <!-- Khoa -->
               <div>
                 <label class="text-xs font-semibold text-slate-600">Khoa</label>
                 <select
@@ -157,11 +233,10 @@
                 </select>
               </div>
 
-              <!-- Năm học -->
               <div>
-                <label class="text-xs font-semibold text-slate-600"
-                  >Năm học</label
-                >
+                <label class="text-xs font-semibold text-slate-600">
+                  Năm học
+                </label>
                 <select
                   :value="selectedAcademicYearValue"
                   @change="onAcademicYearChange"
@@ -187,14 +262,13 @@
               <button
                 type="button"
                 class="w-full text-center text-xs font-semibold text-slate-500 hover:text-slate-700"
-                @click="$emit('reset')"
+                @click="emit('reset')"
               >
                 Đặt lại bộ lọc
               </button>
             </form>
           </div>
         </div>
-
       </div>
     </div>
   </section>
@@ -214,12 +288,32 @@ type CategoryKey =
   | "book"
   | "conference";
 
-const props = defineProps<{
-  filterState: PublicResearchFilterState;
-  facultyOptions: SelectOption<number | null>[];
-  academicYearOptions: SelectOption<number | null>[];
-  category: CategoryKey;
-}>();
+type OverviewStats = {
+  lecturerCount: number;
+  articleCount: number;
+  projectCount: number;
+  bookCount: number;
+  conferenceCount: number;
+};
+
+const props = withDefaults(
+  defineProps<{
+    filterState: PublicResearchFilterState;
+    facultyOptions: SelectOption<number | null>[];
+    academicYearOptions: SelectOption<number | null>[];
+    category: CategoryKey;
+    overviewStats?: OverviewStats;
+  }>(),
+  {
+    overviewStats: () => ({
+      lecturerCount: 0,
+      articleCount: 0,
+      projectCount: 0,
+      bookCount: 0,
+      conferenceCount: 0,
+    }),
+  }
+);
 
 const emit = defineEmits<{
   (e: "update-filter", next: Partial<PublicResearchFilterState>): void;
@@ -287,6 +381,10 @@ const categoryItems: Array<{ key: CategoryKey; label: string }> = [
   { key: "book", label: "Sách - Giáo trình" },
   { key: "conference", label: "Hội thảo - Báo cáo khoa học" },
 ];
+
+function formatStatValue(value: number): string {
+  return new Intl.NumberFormat("vi-VN").format(value ?? 0);
+}
 
 function onLecturerQueryInput(e: Event) {
   emit("update-filter", {

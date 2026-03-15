@@ -3,9 +3,6 @@
     <div class="flex items-center justify-between gap-3">
       <div class="min-w-0">
         <div class="truncate text-sm font-semibold text-slate-900">Danh sách công trình</div>
-        <div class="mt-1 text-xs text-slate-500">
-          Hiển thị <span class="font-medium text-slate-700">{{ items.length }}</span> / {{ totalItems }} kết quả
-        </div>
       </div>
 
       <div v-if="loadingState === 'loading'" class="text-xs text-slate-500">Đang tải…</div>
@@ -28,7 +25,6 @@
             @click="$emit('row-click', row.id)"
           >
             <div class="flex items-start justify-between gap-4">
-              <!-- LEFT -->
               <div class="min-w-0 flex-1">
                 <div class="text-[13px] font-bold text-[#1d4ed8] group-hover:underline">
                   {{ row.title }}
@@ -47,16 +43,7 @@
                 </div>
               </div>
 
-              <!-- RIGHT -->
               <div class="flex shrink-0 flex-col items-end gap-2">
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                  @click.stop="onPdfClick(row)"
-                >
-                  PDF
-                </button>
-
                 <div class="text-xs text-slate-400">
                   {{ row.lecturerCode }}
                 </div>
@@ -64,56 +51,39 @@
             </div>
           </li>
 
-          <li v-if="items.length === 0 && loadingState !== 'loading'" class="px-4 py-10 text-center text-sm text-slate-500">
+          <li
+            v-if="items.length === 0 && loadingState !== 'loading'"
+            class="px-4 py-10 text-center text-sm text-slate-500"
+          >
             Không có kết quả phù hợp.
           </li>
         </ul>
       </div>
     </div>
 
-    <!-- Pagination (giữ wiring như bạn đang dùng) -->
-    <div class="mt-4 flex items-center justify-between gap-3">
-      <div class="text-xs text-slate-500">
-        Trang {{ page }} / {{ totalPages }}
-      </div>
-
-      <div class="flex items-center gap-2">
-        <label class="text-xs text-slate-500">Hiển thị</label>
-        <select
-          class="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
-          :value="pageSize"
-          @change="$emit('update-page-size', Number(($event.target as HTMLSelectElement).value))"
-        >
-          <option :value="10">10/trang</option>
-          <option :value="20">20/trang</option>
-          <option :value="50">50/trang</option>
-        </select>
-
-        <button
-          type="button"
-          class="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm hover:bg-slate-50 disabled:opacity-50"
-          :disabled="page <= 1"
-          @click="$emit('update-page', page - 1)"
-        >
-          Trước
-        </button>
-
-        <button
-          type="button"
-          class="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm hover:bg-slate-50 disabled:opacity-50"
-          :disabled="page >= totalPages"
-          @click="$emit('update-page', page + 1)"
-        >
-          Sau
-        </button>
-      </div>
-    </div>
+    <SharedPaginationControls
+      container-class-name="mt-4"
+      :total-item-count="totalItems"
+      :current-page-number="page"
+      :page-size="pageSize"
+      display-mode="FULL"
+      :page-size-option-list="[10, 20, 50]"
+      page-size-label="Dòng / trang"
+      :show-record-summary="true"
+      record-summary-mode="PAGE_COUNT"
+      record-summary-unit-label="kết quả"
+      @update:currentPageNumber="$emit('update-page', $event)"
+      @update:pageSize="$emit('update-page-size', $event)"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import type { LoadingState, PublicResearchItem } from "../models/publicResearchModels";
-import { computed } from "vue";
+import type {
+  LoadingState,
+  PublicResearchItem,
+} from "../models/publicResearchModels";
+import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 
 type PublicResearchTableProps = {
   items: PublicResearchItem[];
@@ -130,7 +100,7 @@ type PublicResearchTableEmits = {
   (e: "update-page-size", pageSize: number): void;
 };
 
-const props = defineProps<PublicResearchTableProps>();
+defineProps<PublicResearchTableProps>();
 defineEmits<PublicResearchTableEmits>();
 
 function workTypeLabel(type: PublicResearchItem["workType"]): string {
@@ -139,17 +109,5 @@ function workTypeLabel(type: PublicResearchItem["workType"]): string {
   if (type === "PROJECT") return "Đề tài";
   if (type === "CONFERENCE") return "Hội thảo";
   return "Khác";
-}
-
-const totalPages = computed(() => {
-  const size = Math.max(1, props.pageSize);
-  return Math.max(1, Math.ceil(props.totalItems / size));
-});
-
-function onPdfClick(_row: PublicResearchItem) {
-  // Nếu bạn chưa có pdfUrl thì cứ để noop.
-  // Sau này BE trả pdf_url thì mở new tab tại đây.
-  // window.open(row.pdfUrl, "_blank")
-  alert("Chưa có file PDF (mock). Khi nối BE, map pdf_url vào đây là mở được.");
 }
 </script>

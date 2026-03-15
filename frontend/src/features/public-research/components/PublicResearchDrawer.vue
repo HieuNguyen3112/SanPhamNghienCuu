@@ -165,11 +165,7 @@
             </div>
           </div>
 
-          <!-- footer note -->
-          <div class="border-t border-slate-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
-            ⚠️ Chỉ hiển thị các công trình đã được khoa và trường phê duyệt.
-            Không hiển thị giờ NCKH hoặc dữ liệu quản lý nội bộ.
-          </div>
+          
         </div>
       </div>
     </div>

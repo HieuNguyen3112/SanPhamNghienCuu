@@ -12,15 +12,16 @@
 
     <!-- ✅ Trang chủ chỉ có HERO + nội dung landing -->
     <PublicHomeHero
-      :filter-state="filterState"
-      :faculty-options="facultyOptions"
-      :academic-year-options="academicYearOptions"
-      :category="category"
-      @update-filter="updateFilterState"
-      @update:category="category = $event"
-      @search="onHomeSearch"
-      @reset="onHomeReset"
-    />
+  :filter-state="filterState"
+  :faculty-options="facultyOptions"
+  :academic-year-options="academicYearOptions"
+  :category="category"
+  :overview-stats="overviewStats"
+  @update-filter="updateFilterState"
+  @update:category="category = $event"
+  @search="onHomeSearch"
+  @reset="onHomeReset"
+/>
 
     <!-- ✅ THỐNG KÊ CÔNG TRÌNH CỦA TÔI (LẤY TỪ BACKEND THẬT) -->
     <section v-if="isAuthenticated && countsByKind" class="bg-slate-50">
@@ -32,7 +33,7 @@
                 Công trình khoa học của tôi
               </div>
               <div class="mt-1 text-sm text-slate-600">
-                Chỉ tính công trình đã duyệt (read-only).
+                Chỉ tính công trình đã duyệt
               </div>
             </div>
 
@@ -121,9 +122,15 @@ const userStore = useUserStore();
 const { logoutWithFeedback } = useLogoutFeedback("/");
 
 onMounted(async () => {
+  console.log("[HomePage] mounted");
+
   if (!userStore.isInitialized) {
     await userStore.bootstrapAuth();
   }
+
+  console.log("[HomePage] loadOverviewStats start");
+  await loadOverviewStats();
+  console.log("[HomePage] loadOverviewStats done", overviewStats.value);
 });
 
 const isAuthenticated = computed(() => userStore.isAuthenticated);
@@ -192,6 +199,8 @@ const {
   academicYearOptions,
   updateFilterState,
   resetFilterState,
+  overviewStats,
+  loadOverviewStats,
 } = usePublicResearch();
 
 const category = ref<CategoryKey>("lecturer");

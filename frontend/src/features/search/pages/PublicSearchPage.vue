@@ -15,11 +15,9 @@
         <div>
           <div class="text-2xl font-extrabold text-slate-900">{{ pageTitle }}</div>
           <div class="mt-1 text-sm text-slate-600">
-            Tra cứu theo mục 
+            Tra cứu theo mục
           </div>
         </div>
-
-    
       </div>
 
       <div class="mt-5 space-y-4">
@@ -46,20 +44,22 @@
           @update-page="onUpdatePage"
           @update-page-size="onUpdatePageSize"
         />
-
-        
       </div>
     </main>
 
     <PublicHomeFooter />
 
-    <PublicResearchDrawer :open="isResearchDrawerOpen" :item="selectedResearchItem" @close="closeResearchDrawer" />
+    <PublicResearchDrawer
+      :open="isResearchDrawerOpen"
+      :item="selectedResearchItem"
+      @close="closeResearchDrawer"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { useRoute } from "vue-router";
 
 import { useUserStore } from "@/app/stores/userStore";
 import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
@@ -81,6 +81,7 @@ const route = useRoute();
 const { logoutWithFeedback } = useLogoutFeedback("/");
 
 const userStore = useUserStore();
+
 onMounted(async () => {
   if (!userStore.isInitialized) {
     await userStore.bootstrapAuth();
@@ -160,18 +161,35 @@ const pageTitle = computed(() => {
 });
 
 function applyPresetAndQueryThenSearch() {
-  // 1) preset workType
-  updateFilterState({ workType: fixedWorkType.value, page: 1 });
+  resetFilterState();
 
-  // 2) query from home: ?lecturer=&facultyId=&academicYearId=
-  const lecturer = typeof route.query.lecturer === "string" ? route.query.lecturer : "";
-  const facultyId = typeof route.query.facultyId === "string" ? Number(route.query.facultyId) : null;
-  const academicYearId = typeof route.query.academicYearId === "string" ? Number(route.query.academicYearId) : null;
+  const lecturer =
+    typeof route.query.lecturer === "string" ? route.query.lecturer : "";
+
+  const facultyIdRaw =
+    typeof route.query.facultyId === "string"
+      ? Number(route.query.facultyId)
+      : null;
+
+  const academicYearIdRaw =
+    typeof route.query.academicYearId === "string"
+      ? Number(route.query.academicYearId)
+      : null;
+
+  const facultyId =
+    facultyIdRaw !== null && Number.isFinite(facultyIdRaw) ? facultyIdRaw : null;
+
+  const academicYearId =
+    academicYearIdRaw !== null && Number.isFinite(academicYearIdRaw)
+      ? academicYearIdRaw
+      : null;
 
   updateFilterState({
+    keyword: "",
     lecturerQuery: lecturer,
-    facultyId: Number.isFinite(facultyId as any) ? facultyId : null,
-    academicYearId: Number.isFinite(academicYearId as any) ? academicYearId : null,
+    facultyId,
+    academicYearId,
+    workType: fixedWorkType.value,
     page: 1,
   });
 
@@ -182,24 +200,43 @@ onMounted(() => {
   applyPresetAndQueryThenSearch();
 });
 
-// pagination: giữ behavior như file HomePage cũ
+watch(
+  () => props.preset,
+  () => {
+    applyPresetAndQueryThenSearch();
+  }
+);
+
+watch(
+  () => [route.query.lecturer, route.query.facultyId, route.query.academicYearId],
+  () => {
+    applyPresetAndQueryThenSearch();
+  }
+);
+
+// Chỉ reload khi user thao tác pagination sau khi page đã được set
 watch(
   () => [filterState.page, filterState.pageSize],
-  () => {
+  ([nextPage, nextPageSize], [prevPage, prevPageSize]) => {
+    if (nextPage === prevPage && nextPageSize === prevPageSize) return;
     loadPublicResearchItems();
   }
 );
 
 function onSearch() {
-  // giữ fixed workType với các tab không phải giảng viên
-  updateFilterState({ page: 1, workType: fixedWorkType.value });
+  updateFilterState({
+    page: 1,
+    workType: fixedWorkType.value,
+  });
   loadPublicResearchItems();
 }
 
 function onReset() {
   resetFilterState();
-  // reset xong vẫn phải giữ preset workType
-  updateFilterState({ workType: fixedWorkType.value, page: 1 });
+  updateFilterState({
+    workType: fixedWorkType.value,
+    page: 1,
+  });
   loadPublicResearchItems();
 }
 
