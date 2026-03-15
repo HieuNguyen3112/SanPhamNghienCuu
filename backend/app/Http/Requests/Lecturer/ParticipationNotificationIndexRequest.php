@@ -40,7 +40,7 @@ class ParticipationNotificationIndexRequest extends FormRequest
             'status' => ['nullable', 'string', 'in:ALL,PENDING,ACCEPTED,REJECTED'],
             'q' => ['nullable', 'string', 'max:255'],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];

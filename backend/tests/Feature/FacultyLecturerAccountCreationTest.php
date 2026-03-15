@@ -174,8 +174,62 @@ class FacultyLecturerAccountCreationTest extends TestCase
             'email' => 'gv901@uni.test',
             'unit_id' => $outsideDepartmentId,
             'status' => 'ACTIVE',
-        ])->assertStatus(403)
-            ->assertJsonPath('message', 'unit not in scope');
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['unit_id']);
+    }
+
+    public function test_update_lecturer_rejects_unit_outside_faculty_scope(): void
+    {
+        [, $departmentA] = $this->seedFacultyDepartments();
+
+        $outsideFacultyId = DB::table('faculties')->insertGetId([
+            'code' => 'SP',
+            'name' => 'Khoa Su pham',
+        ]);
+        $outsideDepartmentId = DB::table('departments')->insertGetId([
+            'faculty_id' => $outsideFacultyId,
+            'code' => 'SP01',
+            'name' => 'Bo mon Su pham Co ban',
+        ]);
+
+        $departmentAdmin = User::factory()->create([
+            'email' => 'dept-admin-4@uni.test',
+            'email_verified_at' => now(),
+        ]);
+        $departmentAdmin->assignRole('DEPARTMENT_BOARD');
+
+        Lecturer::create([
+            'user_id' => $departmentAdmin->id,
+            'code' => 'DL004',
+            'full_name' => 'Department Admin 4',
+            'email' => 'dept-admin-4@uni.test',
+            'department_id' => $departmentA,
+            'active' => true,
+        ]);
+
+        $targetUser = User::factory()->create([
+            'email' => 'gv-update@uni.test',
+            'email_verified_at' => now(),
+        ]);
+
+        $targetLecturer = Lecturer::create([
+            'user_id' => $targetUser->id,
+            'code' => 'GV902',
+            'full_name' => 'Giang vien cap nhat',
+            'email' => 'gv-update@uni.test',
+            'department_id' => $departmentA,
+            'active' => true,
+        ]);
+
+        Sanctum::actingAs($departmentAdmin);
+
+        $this->putJson('/api/faculty/users/lecturer-accounts/' . $targetLecturer->id, [
+            'full_name' => 'Giang vien cap nhat',
+            'email' => 'gv-update@uni.test',
+            'unit_id' => $outsideDepartmentId,
+            'position_title' => 'Pho truong bo mon',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['unit_id']);
     }
 
     private function seedFacultyDepartments(): array

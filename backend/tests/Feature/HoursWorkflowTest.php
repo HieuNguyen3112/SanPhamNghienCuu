@@ -700,6 +700,144 @@ class HoursWorkflowTest extends TestCase
         );
     }
 
+    public function test_faculty_owner_cannot_approve_or_reject_own_activity(): void
+    {
+        $this->lecturerUser->assignRole('DEPARTMENT_BOARD');
+        $assistantStageId = (int) DB::table('approval_stages')->where('code', 'assistant')->value('id');
+        $activityId = $this->createActivity('pending_faculty_review', null);
+
+        Sanctum::actingAs($this->lecturerUser);
+
+        $this->putJson("/api/faculty/works/approvals/{$activityId}/approve")
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'APPROVER_IS_ACTIVITY_PARTICIPANT')
+            ->assertJsonPath('details.participant_role', 'owner');
+
+        $this->putJson("/api/faculty/works/approvals/{$activityId}/reject", [
+            'reason_type' => 'OTHER',
+            'reason_detail' => 'Conflict of interest',
+        ])
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'APPROVER_IS_ACTIVITY_PARTICIPANT')
+            ->assertJsonPath('details.participant_role', 'owner');
+
+        $this->assertDatabaseHas('research_activities', [
+            'id' => $activityId,
+            'status_id' => $this->statusId('pending_faculty_review'),
+        ]);
+
+        $this->assertDatabaseMissing('activity_approvals', [
+            'activity_id' => $activityId,
+            'stage_id' => $assistantStageId,
+            'decided_by_user_id' => $this->lecturerUser->id,
+        ]);
+    }
+
+    public function test_faculty_member_cannot_approve_or_reject_activity_they_joined(): void
+    {
+        $this->memberUser->assignRole('DEPARTMENT_BOARD');
+        $assistantStageId = (int) DB::table('approval_stages')->where('code', 'assistant')->value('id');
+        $activityId = $this->createActivity('pending_faculty_review', null);
+
+        DB::table('research_activity_members')->insert([
+            'activity_id' => $activityId,
+            'lecturer_id' => $this->memberLecturerId,
+            'member_role_id' => $this->memberRoleId,
+            'contribution_share' => null,
+            'hours_assigned' => null,
+            'confirmation_status' => 'accepted',
+            'responded_at' => now(),
+            'confirmation_note' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->memberUser);
+
+        $this->putJson("/api/faculty/works/approvals/{$activityId}/approve")
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'APPROVER_IS_ACTIVITY_PARTICIPANT')
+            ->assertJsonPath('details.participant_role', 'member');
+
+        $this->putJson("/api/faculty/works/approvals/{$activityId}/reject", [
+            'reason_type' => 'OTHER',
+            'reason_detail' => 'Conflict of interest',
+        ])
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'APPROVER_IS_ACTIVITY_PARTICIPANT')
+            ->assertJsonPath('details.participant_role', 'member');
+
+        $this->assertDatabaseHas('research_activities', [
+            'id' => $activityId,
+            'status_id' => $this->statusId('pending_faculty_review'),
+        ]);
+
+        $this->assertDatabaseMissing('activity_approvals', [
+            'activity_id' => $activityId,
+            'stage_id' => $assistantStageId,
+            'decided_by_user_id' => $this->memberUser->id,
+        ]);
+    }
+
+    public function test_unrelated_faculty_board_member_can_approve_or_reject_activity(): void
+    {
+        $activityToApprove = $this->createActivity('pending_faculty_review', null);
+        $activityToReject = $this->createActivity('pending_faculty_review', null);
+
+        Sanctum::actingAs($this->facultyUser);
+
+        $this->putJson("/api/faculty/works/approvals/{$activityToApprove}/approve")
+            ->assertOk();
+
+        $this->putJson("/api/faculty/works/approvals/{$activityToReject}/reject", [
+            'reason_type' => 'OTHER',
+            'reason_detail' => 'Need revision',
+        ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('research_activities', [
+            'id' => $activityToApprove,
+            'status_id' => $this->statusId('approved'),
+        ]);
+
+        $this->assertDatabaseHas('research_activities', [
+            'id' => $activityToReject,
+            'status_id' => $this->statusId('rejected'),
+        ]);
+    }
+
+    public function test_faculty_list_and_detail_expose_approver_conflict_metadata(): void
+    {
+        $this->memberUser->assignRole('DEPARTMENT_BOARD');
+        $activityId = $this->createActivity('pending_faculty_review', null);
+
+        DB::table('research_activity_members')->insert([
+            'activity_id' => $activityId,
+            'lecturer_id' => $this->memberLecturerId,
+            'member_role_id' => $this->memberRoleId,
+            'contribution_share' => null,
+            'hours_assigned' => null,
+            'confirmation_status' => 'accepted',
+            'responded_at' => now(),
+            'confirmation_note' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->memberUser);
+
+        $this->getJson('/api/faculty/works/approvals')
+            ->assertOk()
+            ->assertJsonPath('data.0.activity_id', $activityId)
+            ->assertJsonPath('data.0.has_approver_conflict', true)
+            ->assertJsonPath('data.0.approver_conflict_code', 'APPROVER_IS_ACTIVITY_PARTICIPANT');
+
+        $this->getJson("/api/faculty/works/approvals/{$activityId}")
+            ->assertOk()
+            ->assertJsonPath('data.activity.has_approver_conflict', true)
+            ->assertJsonPath('data.activity.approver_conflict_code', 'APPROVER_IS_ACTIVITY_PARTICIPANT');
+    }
+
     public function test_faculty_work_approval_applies_paper_600_equal_split_for_three_members(): void
     {
         $paper600TypeId = DB::table('activity_types')->insertGetId([

@@ -5,17 +5,17 @@ namespace App\DTO\UserManagement;
 class CreateLecturerAccountData
 {
     public function __construct(
-        public readonly string $lecturerCode,
-        public readonly string $fullName,
-        public readonly string $email,
-        public readonly ?string $phoneNumber,
-        public readonly ?string $academicTitle,
-        public readonly ?int $degreeId,
-        public readonly ?int $academicRankId,
-        public readonly bool $isActive,
-        public readonly int $departmentId,
-        public readonly int $facultyId,
-        public readonly int $creatorUserId,
+        public string $lecturerCode,
+        public string $fullName,
+        public string $email,
+        public ?string $phoneNumber,
+        public ?string $academicTitle,
+        public ?int $degreeId,
+        public ?int $academicRankId,
+        public bool $isActive,
+        public int $departmentId,
+        public int $facultyId,
+        public int $creatorUserId,
     ) {}
 
     public static function fromFacultyRequest(array $payload, int $creatorUserId, int $departmentId, int $facultyId): self

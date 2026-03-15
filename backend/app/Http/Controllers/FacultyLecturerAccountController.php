@@ -38,9 +38,6 @@ class FacultyLecturerAccountController extends Controller
 
         $validated = $request->validated();
         $unitId = (int) $validated['unit_id'];
-        if (! $this->unitInScope($unitId, $departmentScope['faculty_id'])) {
-            return response()->json(['message' => 'unit not in scope'], Response::HTTP_FORBIDDEN);
-        }
 
         $data = CreateLecturerAccountData::fromFacultyRequest(
             payload: $validated,
@@ -184,10 +181,6 @@ class FacultyLecturerAccountController extends Controller
         }
 
         $data = $request->validated();
-        if (! $this->unitInScope((int) $data['unit_id'], $scope['faculty_id'])) {
-            return response()->json(['message' => 'unit not in scope'], Response::HTTP_FORBIDDEN);
-        }
-
         DB::transaction(function () use ($data, $lecturer) {
             $lecturer->fill([
                 'full_name' => $data['full_name'],

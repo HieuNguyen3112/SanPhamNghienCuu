@@ -5,7 +5,7 @@
     >
       <PageHeader
         title="Quản lý công trình khoa học cá nhân"
-        subtitle="Theo dõi & kê khai các công trình NCKH của bạn"
+        subtitle="Theo dõi và kê khai các công trình NCKH của bạn"
         :show-export-pdf="false"
         :show-export-excel="false"
         @exportPdfClicked="() => {}"
@@ -18,6 +18,32 @@
       :active-tab="filterTab"
       @select="selectCard"
     />
+
+    <div
+      v-if="stats.rejectedCount > 0 || filterTab === 'rejected'"
+      class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
+    >
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div class="font-semibold text-sky-950">
+            Công trình bị khoa trả về được xử lý trong mục này
+          </div>
+          <p class="mt-1 leading-6">
+            Thông báo workflow ở biểu tượng chuông chỉ giúp điều hướng. Chủ nhiệm và các thành viên đã chấp nhận
+            tham gia đều xem lý do từ chối và mở lại công trình tại tab
+            <span class="font-semibold">Bị từ chối</span>.
+          </p>
+        </div>
+        <button
+          v-if="filterTab !== 'rejected'"
+          type="button"
+          class="inline-flex items-center justify-center rounded-xl border border-sky-300 bg-white px-3 py-2 font-semibold text-sky-900 transition hover:border-sky-400 hover:bg-sky-100"
+          @click="selectCard('rejected')"
+        >
+          Xem công trình bị từ chối ({{ stats.rejectedCount }})
+        </button>
+      </div>
+    </div>
 
     <div
       v-if="noticeMessage"

@@ -1,7 +1,6 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="space-y-4 p-4 md:p-6">
-      <!-- Header -->
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
@@ -13,7 +12,6 @@
         />
       </div>
 
-      <!-- Notification -->
       <div
         v-if="notificationMessage"
         class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
@@ -21,7 +19,27 @@
         {{ notificationMessage }}
       </div>
 
-      <!-- Filters -->
+      <div
+        class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
+      >
+        <div class="font-semibold text-sky-950">
+          Trang này chỉ dùng cho lời mời và xác nhận tham gia
+        </div>
+        <p class="mt-1 leading-6">
+          Nếu công trình bị khoa trả về, hệ thống không tạo một yêu cầu tham gia mới tại đây.
+          Chủ nhiệm và các thành viên đã chấp nhận tham gia sẽ nhận thông báo workflow ở biểu tượng chuông
+          và thấy công trình trong mục <span class="font-semibold">Công trình của tôi</span>.
+        </p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <RouterLink
+            to="/works/personal?tab=rejected"
+            class="inline-flex items-center rounded-xl border border-sky-300 bg-white px-3 py-2 font-semibold text-sky-900 transition hover:border-sky-400 hover:bg-sky-100"
+          >
+            Mở Công trình của tôi
+          </RouterLink>
+        </div>
+      </div>
+
       <div
         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
       >
@@ -40,9 +58,7 @@
           </div>
 
           <div class="md:col-span-3">
-            <label class="text-xs font-medium text-slate-600"
-              >Tìm theo tên công trình</label
-            >
+            <label class="text-xs font-medium text-slate-600">Tìm theo tên công trình</label>
             <div class="relative mt-1">
               <Search
                 class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -89,7 +105,6 @@
         </div>
       </div>
 
-      <!-- List -->
       <ParticipationNotificationTable
         :rows="rows"
         :loading="loading"
@@ -102,7 +117,6 @@
         @row-click="openDetail"
       />
 
-      <!-- Detail panel -->
       <ParticipationNotificationDetailPanel
         :open="detailOpen"
         :notification="selected"

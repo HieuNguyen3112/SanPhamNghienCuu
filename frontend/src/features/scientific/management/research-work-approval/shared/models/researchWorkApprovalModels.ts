@@ -103,6 +103,9 @@ export interface ResearchWorkApprovalEntry {
   hoursResolutionNote?: string | null;
 
   approvalStatus: ResearchWorkApprovalStatus;
+  hasApproverConflict?: boolean;
+  approverConflictCode?: string | null;
+  approverConflictMessage?: string | null;
 
   evidenceAttachmentList: EvidenceAttachment[];
   researchWorkAuthorList: ResearchWorkAuthor[];

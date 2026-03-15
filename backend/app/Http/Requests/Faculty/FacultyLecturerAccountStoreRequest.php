@@ -2,11 +2,15 @@
 
 namespace App\Http\Requests\Faculty;
 
+use App\Http\Requests\Faculty\Concerns\ValidatesFacultyScopedUnit;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class FacultyLecturerAccountStoreRequest extends FormRequest
 {
+    use ValidatesFacultyScopedUnit;
+
     public function authorize(): bool
     {
         return true;
@@ -38,5 +42,10 @@ class FacultyLecturerAccountStoreRequest extends FormRequest
             'unit_id' => ['required', 'integer', 'exists:departments,id'],
             'status' => ['nullable', Rule::in(['ACTIVE', 'INACTIVE'])],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $this->addFacultyScopedUnitValidation($validator);
     }
 }

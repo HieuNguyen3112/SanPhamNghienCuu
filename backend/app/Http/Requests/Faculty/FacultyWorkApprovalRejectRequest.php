@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Faculty;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class FacultyWorkApprovalRejectRequest extends FormRequest
 {
@@ -33,5 +34,12 @@ class FacultyWorkApprovalRejectRequest extends FormRequest
             ],
             'reason_detail' => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->sometimes('reason_detail', ['required'], function ($input) {
+            return isset($input->reason_type) && $input->reason_type === 'OTHER';
+        });
     }
 }

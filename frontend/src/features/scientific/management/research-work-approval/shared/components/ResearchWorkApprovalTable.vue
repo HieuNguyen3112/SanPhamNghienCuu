@@ -186,6 +186,13 @@
                 </span>
 
                 <span
+                  v-if="researchWorkApprovalEntry.hasApproverConflict"
+                  class="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-800"
+                >
+                  Bạn tham gia công trình này
+                </span>
+
+                <span
                   class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-700"
                 >
                   Giờ kê khai:
@@ -316,5 +323,5 @@ const pagedResearchWorkApprovalList = computed<ResearchWorkApprovalEntry[]>(
   },
 );
 
-const { approvalScopeIdentifier, tableActionButtonLabel } = componentProperties;
+const { approvalScopeIdentifier } = componentProperties;
 </script>

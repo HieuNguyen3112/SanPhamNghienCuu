@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   mapper,
   type PersonalStats,
@@ -19,8 +20,18 @@ const sortKeyMap: Record<SortKey, string> = {
   roleName: "role_name",
 };
 
+const allowedTabs: PersonalWorkFilterTab[] = [
+  "all",
+  "approved",
+  "pending",
+  "rejected",
+  "draft",
+];
+
 export function usePersonalResearchWorks() {
   const { runPageLoad } = usePageLoadFeedback();
+  const route = useRoute();
+  const router = useRouter();
 
   const stats = ref<PersonalStats>({
     totalCount: 0,
@@ -63,6 +74,36 @@ export function usePersonalResearchWorks() {
     return `${key}:${direction}`;
   };
 
+  function resolveRequestedTab(): PersonalWorkFilterTab | null {
+    const raw = route.query.tab;
+    if (typeof raw !== "string") return null;
+    return allowedTabs.includes(raw as PersonalWorkFilterTab)
+      ? (raw as PersonalWorkFilterTab)
+      : null;
+  }
+
+  function resolveRequestedActivityId(): number | null {
+    const raw = route.query.activity_id;
+    if (typeof raw !== "string") return null;
+    const parsed = Number(raw);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  async function clearHandledRouteContext(options: {
+    clearTab?: boolean;
+    clearActivityId?: boolean;
+  }) {
+    const nextQuery = { ...route.query };
+    if (options.clearTab) {
+      delete nextQuery.tab;
+    }
+    if (options.clearActivityId) {
+      delete nextQuery.activity_id;
+    }
+
+    await router.replace({ path: route.path, query: nextQuery }).catch(() => undefined);
+  }
+
   async function loadWorksInternal() {
     loadingList.value = true;
     errorList.value = null;
@@ -102,12 +143,36 @@ export function usePersonalResearchWorks() {
   }
 
   async function bootstrap() {
+    const requestedTab = resolveRequestedTab();
+    if (requestedTab) {
+      filterTab.value = requestedTab;
+      currentPageNumber.value = 1;
+    }
+
     await runPageLoad(loadWorksInternal, {
       loading: {
         title: "Đang khởi tạo công trình của tôi",
         message: "Hệ thống đang chuẩn bị dữ liệu công trình nghiên cứu cá nhân...",
       },
     });
+
+    const requestedActivityId = resolveRequestedActivityId();
+    if (requestedActivityId) {
+      await openDetail(requestedActivityId);
+
+      if (selectedWorkDetail.value?.activityId === requestedActivityId) {
+        noticeTone.value = "info";
+        noticeMessage.value =
+          "Công trình bị khoa trả về đã được mở trong Công trình của tôi. Chủ nhiệm và các thành viên đã chấp nhận tham gia đều xem lý do và tiếp tục cập nhật tại đây.";
+      }
+    }
+
+    if (requestedTab || requestedActivityId) {
+      await clearHandledRouteContext({
+        clearTab: requestedTab !== null,
+        clearActivityId: requestedActivityId !== null,
+      });
+    }
   }
 
   async function changeTab(nextTab: PersonalWorkFilterTab) {

@@ -94,11 +94,18 @@ class FacultyResearchWorkApprovalController extends Controller
 
         $items = collect($paginator->items());
         $activityIds = $items->pluck('activity_id')->all();
+        $actingLecturerId = $this->resolveActingLecturerId($request);
         $authorsByActivity = $this->fetchAuthorsByActivity($activityIds);
+        $participantLecturerIdsByActivity = $this->fetchParticipantLecturerIdsByActivity($activityIds);
 
         $rows = $items
-            ->map(function ($row) use ($authorsByActivity) {
-                return $this->mapListEntry($row, $authorsByActivity);
+            ->map(function ($row) use ($authorsByActivity, $actingLecturerId, $participantLecturerIdsByActivity) {
+                return $this->mapListEntry(
+                    $row,
+                    $authorsByActivity,
+                    $actingLecturerId,
+                    $participantLecturerIdsByActivity
+                );
             })
             ->values()
             ->all();
@@ -146,7 +153,16 @@ class FacultyResearchWorkApprovalController extends Controller
             return response()->json(['message' => 'activity not available for faculty approval'], Response::HTTP_NOT_FOUND);
         }
 
-        // Đồng bộ trước khi hiển thị để bảng "Thành viên & số giờ" luôn có dữ liệu dự kiến mới nhất.
+        $actingLecturerId = $this->resolveActingLecturerId($request);
+        $participantLecturerIdsByActivity = $this->fetchParticipantLecturerIdsByActivity([(int) $activity]);
+        $approverConflict = $this->resolveApproverConflict(
+            $actingLecturerId,
+            (int) $activity,
+            (int) $row->lecturer_id,
+            $participantLecturerIdsByActivity
+        );
+
+        // Recompute before rendering so the member-hours grid always uses the latest projected values.
         $now = now();
         $this->ensureOwnerMemberExists((int) $activity, (int) $row->lecturer_id, $now);
         $calculation = $this->hoursRecomputeService->recomputeActivity((int) $activity, $now, true);
@@ -210,7 +226,7 @@ class FacultyResearchWorkApprovalController extends Controller
 
         return response()->json([
             'data' => [
-                'activity' => [
+                'activity' => array_merge([
                     'activity_id' => (int) $row->activity_id,
                     'activity_code' => $row->activity_code,
                     'title' => $row->title,
@@ -244,7 +260,7 @@ class FacultyResearchWorkApprovalController extends Controller
                         'faculty_id' => $row->faculty_id,
                         'faculty_name' => $row->faculty_name,
                     ],
-                ],
+                ], $this->buildApproverConflictPayload($approverConflict)),
                 'members' => $membersPayload,
                 'evidence_files' => $this->fetchEvidenceFiles($activity),
                 'approvals' => $this->fetchApprovals($activity),
@@ -270,6 +286,15 @@ class FacultyResearchWorkApprovalController extends Controller
 
         if ($this->resolveFacultyApprovalStatus($current) !== self::STATUS_PENDING) {
             return response()->json(['message' => 'activity is not pending faculty approval'], Response::HTTP_CONFLICT);
+        }
+
+        $approverConflict = $this->resolveApproverConflict(
+            $this->resolveActingLecturerId($request),
+            $activity,
+            (int) $current->lecturer_id
+        );
+        if ($approverConflict) {
+            return $this->buildApproverConflictResponse($approverConflict);
         }
 
         $approvedStatusId = $this->getStatusId('approved');
@@ -394,6 +419,15 @@ class FacultyResearchWorkApprovalController extends Controller
             return response()->json(['message' => 'activity is not pending faculty approval'], Response::HTTP_CONFLICT);
         }
 
+        $approverConflict = $this->resolveApproverConflict(
+            $this->resolveActingLecturerId($request),
+            $activity,
+            (int) $current->lecturer_id
+        );
+        if ($approverConflict) {
+            return $this->buildApproverConflictResponse($approverConflict);
+        }
+
         $rejectedStatusId = $this->getStatusId('rejected');
         if (! $rejectedStatusId) {
             return response()->json(['message' => 'rejected status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -482,7 +516,7 @@ class FacultyResearchWorkApprovalController extends Controller
                 $workTitle !== ''
                     ? 'Công trình "' . $workTitle . '" đã bị khoa từ chối và trả về để nhóm cập nhật.'
                     : 'Công trình đã bị khoa từ chối và trả về để nhóm cập nhật.',
-                '/works/personal?activity_id=' . $activity,
+                '/works/personal?tab=rejected&activity_id=' . $activity,
                 [
                     'activity_id' => (int) $activity,
                     'activity_title' => $workTitle !== '' ? $workTitle : null,
@@ -518,6 +552,13 @@ class FacultyResearchWorkApprovalController extends Controller
             'faculty_id' => (int) $faculty->id,
             'faculty_name' => $faculty->name,
         ];
+    }
+
+    private function resolveActingLecturerId(Request $request): ?int
+    {
+        $lecturerId = $request->user()?->lecturer?->id;
+
+        return $lecturerId ? (int) $lecturerId : null;
     }
 
     private function getStageIds(): array
@@ -671,12 +712,23 @@ class FacultyResearchWorkApprovalController extends Controller
         return null;
     }
 
-    private function mapListEntry(object $row, array $authorsByActivity): array
+    private function mapListEntry(
+        object $row,
+        array $authorsByActivity,
+        ?int $actingLecturerId,
+        array $participantLecturerIdsByActivity
+    ): array
     {
         $activityId = (int) $row->activity_id;
         $approvalStatus = $this->resolveFacultyApprovalStatus($row) ?? self::STATUS_PENDING;
+        $approverConflict = $this->resolveApproverConflict(
+            $actingLecturerId,
+            $activityId,
+            (int) $row->lecturer_id,
+            $participantLecturerIdsByActivity
+        );
 
-        return [
+        return array_merge([
             'activity_id' => $activityId,
             'activity_code' => $row->activity_code,
             'title' => $row->title,
@@ -703,7 +755,112 @@ class FacultyResearchWorkApprovalController extends Controller
                 'faculty_name' => $row->faculty_name,
             ],
             'authors' => $authorsByActivity[$activityId] ?? [],
+        ], $this->buildApproverConflictPayload($approverConflict));
+    }
+
+    private function fetchParticipantLecturerIdsByActivity(array $activityIds): array
+    {
+        if (count($activityIds) === 0) {
+            return [];
+        }
+
+        $grouped = [];
+
+        $ownerRows = DB::table('research_activities')
+            ->whereIn('id', $activityIds)
+            ->select(['id', 'owner_lecturer_id'])
+            ->get();
+
+        foreach ($ownerRows as $row) {
+            $activityId = (int) $row->id;
+            if ($row->owner_lecturer_id !== null) {
+                $grouped[$activityId][] = (int) $row->owner_lecturer_id;
+            }
+        }
+
+        $memberRows = DB::table('research_activity_members')
+            ->whereIn('activity_id', $activityIds)
+            ->select(['activity_id', 'lecturer_id'])
+            ->get();
+
+        foreach ($memberRows as $row) {
+            $activityId = (int) $row->activity_id;
+            if ($row->lecturer_id !== null) {
+                $grouped[$activityId][] = (int) $row->lecturer_id;
+            }
+        }
+
+        foreach ($grouped as $activityId => $lecturerIds) {
+            $grouped[$activityId] = collect($lecturerIds)
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return $grouped;
+    }
+
+    private function resolveApproverConflict(
+        ?int $actingLecturerId,
+        int $activityId,
+        ?int $ownerLecturerId = null,
+        ?array $participantLecturerIdsByActivity = null
+    ): ?array {
+        if (! $actingLecturerId || $activityId <= 0) {
+            return null;
+        }
+
+        if ($ownerLecturerId !== null && $actingLecturerId === $ownerLecturerId) {
+            return [
+                'code' => 'APPROVER_IS_ACTIVITY_PARTICIPANT',
+                'message' => 'You cannot approve or reject an activity you participate in.',
+                'participant_role' => 'owner',
+            ];
+        }
+
+        $participantLecturerIds = $participantLecturerIdsByActivity[$activityId] ?? null;
+        if ($participantLecturerIds === null) {
+            $participantLecturerIds = DB::table('research_activity_members')
+                ->where('activity_id', $activityId)
+                ->pluck('lecturer_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if (in_array($actingLecturerId, $participantLecturerIds, true)) {
+            return [
+                'code' => 'APPROVER_IS_ACTIVITY_PARTICIPANT',
+                'message' => 'You cannot approve or reject an activity you participate in.',
+                'participant_role' => 'member',
+            ];
+        }
+
+        return null;
+    }
+
+    private function buildApproverConflictPayload(?array $conflict): array
+    {
+        return [
+            'has_approver_conflict' => $conflict !== null,
+            'approver_conflict_code' => $conflict['code'] ?? null,
+            'approver_conflict_message' => $conflict['message'] ?? null,
         ];
+    }
+
+    private function buildApproverConflictResponse(array $conflict)
+    {
+        return response()->json([
+            'code' => $conflict['code'],
+            'message' => $conflict['message'],
+            'details' => [
+                'participant_role' => $conflict['participant_role'] ?? null,
+            ],
+        ], Response::HTTP_FORBIDDEN);
     }
 
     private function buildCounters(array $stageIds, int $facultyId, array $filters): array

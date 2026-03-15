@@ -419,7 +419,7 @@ class LecturerParticipationNotificationController extends Controller
 
     private function normalizeFilters(array $validated): array
     {
-        $filters = [
+        return [
             'status' => $validated['status'] ?? null,
             'q' => $validated['q'] ?? null,
             'from' => $validated['from'] ?? null,
@@ -427,12 +427,6 @@ class LecturerParticipationNotificationController extends Controller
             'page' => $validated['page'] ?? null,
             'per_page' => $validated['per_page'] ?? null,
         ];
-
-        if ($filters['from'] && $filters['to'] && $filters['from'] > $filters['to']) {
-            [$filters['from'], $filters['to']] = [$filters['to'], $filters['from']];
-        }
-
-        return $filters;
     }
 
     private function mapStatusToDb(string $status): string

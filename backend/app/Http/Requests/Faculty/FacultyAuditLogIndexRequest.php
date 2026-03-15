@@ -53,7 +53,7 @@ class FacultyAuditLogIndexRequest extends FormRequest
             'severity' => ['nullable', 'string', 'in:' . implode(',', self::SEVERITIES)],
             'result' => ['nullable', 'string', 'in:' . implode(',', self::RESULT_STATUSES)],
             'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'sort' => ['nullable', 'string', 'max:50'],

@@ -84,6 +84,30 @@ export function useFacultyResearchWorkApprovalProvider() {
     showErrorModal(message, "Có lỗi xảy ra", details);
   }
 
+  function resolveDecisionErrorMessage(
+    error: unknown,
+    fallbackMessage: string,
+  ): string {
+    const errorCode =
+      typeof error === "object" &&
+      error !== null &&
+      "response" in error &&
+      typeof error.response === "object" &&
+      error.response !== null &&
+      "data" in error.response &&
+      typeof error.response.data === "object" &&
+      error.response.data !== null &&
+      "code" in error.response.data
+        ? String(error.response.data.code ?? "")
+        : "";
+
+    if (errorCode === "APPROVER_IS_ACTIVITY_PARTICIPANT") {
+      return "Bạn không thể duyệt hoặc từ chối công trình mà mình tham gia. Vui lòng chuyển hồ sơ cho thành viên hội đồng khoa khác.";
+    }
+
+    return resolveApiErrorMessage(error, fallbackMessage);
+  }
+
   function openResearchWorkDetailDrawer(
     entry: ResearchWorkApprovalEntry,
   ): void {
@@ -211,6 +235,9 @@ export function useFacultyResearchWorkApprovalProvider() {
       officialResearchHours: item.official_hours ?? 0,
 
       approvalStatus: item.approval_status as any,
+      hasApproverConflict: item.has_approver_conflict ?? false,
+      approverConflictCode: item.approver_conflict_code ?? null,
+      approverConflictMessage: item.approver_conflict_message ?? null,
 
       evidenceAttachmentList: Array.from(
         { length: item.evidence_count ?? 0 },
@@ -331,6 +358,9 @@ export function useFacultyResearchWorkApprovalProvider() {
       hoursResolutionNote: item.hours_resolution_note ?? null,
 
       approvalStatus: item.approval_status as any,
+      hasApproverConflict: item.has_approver_conflict ?? false,
+      approverConflictCode: item.approver_conflict_code ?? null,
+      approverConflictMessage: item.approver_conflict_message ?? null,
 
       evidenceAttachmentList: detail.evidence_files.map((file) => ({
         evidenceAttachmentIdentifier: file.id,
@@ -443,7 +473,7 @@ export function useFacultyResearchWorkApprovalProvider() {
         error: {
           title: "Duyệt công trình thất bại",
           message: (error) =>
-            resolveApiErrorMessage(
+            resolveDecisionErrorMessage(
               error,
               "Không thể duyệt công trình. Vui lòng thử lại.",
             ),
@@ -479,7 +509,7 @@ export function useFacultyResearchWorkApprovalProvider() {
         error: {
           title: "Từ chối công trình thất bại",
           message: (error) =>
-            resolveApiErrorMessage(
+            resolveDecisionErrorMessage(
               error,
               "Không thể từ chối công trình. Vui lòng thử lại.",
             ),

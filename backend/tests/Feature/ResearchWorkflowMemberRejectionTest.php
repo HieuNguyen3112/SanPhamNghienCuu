@@ -241,9 +241,57 @@ class ResearchWorkflowMemberRejectionTest extends TestCase
                     && ($payload['event_key'] ?? null) === 'work_rejected'
                     && ($payload['activity_id'] ?? null) === $activityId
                     && ($payload['rejection_note'] ?? null) === $expectedNote
-                    && ($payload['target_url'] ?? null) === "/works/personal?activity_id={$activityId}";
+                    && ($payload['target_url'] ?? null) === "/works/personal?tab=rejected&activity_id={$activityId}";
             }
         );
+    }
+
+    public function test_faculty_reject_requires_reason_detail_for_other(): void
+    {
+        [$activityId] = $this->createActivityWithMember('pending_faculty_review', 'accepted');
+
+        Sanctum::actingAs($this->facultyUser);
+        $this->putJson("/api/faculty/works/approvals/{$activityId}/reject", [
+            'reason_type' => 'OTHER',
+            'reason_detail' => '   ',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['reason_detail']);
+
+        $this->assertDatabaseHas('research_activities', [
+            'id' => $activityId,
+            'status_id' => $this->statusId('pending_faculty_review'),
+        ]);
+    }
+
+    public function test_faculty_rejection_stays_out_of_participation_notifications_and_points_to_my_works(): void
+    {
+        [$activityId] = $this->createActivityWithMember('pending_faculty_review', 'accepted');
+
+        Sanctum::actingAs($this->facultyUser);
+        $this->putJson("/api/faculty/works/approvals/{$activityId}/reject", [
+            'reason_type' => 'MISSING_EVIDENCE',
+            'reason_detail' => 'Bo sung tep PDF.',
+        ])->assertOk();
+
+        Sanctum::actingAs($this->memberUser);
+
+        $this->getJson('/api/lecturer/participation-requests?status=REJECTED')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.items');
+
+        $this->getJson('/api/lecturer/works/my?status=rejected')
+            ->assertOk()
+            ->assertJsonPath('data.items.0.activity_id', $activityId);
+    }
+
+    public function test_participation_notifications_reject_reversed_date_range(): void
+    {
+        Sanctum::actingAs($this->memberUser);
+
+        $this->getJson('/api/lecturer/participation-requests?from=2025-05-10&to=2025-05-01')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['to']);
     }
 
     public function test_accepted_member_can_rework_faculty_rejected_activity_and_see_same_reason(): void

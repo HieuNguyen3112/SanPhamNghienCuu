@@ -138,6 +138,18 @@
                 </div>
               </section>
 
+              <section
+                v-if="approverConflictMessage"
+                class="rounded-2xl border border-rose-200 bg-rose-50/60 p-4"
+              >
+                <div class="text-sm font-semibold text-rose-900">
+                  Bạn đang tham gia công trình này
+                </div>
+                <p class="mt-1 text-sm text-rose-900/90">
+                  {{ approverConflictMessage }}
+                </p>
+              </section>
+
               <!-- 2. Minh chứng -->
               <section class="rounded-2xl border border-slate-200 bg-white p-4">
                 <div class="flex items-center justify-between">
@@ -799,18 +811,41 @@ function getPendingStatusValue() {
 const isApproveActionDisabled = computed(() => {
   const entry = selectedResearchWorkApprovalEntry.value;
   if (!entry) return true;
-  return entry.approvalStatus !== getPendingStatusValue();
+  return (
+    entry.approvalStatus !== getPendingStatusValue() ||
+    entry.hasApproverConflict === true
+  );
 });
 
 const isRejectActionDisabled = computed(() => {
   const entry = selectedResearchWorkApprovalEntry.value;
   if (!entry) return true;
-  return entry.approvalStatus !== getPendingStatusValue();
+  return (
+    entry.approvalStatus !== getPendingStatusValue() ||
+    entry.hasApproverConflict === true
+  );
+});
+
+const approverConflictMessage = computed(() => {
+  const entry = selectedResearchWorkApprovalEntry.value;
+  if (!entry?.hasApproverConflict) return null;
+  return (
+    entry.approverConflictMessage?.trim() ||
+    "Bạn không thể duyệt hoặc từ chối công trình mà mình tham gia. Vui lòng chuyển hồ sơ cho thành viên hội đồng khoa khác."
+  );
 });
 
 function approveSelectedResearchWork(): void {
   const entry = selectedResearchWorkApprovalEntry.value;
   if (!entry) return;
+  if (entry.hasApproverConflict) {
+    showErrorModal(
+      approverConflictMessage.value ??
+        "Bạn không thể duyệt hoặc từ chối công trình mà mình tham gia. Vui lòng chuyển hồ sơ cho thành viên hội đồng khoa khác.",
+      "Không thể xét duyệt",
+    );
+    return;
+  }
 
   if (canFinalizeHours.value) {
     shouldShowOfficialHoursValidationHint.value = true;
@@ -848,6 +883,14 @@ function approveSelectedResearchWork(): void {
 async function onRejectActionButtonClicked(): Promise<void> {
   const entry = selectedResearchWorkApprovalEntry.value;
   if (!entry) return;
+  if (entry.hasApproverConflict) {
+    showErrorModal(
+      approverConflictMessage.value ??
+        "Bạn không thể duyệt hoặc từ chối công trình mà mình tham gia. Vui lòng chuyển hồ sơ cho thành viên hội đồng khoa khác.",
+      "Không thể xét duyệt",
+    );
+    return;
+  }
 
   if (!isRejectionPanelVisible.value) {
     isRejectionPanelVisible.value = true;

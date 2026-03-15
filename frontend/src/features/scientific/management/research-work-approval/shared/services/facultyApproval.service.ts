@@ -35,6 +35,9 @@ export type FacultyApprovalListItem = {
   declared_hours: number | null;
   official_hours: number | null;
   evidence_count: number;
+  has_approver_conflict?: boolean;
+  approver_conflict_code?: string | null;
+  approver_conflict_message?: string | null;
   lecturer: {
     id: number;
     code: string;
