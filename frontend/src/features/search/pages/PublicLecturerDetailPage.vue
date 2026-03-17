@@ -64,7 +64,7 @@
             <div class="grid gap-3 sm:grid-cols-4">
               <button
                 class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-                @click="goTo('paper')"
+                @click="openWorkList('paper')"
               >
                 <div class="text-2xl font-extrabold text-[#e11d48]">
                   {{ counts.paper }}
@@ -74,7 +74,7 @@
 
               <button
                 class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-                @click="goTo('book')"
+                @click="openWorkList('book')"
               >
                 <div class="text-2xl font-extrabold text-[#e11d48]">
                   {{ counts.book_total }}
@@ -86,7 +86,7 @@
 
               <button
                 class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-                @click="goTo('project')"
+                @click="openWorkList('project')"
               >
                 <div class="text-2xl font-extrabold text-[#e11d48]">
                   {{ counts.project }}
@@ -98,7 +98,7 @@
 
               <button
                 class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-                @click="goTo('conference')"
+                @click="openWorkList('conference')"
               >
                 <div class="text-2xl font-extrabold text-[#e11d48]">
                   {{ counts.conference }}
@@ -122,8 +122,9 @@
                     <div>
                       <b>Họ và tên:</b> {{ lecturer?.full_name ?? "—" }}
                     </div>
-                    <div><b>Giới tính:</b> {{ profile?.gender ?? "—" }}</div>
-                    <div><b>Năm sinh:</b> {{ birthYear }}</div>
+                    <div><b>Giới tính:</b> {{ displayGender }}</div>
+                    <div><b>Ngày sinh:</b> {{ displayBirthDate }}</div>
+                    <div><b>Học vị:</b> {{ lecturer?.degree_name ?? "—" }}</div>
                   </div>
 
                   <div
@@ -155,10 +156,10 @@
                     class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"
                   >
                     <div>
-                      <b>Chức danh:</b> {{ profile?.current_position ?? "—" }}
+                      <b>Chức danh:</b> {{ displayPosition }}
                     </div>
                     <div class="mt-2">
-                      <b>Đơn vị:</b> {{ profile?.current_unit ?? "—" }}
+                      <b>Đơn vị:</b> {{ displayUnit }}
                     </div>
                   </div>
 
@@ -193,6 +194,7 @@
                         <th class="px-4 py-3">Thời gian</th>
                         <th class="px-4 py-3">Chức danh</th>
                         <th class="px-4 py-3">Cơ quan</th>
+                        <th class="px-4 py-3">Loại hình</th>
                         <th class="px-4 py-3">Ghi chú</th>
                       </tr>
                     </thead>
@@ -212,11 +214,14 @@
                           {{ w.organization ?? w.workplace ?? "—" }}
                         </td>
                         <td class="px-4 py-3 text-slate-600">
+                          {{ w.employment_type ?? "—" }}
+                        </td>
+                        <td class="px-4 py-3 text-slate-600">
                           {{ w.notes ?? "—" }}
                         </td>
                       </tr>
                       <tr v-if="workHistories.length === 0">
-                        <td class="px-4 py-3 text-slate-600" colspan="4">—</td>
+                        <td class="px-4 py-3 text-slate-600" colspan="5">—</td>
                       </tr>
                     </tbody>
                   </table>
@@ -236,6 +241,8 @@
                         <th class="px-4 py-3">Bậc đào tạo</th>
                         <th class="px-4 py-3">Cơ sở đào tạo</th>
                         <th class="px-4 py-3">Ngành</th>
+                        <th class="px-4 py-3">Địa điểm</th>
+                        <th class="px-4 py-3">Hình thức</th>
                         <th class="px-4 py-3">Thời gian</th>
                       </tr>
                     </thead>
@@ -250,6 +257,10 @@
                         </td>
                         <td class="px-4 py-3">{{ e.institution ?? "—" }}</td>
                         <td class="px-4 py-3">{{ e.major ?? "—" }}</td>
+                        <td class="px-4 py-3">
+                          {{ [e.city, e.country].filter(Boolean).join(", ") || "—" }}
+                        </td>
+                        <td class="px-4 py-3">{{ e.training_form ?? "—" }}</td>
                         <td class="px-4 py-3 text-slate-600">
                           {{
                             formatRange(e.start_date, e.end_date, e.is_current)
@@ -257,7 +268,7 @@
                         </td>
                       </tr>
                       <tr v-if="educations.length === 0">
-                        <td class="px-4 py-3 text-slate-600" colspan="4">—</td>
+                        <td class="px-4 py-3 text-slate-600" colspan="6">—</td>
                       </tr>
                     </tbody>
                   </table>
@@ -270,14 +281,88 @@
     </main>
 
     <PublicHomeFooter />
+
+    <Teleport to="body">
+      <div v-if="isWorkListOpen" class="fixed inset-0 z-[58]">
+        <div class="absolute inset-0 bg-black/30" @click="closeWorkList"></div>
+
+        <div class="absolute right-0 top-0 h-full w-full max-w-4xl bg-white shadow-xl">
+          <div class="flex h-full flex-col">
+            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div class="min-w-0">
+                <div class="text-xs text-slate-500">
+                  Giảng viên / Danh sách công trình / {{ workListTitle }}
+                </div>
+                <div class="mt-1 text-sm font-semibold text-slate-900">
+                  {{ lecturer?.full_name ?? "—" }}
+                </div>
+                <div class="text-xs text-slate-500">
+                  {{ lecturer?.code ?? "" }} • {{ lecturer?.department_name ?? "—" }}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+                @click="closeWorkList"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-5">
+              <div v-if="workListLoading" class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                Đang tải danh sách công trình...
+              </div>
+
+              <div v-else-if="workListError" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                {{ workListError }}
+              </div>
+
+              <ul v-else-if="workListItems.length > 0" class="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200">
+                <li
+                  v-for="item in workListItems"
+                  :key="item.id"
+                  class="cursor-pointer px-4 py-4 hover:bg-slate-50"
+                  @click="openResearchDetail(item)"
+                >
+                  <div class="text-sm font-semibold text-[#1d4ed8]">
+                    {{ item.title }}
+                  </div>
+                  <div class="mt-1 text-sm text-slate-800">
+                    {{ item.lecturerName }}
+                  </div>
+                  <div class="mt-1 text-xs text-slate-500">
+                    {{ item.facultyName }} • {{ item.academicYearCode }}
+                  </div>
+                </li>
+              </ul>
+
+              <div v-else class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                Không có công trình phù hợp.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <PublicResearchDrawer
+      :open="isResearchDetailOpen"
+      :item="selectedResearchItem"
+      @close="closeResearchDetail"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
 import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
+import PublicResearchDrawer from "@/features/public-research/components/PublicResearchDrawer.vue";
+import { loadPublicResearchItemsService } from "@/features/public-research/services/publicResearchService";
+import type { PublicResearchItem } from "@/features/public-research/models/publicResearchModels";
 
 import PublicHomeTopHeader from "@/features/search/components/PublicHomeTopHeader.vue";
 import PublicHomeNavBar from "@/features/search/components/PublicHomeNavBar.vue";
@@ -329,7 +414,6 @@ async function fetchLecturerDetail(code: string): Promise<DetailRes> {
   return res.json();
 }
 
-const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
 const { logoutWithFeedback } = useLogoutFeedback("/");
@@ -364,17 +448,54 @@ const workHistories = ref<any[]>([]);
 const educations = ref<any[]>([]);
 const counts = ref({ paper: 0, project: 0, conference: 0, book_total: 0 });
 
+type WorkListKind = "paper" | "book" | "project" | "conference";
+
+const isWorkListOpen = ref(false);
+const workListKind = ref<WorkListKind>("paper");
+const workListItems = ref<PublicResearchItem[]>([]);
+const workListLoading = ref(false);
+const workListError = ref<string | null>(null);
+
+const isResearchDetailOpen = ref(false);
+const selectedResearchItem = ref<PublicResearchItem | null>(null);
+
 const titleLine = computed(() => {
   const a = lecturer.value?.academic_rank_name;
   const d = lecturer.value?.degree_name;
   return [a, d].filter(Boolean).join(" - ") || "Giảng viên";
 });
 
-const birthYear = computed(() => {
+const displayBirthDate = computed(() => {
   const dob = profile.value?.date_of_birth;
   if (!dob) return "—";
-  return String(dob).slice(0, 4);
+  return formatDate(dob);
 });
+
+const displayGender = computed(() => {
+  const raw = String(profile.value?.gender ?? "").trim();
+  if (!raw) return "—";
+  const normalized = raw.toLowerCase();
+  if (["m", "male", "nam"].includes(normalized)) return "Nam";
+  if (["f", "female", "nu", "nữ"].includes(normalized)) return "Nữ";
+  return raw;
+});
+
+const displayPosition = computed(() => {
+  return (
+    profile.value?.current_position ?? lecturer.value?.academic_rank_name ?? "—"
+  );
+});
+
+const displayUnit = computed(() => {
+  return profile.value?.current_unit ?? lecturer.value?.department_name ?? "—";
+});
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("vi-VN").format(date);
+}
 
 function formatRange(
   start?: string | null,
@@ -416,13 +537,56 @@ const lecturerQuery = computed(() => {
   return `${name}${code ? " / " + code : ""}`;
 });
 
-function goTo(kind: "paper" | "book" | "project" | "conference") {
-  const map: Record<string, string> = {
-    paper: "/bai-bao-khoa-hoc",
-    project: "/de-tai-nghien-cuu",
-    conference: "/hoi-thao-bao-cao-khoa-hoc",
-    book: "/sach-giao-trinh",
-  };
-  router.push({ path: map[kind], query: { lecturer: lecturerQuery.value } });
+const workListTitle = computed(() => {
+  if (workListKind.value === "paper") return "Bài báo";
+  if (workListKind.value === "book") return "Sách - Giáo trình";
+  if (workListKind.value === "project") return "Đề tài khoa học";
+  return "Hội thảo";
+});
+
+async function openWorkList(kind: WorkListKind) {
+  workListKind.value = kind;
+  isWorkListOpen.value = true;
+  workListLoading.value = true;
+  workListError.value = null;
+  workListItems.value = [];
+
+  const workTypeMap = {
+    paper: "ARTICLE",
+    book: "BOOK",
+    project: "PROJECT",
+    conference: "CONFERENCE",
+  } as const;
+
+  try {
+    const result = await loadPublicResearchItemsService({
+      q: null,
+      lecturer_query: lecturer.value?.code?.trim() || lecturerQuery.value,
+      faculty_id: null,
+      work_type: workTypeMap[kind],
+      academic_year_id: null,
+      page: 1,
+      page_size: 50,
+    });
+    workListItems.value = result.items;
+  } catch (e: any) {
+    workListError.value = e?.message || "Không tải được danh sách công trình";
+  } finally {
+    workListLoading.value = false;
+  }
+}
+
+function closeWorkList() {
+  isWorkListOpen.value = false;
+}
+
+function openResearchDetail(item: PublicResearchItem) {
+  selectedResearchItem.value = item;
+  isResearchDetailOpen.value = true;
+}
+
+function closeResearchDetail() {
+  isResearchDetailOpen.value = false;
+  selectedResearchItem.value = null;
 }
 </script>

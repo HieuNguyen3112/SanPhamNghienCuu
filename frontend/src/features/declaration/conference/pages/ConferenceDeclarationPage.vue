@@ -640,11 +640,16 @@ async function persistRowEvidence(
 
   const allPendingLinks = row.pendingEvidenceLinks ?? [];
   const validLinkPendings = allPendingLinks.filter(
-    (pendingLink) => String(pendingLink?.url ?? "").trim() !== "",
+    (pendingLink) =>
+      String(pendingLink?.url ?? "").trim() !== "" &&
+      Number(pendingLink?.file_type_id) > 0,
   );
   const linkResults = await Promise.allSettled(
     validLinkPendings.map((pendingLink) =>
-      add_evidence_link(activityId, { url: String(pendingLink.url).trim() }),
+      add_evidence_link(activityId, {
+        url: String(pendingLink.url).trim(),
+        file_type_id: Number(pendingLink.file_type_id),
+      }),
     ),
   );
 
@@ -742,7 +747,7 @@ const canSubmit = computed(() => {
     if (invalidPendingFiles) return false;
 
     const invalidPendingLinks = (row.pendingEvidenceLinks ?? []).some(
-      (l: any) => !String(l.url ?? "").trim(),
+      (l: any) => !String(l.url ?? "").trim() || !l?.file_type_id,
     );
     if (invalidPendingLinks) return false;
 
@@ -756,7 +761,7 @@ async function loadCatalogs() {
   const [years, kinds, fileTypes, roles, lecturerId] = await Promise.all([
     fetch_academic_years(),
     fetch_activity_kinds(),
-    fetch_evidence_file_types(),
+    fetch_evidence_file_types("conference"),
     fetch_member_roles(),
     fetch_current_lecturer_id(),
   ]);

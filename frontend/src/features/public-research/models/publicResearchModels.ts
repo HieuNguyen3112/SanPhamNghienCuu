@@ -52,8 +52,42 @@ export type PublicResearchParticipant = {
   roleName: string;
 };
 
+export type PublicResearchDisplayMeta = {
+  article?: {
+    journalName: string | null;
+    year: number | null;
+    volume: string | null;
+    issue: string | null;
+    pageStart: number | null;
+    pageEnd: number | null;
+    doi: string | null;
+    articleUrl: string | null;
+  };
+  project?: {
+    projectCode: string | null;
+    managementLevel: string | null;
+    startMonth: string | null;
+    endMonth: string | null;
+    decisionNo: string | null;
+    decisionDate: string | null;
+  };
+  book?: {
+    publisher: string | null;
+    isbn: string | null;
+    year: number | null;
+    approvalDecisionNo: string | null;
+    approvalDecisionDate: string | null;
+  };
+  conference?: {
+    conferenceName: string | null;
+    heldOn: string | null;
+    location: string | null;
+  };
+};
+
 export type PublicResearchDetail = PublicResearchItem & {
   activityCode: string;
   participants: PublicResearchParticipant[];
   evidenceFiles: { label: string; url: string }[];
+  displayMeta: PublicResearchDisplayMeta;
 };

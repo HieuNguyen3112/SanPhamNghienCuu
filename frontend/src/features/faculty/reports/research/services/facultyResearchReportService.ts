@@ -1,5 +1,6 @@
 import http from "@/lib/http";
 import type {
+  ResearchCategoryKey,
   ResearchReportCharts,
   ResearchReportFilters,
   ResearchReportFiltersResponse,
@@ -99,7 +100,7 @@ export async function fetchFacultyResearchReportFilters(): Promise<ResearchRepor
       facultyName: dept.faculty_name,
     })),
     researchTypes: data.data.research_types.map((type) => ({
-      value: type.value,
+      value: type.value as ResearchCategoryKey,
       label: type.label,
     })),
     lecturers: data.data.lecturers.map((lecturer) => ({

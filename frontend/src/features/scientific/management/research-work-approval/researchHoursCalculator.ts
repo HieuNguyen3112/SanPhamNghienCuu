@@ -45,7 +45,6 @@ export function calcProjectHours(params: {
   members: Member[];
   leaderId: number; // chủ nhiệm
 }): CalcResult {
-  const n = params.members.length;
   const leaderHours = Math.max(
     0,
     Math.min(

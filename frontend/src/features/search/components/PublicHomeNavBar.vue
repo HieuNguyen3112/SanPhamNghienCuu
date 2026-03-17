@@ -5,29 +5,29 @@
       <nav class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-[12px] font-normal md:gap-2">
         <RouterLink :to="{ path: '/' }" :class="navClass(isActiveExact('/'))">Trang chủ</RouterLink>
 
-        <RouterLink :to="{ path: '/giang-vien' }" :class="navClass(isActivePrefix('/giang-vien'))">Giảng viên</RouterLink>
+        <RouterLink :to="{ path: '/lecturers' }" :class="navClass(isActivePrefix('/lecturers'))">Giảng viên</RouterLink>
 
-        <RouterLink :to="{ path: '/bai-bao-khoa-hoc' }" :class="navClass(isActivePrefix('/bai-bao-khoa-hoc'))">
+        <RouterLink :to="{ path: '/research-articles' }" :class="navClass(isActivePrefix('/research-articles'))">
           Bài báo khoa học
         </RouterLink>
 
-        <RouterLink :to="{ path: '/de-tai-nghien-cuu' }" :class="navClass(isActivePrefix('/de-tai-nghien-cuu'))">
+        <RouterLink :to="{ path: '/research-projects' }" :class="navClass(isActivePrefix('/research-projects'))">
           Đề tài nghiên cứu
         </RouterLink>
 
-        <RouterLink :to="{ path: '/sach-giao-trinh' }" :class="navClass(isActivePrefix('/sach-giao-trinh'))">
+        <RouterLink :to="{ path: '/textbooks' }" :class="navClass(isActivePrefix('/textbooks'))">
           Sách - Giáo trình
         </RouterLink>
 
         <RouterLink
-          :to="{ path: '/hoi-thao-bao-cao-khoa-hoc' }"
-          :class="navClass(isActivePrefix('/hoi-thao-bao-cao-khoa-hoc'))"
+          :to="{ path: '/research-conferences' }"
+          :class="navClass(isActivePrefix('/research-conferences'))"
         >
           <span class="hidden lg:inline">Hội thảo - Báo cáo khoa học</span>
           <span class="lg:hidden">Hội thảo - Báo cáo</span>
         </RouterLink>
 
-        <RouterLink :to="{ path: '/huong-dan-su-dung' }" :class="navClass(isActivePrefix('/huong-dan-su-dung'))">
+        <RouterLink :to="{ path: '/user-guide' }" :class="navClass(isActivePrefix('/user-guide'))">
           <span class="hidden lg:inline">Hướng dẫn sử dụng</span>
           <span class="lg:hidden">Hướng dẫn</span>
         </RouterLink>

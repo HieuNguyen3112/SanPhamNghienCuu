@@ -20,6 +20,7 @@
       @update:category="category = $event"
       @search="onHomeSearch"
       @reset="onHomeReset"
+      @open-list="goToCategoryPage"
     />
 
     <section v-if="isAuthenticated && countsByKind" class="bg-slate-50">
@@ -168,11 +169,11 @@ const {
 const category = ref<CategoryKey>("lecturer");
 
 const categoryToPath: Record<CategoryKey, string> = {
-  lecturer: "/giang-vien",
-  article: "/bai-bao-khoa-hoc",
-  project: "/de-tai-nghien-cuu",
-  book: "/sach-giao-trinh",
-  conference: "/hoi-thao-bao-cao-khoa-hoc",
+  lecturer: "/lecturers",
+  article: "/research-articles",
+  project: "/research-projects",
+  book: "/textbooks",
+  conference: "/research-conferences",
 };
 
 async function onHomeSearch() {
@@ -192,5 +193,22 @@ async function onHomeSearch() {
 
 function onHomeReset() {
   resetFilterState();
+}
+
+async function goToCategoryPage(nextCategory: Exclude<CategoryKey, "lecturer">) {
+  const path = categoryToPath[nextCategory];
+  const q: Record<string, string> = {};
+
+  if (filterState.lecturerQuery?.trim()) {
+    q.lecturer = filterState.lecturerQuery.trim();
+  }
+  if (filterState.facultyId != null) {
+    q.facultyId = String(filterState.facultyId);
+  }
+  if (filterState.academicYearId != null) {
+    q.academicYearId = String(filterState.academicYearId);
+  }
+
+  await router.push({ path, query: q });
 }
 </script>

@@ -34,6 +34,14 @@ class ResearchActivityDetailRequest extends FormRequest
             'isbn',
             'pages',
             'project_code',
+            'project_category',
+            'research_field',
+            'objectives',
+            'content_summary',
+            'application_address',
+            'implementing_unit',
+            'project_status',
+            'main_results',
             'decision_no',
             'decision_date',
             'funding',
@@ -94,12 +102,20 @@ class ResearchActivityDetailRequest extends FormRequest
                 break;
             case 'project_details':
                 $rules += [
-                    'project_code' => ['nullable', 'string', 'max:100'],
+                    'project_code' => ['required', 'string', 'max:100'],
+                    'project_category' => ['nullable', 'string', 'max:255'],
+                    'research_field' => ['nullable', 'string', 'max:255'],
+                    'objectives' => ['nullable', 'string', 'max:2000'],
+                    'content_summary' => ['nullable', 'string', 'max:3000'],
+                    'application_address' => ['nullable', 'string', 'max:500'],
+                    'implementing_unit' => ['required', 'string', 'max:255'],
+                    'project_status' => ['required', 'string', 'max:100'],
+                    'main_results' => ['required', 'string', 'max:3000'],
                     'decision_no' => ['nullable', 'string', 'max:100'],
                     'decision_date' => ['nullable', 'date'],
                     'funding' => ['nullable', 'numeric', 'min:0'],
-                    'start_month' => ['nullable', 'date'],
-                    'end_month' => ['nullable', 'date'],
+                    'start_month' => ['required', 'date'],
+                    'end_month' => ['required', 'date', 'after_or_equal:start_month'],
                 ];
                 break;
             case 'conference_details':

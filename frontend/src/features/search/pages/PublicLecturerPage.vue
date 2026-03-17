@@ -431,15 +431,15 @@ const lecturerCards = computed<LecturerCard[]>(() => {
 function jumpToWorkType(payload: { type: any; lecturerQuery: string }) {
   // Nếu bạn đã chuẩn hoá type: ARTICLE/PROJECT/BOOK/CONFERENCE thì map như sau:
   const routeMap: Record<string, string> = {
-    ARTICLE: "/bai-bao-khoa-hoc",
-    PROJECT: "/de-tai-nghien-cuu",
-    BOOK: "/sach-giao-trinh",
-    CONFERENCE: "/hoi-thao-bao-cao-khoa-hoc",
-    TEXTBOOK: "/sach-giao-trinh",
-    OTHER: "/sach-giao-trinh",
+    ARTICLE: "/research-articles",
+    PROJECT: "/research-projects",
+    BOOK: "/textbooks",
+    CONFERENCE: "/research-conferences",
+    TEXTBOOK: "/textbooks",
+    OTHER: "/textbooks",
   };
 
-  const path = routeMap[payload.type] ?? "/bai-bao-khoa-hoc";
+  const path = routeMap[payload.type] ?? "/research-articles";
 
   router.push({
     path,

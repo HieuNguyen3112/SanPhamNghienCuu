@@ -115,6 +115,9 @@ export type EvidenceFileDto = {
 export type EvidenceLinkDto = {
   id: number;
   activity_id: number;
+  file_type_id: number;
+  file_type_name?: string | null;
+  file_type_code?: string | null;
   lecturer_id: number;
   lecturer_name?: string | null;
   url: string;

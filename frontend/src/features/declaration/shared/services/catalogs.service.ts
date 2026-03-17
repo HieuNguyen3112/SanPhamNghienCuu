@@ -52,10 +52,11 @@ const memberRolesCache: CacheState<MemberRoleDto> = {
   value: null,
   promise: null,
 };
-const evidenceFileTypesCache: CacheState<EvidenceFileTypeDto> = {
-  value: null,
-  promise: null,
-};
+const evidenceFileTypesByKindCache = new Map<string, EvidenceFileTypeDto[]>();
+const evidenceFileTypesByKindPromise = new Map<
+  string,
+  Promise<EvidenceFileTypeDto[]>
+>();
 const activityStatusesCache: CacheState<ActivityStatusDto> = {
   value: null,
   promise: null,
@@ -202,15 +203,37 @@ export async function fetch_member_roles(): Promise<MemberRoleDto[]> {
   });
 }
 
-export async function fetch_evidence_file_types(): Promise<
+export async function fetch_evidence_file_types(kindCode?: string): Promise<
   EvidenceFileTypeDto[]
 > {
-  return readCachedList(evidenceFileTypesCache, async () => {
-    const { data } = await http.get<{ data: EvidenceFileTypeDto[] }>(
-      "/api/lookups/evidence-file-types",
-    );
-    return data.data;
-  });
+  const normalizedKind = normalizeSearch(kindCode ?? "");
+
+  if (evidenceFileTypesByKindCache.has(normalizedKind)) {
+    return cloneRows(evidenceFileTypesByKindCache.get(normalizedKind) ?? []);
+  }
+
+  if (evidenceFileTypesByKindPromise.has(normalizedKind)) {
+    const pending = evidenceFileTypesByKindPromise.get(normalizedKind);
+    const rows = pending ? await pending : [];
+    return cloneRows(rows);
+  }
+
+  const request = http
+    .get<{ data: EvidenceFileTypeDto[] }>("/api/lookups/evidence-file-types", {
+      params: normalizedKind ? { kind_code: normalizedKind } : undefined,
+    })
+    .then(({ data }) => data.data)
+    .then((rows) => {
+      evidenceFileTypesByKindCache.set(normalizedKind, rows);
+      return rows;
+    })
+    .finally(() => {
+      evidenceFileTypesByKindPromise.delete(normalizedKind);
+    });
+
+  evidenceFileTypesByKindPromise.set(normalizedKind, request);
+  const rows = await request;
+  return cloneRows(rows);
 }
 
 export async function fetch_activity_statuses(): Promise<ActivityStatusDto[]> {

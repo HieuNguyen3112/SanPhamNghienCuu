@@ -54,8 +54,10 @@
 
           <!-- 4 nhóm dữ liệu -->
           <div class="mt-4 grid gap-3 sm:grid-cols-2">
-            <div
-              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10"
+            <button
+              type="button"
+              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
+              @click="emit('open-list', 'article')"
             >
               <div class="flex items-start gap-3">
                 <span
@@ -75,10 +77,12 @@
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
 
-            <div
-              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10"
+            <button
+              type="button"
+              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
+              @click="emit('open-list', 'project')"
             >
               <div class="flex items-start gap-3">
                 <span
@@ -96,10 +100,12 @@
                   <div class="mt-1 text-xs text-white/70">Đề tài các cấp</div>
                 </div>
               </div>
-            </div>
+            </button>
 
-            <div
-              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10"
+            <button
+              type="button"
+              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
+              @click="emit('open-list', 'book')"
             >
               <div class="flex items-start gap-3">
                 <span
@@ -119,10 +125,12 @@
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
 
-            <div
-              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10"
+            <button
+              type="button"
+              class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
+              @click="emit('open-list', 'conference')"
             >
               <div class="flex items-start gap-3">
                 <span
@@ -142,7 +150,7 @@
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -289,6 +297,7 @@ const emit = defineEmits<{
   (e: "update:category", next: CategoryKey): void;
   (e: "search"): void;
   (e: "reset"): void;
+  (e: "open-list", next: Exclude<CategoryKey, "lecturer">): void;
 }>();
 
 const ALL_OPTION_VALUE = "ALL";

@@ -246,7 +246,7 @@ import SharedPaginationControls from "@/shared/components/layout/SharedPaginatio
 import type { HoursQuotaErrors } from "../contracts/researchHoursCatalog.contract";
 import type { HoursQuotaRow } from "../contracts/researchHoursCatalog.contract";
 
-const props = defineProps<{
+defineProps<{
   vm: {
     loading: boolean;
     saving: boolean;

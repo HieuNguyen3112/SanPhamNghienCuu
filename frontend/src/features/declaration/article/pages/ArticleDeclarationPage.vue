@@ -645,7 +645,7 @@ const canSubmit = computed(() => {
   if (invalidPending) return false;
 
   const invalidPendingLinks = pendingEvidenceLinks.value.some(
-    (l: any) => !String(l?.url ?? "").trim(),
+    (l: any) => !String(l?.url ?? "").trim() || !l?.file_type_id,
   );
   if (invalidPendingLinks) return false;
 
@@ -714,7 +714,7 @@ async function loadCatalogs() {
       fetch_academic_years(),
       fetch_activity_kinds(),
       fetch_member_roles(),
-      fetch_evidence_file_types(),
+      fetch_evidence_file_types("paper"),
     ]);
 
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
@@ -940,11 +940,16 @@ async function persistEvidenceDraft(activityId: number) {
   });
 
   const validLinkPendings = pendingEvidenceLinks.value.filter(
-    (pendingLink) => String(pendingLink?.url ?? "").trim() !== "",
+    (pendingLink) =>
+      String(pendingLink?.url ?? "").trim() !== "" &&
+      Number(pendingLink?.file_type_id) > 0,
   );
   const linkResults = await Promise.allSettled(
     validLinkPendings.map((pendingLink) =>
-      add_evidence_link(activityId, { url: String(pendingLink.url).trim() }),
+      add_evidence_link(activityId, {
+        url: String(pendingLink.url).trim(),
+        file_type_id: Number(pendingLink.file_type_id),
+      }),
     ),
   );
 

@@ -73,23 +73,13 @@
 
           <div class="md:col-span-2">
             <label class="mb-1 block text-xs font-medium text-slate-700"
-              >Tên đăng nhập</label
+              >Email</label
             >
-            <div class="flex overflow-hidden rounded-xl border border-slate-200">
-              <input
-                v-model="form.email"
-                class="min-w-0 flex-1 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-0"
-                placeholder="Nhập phần trước @"
-              />
-              <span
-                class="inline-flex items-center border-l border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600"
-              >
-                @local.test
-              </span>
-            </div>
-            <div class="mt-1 text-xs text-slate-500">
-              Hệ thống tự gắn hậu tố <span class="font-semibold">@local.test</span>.
-            </div>
+            <input
+              v-model="form.email"
+              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
+              placeholder="Email đăng nhập"
+            />
           </div>
 
           <div class="md:col-span-2">
@@ -204,7 +194,6 @@ const organizationLabel = computed(() => props.organizationLabel ?? "Đơn vị"
 const placeholderText = computed(() =>
   organizationLabel.value === "Khoa" ? "Chọn khoa" : "Chọn đơn vị",
 );
-const emailDomain = "@local.test";
 
 watch(
   () => props.open,
@@ -221,21 +210,10 @@ watch(
   },
 );
 
-function normalizeEmailLocalPart(value: string) {
-  const trimmed = value.trim().toLowerCase();
-  if (!trimmed) return "";
-
-  if (!trimmed.includes("@")) {
-    return trimmed;
-  }
-
-  return trimmed.split("@")[0] ?? "";
-}
-
-function isValidEmailLocalPart(value: string) {
-  if (!value) return false;
-
-  return /^[a-z0-9._-]+$/.test(value);
+function isValidEmail(value: string) {
+  const v = value.trim();
+  if (!v) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
 function onSubmit() {
@@ -243,8 +221,7 @@ function onSubmit() {
 
   const lecturerCode = form.lecturerCode.trim().toUpperCase();
   const fullName = form.fullName.trim();
-  const emailLocalPart = normalizeEmailLocalPart(form.email);
-  const email = `${emailLocalPart}${emailDomain}`;
+  const email = form.email.trim().toLowerCase();
 
   if (!lecturerCode) {
     localError.value = "Mã giảng viên không được để trống.";
@@ -254,9 +231,8 @@ function onSubmit() {
     localError.value = "Họ tên không được để trống.";
     return;
   }
-  if (!isValidEmailLocalPart(emailLocalPart)) {
-    localError.value =
-      "Tên đăng nhập không hợp lệ. Chỉ dùng chữ thường không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.";
+  if (!isValidEmail(email)) {
+    localError.value = "Email không hợp lệ.";
     return;
   }
   if (typeof form.unitId !== "number" || Number.isNaN(form.unitId)) {

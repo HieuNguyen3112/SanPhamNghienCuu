@@ -76,12 +76,20 @@ type BookDetailsDto = {
 
 type ProjectDetailsDto = {
   activity_id: number;
-  project_code: string | null;
+  project_code: string;
+  project_category: string | null;
+  research_field: string | null;
+  objectives: string | null;
+  content_summary: string | null;
+  application_address: string | null;
+  implementing_unit: string;
+  project_status: string;
+  main_results: string;
   decision_no: string | null;
   decision_date: string | null;
   funding: number | null;
-  start_month: string | null;
-  end_month: string | null;
+  start_month: string;
+  end_month: string;
 };
 
 type ConferenceDetailsDto = {
@@ -475,13 +483,17 @@ export async function add_evidence_link(
   activity_id: number,
   payload: {
     url: string;
+    file_type_id: number;
   },
 ): Promise<EvidenceLinkDto | null> {
   if (!MOCK) {
     await ensureCsrfCookie();
     const { data } = await http.post<{ data: EvidenceLinkDto | null }>(
       `/api/research-activities/${activity_id}/evidence-links`,
-      { url: payload.url },
+      {
+        url: payload.url,
+        file_type_id: payload.file_type_id,
+      },
     );
     return data.data ?? null;
   }
@@ -495,6 +507,9 @@ export async function add_evidence_link(
   const created: EvidenceLinkDto = {
     id: next_evidence_link_id++,
     activity_id,
+    file_type_id: payload.file_type_id,
+    file_type_name: `Loại #${payload.file_type_id}`,
+    file_type_code: null,
     lecturer_id: 0,
     lecturer_name: null,
     url: trimmed,

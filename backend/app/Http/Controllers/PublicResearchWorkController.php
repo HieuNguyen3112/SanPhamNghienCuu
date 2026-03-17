@@ -9,6 +9,59 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PublicResearchWorkController extends Controller
 {
+    private const PUBLIC_EVIDENCE_TYPE_CODES_BY_KIND = [
+        'paper' => [
+            'paper_link_doi',
+            'paper_link_journal_page',
+            'paper_link_pdf',
+            'paper_link_indexing',
+            'paper_first_page',
+            'paper_doi_or_article_link',
+            'paper_journal_publication_info',
+            'paper_acceptance_letter',
+            'content',
+            'publication_decision',
+        ],
+        'project' => [
+            'project_link_overview_page',
+            'project_link_summary_report',
+            'project_link_output_product',
+            'project_link_acceptance_evidence',
+            'project_assignment_or_approval_decision',
+            'project_proposal_document',
+            'project_final_or_summary_report',
+            'project_acceptance_minutes_or_recognition_decision',
+            'acceptance_decision',
+            'content',
+        ],
+        'book' => [
+            'book_link_publisher',
+            'book_link_digital_library',
+            'book_link_preview',
+            'book_link_pdf',
+            'book_assignment_decision',
+            'book_complete_manuscript',
+            'book_appraisal_minutes_or_approval_decision',
+            'book_cover_or_publication_info_isbn',
+            'cover',
+            'toc',
+            'publication_decision',
+            'content',
+        ],
+        'conference' => [
+            'conference_link_website',
+            'conference_link_program',
+            'conference_link_proceedings',
+            'conference_link_paper',
+            'conference_link_slide_video',
+            'conference_invitation_or_program',
+            'conference_paper_or_slides',
+            'conference_proceedings_page',
+            'conference_participation_certificate',
+            'content',
+        ],
+    ];
+
     /**
      * GET /api/public/research-works/lookups
      * Trả về: faculties (KHOA) + academic_years
@@ -120,6 +173,7 @@ class PublicResearchWorkController extends Controller
         $select = [
             'ra.id',
             'ra.title',
+            'ra.abstract',
             'ak.code as kind_code',
             'ay.id as academic_year_id',
             'ay.code as academic_year_code',
@@ -184,12 +238,12 @@ class PublicResearchWorkController extends Controller
 
             $query->where(function ($q) use ($matchedLecturerIds) {
                 $q->whereIn('ra.owner_lecturer_id', $matchedLecturerIds)
-                  ->orWhereExists(function ($sub) use ($matchedLecturerIds) {
-                      $sub->select(DB::raw(1))
-                          ->from('research_activity_members as ram')
-                          ->whereColumn('ram.activity_id', 'ra.id')
-                          ->whereIn('ram.lecturer_id', $matchedLecturerIds);
-                  });
+                    ->orWhereExists(function ($sub) use ($matchedLecturerIds) {
+                        $sub->select(DB::raw(1))
+                            ->from('research_activity_members as ram')
+                            ->whereColumn('ram.activity_id', 'ra.id')
+                            ->whereIn('ram.lecturer_id', $matchedLecturerIds);
+                    });
             });
         }
 
@@ -209,7 +263,7 @@ class PublicResearchWorkController extends Controller
             return [
                 'id' => (int)$row->id,
                 'title' => (string)$row->title,
-                'abstract' => '',
+                'abstract' => (string)($row->abstract ?? ''),
 
                 'lecturer_id' => (int)$row->lecturer_id,
                 'lecturer_code' => (string)$row->lecturer_code,
@@ -240,126 +294,301 @@ class PublicResearchWorkController extends Controller
         ], Response::HTTP_OK);
     }
     public function show(Request $request, int $activityId)
-{
-    // ✅ chỉ public item đã approved
-    $base = DB::table('research_activities as ra')
-        ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
-        ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
-        ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
-        ->join('lecturers as l', 'ra.owner_lecturer_id', '=', 'l.id')
-        ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
-        ->where('ast.code', 'approved')
-        ->where('ra.id', $activityId);
+    {
+        // ✅ chỉ public item đã approved
+        $base = DB::table('research_activities as ra')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
+            ->leftJoin('paper_details as pd', 'pd.activity_id', '=', 'ra.id')
+            ->leftJoin('book_details as bd', 'bd.activity_id', '=', 'ra.id')
+            ->leftJoin('project_details as pjd', 'pjd.activity_id', '=', 'ra.id')
+            ->leftJoin('conference_details as cd', 'cd.activity_id', '=', 'ra.id')
+            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+            ->join('lecturers as l', 'ra.owner_lecturer_id', '=', 'l.id')
+            ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
+            ->where('ast.code', 'approved')
+            ->where('ra.id', $activityId);
 
-    $hasFacultyJoin = Schema::hasTable('faculties') && Schema::hasColumn('departments', 'faculty_id');
-    if ($hasFacultyJoin) {
-        $base->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id');
-    }
+        $hasFacultyJoin = Schema::hasTable('faculties') && Schema::hasColumn('departments', 'faculty_id');
+        if ($hasFacultyJoin) {
+            $base->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id');
+        }
 
-    $row = $base->select([
-        'ra.id',
-        'ra.activity_code',
-        'ra.title',
-        'ak.code as kind_code',
-        'ay.id as academic_year_id',
-        'ay.code as academic_year_code',
-        'l.id as lecturer_id',
-        'l.code as lecturer_code',
-        'l.full_name as lecturer_name',
-        // faculty (KHOA)
-        $hasFacultyJoin ? 'f.id as faculty_id' : 'd.id as faculty_id',
-        $hasFacultyJoin ? 'f.name as faculty_name' : 'd.name as faculty_name',
-    ])->first();
+        $row = $base->select([
+            'ra.id',
+            'ra.activity_code',
+            'ra.title',
+            'ra.abstract',
+            'ak.code as kind_code',
+            'at.name as activity_type_name',
+            'pd.keywords as paper_keywords',
+            'ay.id as academic_year_id',
+            'ay.code as academic_year_code',
+            'l.id as lecturer_id',
+            'l.code as lecturer_code',
+            'l.full_name as lecturer_name',
+            'pd.journal_name as paper_journal_name',
+            'pd.year as paper_year',
+            'pd.volume as paper_volume',
+            'pd.issue as paper_issue',
+            'pd.page_start as paper_page_start',
+            'pd.page_end as paper_page_end',
+            'pd.doi as paper_doi',
+            'pd.article_url as paper_article_url',
+            'bd.isbn as book_isbn',
+            'bd.publisher as book_publisher',
+            'bd.year as book_year',
+            'bd.approval_decision_no as book_approval_decision_no',
+            'bd.approval_decision_date as book_approval_decision_date',
+            'pjd.project_code as project_code',
+            'pjd.start_month as project_start_month',
+            'pjd.end_month as project_end_month',
+            'pjd.decision_no as project_decision_no',
+            'pjd.decision_date as project_decision_date',
+            'cd.conference_name as conference_name',
+            'cd.location as conference_location',
+            'cd.held_on as conference_held_on',
+            // faculty (KHOA)
+            $hasFacultyJoin ? 'f.id as faculty_id' : 'd.id as faculty_id',
+            $hasFacultyJoin ? 'f.name as faculty_name' : 'd.name as faculty_name',
+        ])->first();
 
-    if (! $row) {
-        return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
-    }
+        if (! $row) {
+            return response()->json(['message' => 'not found'], Response::HTTP_NOT_FOUND);
+        }
 
-    $workType = match ($row->kind_code) {
-        'paper' => 'ARTICLE',
-        'book' => 'BOOK',
-        'project' => 'PROJECT',
-        'conference' => 'CONFERENCE',
-        default => 'OTHER',
-    };
+        $workType = match ($row->kind_code) {
+            'paper' => 'ARTICLE',
+            'book' => 'BOOK',
+            'project' => 'PROJECT',
+            'conference' => 'CONFERENCE',
+            default => 'OTHER',
+        };
 
-    // ===== participants: owner + members =====
-    $ownerRole = $row->kind_code === 'paper' ? 'Tác giả chính' : 'Chủ nhiệm';
+        // ===== participants: owner + members =====
+        $ownerRole = $row->kind_code === 'paper' ? 'Tác giả chính' : 'Chủ nhiệm';
 
-    $participants = [];
-    $participants[] = [
-        'lecturer_id' => (int) $row->lecturer_id,
-        'lecturer_code' => (string) $row->lecturer_code,
-        'lecturer_name' => (string) $row->lecturer_name,
-        'faculty_name' => (string) ($row->faculty_name ?? '—'),
-        'role_name' => $ownerRole,
-    ];
-
-    $membersQ = DB::table('research_activity_members as ram')
-        ->join('lecturers as ml', 'ram.lecturer_id', '=', 'ml.id')
-        ->leftJoin('departments as md', 'ml.department_id', '=', 'md.id')
-        ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
-        ->where('ram.activity_id', $activityId)
-        ->where('ram.lecturer_id', '<>', (int)$row->lecturer_id);
-
-    if ($hasFacultyJoin) {
-        $membersQ->leftJoin('faculties as mf', 'md.faculty_id', '=', 'mf.id');
-    }
-
-    $memberRows = $membersQ->select([
-        'ml.id as lecturer_id',
-        'ml.code as lecturer_code',
-        'ml.full_name as lecturer_name',
-        $hasFacultyJoin ? 'mf.name as faculty_name' : 'md.name as faculty_name',
-        'mr.name as role_name',
-    ])->get();
-
-    foreach ($memberRows as $m) {
-        $fallbackRole = $row->kind_code === 'paper' ? 'Đồng tác giả' : 'Thành viên';
+        $participants = [];
         $participants[] = [
-            'lecturer_id' => (int) $m->lecturer_id,
-            'lecturer_code' => (string) $m->lecturer_code,
-            'lecturer_name' => (string) $m->lecturer_name,
-            'faculty_name' => (string) ($m->faculty_name ?? '—'),
-            'role_name' => $m->role_name ? (string)$m->role_name : $fallbackRole,
+            'lecturer_id' => (int) $row->lecturer_id,
+            'lecturer_code' => (string) $row->lecturer_code,
+            'lecturer_name' => (string) $row->lecturer_name,
+            'faculty_name' => (string) ($row->faculty_name ?? '—'),
+            'role_name' => $ownerRole,
         ];
+
+        $membersQ = DB::table('research_activity_members as ram')
+            ->join('lecturers as ml', 'ram.lecturer_id', '=', 'ml.id')
+            ->leftJoin('departments as md', 'ml.department_id', '=', 'md.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->where('ram.activity_id', $activityId)
+            ->where('ram.lecturer_id', '<>', (int)$row->lecturer_id);
+
+        if ($hasFacultyJoin) {
+            $membersQ->leftJoin('faculties as mf', 'md.faculty_id', '=', 'mf.id');
+        }
+
+        $memberRows = $membersQ->select([
+            'ml.id as lecturer_id',
+            'ml.code as lecturer_code',
+            'ml.full_name as lecturer_name',
+            $hasFacultyJoin ? 'mf.name as faculty_name' : 'md.name as faculty_name',
+            'mr.name as role_name',
+        ])->get();
+
+        foreach ($memberRows as $m) {
+            $fallbackRole = $row->kind_code === 'paper' ? 'Đồng tác giả' : 'Thành viên';
+            $participants[] = [
+                'lecturer_id' => (int) $m->lecturer_id,
+                'lecturer_code' => (string) $m->lecturer_code,
+                'lecturer_name' => (string) $m->lecturer_name,
+                'faculty_name' => (string) ($m->faculty_name ?? '—'),
+                'role_name' => $m->role_name ? (string)$m->role_name : $fallbackRole,
+            ];
+        }
+
+        $evidenceLinks = $this->loadPublicEvidenceLinks($activityId, (string) $row->kind_code);
+        $pdfUrl = collect($evidenceLinks)
+            ->first(function (array $entry): bool {
+                $url = strtolower((string)($entry['url'] ?? ''));
+                return str_ends_with($url, '.pdf') || str_contains($url, '.pdf?');
+            })['url'] ?? null;
+
+        $keywords = $this->parseKeywords($row->paper_keywords ?? null);
+
+        $displayMeta = [
+            'article' => [
+                'journal_name' => $this->nullableString($row->paper_journal_name ?? null),
+                'year' => $this->nullableInt($row->paper_year ?? null),
+                'volume' => $this->nullableString($row->paper_volume ?? null),
+                'issue' => $this->nullableString($row->paper_issue ?? null),
+                'page_start' => $this->nullableInt($row->paper_page_start ?? null),
+                'page_end' => $this->nullableInt($row->paper_page_end ?? null),
+                'doi' => $this->nullableString($row->paper_doi ?? null),
+                'article_url' => $this->nullableUrl($row->paper_article_url ?? null),
+            ],
+            'project' => [
+                'project_code' => $this->nullableString($row->project_code ?? null),
+                'management_level' => $this->nullableString($row->activity_type_name ?? null),
+                'start_month' => $this->nullableDate($row->project_start_month ?? null),
+                'end_month' => $this->nullableDate($row->project_end_month ?? null),
+                'decision_no' => $this->nullableString($row->project_decision_no ?? null),
+                'decision_date' => $this->nullableDate($row->project_decision_date ?? null),
+            ],
+            'book' => [
+                'publisher' => $this->nullableString($row->book_publisher ?? null),
+                'isbn' => $this->nullableString($row->book_isbn ?? null),
+                'year' => $this->nullableInt($row->book_year ?? null),
+                'approval_decision_no' => $this->nullableString($row->book_approval_decision_no ?? null),
+                'approval_decision_date' => $this->nullableDate($row->book_approval_decision_date ?? null),
+            ],
+            'conference' => [
+                'conference_name' => $this->nullableString($row->conference_name ?? null),
+                'held_on' => $this->nullableDate($row->conference_held_on ?? null),
+                'location' => $this->nullableString($row->conference_location ?? null),
+            ],
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'item' => [
+                    'id' => (int)$row->id,
+                    'activity_code' => (string)($row->activity_code ?? ''),
+                    'title' => (string)$row->title,
+                    'abstract' => (string)($row->abstract ?? ''),
+
+
+                    'lecturer_id' => (int)$row->lecturer_id,
+                    'lecturer_code' => (string)$row->lecturer_code,
+                    'lecturer_name' => (string)$row->lecturer_name,
+
+                    'faculty_id' => (int)($row->faculty_id ?? 0),
+                    'faculty_name' => (string)($row->faculty_name ?? '—'),
+
+                    'work_type' => $workType,
+
+                    'academic_year_id' => (int)($row->academic_year_id ?? 0),
+                    'academic_year_code' => (string)($row->academic_year_code ?? '—'),
+
+                    'approval_status' => 'APPROVED',
+
+                    'pdf_url' => $pdfUrl,
+                    'cover_url' => null,
+                    'keywords' => $keywords,
+
+                    // ✅ quan trọng: đồng tác giả
+                    'participants' => $participants,
+
+                    // public attachments (chỉ các URL công khai hợp lệ)
+                    'evidence_files' => $evidenceLinks,
+                    'display_meta' => $displayMeta,
+                ],
+            ],
+        ], Response::HTTP_OK);
     }
 
-    return response()->json([
-        'success' => true,
-        'data' => [
-            'item' => [
-                'id' => (int)$row->id,
-                'activity_code' => (string)($row->activity_code ?? ''),
-                'title' => (string)$row->title,
-                'abstract' => '',
-                
+    private function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $text = trim((string) $value);
+        return $text === '' ? null : $text;
+    }
 
-                'lecturer_id' => (int)$row->lecturer_id,
-                'lecturer_code' => (string)$row->lecturer_code,
-                'lecturer_name' => (string)$row->lecturer_name,
+    private function nullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_numeric($value)) {
+            return null;
+        }
+        return (int) $value;
+    }
 
-                'faculty_id' => (int)($row->faculty_id ?? 0),
-                'faculty_name' => (string)($row->faculty_name ?? '—'),
+    private function nullableDate(mixed $value): ?string
+    {
+        $text = $this->nullableString($value);
+        if ($text === null) {
+            return null;
+        }
 
-                'work_type' => $workType,
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $text) === 1 ? $text : $text;
+    }
 
-                'academic_year_id' => (int)($row->academic_year_id ?? 0),
-                'academic_year_code' => (string)($row->academic_year_code ?? '—'),
+    private function nullableUrl(mixed $value): ?string
+    {
+        $text = $this->nullableString($value);
+        if ($text === null) {
+            return null;
+        }
 
-                'approval_status' => 'APPROVED',
+        return filter_var($text, FILTER_VALIDATE_URL) ? $text : null;
+    }
 
-                'pdf_url' => null,
-                'cover_url' => null,
-                'keywords' => [],
+    private function parseKeywords(?string $raw): array
+    {
+        if ($raw === null || trim($raw) === '') {
+            return [];
+        }
 
-                // ✅ quan trọng: đồng tác giả
-                'participants' => $participants,
+        return collect(preg_split('/[,;]+/', $raw) ?: [])
+            ->map(fn($part) => trim((string)$part))
+            ->filter(fn($part) => $part !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
 
-                // public attachments (tạm rỗng)
-                'evidence_files' => [],
-            ],
-        ],
-    ], Response::HTTP_OK);
-}
+    private function loadPublicEvidenceLinks(int $activityId, string $kindCode): array
+    {
+        $allowedCodes = self::PUBLIC_EVIDENCE_TYPE_CODES_BY_KIND[$kindCode] ?? [];
+        if ($allowedCodes === []) {
+            return [];
+        }
+
+        $rows = DB::table('evidence_files as ef')
+            ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
+            ->where('ef.activity_id', $activityId)
+            ->whereIn('eft.code', $allowedCodes)
+            ->select([
+                'eft.code as file_type_code',
+                'eft.name as file_type_name',
+                'ef.original_name',
+                'ef.path',
+                'ef.mime_type',
+                'ef.id',
+            ])
+            ->orderByDesc('ef.id')
+            ->get();
+
+        $priority = array_flip($allowedCodes);
+
+        return collect($rows)
+            ->map(function (object $row) {
+                $url = trim((string)($row->path ?? ''));
+                if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                    return null;
+                }
+
+                return [
+                    'label' => trim((string) ($row->file_type_name ?? '')) !== ''
+                        ? (string) $row->file_type_name
+                        : (trim((string)($row->original_name ?? '')) !== '' ? (string) $row->original_name : 'Link minh chứng'),
+                    'url' => $url,
+                    'file_type_code' => (string) ($row->file_type_code ?? ''),
+                ];
+            })
+            ->filter()
+            ->sortBy(fn(array $item) => $priority[$item['file_type_code']] ?? PHP_INT_MAX)
+            ->map(function (array $item) {
+                unset($item['file_type_code']);
+                return $item;
+            })
+            ->values()
+            ->all();
+    }
 }
