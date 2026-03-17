@@ -61,6 +61,7 @@ type PaperDetailsDto = {
   page_start: number | null;
   page_end: number | null;
   year: number | null;
+  keywords?: string | null;
 };
 
 type BookDetailsDto = {
@@ -75,12 +76,20 @@ type BookDetailsDto = {
 
 type ProjectDetailsDto = {
   activity_id: number;
-  project_code: string | null;
+  project_code: string;
+  project_category: string | null;
+  research_field: string | null;
+  objectives: string | null;
+  content_summary: string | null;
+  application_address: string | null;
+  implementing_unit: string;
+  project_status: string;
+  main_results: string;
   decision_no: string | null;
   decision_date: string | null;
   funding: number | null;
-  start_month: string | null;
-  end_month: string | null;
+  start_month: string;
+  end_month: string;
 };
 
 type ConferenceDetailsDto = {
@@ -474,13 +483,17 @@ export async function add_evidence_link(
   activity_id: number,
   payload: {
     url: string;
+    file_type_id: number;
   },
 ): Promise<EvidenceLinkDto | null> {
   if (!MOCK) {
     await ensureCsrfCookie();
     const { data } = await http.post<{ data: EvidenceLinkDto | null }>(
       `/api/research-activities/${activity_id}/evidence-links`,
-      { url: payload.url },
+      {
+        url: payload.url,
+        file_type_id: payload.file_type_id,
+      },
     );
     return data.data ?? null;
   }
@@ -494,6 +507,9 @@ export async function add_evidence_link(
   const created: EvidenceLinkDto = {
     id: next_evidence_link_id++,
     activity_id,
+    file_type_id: payload.file_type_id,
+    file_type_name: `Loại #${payload.file_type_id}`,
+    file_type_code: null,
     lecturer_id: 0,
     lecturer_name: null,
     url: trimmed,
@@ -532,8 +548,11 @@ export type ResearchActivityDetailResponse = {
   detail_kind?: string | null;
   detail?: Record<string, unknown> | null;
   members?: Array<{
-    lecturer_id: number;
+    lecturer_id?: number | null;
     member_role_id: number;
+    is_external?: boolean;
+    external_full_name?: string | null;
+    external_department_name?: string | null;
     contribution_share: number | null;
     hours_assigned: number | null;
     member_role_code?: string | null;
@@ -663,7 +682,8 @@ export async function fetch_current_lecturer_option(): Promise<LecturerOptionDto
     id: lecturer.id,
     code,
     full_name: fullName,
-    department_id: Number.isFinite(departmentId) && departmentId > 0 ? departmentId : 0,
+    department_id:
+      Number.isFinite(departmentId) && departmentId > 0 ? departmentId : 0,
     department_name: lecturer.department_name ?? undefined,
     faculty_id: null,
     faculty_name: null,

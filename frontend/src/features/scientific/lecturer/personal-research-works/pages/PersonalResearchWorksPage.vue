@@ -73,9 +73,6 @@
       :sort-order="sortOrder"
       @sort-change="handleSortChange"
       @open-detail="openDetail"
-      @edit-draft="goToEditDraft"
-      @copy-rejected="copyFromRejected"
-      @reinvite="reinviteFromRow"
     />
 
     <WorkDetailDrawer
@@ -121,8 +118,6 @@ const {
   closeDetail,
 
   goToEditDraft,
-  copyFromRejected,
-  reinviteFromRow,
   reinviteMember,
 
   currentPageNumber,

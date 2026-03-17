@@ -72,6 +72,9 @@ export interface ResearchWorkApprovalEntry {
   researchWorkIdentifier: number;
   researchWorkTitle: string;
 
+  researchWorkKindDisplayName?: string | null;
+  researchWorkCategoryDisplayName?: string | null;
+
   submittingLecturerDisplayName: string;
 
   facultyIdentifier: string;

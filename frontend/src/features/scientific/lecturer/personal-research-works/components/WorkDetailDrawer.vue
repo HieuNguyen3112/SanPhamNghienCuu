@@ -47,9 +47,9 @@
                     {{ work.statusName }}
                   </span>
 
-                  <span v-if="work" class="text-xs text-slate-500">
+                  <!-- <span v-if="work" class="text-xs text-slate-500">
                     {{ work.activityCode }}
-                  </span>
+                  </span> -->
                 </div>
               </div>
 
@@ -84,21 +84,32 @@
 
             <div v-else class="space-y-5">
               <section class="rounded-xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold text-slate-700">Thông tin chung</div>
+                <div class="text-xs font-semibold text-slate-700">
+                  Thông tin chung
+                </div>
 
                 <div class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                   <InfoRow label="Loại công trình" :value="work.kindName" />
                   <InfoRow label="Phân loại" :value="work.typeName ?? '—'" />
                   <InfoRow label="Vai trò" :value="work.roleName ?? '—'" />
-                  <InfoRow label="Năm" :value="work.workYear ? String(work.workYear) : '—'" />
+                  <InfoRow
+                    label="Năm"
+                    :value="work.workYear ? String(work.workYear) : '—'"
+                  />
                   <InfoRow
                     wrapper-class="md:col-span-2"
                     label="Nơi công bố/đơn vị"
                     :value="work.venueName ?? '—'"
                   />
 
-                  <InfoRow label="Ngày gửi" :value="formatDateTime(work.submittedAt)" />
-                  <InfoRow label="Ngày duyệt" :value="formatDateTime(work.approvedAt)" />
+                  <InfoRow
+                    label="Ngày gửi"
+                    :value="formatDateTime(work.submittedAt)"
+                  />
+                  <InfoRow
+                    label="Ngày duyệt"
+                    :value="formatDateTime(work.approvedAt)"
+                  />
 
                   <InfoRow
                     v-if="work.statusCode === 'approved'"
@@ -119,9 +130,12 @@
                   v-if="work.statusCode === 'member_rejected'"
                   class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
                 >
-                  <div class="text-xs font-semibold text-amber-900">Thành viên đã từ chối tham gia</div>
+                  <div class="text-xs font-semibold text-amber-900">
+                    Thành viên đã từ chối tham gia
+                  </div>
                   <p class="mt-1">
-                    Bạn cần xóa/thay thế thành viên bị từ chối hoặc gửi lại yêu cầu xác nhận trước khi gửi lên khoa.
+                    Bạn cần xóa/thay thế thành viên bị từ chối hoặc gửi lại yêu
+                    cầu xác nhận trước khi gửi lên khoa.
                   </p>
                 </div>
               </section>
@@ -130,9 +144,14 @@
                 v-if="work.statusCode === 'member_rejected'"
                 class="rounded-xl border border-rose-200 bg-rose-50 p-4"
               >
-                <div class="text-xs font-semibold text-rose-700">Danh sách thành viên từ chối</div>
+                <div class="text-xs font-semibold text-rose-700">
+                  Danh sách thành viên từ chối
+                </div>
 
-                <div v-if="work.rejectedMembers.length === 0" class="mt-3 text-sm text-rose-700">
+                <div
+                  v-if="work.rejectedMembers.length === 0"
+                  class="mt-3 text-sm text-rose-700"
+                >
                   Chưa có chi tiết thành viên từ chối.
                 </div>
 
@@ -146,16 +165,20 @@
                       <div class="min-w-0">
                         <div class="font-semibold text-slate-900">
                           {{ member.lecturerFullName }}
-                          <span class="text-slate-500">({{ member.lecturerCode ?? 'N/A' }})</span>
+                          <span class="text-slate-500"
+                            >({{ member.lecturerCode ?? "N/A" }})</span
+                          >
                         </div>
                         <div class="mt-0.5 text-xs text-slate-600">
-                          Vai trò: {{ member.memberRoleName ?? '—' }}
+                          Vai trò: {{ member.memberRoleName ?? "—" }}
                         </div>
                         <div class="mt-1 text-xs text-rose-700">
-                          Lý do: {{ member.confirmationNote || 'Không có ghi chú' }}
+                          Lý do:
+                          {{ member.confirmationNote || "Không có ghi chú" }}
                         </div>
                         <div class="mt-1 text-xs text-slate-500">
-                          Thời điểm phản hồi: {{ formatDateTime(member.respondedAt) }}
+                          Thời điểm phản hồi:
+                          {{ formatDateTime(member.respondedAt) }}
                         </div>
                       </div>
 
@@ -172,13 +195,25 @@
               </section>
 
               <section class="rounded-xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold text-slate-700">Danh sách tác giả</div>
+                <div class="text-xs font-semibold text-slate-700">
+                  Danh sách tác giả
+                </div>
 
-                <div v-if="work.authors.length === 0" class="mt-3 text-sm text-slate-600">Chưa có tác giả.</div>
+                <div
+                  v-if="work.authors.length === 0"
+                  class="mt-3 text-sm text-slate-600"
+                >
+                  Chưa có tác giả.
+                </div>
 
-                <div v-else class="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                <div
+                  v-else
+                  class="mt-3 overflow-hidden rounded-lg border border-slate-200"
+                >
                   <table class="w-full text-left text-sm">
-                    <thead class="bg-slate-50 text-xs font-semibold text-slate-600">
+                    <thead
+                      class="bg-slate-50 text-xs font-semibold text-slate-600"
+                    >
                       <tr>
                         <th class="px-3 py-2">Tác giả</th>
                         <th class="px-3 py-2">Vai trò</th>
@@ -187,10 +222,19 @@
                     </thead>
 
                     <tbody class="divide-y divide-slate-100">
-                      <tr v-for="author in work.authors" :key="author.lecturerId">
-                        <td class="px-3 py-2 font-medium text-slate-900">{{ author.lecturerFullName }}</td>
-                        <td class="px-3 py-2 text-slate-700">{{ author.memberRoleName }}</td>
-                        <td class="px-3 py-2 text-slate-700">{{ author.departmentName ?? '—' }}</td>
+                      <tr
+                        v-for="author in work.authors"
+                        :key="author.lecturerId"
+                      >
+                        <td class="px-3 py-2 font-medium text-slate-900">
+                          {{ author.lecturerFullName }}
+                        </td>
+                        <td class="px-3 py-2 text-slate-700">
+                          {{ author.memberRoleName }}
+                        </td>
+                        <td class="px-3 py-2 text-slate-700">
+                          {{ author.departmentName ?? "—" }}
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -198,9 +242,16 @@
               </section>
 
               <section class="rounded-xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold text-slate-700">Minh chứng</div>
+                <div class="text-xs font-semibold text-slate-700">
+                  Minh chứng
+                </div>
 
-                <div v-if="work.evidenceItems.length === 0" class="mt-3 text-sm text-slate-600">Chưa có minh chứng.</div>
+                <div
+                  v-if="work.evidenceItems.length === 0"
+                  class="mt-3 text-sm text-slate-600"
+                >
+                  Chưa có minh chứng.
+                </div>
 
                 <div v-else class="mt-3 space-y-2">
                   <div
@@ -209,7 +260,11 @@
                     class="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50"
                   >
                     <div class="min-w-0">
-                      <div class="truncate text-sm font-semibold text-slate-900">{{ item.originalName }}</div>
+                      <div
+                        class="truncate text-sm font-semibold text-slate-900"
+                      >
+                        {{ item.originalName }}
+                      </div>
                       <div class="mt-1 text-xs text-slate-500">
                         {{ item.fileTypeName }}
                         <span class="px-1 text-slate-300">•</span>
@@ -217,7 +272,9 @@
                         <span class="px-1 text-slate-300">•</span>
                         {{ formatBytes(item.sizeBytes) }}
                       </div>
-                      <div class="mt-1 text-xs text-slate-400">Uploaded: {{ formatDateTime(item.uploadedAt) }}</div>
+                      <div class="mt-1 text-xs text-slate-400">
+                        Uploaded: {{ formatDateTime(item.uploadedAt) }}
+                      </div>
                     </div>
 
                     <button
@@ -226,19 +283,26 @@
                       :disabled="isEvidenceLoading(item.evidenceFileId)"
                       @click="openEvidenceFile(item)"
                     >
-                      {{ isEvidenceLoading(item.evidenceFileId) ? "Đang mở..." : "Mở" }}
+                      {{
+                        isEvidenceLoading(item.evidenceFileId)
+                          ? "Đang mở..."
+                          : "Mở"
+                      }}
                     </button>
                   </div>
                 </div>
               </section>
 
               <section class="rounded-xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold text-slate-700">Trạng thái và lịch sử</div>
+                <div class="text-xs font-semibold text-slate-700">
+                  Trạng thái và lịch sử
+                </div>
 
                 <div class="mt-3 space-y-3">
                   <TimelineItem
                     label="Gửi duyệt"
                     :value="formatDateTime(work.submittedAt)"
+                    :actor-name="submitterName"
                     :note="null"
                     :status="null"
                   />
@@ -247,7 +311,12 @@
                     v-for="approval in work.approvals"
                     :key="approval.stageCode"
                     :label="`Xét duyệt ${approval.stageName}`"
-                    :value="approval.decidedAt ? formatDateTime(approval.decidedAt) : '—'"
+                    :value="
+                      approval.decidedAt
+                        ? formatDateTime(approval.decidedAt)
+                        : '—'
+                    "
+                    :actor-name="approval.decidedByUserName"
                     :note="approval.note"
                     :status="approval.status"
                   />
@@ -256,6 +325,7 @@
                     v-if="work.statusCode === 'approved'"
                     label="Phê duyệt"
                     :value="formatDateTime(work.approvedAt)"
+                    :actor-name="approvalActorName"
                     :note="null"
                     status="approved"
                   />
@@ -264,6 +334,7 @@
                     v-if="work.statusCode === 'rejected'"
                     label="Từ chối"
                     :value="formatDateTime(rejectedActedAt)"
+                    :actor-name="rejectedActorName"
                     :note="work.rejectionNote"
                     status="rejected"
                   />
@@ -274,14 +345,6 @@
 
           <div class="border-t border-slate-200 px-4 py-3">
             <div class="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                @click="emit('close')"
-              >
-                ← Quay lại danh sách
-              </button>
-
               <button
                 v-if="work && work.actions.canEdit"
                 type="button"
@@ -364,6 +427,52 @@ const rejectedActedAt = computed<string | null>(() => {
   return null;
 });
 
+const submitterName = computed<string | null>(() => {
+  const currentWork = props.work;
+  if (!currentWork) return null;
+
+  const submittedHistory = currentWork.statusHistories.find(
+    (history) => history.toStatusCode === "submitted" || history.toStatusCode === "pending_faculty_review"
+  );
+  return submittedHistory?.actedByUserName ?? null;
+});
+
+const approvalActorName = computed<string | null>(() => {
+  const currentWork = props.work;
+  if (!currentWork) return null;
+
+  for (let index = currentWork.statusHistories.length - 1; index >= 0; index -= 1) {
+    const history = currentWork.statusHistories[index];
+    if (history?.toStatusCode === "approved") return history.actedByUserName;
+  }
+
+  for (let index = currentWork.approvals.length - 1; index >= 0; index -= 1) {
+    const approval = currentWork.approvals[index];
+    if (approval?.status === "approved" && approval.decidedByUserName) {
+      return approval.decidedByUserName;
+    }
+  }
+  return null;
+});
+
+const rejectedActorName = computed<string | null>(() => {
+  const currentWork = props.work;
+  if (!currentWork) return null;
+
+  for (let index = currentWork.statusHistories.length - 1; index >= 0; index -= 1) {
+    const history = currentWork.statusHistories[index];
+    if (history?.toStatusCode === "rejected") return history.actedByUserName;
+  }
+
+  for (let index = currentWork.approvals.length - 1; index >= 0; index -= 1) {
+    const approval = currentWork.approvals[index];
+    if (approval?.status === "rejected" && approval.decidedByUserName) {
+      return approval.decidedByUserName;
+    }
+  }
+  return null;
+});
+
 function badgeClass(statusCode: PersonalWorkStatusCode): string {
   switch (statusCode) {
     case "approved":
@@ -413,7 +522,11 @@ function isEvidenceLoading(evidenceId: number): boolean {
 
 async function openEvidenceFile(item: PersonalWorkEvidence): Promise<void> {
   const fallbackUrl = buildEvidenceUrl(item.disk, item.path);
-  const previewRawUrl = (item.previewUrl ?? item.downloadUrl ?? fallbackUrl).trim();
+  const previewRawUrl = (
+    item.previewUrl ??
+    item.downloadUrl ??
+    fallbackUrl
+  ).trim();
   if (!previewRawUrl) return;
 
   if (item.disk === "url" && /^https?:\/\//i.test(previewRawUrl)) {
@@ -450,8 +563,11 @@ watch(
     if (!firstFile) return;
 
     const fallbackUrl = buildEvidenceUrl(firstFile.disk, firstFile.path);
-    const previewRawUrl =
-      (firstFile.previewUrl ?? firstFile.downloadUrl ?? fallbackUrl).trim();
+    const previewRawUrl = (
+      firstFile.previewUrl ??
+      firstFile.downloadUrl ??
+      fallbackUrl
+    ).trim();
     if (!previewRawUrl) return;
     const downloadRawUrl = (firstFile.downloadUrl ?? fallbackUrl).trim();
 
@@ -467,4 +583,3 @@ watch(
   { immediate: true, deep: true },
 );
 </script>
-

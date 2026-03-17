@@ -8,10 +8,64 @@ use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class LookupController extends Controller
 {
+    private const EVIDENCE_FILE_TYPE_CODES_BY_KIND = [
+        'paper' => [
+            'paper_first_page',
+            'paper_doi_or_article_link',
+            'paper_journal_publication_info',
+            'paper_acceptance_letter',
+            'paper_link_doi',
+            'paper_link_journal_page',
+            'paper_link_pdf',
+            'paper_link_indexing',
+            'content',
+            'publication_decision',
+        ],
+        'project' => [
+            'project_assignment_or_approval_decision',
+            'project_proposal_document',
+            'project_final_or_summary_report',
+            'project_acceptance_minutes_or_recognition_decision',
+            'project_link_overview_page',
+            'project_link_summary_report',
+            'project_link_output_product',
+            'project_link_acceptance_evidence',
+            'content',
+            'acceptance_decision',
+        ],
+        'book' => [
+            'book_assignment_decision',
+            'book_complete_manuscript',
+            'book_appraisal_minutes_or_approval_decision',
+            'book_cover_or_publication_info_isbn',
+            'book_link_publisher',
+            'book_link_digital_library',
+            'book_link_preview',
+            'book_link_pdf',
+            'content',
+            'cover',
+            'toc',
+            'publication_decision',
+        ],
+        'conference' => [
+            'conference_invitation_or_program',
+            'conference_paper_or_slides',
+            'conference_proceedings_page',
+            'conference_participation_certificate',
+            'conference_link_website',
+            'conference_link_program',
+            'conference_link_proceedings',
+            'conference_link_paper',
+            'conference_link_slide_video',
+            'content',
+        ],
+    ];
+
     public function degrees()
     {
         $data = Degree::query()
@@ -175,12 +229,25 @@ class LookupController extends Controller
         return response()->json(['data' => $data], Response::HTTP_OK);
     }
 
-    public function evidenceFileTypes()
+    public function evidenceFileTypes(Request $request)
     {
-        $data = DB::table('evidence_file_types')
+        $kindCode = Str::lower(trim((string) $request->query('kind_code', '')));
+        $codes = self::EVIDENCE_FILE_TYPE_CODES_BY_KIND[$kindCode] ?? null;
+
+        $query = DB::table('evidence_file_types')
             ->select(['id', 'code', 'name'])
-            ->orderBy('name')
-            ->get();
+            ->when($codes !== null, fn($builder) => $builder->whereIn('code', $codes));
+
+        $rows = $query->orderBy('name')->get();
+
+        if ($codes === null) {
+            return response()->json(['data' => $rows], Response::HTTP_OK);
+        }
+
+        $order = array_flip($codes);
+        $data = $rows
+            ->sortBy(fn($row) => $order[$row->code] ?? PHP_INT_MAX)
+            ->values();
 
         return response()->json(['data' => $data], Response::HTTP_OK);
     }
@@ -255,6 +322,38 @@ class LookupController extends Controller
                 });
             })
             ->orderBy('j.name')
+            ->limit(50);
+
+        return response()->json(['data' => $query->get()], Response::HTTP_OK);
+    }
+
+    public function publishers(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $activeOnly = $request->boolean('active', true);
+
+        $query = DB::table('publishers as p')
+            ->select([
+                'p.id',
+                'p.name',
+                'p.code',
+                'p.address',
+                'p.phone',
+                'p.email',
+                'p.website',
+                'p.is_active',
+            ])
+            ->when($activeOnly, fn($q) => $q->where('p.is_active', 1))
+            ->when($search !== '', function ($q) use ($search) {
+                $like = '%' . $search . '%';
+                $q->where(function ($sub) use ($like) {
+                    $sub->where('p.name', 'like', $like)
+                        ->orWhere('p.code', 'like', $like)
+                        ->orWhere('p.email', 'like', $like)
+                        ->orWhere('p.website', 'like', $like);
+                });
+            })
+            ->orderBy('p.name')
             ->limit(50);
 
         return response()->json(['data' => $query->get()], Response::HTTP_OK);

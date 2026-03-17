@@ -98,14 +98,25 @@
 
               <div class="md:col-span-2">
                 <label class="text-xs font-medium text-slate-600"
-                  >Nhà xuất bản <span class="text-rose-600">*</span></label
+                  >Tóm tắt (abstract)</label
                 >
-                <input
-                  v-model.trim="form.publisher"
+                <textarea
+                  v-model.trim="form.abstract"
                   :disabled="readOnly"
-                  maxlength="255"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
-                  placeholder="book_details.publisher (required)"
+                  placeholder="Tóm tắt ngắn nội dung tài liệu (tuỳ chọn)"
+                  class="mt-1 min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+
+              <div class="md:col-span-2">
+                <PublisherSelect
+                  v-model="selectedPublisherId"
+                  v-model:publisherName="form.publisher"
+                  :disabled="readOnly"
+                  label="Nhà xuất bản"
+                  :required="true"
+                  hint="Gõ để tìm trong danh mục nhà xuất bản và chọn nhanh."
+                  :search-fn="searchPublishers"
                 />
               </div>
 
@@ -244,6 +255,7 @@ import DeclarationFormShell from "../../shared/components/DeclarationFormShell.v
 import ParticipantsTable from "../../shared/components/ParticipantsTable.vue";
 import EvidenceUpload from "../../shared/components/EvidenceUpload.vue";
 import HoursSummaryPanel from "../../shared/components/HoursSummaryPanel.vue";
+import PublisherSelect from "../../shared/components/PublisherSelect.vue";
 
 import type {
   AcademicYearDto,
@@ -266,6 +278,7 @@ import {
   fetch_member_roles,
   fetch_evidence_file_types,
   search_lecturer_options,
+  search_publishers,
 } from "../../shared/services/catalogs.service";
 import {
   fetch_activity,
@@ -298,6 +311,7 @@ const evidenceFileTypes = ref<EvidenceFileTypeDto[]>([]);
 const lecturers = ref<LecturerOptionDto[]>([]);
 const types = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
+const selectedPublisherId = ref<number | null>(null);
 
 const currentLecturerId = ref<number>(0);
 
@@ -307,6 +321,7 @@ const form = reactive<BookDeclarationFormModel>({
   kindId: 0,
   typeId: null,
   title: "",
+  abstract: "",
   notes: "",
   publisher: "",
   year: null,
@@ -426,10 +441,12 @@ const canSubmit = computed(() => {
   if (!form.typeId) return false;
   if (!form.title.trim()) return false;
   if (!form.publisher.trim()) return false; // book_details.publisher required
-  const validMembers = form.members.filter(
-    (m) =>
-      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number",
-  );
+  const validMembers = form.members.filter((m) => {
+    const hasRole = typeof m.member_role_id === "number";
+    if (!hasRole) return false;
+    if (m.is_external) return Boolean(m.external_full_name?.trim());
+    return typeof m.lecturer_id === "number";
+  });
   if (validMembers.length === 0) return false;
   if (chiefEditorWarning.value) return false;
   const invalidPending = pendingEvidenceFiles.value.some(
@@ -437,7 +454,7 @@ const canSubmit = computed(() => {
   );
   if (invalidPending) return false;
   const invalidPendingLinks = pendingEvidenceLinks.value.some(
-    (l: any) => !String(l?.url ?? "").trim(),
+    (l: any) => !String(l?.url ?? "").trim() || !l?.file_type_id,
   );
   if (invalidPendingLinks) return false;
   return true;
@@ -451,7 +468,7 @@ async function loadCatalogs() {
       fetch_academic_years(),
       fetch_activity_kinds(),
       fetch_member_roles(),
-      fetch_evidence_file_types(),
+      fetch_evidence_file_types("book"),
     ]);
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
   lecturers.value = currentLecturerOption
@@ -485,6 +502,10 @@ async function onSearchLecturers(q: string) {
   lecturers.value = await search_lecturer_options(q);
 }
 
+async function searchPublishers(q: string) {
+  return await search_publishers(q);
+}
+
 function normalizeErrorMessage(err: unknown, fallback: string): string {
   if (axios.isAxiosError(err)) {
     const message = err.response?.data?.message;
@@ -505,26 +526,29 @@ async function onRemoveExistingEvidence(_id: number) {
   deletingEvidenceFileId.value = _id;
 
   try {
-    await runWithFeedback(() => delete_evidence_file(form.activityId as number, _id), {
-      loading: {
-        enabled: true,
-        title: "Đang xoá minh chứng",
-        message: "Vui lòng đợi trong giây lát...",
-        delayMs: 450,
-        minShowMs: 250,
+    await runWithFeedback(
+      () => delete_evidence_file(form.activityId as number, _id),
+      {
+        loading: {
+          enabled: true,
+          title: "Đang xoá minh chứng",
+          message: "Vui lòng đợi trong giây lát...",
+          delayMs: 450,
+          minShowMs: 250,
+        },
+        success: {
+          enabled: true,
+          title: "Thành công",
+          message: "Đã xoá file minh chứng.",
+        },
+        error: {
+          enabled: true,
+          title: "Không thể xoá",
+          message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
+        },
+        rethrow: true,
       },
-      success: {
-        enabled: true,
-        title: "Thành công",
-        message: "Đã xoá file minh chứng.",
-      },
-      error: {
-        enabled: true,
-        title: "Không thể xoá",
-        message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
-      },
-      rethrow: true,
-    });
+    );
     existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
   } catch (err) {
     shell.error_message.value = normalizeErrorMessage(
@@ -591,11 +615,16 @@ async function persistEvidenceDraft(activityId: number) {
   });
 
   const validLinkPendings = pendingEvidenceLinks.value.filter(
-    (pendingLink) => String(pendingLink?.url ?? "").trim() !== "",
+    (pendingLink) =>
+      String(pendingLink?.url ?? "").trim() !== "" &&
+      Number(pendingLink?.file_type_id) > 0,
   );
   const linkResults = await Promise.allSettled(
     validLinkPendings.map((pendingLink) =>
-      add_evidence_link(activityId, { url: String(pendingLink.url).trim() }),
+      add_evidence_link(activityId, {
+        url: String(pendingLink.url).trim(),
+        file_type_id: Number(pendingLink.file_type_id),
+      }),
     ),
   );
 
@@ -641,11 +670,13 @@ async function loadDraftFromQuery() {
     form.kindId = activity.kind_id ?? form.kindId;
     form.typeId = activity.type_id ?? null;
     form.title = activity.title ?? "";
+    form.abstract = activity.abstract ?? "";
     form.notes = activity.notes ?? "";
 
     if (data.detail_kind === "book_details" && data.detail) {
       const detail = data.detail as any;
       form.publisher = detail.publisher ?? "";
+      selectedPublisherId.value = null;
       form.approvalDecisionNo = detail.approval_decision_no ?? "";
       form.approvalDecisionDate = detail.approval_decision_date ?? null;
       form.isbn = detail.isbn ?? "";
@@ -654,9 +685,12 @@ async function loadDraftFromQuery() {
     }
 
     form.members = (data.members ?? []).map((member) => ({
-      lecturer_id: member.lecturer_id,
+      lecturer_id: member.lecturer_id ?? null,
       member_role_id: member.member_role_id,
       member_role_code: member.member_role_code ?? null,
+      is_external: !!member.is_external,
+      external_full_name: member.external_full_name ?? null,
+      external_department_name: member.external_department_name ?? null,
     }));
     lecturers.value = mergeLecturerOptionsFromMembers(
       lecturers.value,
@@ -692,7 +726,7 @@ const shell = useDeclarationFormShell({
         academic_year_id: form.academicYearId ?? 0,
         status_id: 100,
         title: form.title,
-        abstract: null,
+        abstract: form.abstract || null,
         start_date: null,
         end_date: null,
         quantity: 1,
@@ -718,14 +752,21 @@ const shell = useDeclarationFormShell({
       });
 
       const upsertList = form.members
-        .filter(
-          (m) =>
-            typeof m.lecturer_id === "number" &&
-            typeof m.member_role_id === "number",
-        )
+        .filter((m) => {
+          if (typeof m.member_role_id !== "number") return false;
+          if (m.is_external) return Boolean(m.external_full_name?.trim());
+          return typeof m.lecturer_id === "number";
+        })
         .map((m) => ({
-          lecturer_id: m.lecturer_id as number,
+          lecturer_id: m.is_external ? null : (m.lecturer_id as number),
           member_role_id: m.member_role_id as number,
+          is_external: !!m.is_external,
+          external_full_name: m.is_external
+            ? (m.external_full_name?.trim() ?? null)
+            : null,
+          external_department_name: m.is_external
+            ? (m.external_department_name?.trim() ?? null)
+            : null,
           contribution_share: null,
         }));
       await upsert_members(saved.id, upsertList);
@@ -766,14 +807,17 @@ const shell = useDeclarationFormShell({
 const { runPageLoad } = useDeclarationPageLoadFeedback();
 
 onMounted(async () => {
-  await runPageLoad(async () => {
-    await loadCatalogs();
-    await loadDraftFromQuery();
-  }, {
-    onError: (message) => {
-      shell.error_message.value = message;
+  await runPageLoad(
+    async () => {
+      await loadCatalogs();
+      await loadDraftFromQuery();
     },
-    fallbackMessage: "Không thể khởi tạo trang kê khai.",
-  });
+    {
+      onError: (message) => {
+        shell.error_message.value = message;
+      },
+      fallbackMessage: "Không thể khởi tạo trang kê khai.",
+    },
+  );
 });
 </script>

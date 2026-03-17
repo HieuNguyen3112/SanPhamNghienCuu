@@ -10,20 +10,19 @@
       @logout="handleLogout"
     />
 
-    <!-- ✅ Trang chủ chỉ có HERO + nội dung landing -->
     <PublicHomeHero
-  :filter-state="filterState"
-  :faculty-options="facultyOptions"
-  :academic-year-options="academicYearOptions"
-  :category="category"
-  :overview-stats="overviewStats"
-  @update-filter="updateFilterState"
-  @update:category="category = $event"
-  @search="onHomeSearch"
-  @reset="onHomeReset"
-/>
+      :filter-state="filterState"
+      :faculty-options="facultyOptions"
+      :academic-year-options="academicYearOptions"
+      :category="category"
+      :overview-stats="overviewStats"
+      @update-filter="updateFilterState"
+      @update:category="category = $event"
+      @search="onHomeSearch"
+      @reset="onHomeReset"
+      @open-list="goToCategoryPage"
+    />
 
-    <!-- ✅ THỐNG KÊ CÔNG TRÌNH CỦA TÔI (LẤY TỪ BACKEND THẬT) -->
     <section v-if="isAuthenticated && countsByKind" class="bg-slate-50">
       <div class="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -44,55 +43,42 @@
           </div>
 
           <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <button
-              class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-              @click="goToPapers"
-            >
+            <div class="rounded-2xl bg-slate-50 p-4">
               <div class="text-3xl font-extrabold text-[#e11d48]">
                 {{ myCounts.paper }}
               </div>
               <div class="mt-1 text-sm font-bold text-slate-800">Bài báo</div>
-            </button>
+            </div>
 
-            <button
-              class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-              @click="goToProjects"
-            >
+            <div class="rounded-2xl bg-slate-50 p-4">
               <div class="text-3xl font-extrabold text-[#e11d48]">
                 {{ myCounts.project }}
               </div>
               <div class="mt-1 text-sm font-bold text-slate-800">Đề tài</div>
-            </button>
+            </div>
 
-            <button
-              class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-              @click="goToBooks('book')"
-            >
+            <div class="rounded-2xl bg-slate-50 p-4">
               <div class="text-3xl font-extrabold text-[#e11d48]">
                 {{ myCounts.book }}
               </div>
               <div class="mt-1 text-sm font-bold text-slate-800">Sách</div>
-            </button>
+            </div>
 
-            <button
-              class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-              @click="goToBooks('textbook')"
-            >
+            <div class="rounded-2xl bg-slate-50 p-4">
               <div class="text-3xl font-extrabold text-[#e11d48]">
                 {{ myCounts.textbook }}
               </div>
-              <div class="mt-1 text-sm font-bold text-slate-800">Giáo trình</div>
-            </button>
+              <div class="mt-1 text-sm font-bold text-slate-800">
+                Giáo trình
+              </div>
+            </div>
 
-            <button
-              class="rounded-2xl bg-slate-50 p-4 text-left hover:bg-slate-100"
-              @click="goToConferences"
-            >
+            <div class="rounded-2xl bg-slate-50 p-4">
               <div class="text-3xl font-extrabold text-[#e11d48]">
                 {{ myCounts.conference }}
               </div>
               <div class="mt-1 text-sm font-bold text-slate-800">Hội thảo</div>
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -142,7 +128,7 @@ const userInitials = computed(() => {
   if (!name) return "U";
   const parts = name.split(/\s+/).filter(Boolean);
   const first = parts[0]?.[0] ?? "U";
-  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
   return (first + last).toUpperCase();
 });
 
@@ -150,49 +136,26 @@ async function handleLogout() {
   await logoutWithFeedback();
 }
 
-/** ✅ research_works từ backend thật */
-const researchWorks = computed(() => (userStore.currentUser as any)?.research_works ?? null);
-const countsByKind = computed(() => researchWorks.value?.counts_by_kind ?? null);
+const researchWorks = computed(
+  () => (userStore.currentUser as any)?.research_works ?? null,
+);
+const countsByKind = computed(
+  () => researchWorks.value?.counts_by_kind ?? null,
+);
 
-/** ✅ map số lượng */
 const myCounts = computed(() => {
   const c = countsByKind.value || {};
   return {
     paper: Number(c.paper ?? 0),
     project: Number(c.project ?? 0),
     conference: Number(c.conference ?? 0),
-    book: Number(c.book_only ?? 0),     // ✅ sách
-    textbook: Number(c.textbook ?? 0),  // ✅ giáo trình
+    book: Number(c.book_only ?? 0), 
+    textbook: Number(c.textbook ?? 0), 
     total: Number(c.total ?? 0),
   };
 });
 
-/** ✅ query để public search tự fill tên/mã */
-const lecturerQuery = computed(() => {
-  const name = lecturerName.value.trim();
-  const code = lecturerCode.value.trim();
-  if (!name && !code) return "";
-  return `${name}${code ? " / " + code : ""}`;
-});
 
-/** ✅ click thống kê -> nhảy sang trang tương ứng */
-function goToPapers() {
-  router.push({ path: "/bai-bao-khoa-hoc", query: { lecturer: lecturerQuery.value } });
-}
-function goToProjects() {
-  router.push({ path: "/de-tai-nghien-cuu", query: { lecturer: lecturerQuery.value } });
-}
-function goToConferences() {
-  router.push({ path: "/hoi-thao-bao-cao-khoa-hoc", query: { lecturer: lecturerQuery.value } });
-}
-function goToBooks(kind: "book" | "textbook") {
-  router.push({
-    path: "/sach-giao-trinh",
-    query: { lecturer: lecturerQuery.value, kind },
-  });
-}
-
-/** ✅ Hero search (public) */
 const {
   filterState,
   facultyOptions,
@@ -206,20 +169,23 @@ const {
 const category = ref<CategoryKey>("lecturer");
 
 const categoryToPath: Record<CategoryKey, string> = {
-  lecturer: "/giang-vien",
-  article: "/bai-bao-khoa-hoc",
-  project: "/de-tai-nghien-cuu",
-  book: "/sach-giao-trinh",
-  conference: "/hoi-thao-bao-cao-khoa-hoc",
+  lecturer: "/lecturers",
+  article: "/research-articles",
+  project: "/research-projects",
+  book: "/textbooks",
+  conference: "/research-conferences",
 };
 
 async function onHomeSearch() {
   const path = categoryToPath[category.value];
   const q: Record<string, string> = {};
 
-  if (filterState.lecturerQuery?.trim()) q.lecturer = filterState.lecturerQuery.trim();
-  if (filterState.facultyId != null) q.facultyId = String(filterState.facultyId);
-  if (filterState.academicYearId != null) q.academicYearId = String(filterState.academicYearId);
+  if (filterState.lecturerQuery?.trim())
+    q.lecturer = filterState.lecturerQuery.trim();
+  if (filterState.facultyId != null)
+    q.facultyId = String(filterState.facultyId);
+  if (filterState.academicYearId != null)
+    q.academicYearId = String(filterState.academicYearId);
 
   await router.push({ path, query: q });
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -227,5 +193,22 @@ async function onHomeSearch() {
 
 function onHomeReset() {
   resetFilterState();
+}
+
+async function goToCategoryPage(nextCategory: Exclude<CategoryKey, "lecturer">) {
+  const path = categoryToPath[nextCategory];
+  const q: Record<string, string> = {};
+
+  if (filterState.lecturerQuery?.trim()) {
+    q.lecturer = filterState.lecturerQuery.trim();
+  }
+  if (filterState.facultyId != null) {
+    q.facultyId = String(filterState.facultyId);
+  }
+  if (filterState.academicYearId != null) {
+    q.academicYearId = String(filterState.academicYearId);
+  }
+
+  await router.push({ path, query: q });
 }
 </script>

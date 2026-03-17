@@ -4,6 +4,7 @@ import type {
   DegreeOption,
   FacultyOption,
   GenderOption,
+  LecturerReportFilters,
   LecturerReportCharts,
   LecturerReportFiltersResponse,
   LecturerReportPagination,
@@ -138,7 +139,7 @@ export async function fetchFacultyLecturerReport(params: {
     lastPage: paginationDto.last_page,
   };
 
-  const appliedFilters = {
+  const appliedFilters: LecturerReportFilters = {
     facultyId: data.data.applied_filters.faculty_id ?? "ALL",
     degreeId: data.data.applied_filters.degree_id ?? "ALL",
     academicRankId: data.data.applied_filters.academic_rank_id ?? "ALL",

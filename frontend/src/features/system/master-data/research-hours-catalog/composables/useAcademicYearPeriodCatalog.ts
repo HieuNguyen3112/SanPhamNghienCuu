@@ -115,7 +115,7 @@ export function useAcademicYearPeriodCatalog() {
 
   function mapRows(years: AcademicYearDerivedDTO[]): AcademicYearPeriodRow[] {
     return years
-      .map((y) => ({
+        .map<AcademicYearPeriodRow>((y) => ({
         id: y.id,
         kind: "academic_year",
         name: y.code,

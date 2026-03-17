@@ -4,6 +4,9 @@
     <div class="min-w-0">
       <div class="text-sm font-medium text-slate-900">{{ label }}</div>
       <div class="mt-0.5 text-xs text-slate-500">{{ value }}</div>
+      <div v-if="actorName" class="mt-1 text-xs text-slate-700">
+        Người xử lý: {{ actorName }}
+      </div>
       <div v-if="note" class="mt-1 text-xs text-slate-600">
         {{ note }}
       </div>
@@ -20,10 +23,12 @@ const props = withDefaults(
   defineProps<{
     label: string;
     value: string;
+    actorName?: string | null;
     note?: string | null;
     status?: TimelineStatus;
   }>(),
   {
+    actorName: null,
     note: null,
     status: null,
   }

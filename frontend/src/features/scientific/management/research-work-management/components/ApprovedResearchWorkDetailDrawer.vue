@@ -89,6 +89,82 @@
 
             <div v-else class="space-y-6">
               <section class="rounded-xl border border-slate-200 bg-white p-4">
+                <div class="text-xs font-semibold text-slate-700">
+                  Thông tin chung
+                </div>
+
+                <div class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Loại công trình
+                    </div>
+                    <div class="mt-1 text-slate-900">{{ detail.kindName }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Phân loại
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ detail.typeName ?? "—" }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Vai trò
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ detail.memberRoleName ?? "—" }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">Năm</div>
+                    <div class="mt-1 text-slate-900">
+                      {{ detail.workYear ?? "—" }}
+                    </div>
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <div class="text-xs font-semibold text-slate-500">
+                      Nơi công bố/đơn vị
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ detail.venueName ?? "—" }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Ngày gửi
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ formatDate(detail.submittedAt) }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Ngày duyệt
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ formatDate(detail.approvedAt) }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Giờ NCKH của bạn
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ detail.lecturerHours ?? "—" }}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="rounded-xl border border-slate-200 bg-white p-4">
                 <div class="text-sm font-semibold text-slate-900">Tóm tắt</div>
                 <div class="mt-2 text-sm text-slate-700">
                   <div v-if="detail.abstract" class="whitespace-pre-wrap">
@@ -285,6 +361,7 @@ import type {
 import { ArrowLeftToLine } from "lucide-vue-next";
 import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
 import { usePdfPreview } from "@/shared/composables/usePdfPreview";
+import { parseBackendDateTime } from "../../shared/utils/backendDateTime";
 
 interface DetailDrawerProps {
   isOpen: boolean;
@@ -297,8 +374,7 @@ interface DetailDrawerEmits {
   (e: "back"): void;
   (e: "close"): void;
 }
-const detailEmptyEvidenceMessage =
-  "Chưa có minh chứng cho công trình này.";
+const detailEmptyEvidenceMessage = "Chưa có minh chứng cho công trình này.";
 
 const props = defineProps<DetailDrawerProps>();
 const emit = defineEmits<DetailDrawerEmits>();
@@ -322,13 +398,13 @@ const emptyEvidenceMessage = detailEmptyEvidenceMessage;
 
 const linkEvidenceItems = computed(() => {
   return (props.detail?.evidenceItems ?? []).filter(
-    (item) => item.disk === "url"
+    (item) => item.disk === "url",
   );
 });
 
 const fileEvidenceItems = computed(() => {
   return (props.detail?.evidenceItems ?? []).filter(
-    (item) => item.disk !== "url"
+    (item) => item.disk !== "url",
   );
 });
 
@@ -340,8 +416,10 @@ function emitClose() {
   emit("close");
 }
 
-function formatDate(iso: string) {
-  const date = new Date(iso);
+function formatDate(iso: string | null) {
+  if (!iso) return "—";
+  const date = parseBackendDateTime(iso);
+  if (!date) return iso;
   return date.toLocaleString("vi-VN");
 }
 
@@ -367,7 +445,11 @@ async function openEvidenceUrl(item: Evidence) {
     return;
   }
 
-  const previewRawUrl = (item.previewUrl ?? item.downloadUrl ?? item.path).trim();
+  const previewRawUrl = (
+    item.previewUrl ??
+    item.downloadUrl ??
+    item.path
+  ).trim();
   if (!previewRawUrl) return;
   const downloadRawUrl = (item.downloadUrl ?? item.path).trim();
   const fallbackFileName =
@@ -392,8 +474,11 @@ watch(
     );
     if (!firstFile) return;
 
-    const previewRawUrl =
-      (firstFile.previewUrl ?? firstFile.downloadUrl ?? firstFile.path).trim();
+    const previewRawUrl = (
+      firstFile.previewUrl ??
+      firstFile.downloadUrl ??
+      firstFile.path
+    ).trim();
     if (!previewRawUrl) return;
     const downloadRawUrl = (firstFile.downloadUrl ?? firstFile.path).trim();
 

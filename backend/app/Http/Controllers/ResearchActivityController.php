@@ -34,6 +34,64 @@ class ResearchActivityController extends Controller
     private const STATUS_REJECTED = 'rejected';
     private const EVIDENCE_LINK_MIME = 'text/uri-list';
     private const EVIDENCE_LINK_LABEL = 'Link minh chứng';
+    private const EVIDENCE_FILE_TYPE_CODES_BY_KIND = [
+        'paper' => [
+            'paper_first_page',
+            'paper_doi_or_article_link',
+            'paper_journal_publication_info',
+            'paper_acceptance_letter',
+            'paper_link_doi',
+            'paper_link_journal_page',
+            'paper_link_pdf',
+            'paper_link_indexing',
+        ],
+        'project' => [
+            'project_assignment_or_approval_decision',
+            'project_proposal_document',
+            'project_final_or_summary_report',
+            'project_acceptance_minutes_or_recognition_decision',
+            'project_link_overview_page',
+            'project_link_summary_report',
+            'project_link_output_product',
+            'project_link_acceptance_evidence',
+        ],
+        'book' => [
+            'book_assignment_decision',
+            'book_complete_manuscript',
+            'book_appraisal_minutes_or_approval_decision',
+            'book_cover_or_publication_info_isbn',
+            'book_link_publisher',
+            'book_link_digital_library',
+            'book_link_preview',
+            'book_link_pdf',
+        ],
+        'conference' => [
+            'conference_invitation_or_program',
+            'conference_paper_or_slides',
+            'conference_proceedings_page',
+            'conference_participation_certificate',
+            'conference_link_website',
+            'conference_link_program',
+            'conference_link_proceedings',
+            'conference_link_paper',
+            'conference_link_slide_video',
+        ],
+    ];
+
+    private const LEGACY_EVIDENCE_FILE_TYPE_CODES_BY_KIND = [
+        'paper' => ['content', 'publication_decision'],
+        'project' => ['content', 'acceptance_decision'],
+        'book' => ['content', 'cover', 'toc', 'publication_decision'],
+        'conference' => ['content'],
+    ];
+
+    private const EVIDENCE_LINK_PREFERRED_CODE_BY_KIND = [
+        'paper' => ['paper_link_doi', 'paper_link_journal_page', 'paper_link_pdf', 'paper_link_indexing'],
+        'project' => ['project_link_overview_page', 'project_link_summary_report', 'project_link_output_product', 'project_link_acceptance_evidence'],
+        'book' => ['book_link_publisher', 'book_link_digital_library', 'book_link_preview', 'book_link_pdf'],
+        'conference' => ['conference_link_website', 'conference_link_program', 'conference_link_proceedings', 'conference_link_paper', 'conference_link_slide_video'],
+    ];
+
     private HoursRuleResolver $hoursRuleResolver;
     private HoursAllocator $hoursAllocator;
     private ResearchEvidenceStorageService $evidenceStorageService;
@@ -160,7 +218,7 @@ class ResearchActivityController extends Controller
                 'request_http_status' => Response::HTTP_OK,
                 'changes' => collect($updates)
                     ->except('updated_at')
-                    ->map(fn ($value, $field) => [
+                    ->map(fn($value, $field) => [
                         'field' => $field,
                         'before' => $current->{$field} ?? null,
                         'after' => $value,
@@ -266,7 +324,8 @@ class ResearchActivityController extends Controller
             $itemsToSync = $items;
             $ownerInPayload = false;
             foreach ($itemsToSync as $memberItem) {
-                if ((int) ($memberItem['lecturer_id'] ?? 0) === $ownerLecturerId) {
+                $isExternal = (bool) ($memberItem['is_external'] ?? false);
+                if (! $isExternal && (int) ($memberItem['lecturer_id'] ?? 0) === $ownerLecturerId) {
                     $ownerInPayload = true;
                     break;
                 }
@@ -300,29 +359,101 @@ class ResearchActivityController extends Controller
                     $itemsToSync[] = [
                         'lecturer_id' => $ownerLecturerId,
                         'member_role_id' => (int) $ownerRoleId,
+                        'is_external' => false,
+                        'external_full_name' => null,
+                        'external_department_name' => null,
                         'contribution_share' => null,
                         'hours_assigned' => null,
                     ];
                 }
             }
 
-            $handled = [];
+            $existingRows = DB::table('research_activity_members')
+                ->where('activity_id', $activity)
+                ->get();
+
+            $existingByLecturer = [];
+            $existingExternal = [];
+            foreach ($existingRows as $existingRow) {
+                if ((bool) ($existingRow->is_external ?? false)) {
+                    $existingExternal[] = $existingRow;
+                    continue;
+                }
+
+                if ($existingRow->lecturer_id !== null) {
+                    $existingByLecturer[(int) $existingRow->lecturer_id] = $existingRow;
+                }
+            }
+
+            $handledLecturerIds = [];
+            $handledExternalIds = [];
+
             foreach ($itemsToSync as $item) {
+                $isExternal = (bool) ($item['is_external'] ?? false);
+                $externalFullName = $isExternal ? trim((string) ($item['external_full_name'] ?? '')) : null;
+                $externalDepartmentName = $isExternal ? trim((string) ($item['external_department_name'] ?? '')) : null;
+
+                if ($isExternal) {
+                    $existing = collect($existingExternal)
+                        ->first(function ($row) use ($item, $externalFullName, $externalDepartmentName, $handledExternalIds) {
+                            if (in_array((int) $row->id, $handledExternalIds, true)) {
+                                return false;
+                            }
+
+                            return (int) $row->member_role_id === (int) $item['member_role_id']
+                                && trim((string) ($row->external_full_name ?? '')) === $externalFullName
+                                && trim((string) ($row->external_department_name ?? '')) === $externalDepartmentName;
+                        });
+
+                    $payload = [
+                        'activity_id' => $activity,
+                        'lecturer_id' => null,
+                        'member_role_id' => $item['member_role_id'],
+                        'is_external' => true,
+                        'external_full_name' => $externalFullName !== '' ? $externalFullName : null,
+                        'external_department_name' => $externalDepartmentName !== '' ? $externalDepartmentName : null,
+                        'contribution_share' => $item['contribution_share'] ?? null,
+                        'hours_assigned' => $item['hours_assigned'] ?? null,
+                        'confirmation_status' => 'accepted',
+                        'responded_at' => $now,
+                        'confirmation_note' => null,
+                        'updated_at' => $now,
+                    ];
+
+                    if (! $existing) {
+                        $payload['created_at'] = $now;
+                        $insertedId = DB::table('research_activity_members')->insertGetId($payload);
+                        $handledExternalIds[] = (int) $insertedId;
+                        continue;
+                    }
+
+                    DB::table('research_activity_members')
+                        ->where('id', (int) $existing->id)
+                        ->update($payload);
+                    $handledExternalIds[] = (int) $existing->id;
+                    continue;
+                }
+
+                $lecturerId = (int) ($item['lecturer_id'] ?? 0);
+                if ($lecturerId <= 0) {
+                    continue;
+                }
+
                 $payload = [
                     'activity_id' => $activity,
-                    'lecturer_id' => $item['lecturer_id'],
+                    'lecturer_id' => $lecturerId,
                     'member_role_id' => $item['member_role_id'],
+                    'is_external' => false,
+                    'external_full_name' => null,
+                    'external_department_name' => null,
                     'contribution_share' => $item['contribution_share'] ?? null,
                     'hours_assigned' => $item['hours_assigned'] ?? null,
                     'updated_at' => $now,
                 ];
 
-                $existing = DB::table('research_activity_members')
-                    ->where('activity_id', $activity)
-                    ->where('lecturer_id', $item['lecturer_id'])
-                    ->first();
+                $existing = $existingByLecturer[$lecturerId] ?? null;
 
-                $isOwner = (int) $item['lecturer_id'] === $ownerLecturerId;
+                $isOwner = $lecturerId === $ownerLecturerId;
                 $statusPayload = [];
 
                 if ($isOwner) {
@@ -364,17 +495,48 @@ class ResearchActivityController extends Controller
                 } else {
                     DB::table('research_activity_members')
                         ->where('activity_id', $activity)
-                        ->where('lecturer_id', $item['lecturer_id'])
+                        ->where('lecturer_id', $lecturerId)
+                        ->where(function ($query) {
+                            $query->where('is_external', false)
+                                ->orWhereNull('is_external');
+                        })
                         ->update(array_merge($payload, $statusPayload));
                 }
 
-                $handled[] = $item['lecturer_id'];
+                $handledLecturerIds[] = $lecturerId;
             }
 
-            DB::table('research_activity_members')
-                ->where('activity_id', $activity)
-                ->whereNotIn('lecturer_id', $handled)
-                ->delete();
+            if (count($handledLecturerIds) > 0) {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activity)
+                    ->where(function ($query) {
+                        $query->where('is_external', false)
+                            ->orWhereNull('is_external');
+                    })
+                    ->whereNotIn('lecturer_id', $handledLecturerIds)
+                    ->delete();
+            } else {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activity)
+                    ->where(function ($query) {
+                        $query->where('is_external', false)
+                            ->orWhereNull('is_external');
+                    })
+                    ->delete();
+            }
+
+            if (count($handledExternalIds) > 0) {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activity)
+                    ->where('is_external', true)
+                    ->whereNotIn('id', $handledExternalIds)
+                    ->delete();
+            } else {
+                DB::table('research_activity_members')
+                    ->where('activity_id', $activity)
+                    ->where('is_external', true)
+                    ->delete();
+            }
 
             return DB::table('research_activity_members')
                 ->where('activity_id', $activity)
@@ -470,6 +632,7 @@ class ResearchActivityController extends Controller
                     'ram.id',
                     'ram.activity_id',
                     'ram.lecturer_id',
+                    'ram.is_external',
                     'ram.member_role_id',
                     'ram.confirmation_status',
                     'ram.confirmation_note',
@@ -487,6 +650,14 @@ class ResearchActivityController extends Controller
                     'error' => 'member not found in activity',
                     'code' => 'MEMBER_NOT_FOUND',
                     'status' => Response::HTTP_NOT_FOUND,
+                ];
+            }
+
+            if ((bool) ($memberRow->is_external ?? false) || ! $memberRow->lecturer_id) {
+                return [
+                    'error' => 'external member cannot be reinvited',
+                    'code' => 'EXTERNAL_MEMBER_CANNOT_REINVITE',
+                    'status' => Response::HTTP_UNPROCESSABLE_ENTITY,
                 ];
             }
 
@@ -642,6 +813,10 @@ class ResearchActivityController extends Controller
             ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activity)
+            ->where(function ($query) {
+                $query->where('ram.is_external', false)
+                    ->orWhereNull('ram.is_external');
+            })
             ->where('ram.lecturer_id', '!=', $ownerLecturerId)
             ->where('ram.confirmation_status', 'rejected')
             ->select([
@@ -703,6 +878,10 @@ class ResearchActivityController extends Controller
             ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activity)
+            ->where(function ($query) {
+                $query->where('ram.is_external', false)
+                    ->orWhereNull('ram.is_external');
+            })
             ->where('ram.lecturer_id', '!=', $ownerLecturerId)
             ->where('ram.confirmation_status', 'pending')
             ->select([
@@ -887,6 +1066,9 @@ class ResearchActivityController extends Controller
             ->select([
                 'ram.lecturer_id',
                 'ram.member_role_id',
+                'ram.is_external',
+                'ram.external_full_name',
+                'ram.external_department_name',
                 'ram.contribution_share',
                 'ram.hours_assigned',
                 'ram.confirmation_status',
@@ -904,9 +1086,17 @@ class ResearchActivityController extends Controller
             ->get()
             ->map(function ($row) use ($ownerFacultyId) {
                 $memberFacultyId = $row->member_faculty_id !== null ? (int) $row->member_faculty_id : null;
+                $isExternal = (bool) ($row->is_external ?? false);
                 return array_merge((array) $row, [
+                    'lecturer_full_name' => $isExternal
+                        ? ($row->external_full_name ?? null)
+                        : ($row->lecturer_full_name ?? null),
+                    'department_name' => $isExternal
+                        ? ($row->external_department_name ?? null)
+                        : ($row->department_name ?? null),
                     'owner_faculty_id' => $ownerFacultyId,
-                    'is_outside_faculty' => $ownerFacultyId !== null
+                    'is_outside_faculty' => ! $isExternal
+                        && $ownerFacultyId !== null
                         && $memberFacultyId !== null
                         && $ownerFacultyId !== $memberFacultyId,
                 ]);
@@ -994,6 +1184,16 @@ class ResearchActivityController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        $fileTypeId = (int) $request->integer('file_type_id');
+        if (! $this->isEvidenceTypeAllowedForKind($fileTypeId, $current->kind_code)) {
+            return response()->json([
+                'message' => 'Loại minh chứng không phù hợp với loại công trình.',
+                'errors' => [
+                    'file_type_id' => ['Loại minh chứng không phù hợp với loại công trình.'],
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         /** @var \Illuminate\Http\UploadedFile $file */
         $file = $request->file('file');
         $contentSha256 = hash_file('sha256', $file->getRealPath());
@@ -1048,7 +1248,7 @@ class ResearchActivityController extends Controller
         try {
             $id = DB::table('evidence_files')->insertGetId([
                 'activity_id' => $activity,
-                'file_type_id' => (int) $request->input('file_type_id'),
+                'file_type_id' => $fileTypeId,
                 'disk' => $storedDisk,
                 'path' => $storedPath,
                 'original_name' => (string) ($file->getClientOriginalName() ?: ('evidence-' . Str::uuid() . '.pdf')),
@@ -1291,11 +1491,15 @@ class ResearchActivityController extends Controller
             $request->all(),
             [
                 'url' => ['required', 'url', 'max:500'],
+                'file_type_id' => ['required', 'integer', 'exists:evidence_file_types,id'],
             ],
             [
                 'url.required' => 'Vui lòng nhập link minh chứng.',
                 'url.url' => 'Link minh chứng không hợp lệ.',
                 'url.max' => 'Link minh chứng quá dài (tối đa 500 ký tự).',
+                'file_type_id.required' => 'Vui lòng chọn loại link minh chứng.',
+                'file_type_id.integer' => 'Loại link minh chứng không hợp lệ.',
+                'file_type_id.exists' => 'Loại link minh chứng không tồn tại.',
             ]
         );
 
@@ -1307,20 +1511,36 @@ class ResearchActivityController extends Controller
         }
 
         $url = trim((string) $request->input('url'));
+        $fileTypeId = (int) $request->integer('file_type_id');
+
+        if (! $this->isEvidenceTypeAllowedForKind($fileTypeId, $current->kind_code)) {
+            return response()->json([
+                'message' => 'Loại link minh chứng không phù hợp với loại công trình.',
+                'errors' => [
+                    'file_type_id' => ['Loại link minh chứng không phù hợp với loại công trình.'],
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $existing = DB::table('evidence_files as ef')
             ->leftJoin('users as u', 'ef.uploaded_by_user_id', '=', 'u.id')
             ->leftJoin('lecturers as l', 'u.id', '=', 'l.user_id')
+            ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
             ->where('ef.activity_id', $activity)
             ->where('ef.disk', ResearchEvidenceStorageService::LINK_DISK)
             ->where('ef.path', $url)
+            ->where('ef.file_type_id', $fileTypeId)
             ->where('ef.uploaded_by_user_id', (int) $user->id)
             ->select([
                 'ef.id',
                 'ef.activity_id',
+                'ef.file_type_id',
                 'ef.path as url',
                 'ef.uploaded_by_user_id as added_by_user_id',
                 'ef.created_at',
                 'ef.updated_at',
+                'eft.name as file_type_name',
+                'eft.code as file_type_code',
                 'l.id as lecturer_id',
                 'l.full_name as lecturer_name',
             ])
@@ -1331,13 +1551,6 @@ class ResearchActivityController extends Controller
                 'message' => 'Link minh chứng đã tồn tại.',
                 'data' => $this->mapEvidenceLinkRow($existing),
             ], Response::HTTP_OK);
-        }
-
-        $fileTypeId = $this->resolveEvidenceLinkFileTypeId();
-        if (! $fileTypeId) {
-            return response()->json([
-                'message' => 'Chưa cấu hình loại minh chứng mặc định để lưu liên kết.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $sha256 = $this->makeEvidenceLinkSha($activity, (int) $lecturer->id, $url);
@@ -2010,6 +2223,7 @@ class ResearchActivityController extends Controller
     private function fetchEvidenceLinks(int $activityId): array
     {
         return DB::table('evidence_files as ef')
+            ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
             ->leftJoin('users as u', 'ef.uploaded_by_user_id', '=', 'u.id')
             ->leftJoin('lecturers as l', 'u.id', '=', 'l.user_id')
             ->where('ef.activity_id', $activityId)
@@ -2017,10 +2231,13 @@ class ResearchActivityController extends Controller
             ->select([
                 'ef.id',
                 'ef.activity_id',
+                'ef.file_type_id',
                 'ef.path as url',
                 'ef.uploaded_by_user_id as added_by_user_id',
                 'ef.created_at',
                 'ef.updated_at',
+                'eft.code as file_type_code',
+                'eft.name as file_type_name',
                 'l.full_name as lecturer_name',
                 'l.id as lecturer_id',
             ])
@@ -2035,6 +2252,9 @@ class ResearchActivityController extends Controller
         return [
             'id' => (int) $row->id,
             'activity_id' => (int) $row->activity_id,
+            'file_type_id' => (int) ($row->file_type_id ?? 0),
+            'file_type_code' => $row->file_type_code ?? null,
+            'file_type_name' => $row->file_type_name ?? null,
             'lecturer_id' => isset($row->lecturer_id) ? (int) $row->lecturer_id : 0,
             'lecturer_name' => $row->lecturer_name ?? null,
             'url' => (string) $row->url,
@@ -2068,9 +2288,14 @@ class ResearchActivityController extends Controller
         }
     }
 
-    private function resolveEvidenceLinkFileTypeId(): ?int
+    private function resolveEvidenceLinkFileTypeId(?string $kindCode = null): ?int
     {
-        $preferred = ['content', 'cover', 'toc', 'acceptance_decision', 'publication_decision'];
+        $kindCode = Str::lower(trim((string) $kindCode));
+        $preferred = self::EVIDENCE_LINK_PREFERRED_CODE_BY_KIND[$kindCode] ?? [];
+
+        if ($preferred === []) {
+            $preferred = ['content', 'cover', 'toc', 'acceptance_decision', 'publication_decision'];
+        }
 
         $idsByCode = DB::table('evidence_file_types')
             ->whereIn('code', $preferred)
@@ -2086,6 +2311,37 @@ class ResearchActivityController extends Controller
 
         $fallback = DB::table('evidence_file_types')->orderBy('id')->value('id');
         return $fallback ? (int) $fallback : null;
+    }
+
+    private function isEvidenceTypeAllowedForKind(int $fileTypeId, ?string $kindCode): bool
+    {
+        $kind = Str::lower(trim((string) $kindCode));
+        if ($kind === '') {
+            return true;
+        }
+
+        $allowedCodes = $this->allowedEvidenceTypeCodesForKind($kind);
+        if ($allowedCodes === []) {
+            return true;
+        }
+
+        $selectedCode = DB::table('evidence_file_types')
+            ->where('id', $fileTypeId)
+            ->value('code');
+
+        if (! is_string($selectedCode) || $selectedCode === '') {
+            return false;
+        }
+
+        return in_array($selectedCode, $allowedCodes, true);
+    }
+
+    private function allowedEvidenceTypeCodesForKind(string $kindCode): array
+    {
+        $primary = self::EVIDENCE_FILE_TYPE_CODES_BY_KIND[$kindCode] ?? [];
+        $legacy = self::LEGACY_EVIDENCE_FILE_TYPE_CODES_BY_KIND[$kindCode] ?? [];
+
+        return array_values(array_unique(array_merge($primary, $legacy)));
     }
 
     private function makeEvidenceLinkSha(int $activityId, int $lecturerId, string $url): string
@@ -2107,5 +2363,4 @@ class ResearchActivityController extends Controller
         $trimmed = trim((string) $name);
         return $trimmed !== '' ? $trimmed : null;
     }
-
 }

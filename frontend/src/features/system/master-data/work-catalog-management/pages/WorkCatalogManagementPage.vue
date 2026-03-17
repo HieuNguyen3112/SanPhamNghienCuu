@@ -117,6 +117,33 @@
             @update:form="onUpdateJournalForm"
           />
 
+          <PublisherCatalogSection
+            v-else-if="activeTab === 'publisher'"
+            :rows="pagedPublishers"
+            :start-index="(pagePublisher - 1) * pageSizePublisher"
+            :total="publisherTotal"
+            :search="qPublisher"
+            :page="pagePublisher"
+            :page-size="pageSizePublisher"
+            :modal-open="modalPublisherOpen"
+            :modal-title="
+              modalModePublisher === 'create'
+                ? 'Thêm nhà xuất bản'
+                : 'Chỉnh sửa nhà xuất bản'
+            "
+            :submitting="loading"
+            :form="publisherForm"
+            :errors="publisherErrors"
+            @update:search="qPublisher = $event"
+            @update:page="pagePublisher = $event"
+            @update:pageSize="pageSizePublisher = $event"
+            @create="openCreatePublisher"
+            @edit="onEditPublisher"
+            @close-modal="modalPublisherOpen = false"
+            @submit="handleSavePublisher"
+            @update:form="onUpdatePublisherForm"
+          />
+
           <ConferenceCatalogSection
             v-else-if="activeTab === 'conference'"
             :rows="pagedConferences"
@@ -178,12 +205,20 @@
 
 <script setup lang="ts">
 import { onMounted } from "vue";
-import { Layers, Flag, BookOpen, Users, Brain } from "lucide-vue-next";
+import {
+  Layers,
+  Flag,
+  BookOpen,
+  Building2,
+  Users,
+  Brain,
+} from "lucide-vue-next";
 
 import CatalogTabs from "../components/CatalogTabs.vue";
 import WorkTypeCatalogSection from "../components/WorkTypeCatalogSection.vue";
 import WorkLevelCatalogSection from "../components/WorkLevelCatalogSection.vue";
 import JournalCatalogSection from "../components/JournalCatalogSection.vue";
+import PublisherCatalogSection from "../components/PublisherCatalogSection.vue";
 import ConferenceCatalogSection from "../components/ConferenceCatalogSection.vue";
 import ResearchFieldCatalogSection from "../components/ResearchFieldCatalogSection.vue";
 
@@ -201,6 +236,7 @@ const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
   { key: "work_type", label: "Loại công trình", icon: Layers },
   { key: "work_level", label: "Cấp công trình", icon: Flag },
   { key: "journal", label: "Tạp chí khoa học", icon: BookOpen },
+  { key: "publisher", label: "Nhà xuất bản", icon: Building2 },
   { key: "conference", label: "Hội nghị khoa học", icon: Users },
   { key: "research_field", label: "Lĩnh vực nghiên cứu", icon: Brain },
 ];
@@ -218,46 +254,54 @@ const {
   workTypes,
   workLevels,
   journals,
+  publishers,
   conferences,
   researchFields,
 
   qWorkType,
   qWorkLevel,
   qJournal,
+  qPublisher,
   qConference,
   qResearchField,
 
   pageWorkType,
   pageWorkLevel,
   pageJournal,
+  pagePublisher,
   pageConference,
   pageResearchField,
   pageSizeWorkType,
   pageSizeWorkLevel,
   pageSizeJournal,
+  pageSizePublisher,
   pageSizeConference,
   pageSizeResearchField,
 
   pagedWorkTypes,
   pagedWorkLevels,
   pagedJournals,
+  pagedPublishers,
   pagedConferences,
   pagedResearchFields,
   workTypeTotal,
   workLevelTotal,
   journalTotal,
+  publisherTotal,
   conferenceTotal,
   researchFieldTotal,
 
   modalModeWorkType,
   modalModeWorkLevel,
   modalModeJournal,
+  modalModePublisher,
   modalModeConference,
   modalModeResearchField,
 
   modalWorkTypeOpen,
   modalWorkLevelOpen,
   modalJournalOpen,
+  modalPublisherOpen,
   modalConferenceOpen,
   modalResearchFieldOpen,
 
@@ -267,6 +311,8 @@ const {
   workLevelErrors,
   journalForm,
   journalErrors,
+  publisherForm,
+  publisherErrors,
   conferenceForm,
   conferenceErrors,
   researchFieldForm,
@@ -286,6 +332,11 @@ const {
   openEditJournal,
   saveJournal,
   onUpdateJournalForm,
+
+  openCreatePublisher,
+  openEditPublisher,
+  savePublisher,
+  onUpdatePublisherForm,
 
   openCreateConference,
   openEditConference,
@@ -333,6 +384,11 @@ function onEditJournal(id: number) {
   if (item) openEditJournal(item);
 }
 
+function onEditPublisher(id: number) {
+  const item = publishers.value.find((x: any) => x.id === id);
+  if (item) openEditPublisher(item);
+}
+
 function onEditConference(id: number) {
   const item = conferences.value.find((x: any) => x.id === id);
   if (item) openEditConference(item);
@@ -351,7 +407,7 @@ function buildStatusActionText(
   mode: "create" | "edit",
   isActive: boolean,
   createText: string,
-  updateText: string
+  updateText: string,
 ) {
   if (mode === "create") return createText;
   if (!isActive) return "Ngừng sử dụng thành công.";
@@ -360,7 +416,7 @@ function buildStatusActionText(
 
 async function runCatalogAction(
   action: () => Promise<void>,
-  successMessage: string
+  successMessage: string,
 ) {
   await runWithFeedback(action, {
     loading: {
@@ -374,7 +430,10 @@ async function runCatalogAction(
     error: {
       title: "Có lỗi xảy ra",
       message: (error) =>
-        resolveActionErrorMessage(error, "Thao tác thất bại. Vui lòng thử lại."),
+        resolveActionErrorMessage(
+          error,
+          "Thao tác thất bại. Vui lòng thử lại.",
+        ),
     },
     rethrow: false,
   });
@@ -385,7 +444,7 @@ async function handleSaveWorkType() {
     modalModeWorkType.value,
     workTypeForm.isActive,
     "Thêm loại công trình thành công.",
-    "Cập nhật loại công trình thành công."
+    "Cập nhật loại công trình thành công.",
   );
   await runCatalogAction(() => saveWorkType(), successMessage);
 }
@@ -395,7 +454,7 @@ async function handleSaveWorkLevel() {
     modalModeWorkLevel.value,
     workLevelForm.isActive,
     "Thêm cấp công trình thành công.",
-    "Cập nhật cấp công trình thành công."
+    "Cập nhật cấp công trình thành công.",
   );
   await runCatalogAction(() => saveWorkLevel(), successMessage);
 }
@@ -405,9 +464,19 @@ async function handleSaveJournal() {
     modalModeJournal.value,
     journalForm.isActive,
     "Thêm tạp chí khoa học thành công.",
-    "Cập nhật tạp chí khoa học thành công."
+    "Cập nhật tạp chí khoa học thành công.",
   );
   await runCatalogAction(() => saveJournal(), successMessage);
+}
+
+async function handleSavePublisher() {
+  const successMessage = buildStatusActionText(
+    modalModePublisher.value,
+    publisherForm.isActive,
+    "Thêm nhà xuất bản thành công.",
+    "Cập nhật nhà xuất bản thành công.",
+  );
+  await runCatalogAction(() => savePublisher(), successMessage);
 }
 
 async function handleSaveConference() {
@@ -415,7 +484,7 @@ async function handleSaveConference() {
     modalModeConference.value,
     conferenceForm.isActive,
     "Thêm hội nghị khoa học thành công.",
-    "Cập nhật hội nghị khoa học thành công."
+    "Cập nhật hội nghị khoa học thành công.",
   );
   await runCatalogAction(() => saveConference(), successMessage);
 }
@@ -425,9 +494,8 @@ async function handleSaveResearchField() {
     modalModeResearchField.value,
     researchFieldForm.isActive,
     "Thêm lĩnh vực nghiên cứu thành công.",
-    "Cập nhật lĩnh vực nghiên cứu thành công."
+    "Cập nhật lĩnh vực nghiên cứu thành công.",
   );
   await runCatalogAction(() => saveResearchField(), successMessage);
 }
 </script>
-

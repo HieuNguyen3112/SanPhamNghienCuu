@@ -546,6 +546,130 @@ class AdminWorkCatalogController extends Controller
         ], Response::HTTP_OK);
     }
 
+    // ===== PUBLISHERS =====
+    public function listPublishers(Request $request)
+    {
+        [$keyword, $page, $perPage] = $this->resolveListParams($request);
+
+        $query = DB::table('publishers')
+            ->when($keyword !== '', function ($q) use ($keyword) {
+                $q->where(function ($sub) use ($keyword) {
+                    $like = '%' . $keyword . '%';
+                    $sub->where('name', 'like', $like)
+                        ->orWhere('code', 'like', $like)
+                        ->orWhere('address', 'like', $like)
+                        ->orWhere('phone', 'like', $like)
+                        ->orWhere('email', 'like', $like)
+                        ->orWhere('website', 'like', $like);
+                });
+            })
+            ->orderByDesc('updated_at');
+
+        return $this->paginateResponse($query, $page, $perPage, function ($row) {
+            return $this->publisherPayload($row);
+        });
+    }
+
+    public function storePublisher(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:50', 'unique:publishers,code'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'string', 'email', 'max:100'],
+            'website' => ['nullable', 'string', 'max:255'],
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $now = now();
+        $id = DB::table('publishers')->insertGetId([
+            'name' => trim((string) $data['name']),
+            'code' => strtoupper(trim((string) $data['code'])),
+            'address' => $data['address'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'email' => $data['email'] ?? null,
+            'website' => $data['website'] ?? null,
+            'is_active' => (bool) $data['is_active'],
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $row = DB::table('publishers')->where('id', $id)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tạo mới thành công.',
+            'data' => $this->publisherPayload($row),
+        ], Response::HTTP_CREATED);
+    }
+
+    public function updatePublisher(Request $request, int $id)
+    {
+        $existing = DB::table('publishers')->where('id', $id)->first();
+        if (! $existing) {
+            return response()->json(['message' => 'Không tìm thấy nhà xuất bản.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:50', Rule::unique('publishers', 'code')->ignore($id)],
+            'address' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'string', 'email', 'max:100'],
+            'website' => ['nullable', 'string', 'max:255'],
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        DB::table('publishers')
+            ->where('id', $id)
+            ->update([
+                'name' => trim((string) $data['name']),
+                'code' => strtoupper(trim((string) $data['code'])),
+                'address' => $data['address'] ?? null,
+                'phone' => $data['phone'] ?? null,
+                'email' => $data['email'] ?? null,
+                'website' => $data['website'] ?? null,
+                'is_active' => (bool) $data['is_active'],
+                'updated_at' => now(),
+            ]);
+
+        $row = DB::table('publishers')->where('id', $id)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật thành công.',
+            'data' => $this->publisherPayload($row),
+        ], Response::HTTP_OK);
+    }
+
+    public function updatePublisherStatus(Request $request, int $id)
+    {
+        $existing = DB::table('publishers')->where('id', $id)->first();
+        if (! $existing) {
+            return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        DB::table('publishers')
+            ->where('id', $id)
+            ->update([
+                'is_active' => (bool) $data['is_active'],
+                'updated_at' => now(),
+            ]);
+
+        $row = DB::table('publishers')->where('id', $id)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật thành công.',
+            'data' => $this->publisherPayload($row),
+        ], Response::HTTP_OK);
+    }
+
     // ===== RESEARCH FIELDS =====
     public function listResearchFields(Request $request)
     {
@@ -958,6 +1082,21 @@ class AdminWorkCatalogController extends Controller
             'code' => $row->code,
             'name' => $row->name,
             'description' => $row->description,
+            'is_active' => (bool) $row->is_active,
+            'updated_at' => $row->updated_at,
+        ];
+    }
+
+    private function publisherPayload($row): array
+    {
+        return [
+            'id' => (int) $row->id,
+            'name' => $row->name,
+            'code' => $row->code,
+            'address' => $row->address,
+            'phone' => $row->phone,
+            'email' => $row->email,
+            'website' => $row->website,
             'is_active' => (bool) $row->is_active,
             'updated_at' => $row->updated_at,
         ];

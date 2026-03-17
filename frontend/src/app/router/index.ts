@@ -8,6 +8,7 @@ import { useUserStore } from "@/app/stores/userStore";
 // Layouts
 import MainLayout from "@/layouts/MainLayout.vue";
 import LoginPage from "@/features/auth/pages/LoginPage.vue";
+import ResetPasswordPage from "@/features/auth/pages/ResetPasswordPage.vue";
 
 // ✅ Public HomePage
 import HomePage from "@/features/search/pages/HomePage.vue";
@@ -30,6 +31,11 @@ const routes: RouteRecordRaw[] = [
     component: LoginPage,
     meta: { guestOnly: true },
   },
+  {
+    path: "/reset-password",
+    name: "reset-password",
+    component: ResetPasswordPage,
+  },
 
   /**
    * ✅ PUBLIC HOME (ALWAYS PUBLIC)
@@ -45,48 +51,48 @@ const routes: RouteRecordRaw[] = [
 
   // ✅ PUBLIC SEARCH ROUTES (ALWAYS PUBLIC)
   {
-    path: "/giang-vien",
+    path: "/lecturers",
     name: "public-lecturer",
     component: () => import("@/features/search/pages/PublicLecturerPage.vue"),
     meta: { initAuth: true },
   },
   {
-    path: "/giang-vien/:lecturerCode",
+    path: "/lecturers/:lecturerCode",
     name: "public-lecturer-detail",
     component: () =>
       import("@/features/search/pages/PublicLecturerDetailPage.vue"),
     meta: { initAuth: true },
   },
   {
-    path: "/bai-bao-khoa-hoc",
+    path: "/research-articles",
     name: "public-article",
     component: () => import("@/features/search/pages/PublicSearchPage.vue"),
     props: { preset: "article" },
     meta: { initAuth: true },
   },
   {
-    path: "/de-tai-nghien-cuu",
+    path: "/research-projects",
     name: "public-project",
     component: () => import("@/features/search/pages/PublicSearchPage.vue"),
     props: { preset: "project" },
     meta: { initAuth: true },
   },
   {
-    path: "/sach-giao-trinh",
+    path: "/textbooks",
     name: "public-book",
     component: () => import("@/features/search/pages/PublicSearchPage.vue"),
     props: { preset: "book" },
     meta: { initAuth: true },
   },
   {
-    path: "/hoi-thao-bao-cao-khoa-hoc",
+    path: "/research-conferences",
     name: "public-conference",
     component: () => import("@/features/search/pages/PublicSearchPage.vue"),
     props: { preset: "conference" },
     meta: { initAuth: true },
   },
   {
-    path: "/huong-dan-su-dung",
+    path: "/user-guide",
     name: "public-guide",
     component: () => import("@/features/search/pages/PublicGuidePage.vue"),
     meta: { initAuth: true },

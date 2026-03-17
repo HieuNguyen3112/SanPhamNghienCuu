@@ -13,51 +13,23 @@
         </p>
       </div>
 
-      <!-- Actions -->
-      <form
-        class="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center"
-        @submit.prevent="$emit('request-search', search)"
-      >
-        <div class="relative w-full md:w-[280px]">
-          <input
-            v-model.trim="search"
-            type="text"
-            class="h-10 w-full rounded-xl border border-slate-200 bg-white pl-3 pr-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60"
-            placeholder="Tìm giảng viên..."
-            :disabled="readOnly"
-            aria-label="Tìm giảng viên"
-          />
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button
-            type="submit"
-            class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="readOnly"
-            @click.prevent="$emit('request-search', search)"
-            aria-label="Tìm"
-          >
-            <Search class="h-4 w-4" />
-            <span class="hidden sm:inline">Tìm</span>
-          </button>
-
-          <button
-            type="button"
-            class="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/20 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="readOnly"
-            @click="addRow"
-            aria-label="Thêm người tham gia"
-          >
-            <Plus class="h-4 w-4" />
-            <span>Thêm</span>
-          </button>
-        </div>
-      </form>
+      <div class="flex items-center justify-end">
+        <button
+          type="button"
+          class="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/20 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="readOnly"
+          @click="addRow"
+          aria-label="Thêm người tham gia"
+        >
+          <Plus class="h-4 w-4" />
+          <span>Thêm</span>
+        </button>
+      </div>
     </header>
 
     <!-- Desktop Table -->
     <div class="hidden md:block">
-      <div class="overflow-hidden">
+      <div class="overflow-visible">
         <div class="max-h-[520px] overflow-auto">
           <table class="min-w-full text-sm">
             <colgroup>
@@ -114,9 +86,10 @@
               <tr
                 v-for="(row, idx) in modelValue"
                 :key="idx"
-                class="group hover:bg-slate-50"
+                class="group relative hover:bg-slate-50"
                 :class="[
                   row.lecturer_id === currentLecturerId ? 'bg-slate-50/60' : '',
+                  activeLecturerRow === idx && !isLecturerPanelOpen ? 'z-40' : '',
                 ]"
               >
                 <!-- Ngoài (cột đầu) -->
@@ -140,7 +113,10 @@
                 </td>
 
                 <!-- Họ tên -->
-                <td class="px-4 py-3 align-top md:px-6">
+                <td
+                  class="relative px-4 py-3 align-top md:px-6"
+                  :class="activeLecturerRow === idx && !isLecturerPanelOpen ? 'z-50' : ''"
+                >
                   <div class="flex flex-col gap-2">
                     <template v-if="row.is_external">
                       <input
@@ -161,24 +137,30 @@
                     </template>
 
                     <template v-else>
-                      <select
-                        class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60"
-                        :disabled="readOnly"
-                        :value="row.lecturer_id ?? ''"
-                        @change="
-                          updateRow(idx, { lecturer_id: toNumber($event) })
-                        "
-                        :aria-label="`Chọn giảng viên - dòng ${idx + 1}`"
-                      >
-                        <option value="">— Chọn giảng viên —</option>
-                        <option
-                          v-for="l in lecturers"
-                          :key="l.id"
-                          :value="l.id"
-                        >
-                          {{ l.full_name }} ({{ l.code }})
-                        </option>
-                      </select>
+                      <div class="relative">
+                        <div class="flex items-center gap-2">
+                          <input
+                            type="text"
+                            class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60"
+                            placeholder="Tìm theo tên/mã giảng viên"
+                            :disabled="readOnly"
+                            :value="lecturerInputValue(idx, row.lecturer_id)"
+                            :ref="(el) => setDesktopInputRef(idx, el as HTMLInputElement | null)"
+                            @focus="onLecturerFocus(idx)"
+                            @blur="onLecturerBlur(idx)"
+                            @input="onLecturerInput(idx, ($event.target as HTMLInputElement).value)"
+                            :aria-label="`Tìm giảng viên - dòng ${idx + 1}`"
+                          />
+                          <button
+                            type="button"
+                            class="inline-flex h-10 shrink-0 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                            @mousedown.prevent="openLecturerPanel(idx)"
+                          >
+                            Chi tiết
+                          </button>
+                        </div>
+
+                      </div>
                     </template>
                   </div>
                 </td>
@@ -223,13 +205,16 @@
                     class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60"
                     :disabled="readOnly"
                     :value="row.member_role_id ?? ''"
-                    @change="
-                      updateRow(idx, { member_role_id: toNumber($event) })
-                    "
+                    @change="onMemberRoleChange(idx, $event)"
                     :aria-label="`Chọn vai trò - dòng ${idx + 1}`"
                   >
                     <option value="">— Chọn vai trò —</option>
-                    <option v-for="r in memberRoles" :key="r.id" :value="r.id">
+                    <option
+                      v-for="r in memberRoles"
+                      :key="r.id"
+                      :value="r.id"
+                      :disabled="isMemberRoleDisabled(idx, r.id)"
+                    >
                       {{ r.name }}
                     </option>
                   </select>
@@ -293,6 +278,38 @@
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="shouldShowDesktopInlineDropdown"
+        class="fixed z-120 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl"
+        :style="desktopDropdownStyle"
+        @mousedown="cancelLecturerBlurTimer"
+      >
+        <button
+          type="button"
+          class="block w-full px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-50"
+          @mousedown.prevent="chooseLecturer(activeLecturerRow as number, null)"
+        >
+          — Chọn giảng viên —
+        </button>
+        <button
+          v-for="lecturer in filteredLecturersForRow(activeLecturerRow as number)"
+          :key="`desktop-floating-option-${(activeLecturerRow as number)}-${lecturer.id}`"
+          type="button"
+          class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+          @mousedown.prevent="chooseLecturer(activeLecturerRow as number, lecturer)"
+        >
+          {{ lecturer.full_name }} ({{ lecturer.code }})
+        </button>
+        <div
+          v-if="filteredLecturersForRow(activeLecturerRow as number).length === 0"
+          class="px-3 py-2 text-sm text-slate-500"
+        >
+          Không tìm thấy giảng viên phù hợp.
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Mobile Cards (giữ nguyên như bạn đang có) -->
     <div class="md:hidden">
@@ -382,17 +399,46 @@
                   />
                 </template>
                 <template v-else>
-                  <select
-                    class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60"
-                    :disabled="readOnly"
-                    :value="row.lecturer_id ?? ''"
-                    @change="updateRow(idx, { lecturer_id: toNumber($event) })"
-                  >
-                    <option value="">— Chọn giảng viên —</option>
-                    <option v-for="l in lecturers" :key="l.id" :value="l.id">
-                      {{ l.full_name }} ({{ l.code }})
-                    </option>
-                  </select>
+                  <div class="relative">
+                    <input
+                      type="text"
+                      class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60"
+                      placeholder="Tìm theo tên/mã giảng viên"
+                      :disabled="readOnly"
+                      :value="lecturerInputValue(idx, row.lecturer_id)"
+                      @focus="onLecturerFocus(idx)"
+                      @blur="onLecturerBlur(idx)"
+                      @input="onLecturerInput(idx, ($event.target as HTMLInputElement).value)"
+                    />
+
+                    <div
+                      v-if="activeLecturerRow === idx && !readOnly"
+                      class="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
+                    >
+                      <button
+                        type="button"
+                        class="block w-full px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-50"
+                        @mousedown.prevent="chooseLecturer(idx, null)"
+                      >
+                        — Chọn giảng viên —
+                      </button>
+                      <button
+                        v-for="lecturer in filteredLecturersForRow(idx)"
+                        :key="`mobile-option-${idx}-${lecturer.id}`"
+                        type="button"
+                        class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                        @mousedown.prevent="chooseLecturer(idx, lecturer)"
+                      >
+                        {{ lecturer.full_name }} ({{ lecturer.code }})
+                      </button>
+                      <div
+                        v-if="filteredLecturersForRow(idx).length === 0"
+                        class="px-3 py-2 text-sm text-slate-500"
+                      >
+                        Không tìm thấy giảng viên phù hợp.
+                      </div>
+                    </div>
+                  </div>
                 </template>
               </div>
             </div>
@@ -441,10 +487,15 @@
                   class="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60"
                   :disabled="readOnly"
                   :value="row.member_role_id ?? ''"
-                  @change="updateRow(idx, { member_role_id: toNumber($event) })"
+                  @change="onMemberRoleChange(idx, $event)"
                 >
                   <option value="">— Chọn vai trò —</option>
-                  <option v-for="r in memberRoles" :key="r.id" :value="r.id">
+                  <option
+                    v-for="r in memberRoles"
+                    :key="r.id"
+                    :value="r.id"
+                    :disabled="isMemberRoleDisabled(idx, r.id)"
+                  >
                     {{ r.name }}
                   </option>
                 </select>
@@ -468,6 +519,72 @@
         </article>
       </div>
     </div>
+
+    <!-- Desktop side picker -->
+    <aside
+      v-if="isLecturerPanelOpen && activeLecturerRow !== null && !readOnly"
+      class="fixed z-90 hidden w-[460px] rounded-2xl border border-slate-200 bg-white shadow-2xl md:block"
+      :style="desktopPanelStyle"
+      @mousedown="cancelLecturerBlurTimer"
+    >
+      <div
+        class="flex cursor-move items-center justify-between border-b border-slate-200 px-4 py-3"
+        @pointerdown="startPanelDrag"
+      >
+        <div class="text-sm font-semibold text-slate-900">Chọn giảng viên</div>
+        <button
+          type="button"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+          @mousedown.prevent="closeLecturerPanel"
+          @pointerdown.stop
+          aria-label="Đóng panel chọn giảng viên"
+        >
+          <X class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="border-b border-slate-200 px-4 py-3">
+        <input
+          type="text"
+          class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          placeholder="Tìm theo họ tên hoặc mã giảng viên"
+          :value="activeLecturerQuery"
+          @input="onActiveLecturerPanelInput(($event.target as HTMLInputElement).value)"
+          aria-label="Tìm giảng viên ở panel bên phải"
+        />
+      </div>
+
+      <div class="max-h-[420px] overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead class="sticky top-0 z-10 bg-slate-50">
+            <tr>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">Họ tên</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">Mã GV</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">Đơn vị</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            <tr
+              v-for="lecturer in activeLecturerOptions"
+              :key="`side-option-${lecturer.id}`"
+              class="cursor-pointer hover:bg-slate-50"
+              :class="activeLecturerRowSelectedId === lecturer.id ? 'bg-slate-100' : ''"
+              @mousedown.prevent="chooseLecturer(activeLecturerRow as number, lecturer)"
+            >
+              <td class="px-3 py-2 text-slate-800">{{ lecturer.full_name }}</td>
+              <td class="px-3 py-2 text-slate-700">{{ lecturer.code }}</td>
+              <td class="px-3 py-2 text-slate-600">{{ lecturer.department_name || '—' }}</td>
+            </tr>
+
+            <tr v-if="activeLecturerOptions.length === 0">
+              <td colspan="3" class="px-3 py-6 text-center text-sm text-slate-500">
+                Không tìm thấy giảng viên phù hợp.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </aside>
 
     <!-- Warnings -->
     <div v-if="warnings.length" class="border-t border-slate-200 p-4 md:p-6">
@@ -495,8 +612,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { AlertTriangle, Plus, Search, Trash2 } from "lucide-vue-next";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { AlertTriangle, Plus, Trash2, X } from "lucide-vue-next";
 import type {
   LecturerOptionDto,
   MemberRoleDto,
@@ -530,7 +647,48 @@ const emit = defineEmits<{
   (e: "request-search", query: string): void;
 }>();
 
-const search = ref("");
+const rowSearchQueries = ref<Record<number, string>>({});
+const activeLecturerRow = ref<number | null>(null);
+const isLecturerPanelOpen = ref(false);
+const desktopInputRefs = ref<Record<number, HTMLInputElement | null>>({});
+const isDesktopViewport = ref(false);
+const desktopDropdownStyle = ref<Record<string, string>>({});
+const panelPosition = ref({ x: 0, y: 96 });
+const panelDragOffset = ref({ x: 0, y: 0 });
+const isDraggingPanel = ref(false);
+const isPanelPositionInitialized = ref(false);
+let lecturerBlurTimer: ReturnType<typeof setTimeout> | null = null;
+
+const activeLecturerQuery = computed(() => {
+  if (activeLecturerRow.value === null) return "";
+  return rowSearchQueries.value[activeLecturerRow.value] ?? "";
+});
+
+const activeLecturerOptions = computed(() => {
+  if (activeLecturerRow.value === null) return [];
+  return filteredLecturersForRow(activeLecturerRow.value);
+});
+
+const activeLecturerRowSelectedId = computed(() => {
+  if (activeLecturerRow.value === null) return null;
+  return props.modelValue[activeLecturerRow.value]?.lecturer_id ?? null;
+});
+
+const shouldShowDesktopInlineDropdown = computed(() => {
+  return (
+    isDesktopViewport.value &&
+    activeLecturerRow.value !== null &&
+    !props.readOnly &&
+    !isLecturerPanelOpen.value
+  );
+});
+
+const desktopPanelStyle = computed(() => {
+  return {
+    left: `${panelPosition.value.x}px`,
+    top: `${panelPosition.value.y}px`,
+  };
+});
 
 const warnings = computed(() => {
   const list: string[] = [];
@@ -548,7 +706,25 @@ const warnings = computed(() => {
     );
   }
 
+  if (typeof props.currentLecturerId === "number" && props.currentLecturerId > 0) {
+    const hasDeclarer = props.modelValue.some(
+      (row) => !row.is_external && row.lecturer_id === props.currentLecturerId,
+    );
+    if (!hasDeclarer) {
+      list.push(
+        "Lưu ý: Người kê khai chưa có trong danh sách thành viên. Vui lòng thêm mình vào danh sách thành viên.",
+      );
+    }
+  }
+
   return list;
+});
+
+const principalRoleId = computed(() => {
+  return (
+    props.memberRoles.find((role) => role.code?.toLowerCase() === "principal")
+      ?.id ?? null
+  );
 });
 
 function addRow() {
@@ -569,6 +745,13 @@ function addRow() {
 
 function removeRow(idx: number) {
   const next = props.modelValue.filter((_, i) => i !== idx);
+  const nextQueries: Record<number, string> = {};
+  for (const [key, value] of Object.entries(rowSearchQueries.value)) {
+    const keyNumber = Number(key);
+    if (!Number.isFinite(keyNumber) || keyNumber === idx) continue;
+    nextQueries[keyNumber > idx ? keyNumber - 1 : keyNumber] = value;
+  }
+  rowSearchQueries.value = nextQueries;
   emit("update:modelValue", next);
 }
 
@@ -577,6 +760,230 @@ function updateRow(idx: number, patch: Partial<ParticipantRowModel>) {
     i === idx ? { ...r, ...patch } : r,
   );
   emit("update:modelValue", next);
+}
+
+function lecturerInputValue(
+  idx: number,
+  lecturerId: number | null | undefined,
+): string {
+  const typed = rowSearchQueries.value[idx];
+  if (typeof typed === "string" && typed !== "") {
+    return typed;
+  }
+
+  if (typeof lecturerId === "number") {
+    const selected = props.lecturers.find((l) => l.id === lecturerId);
+    if (selected) return `${selected.full_name} (${selected.code})`;
+  }
+
+  return "";
+}
+
+function onLecturerFocus(idx: number) {
+  if (lecturerBlurTimer) {
+    clearTimeout(lecturerBlurTimer);
+    lecturerBlurTimer = null;
+  }
+
+  // Reset query when reopening the picker so the dropdown shows full options.
+  rowSearchQueries.value[idx] = "";
+  emit("request-search", "");
+
+  isLecturerPanelOpen.value = false;
+  activeLecturerRow.value = idx;
+  updateDesktopDropdownPosition(idx);
+}
+
+function onLecturerBlur(idx: number) {
+  lecturerBlurTimer = setTimeout(() => {
+    if (activeLecturerRow.value === idx && !isLecturerPanelOpen.value) {
+      activeLecturerRow.value = null;
+    }
+  }, 120);
+}
+
+function openLecturerPanel(idx: number) {
+  cancelLecturerBlurTimer();
+  activeLecturerRow.value = idx;
+  ensurePanelPosition();
+  isLecturerPanelOpen.value = true;
+}
+
+function setDesktopInputRef(idx: number, el: HTMLInputElement | null) {
+  desktopInputRefs.value[idx] = el;
+}
+
+function updateDesktopViewportFlag() {
+  if (typeof window === "undefined") return;
+  isDesktopViewport.value = window.innerWidth >= 768;
+}
+
+function ensurePanelPosition() {
+  if (typeof window === "undefined") return;
+  if (isPanelPositionInitialized.value) return;
+
+  panelPosition.value = {
+    x: Math.max(16, window.innerWidth - 460 - 16),
+    y: 96,
+  };
+  isPanelPositionInitialized.value = true;
+}
+
+function startPanelDrag(event: PointerEvent) {
+  if (typeof window === "undefined") return;
+  ensurePanelPosition();
+
+  isDraggingPanel.value = true;
+  panelDragOffset.value = {
+    x: event.clientX - panelPosition.value.x,
+    y: event.clientY - panelPosition.value.y,
+  };
+
+  window.addEventListener("pointermove", onPanelDrag);
+  window.addEventListener("pointerup", stopPanelDrag);
+}
+
+function onPanelDrag(event: PointerEvent) {
+  if (!isDraggingPanel.value || typeof window === "undefined") return;
+
+  const nextX = event.clientX - panelDragOffset.value.x;
+  const nextY = event.clientY - panelDragOffset.value.y;
+  const maxX = Math.max(16, window.innerWidth - 460 - 16);
+  const maxY = Math.max(16, window.innerHeight - 120);
+
+  panelPosition.value = {
+    x: Math.min(Math.max(16, nextX), maxX),
+    y: Math.min(Math.max(16, nextY), maxY),
+  };
+}
+
+function stopPanelDrag() {
+  if (typeof window === "undefined") return;
+
+  isDraggingPanel.value = false;
+  window.removeEventListener("pointermove", onPanelDrag);
+  window.removeEventListener("pointerup", stopPanelDrag);
+}
+
+function updateDesktopDropdownPosition(idx: number | null) {
+  if (idx === null) return;
+  const inputEl = desktopInputRefs.value[idx];
+  if (!inputEl) return;
+
+  const rect = inputEl.getBoundingClientRect();
+  desktopDropdownStyle.value = {
+    left: `${rect.left}px`,
+    top: `${rect.bottom + 4}px`,
+    width: `${rect.width}px`,
+  };
+}
+
+function cancelLecturerBlurTimer() {
+  if (!lecturerBlurTimer) return;
+  clearTimeout(lecturerBlurTimer);
+  lecturerBlurTimer = null;
+}
+
+function closeLecturerPanel() {
+  cancelLecturerBlurTimer();
+  isLecturerPanelOpen.value = false;
+  activeLecturerRow.value = null;
+}
+
+function onActiveLecturerPanelInput(value: string) {
+  if (activeLecturerRow.value === null) return;
+  onLecturerInput(activeLecturerRow.value, value);
+}
+
+function isMemberRoleDisabled(idx: number, roleId: number): boolean {
+  if (principalRoleId.value === null) return false;
+  if (roleId !== principalRoleId.value) return false;
+
+  const currentRoleId = props.modelValue[idx]?.member_role_id ?? null;
+  if (currentRoleId === principalRoleId.value) return false;
+
+  return props.modelValue.some(
+    (row, rowIdx) => rowIdx !== idx && row.member_role_id === principalRoleId.value,
+  );
+}
+
+function onMemberRoleChange(idx: number, e: Event) {
+  const nextRoleId = toNumber(e);
+
+  if (
+    typeof nextRoleId === "number" &&
+    principalRoleId.value !== null &&
+    nextRoleId === principalRoleId.value &&
+    isMemberRoleDisabled(idx, nextRoleId)
+  ) {
+    return;
+  }
+
+  updateRow(idx, { member_role_id: nextRoleId });
+}
+
+function filteredLecturersForRow(idx: number): LecturerOptionDto[] {
+  const keyword = (rowSearchQueries.value[idx] ?? "").trim().toLowerCase();
+  if (!keyword) return props.lecturers;
+
+  return props.lecturers.filter((lecturer) => {
+    const haystack = `${lecturer.full_name} ${lecturer.code}`.toLowerCase();
+    return haystack.includes(keyword);
+  });
+}
+
+function chooseLecturer(idx: number, lecturer: LecturerOptionDto | null) {
+  if (!lecturer) {
+    rowSearchQueries.value[idx] = "";
+    updateRow(idx, { lecturer_id: null });
+    activeLecturerRow.value = null;
+    return;
+  }
+
+  rowSearchQueries.value[idx] = `${lecturer.full_name} (${lecturer.code})`;
+  updateRow(idx, { lecturer_id: lecturer.id });
+  isLecturerPanelOpen.value = false;
+  activeLecturerRow.value = null;
+}
+
+function handleFloatingDropdownReposition() {
+  if (!shouldShowDesktopInlineDropdown.value) return;
+  updateDesktopDropdownPosition(activeLecturerRow.value);
+}
+
+onMounted(() => {
+  updateDesktopViewportFlag();
+  ensurePanelPosition();
+  if (typeof window !== "undefined") {
+    window.addEventListener("resize", updateDesktopViewportFlag);
+    window.addEventListener("resize", handleFloatingDropdownReposition);
+    window.addEventListener("scroll", handleFloatingDropdownReposition, true);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (lecturerBlurTimer) {
+    clearTimeout(lecturerBlurTimer);
+    lecturerBlurTimer = null;
+  }
+
+  if (typeof window !== "undefined") {
+    stopPanelDrag();
+    window.removeEventListener("resize", updateDesktopViewportFlag);
+    window.removeEventListener("resize", handleFloatingDropdownReposition);
+    window.removeEventListener("scroll", handleFloatingDropdownReposition, true);
+  }
+});
+
+function onLecturerInput(idx: number, value: string) {
+  rowSearchQueries.value[idx] = value;
+  activeLecturerRow.value = idx;
+  emit("request-search", value);
+  updateDesktopDropdownPosition(idx);
+
+  if (value.trim() === "") {
+    updateRow(idx, { lecturer_id: null });
+  }
 }
 
 function toggleExternal(idx: number, checked: boolean) {
@@ -589,6 +996,7 @@ function toggleExternal(idx: number, checked: boolean) {
       external_department_name:
         props.modelValue[idx]?.external_department_name ?? "",
     });
+    rowSearchQueries.value[idx] = "";
   } else {
     // chuyển về GV nội bộ: clear các field external
     updateRow(idx, {

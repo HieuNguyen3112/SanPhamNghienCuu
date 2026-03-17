@@ -68,7 +68,7 @@
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
-                  >Cấp đề tài</label
+                  >Cấp đề tài <span class="text-rose-600">*</span></label
                 >
                 <select
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
@@ -141,23 +141,86 @@
                   placeholder="VD: Nghiên cứu ứng dụng AI trong quản lý học tập"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Gợi ý: research_activities.title (VARCHAR500)
+                  Nhập đúng tên đầy đủ của đề tài.
+                </div>
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="text-xs font-medium text-slate-600"
+                  >Tóm tắt (abstract)</label
+                >
+                <textarea
+                  v-model.trim="form.abstract"
+                  :disabled="readOnly"
+                  placeholder="Tóm tắt ngắn mục tiêu/nội dung đề tài (tuỳ chọn)"
+                  class="mt-1 min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                />
+                <div class="mt-1 text-xs text-slate-500">
+                  Có thể mô tả ngắn mục tiêu và phạm vi đề tài.
                 </div>
               </div>
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
-                  >Mã số đề tài</label
+                  >Mã đề tài <span class="text-rose-600">*</span></label
                 >
                 <input
                   v-model.trim="form.projectCode"
                   :disabled="readOnly"
                   maxlength="100"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
-                  placeholder="VD: DT-2025-012 (nếu có)"
+                  placeholder="VD: DT-2025-012"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Gợi ý: project_details.project_code (VARCHAR100, nullable)
+                  Bắt buộc: mã nhận diện đề tài.
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600"
+                  >Loại hình đề tài</label
+                >
+                <input
+                  v-model.trim="form.projectCategory"
+                  :disabled="readOnly"
+                  maxlength="255"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  placeholder="VD: Nghiên cứu ứng dụng / Nghiên cứu cơ bản"
+                />
+                <div class="mt-1 text-xs text-slate-500">
+                  Nên có: dùng để phân nhóm đề tài.
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600"
+                  >Đơn vị thực hiện <span class="text-rose-600">*</span></label
+                >
+                <input
+                  v-model.trim="form.implementingUnit"
+                  :disabled="readOnly"
+                  maxlength="255"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  placeholder="VD: Khoa Công nghệ thông tin"
+                />
+                <div class="mt-1 text-xs text-slate-500">
+                  Bắt buộc: đơn vị trực tiếp triển khai.
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600"
+                  >Lĩnh vực</label
+                >
+                <input
+                  v-model.trim="form.researchField"
+                  :disabled="readOnly"
+                  maxlength="255"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  placeholder="VD: Trí tuệ nhân tạo"
+                />
+                <div class="mt-1 text-xs text-slate-500">
+                  Nên có: giúp tra cứu theo lĩnh vực nghiên cứu.
                 </div>
               </div>
 
@@ -173,7 +236,7 @@
                   placeholder="VD: 123/QĐ-ĐHXYZ (nếu có)"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Gợi ý: project_details.decision_no (VARCHAR100, nullable)
+                  Nếu có quyết định giao đề tài thì nhập số quyết định.
                 </div>
               </div>
 
@@ -188,7 +251,7 @@
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Gợi ý: project_details.decision_date (DATE, nullable)
+                  Ngày ban hành quyết định (nếu có).
                 </div>
               </div>
 
@@ -197,54 +260,129 @@
                   >Kinh phí</label
                 >
                 <input
-                  v-model.number="form.funding"
-                  type="number"
-                  step="0.01"
+                  v-model="fundingInput"
+                  type="text"
+                  inputmode="numeric"
                   :disabled="readOnly"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
                   placeholder="VD: 150000000 (VND) (nếu có)"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Gợi ý: project_details.funding (DECIMAL12,2, nullable)
+                  Nhập nhanh dạng số, hệ thống tự định dạng: 1.500.000.
                 </div>
               </div>
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
-                  >Năm bắt đầu</label
+                  >Thời gian bắt đầu <span class="text-rose-600">*</span></label
                 >
                 <input
-                  v-model.number="form.startYear"
-                  type="number"
-                  min="1900"
-                  max="2100"
+                  v-model="form.startDate"
+                  type="date"
                   :disabled="readOnly"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
-                  placeholder="VD: 2024"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Gợi ý: sẽ map sang research_activities.start_date (DATE,
-                  nullable)
+                  Chọn ngày bắt đầu thực hiện đề tài.
                 </div>
               </div>
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
-                  >Năm kết thúc</label
+                  >Thời gian kết thúc <span class="text-rose-600">*</span></label
                 >
                 <input
-                  v-model.number="form.endYear"
-                  type="number"
-                  min="1900"
-                  max="2100"
+                  v-model="form.endDate"
+                  type="date"
                   :disabled="readOnly"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
-                  placeholder="VD: 2025"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Gợi ý: sẽ map sang research_activities.end_date (DATE,
-                  nullable)
+                  Chọn ngày kết thúc hoặc nghiệm thu dự kiến.
                 </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600"
+                  >Tình trạng <span class="text-rose-600">*</span></label
+                >
+                <select
+                  v-model="form.projectStatus"
+                  :disabled="readOnly"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                >
+                  <option value="">— Chọn tình trạng —</option>
+                  <option
+                    v-for="status in PROJECT_STATUS_OPTIONS"
+                    :key="status.value"
+                    :value="status.value"
+                  >
+                    {{ status.label }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600"
+                  >Chủ nhiệm <span class="text-rose-600">*</span></label
+                >
+                <input
+                  :value="principalDisplayName"
+                  disabled
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                />
+                <div class="mt-1 text-xs text-slate-500">
+                  Chọn vai trò <b>Chủ nhiệm</b> trong danh sách thành viên ở phần bên dưới.
+                </div>
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="text-xs font-medium text-slate-600"
+                  >Mục tiêu</label
+                >
+                <textarea
+                  v-model.trim="form.objectives"
+                  :disabled="readOnly"
+                  placeholder="Nêu mục tiêu chính của đề tài (khuyến nghị)"
+                  class="mt-1 min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="text-xs font-medium text-slate-600"
+                  >Nội dung</label
+                >
+                <textarea
+                  v-model.trim="form.contentSummary"
+                  :disabled="readOnly"
+                  placeholder="Mô tả nội dung chính của đề tài (khuyến nghị)"
+                  class="mt-1 min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="text-xs font-medium text-slate-600"
+                  >Kết quả chính <span class="text-rose-600">*</span></label
+                >
+                <textarea
+                  v-model.trim="form.mainResults"
+                  :disabled="readOnly"
+                  placeholder="Tóm tắt kết quả chính đạt được của đề tài"
+                  class="mt-1 min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="text-xs font-medium text-slate-600"
+                  >Địa chỉ ứng dụng</label
+                >
+                <input
+                  v-model.trim="form.applicationAddress"
+                  :disabled="readOnly"
+                  maxlength="500"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                  placeholder="VD: Trung tâm A/Bộ phận B hoặc URL ứng dụng"
+                />
               </div>
 
               <div class="md:col-span-2">
@@ -259,7 +397,7 @@
                   placeholder="VD: Đề tài đã nghiệm thu/đang triển khai... (tuỳ chọn)"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Gợi ý: research_activities.notes (VARCHAR500, nullable)
+                  Ghi chú thêm nếu cần.
                 </div>
               </div>
             </div>
@@ -278,6 +416,14 @@
           />
 
           <!-- Section D -->
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+            <div class="text-sm font-semibold text-slate-900">
+              D. Minh chứng và link liên quan
+            </div>
+            <div class="mt-1 text-xs text-slate-500">
+              <span class="text-rose-600">*</span> Bắt buộc có ít nhất 1 file minh chứng. Link liên quan là khuyến nghị.
+            </div>
+          </div>
           <EvidenceUpload
             :existingFiles="existingEvidence"
             :existingLinks="existingEvidenceLinks"
@@ -506,6 +652,12 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
 const ALLOWED_PROJECT_TYPE_CODES = new Set(
   Object.keys(PROJECT_TYPE_LABELS).map((code) => code.toLowerCase()),
 );
+const PROJECT_STATUS_OPTIONS = [
+  { value: "planning", label: "Chuẩn bị" },
+  { value: "ongoing", label: "Đang thực hiện" },
+  { value: "completed", label: "Đã hoàn thành" },
+  { value: "accepted", label: "Đã nghiệm thu/công nhận" },
+] as const;
 
 const academicYears = ref<AcademicYearDto[]>([]);
 const memberRoles = ref<MemberRoleDto[]>([]);
@@ -523,10 +675,19 @@ const form = reactive<ProjectDeclarationFormModel>({
   kindId: 0,
   typeId: null,
   title: "",
+  abstract: "",
   notes: "",
-  startYear: null,
-  endYear: null,
+  startDate: null,
+  endDate: null,
   projectCode: "",
+  projectCategory: "",
+  researchField: "",
+  objectives: "",
+  contentSummary: "",
+  applicationAddress: "",
+  implementingUnit: "",
+  projectStatus: "",
+  mainResults: "",
   decisionNo: "",
   decisionDate: null,
   funding: null,
@@ -550,6 +711,39 @@ const ownerFacultyId = computed(
     lecturers.value.find((l) => l.id === currentLecturerId.value)?.faculty_id ??
     null,
 );
+const hasPrincipalMember = computed(() =>
+  form.members.some((member) => {
+    if (typeof member.member_role_id !== "number") return false;
+    return memberRoleCodeById.value[member.member_role_id] === "principal";
+  }),
+);
+const fundingInput = computed({
+  get: () => {
+    if (form.funding === null || !Number.isFinite(form.funding)) return "";
+    return new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(Math.round(form.funding));
+  },
+  set: (value: string) => {
+    const digits = String(value ?? "").replace(/[^\d]/g, "");
+    form.funding = digits ? Number(digits) : null;
+  },
+});
+const principalDisplayName = computed(() => {
+  const principal = form.members.find((member) => {
+    if (typeof member.member_role_id !== "number") return false;
+    return memberRoleCodeById.value[member.member_role_id] === "principal";
+  });
+
+  if (!principal) return "Chưa chọn chủ nhiệm";
+  if (principal.is_external) {
+    return principal.external_full_name?.trim() || "Chủ nhiệm ngoài trường";
+  }
+
+  const lecturerId = principal.lecturer_id;
+  if (typeof lecturerId !== "number") return "Chưa chọn chủ nhiệm";
+  return lecturerNameById.value[lecturerId] ?? `lecturer_id=${lecturerId}`;
+});
 
 const memberRoleCodeById = computed(() =>
   Object.fromEntries(memberRoles.value.map((r) => [r.id, r.code])),
@@ -615,18 +809,26 @@ const selectedTypeRoleRule = computed(() => {
 function normalizeServerPreview(
   preview: ProjectHoursPreviewResponseDto,
 ): ProjectHoursComputationResult {
+  const distribution: ProjectHoursComputationResult["distribution"] = (
+    preview.members ?? []
+  ).map((member) => ({
+    lecturer_id: member.lecturer_id,
+    lecturer_name: member.lecturer_full_name,
+    member_role_id:
+      memberRoles.value.find((role) => role.code === member.member_role_code)
+        ?.id ?? 0,
+    member_role_name: member.member_role_name ?? "—",
+    hours: member.hours_assigned ?? 0,
+  }));
+
+  const currentLecturerHours =
+    distribution.find((member) => member.lecturer_id === currentLecturerId.value)
+      ?.hours ?? 0;
+
   return {
     total_hours: preview.formula.total_hours_allocated ?? 0,
-    current_lecturer_hours: preview.current_lecturer_hours ?? 0,
-    distribution: (preview.members ?? []).map((member) => ({
-      lecturer_id: member.lecturer_id,
-      lecturer_name: member.lecturer_full_name,
-      member_role_id:
-        memberRoles.value.find((role) => role.code === member.member_role_code)
-          ?.id ?? 0,
-      member_role_name: member.member_role_name ?? "—",
-      hours: member.hours_assigned ?? 0,
-    })),
+    current_lecturer_hours: currentLecturerHours,
+    distribution,
     has_rule: !!preview.distribution_strategy,
     rule_type_code: preview.type_code,
     rule_label: preview.level_label ?? preview.type_name,
@@ -759,19 +961,34 @@ const canSubmit = computed(() => {
   if (!form.academicYearId) return false;
   if (!form.typeId) return false;
   if (!form.title.trim()) return false;
+  if (!form.projectCode.trim()) return false;
+  if (!form.implementingUnit.trim()) return false;
+  if (!form.projectStatus.trim()) return false;
+  if (!form.mainResults.trim()) return false;
+  if (!form.startDate || !form.endDate) return false;
+  if (new Date(form.endDate).getTime() < new Date(form.startDate).getTime()) {
+    return false;
+  }
   // members must be valid
-  const validMembers = form.members.filter(
-    (m) =>
-      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number",
-  );
+  const validMembers = form.members.filter((m) => {
+    const hasRole = typeof m.member_role_id === "number";
+    if (!hasRole) return false;
+    if (m.is_external) return Boolean(m.external_full_name?.trim());
+    return typeof m.lecturer_id === "number";
+  });
   if (validMembers.length === 0) return false;
+  if (!hasPrincipalMember.value) return false;
   // evidence pending files should have file_type_id selected (if any)
   const invalidPending = pendingEvidenceFiles.value.some(
     (p: any) => !p.file_type_id,
   );
   if (invalidPending) return false;
+  const hasEvidenceFile =
+    existingEvidence.value.length > 0 ||
+    pendingEvidenceFiles.value.some((p: any) => p?.file && p?.file_type_id);
+  if (!hasEvidenceFile) return false;
   const invalidPendingLinks = pendingEvidenceLinks.value.some(
-    (l: any) => !String(l?.url ?? "").trim(),
+    (l: any) => !String(l?.url ?? "").trim() || !l?.file_type_id,
   );
   if (invalidPendingLinks) return false;
   return true;
@@ -786,24 +1003,29 @@ const filteredMemberRoles = computed(() => {
   return list.length > 0 ? list : memberRoles.value;
 });
 async function loadCatalogs() {
-  const [currentLecturerOption, lecturerOptions, years, kinds, roles, fileTypes] =
+  const [currentLecturerOption, years, kinds, roles, fileTypes, initialLecturers] =
     await Promise.all([
       fetch_current_lecturer_option(),
-      search_lecturer_options(""),
       fetch_academic_years(),
       fetch_activity_kinds(),
       fetch_member_roles(),
-      fetch_evidence_file_types(),
+      fetch_evidence_file_types("project"),
+      search_lecturer_options(""),
     ]);
+
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
-  lecturers.value = currentLecturerOption
+
+  const baseLecturers = currentLecturerOption
     ? [
         currentLecturerOption,
-        ...lecturerOptions.filter(
+        ...initialLecturers.filter(
           (lecturer) => lecturer.id !== currentLecturerOption.id,
         ),
       ]
-    : lecturerOptions;
+    : initialLecturers;
+
+  lecturers.value = mergeLecturerOptionsFromMembers(baseLecturers, form.members);
+
   academicYears.value = years;
   memberRoles.value = roles;
   evidenceFileTypes.value = fileTypes;
@@ -824,8 +1046,8 @@ async function loadCatalogs() {
     form.typeId = null;
   }
 
-  // default add current lecturer as member
-  if (form.members.length === 0 && currentLecturerId.value) {
+  // Mặc định form mới luôn có người kê khai trong danh sách thành viên.
+  if (!form.activityId && form.members.length === 0 && currentLecturerId.value) {
     const principalRole = roles.find((r) => r.code === "principal");
     form.members.push({
       lecturer_id: currentLecturerId.value,
@@ -860,26 +1082,29 @@ async function onRemoveExistingEvidence(_id: number) {
   deletingEvidenceFileId.value = _id;
 
   try {
-    await runWithFeedback(() => delete_evidence_file(form.activityId as number, _id), {
-      loading: {
-        enabled: true,
-        title: "Đang xoá minh chứng",
-        message: "Vui lòng đợi trong giây lát...",
-        delayMs: 450,
-        minShowMs: 250,
+    await runWithFeedback(
+      () => delete_evidence_file(form.activityId as number, _id),
+      {
+        loading: {
+          enabled: true,
+          title: "Đang xoá minh chứng",
+          message: "Vui lòng đợi trong giây lát...",
+          delayMs: 450,
+          minShowMs: 250,
+        },
+        success: {
+          enabled: true,
+          title: "Thành công",
+          message: "Đã xoá file minh chứng.",
+        },
+        error: {
+          enabled: true,
+          title: "Không thể xoá",
+          message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
+        },
+        rethrow: true,
       },
-      success: {
-        enabled: true,
-        title: "Thành công",
-        message: "Đã xoá file minh chứng.",
-      },
-      error: {
-        enabled: true,
-        title: "Không thể xoá",
-        message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
-      },
-      rethrow: true,
-    });
+    );
     existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
   } catch (err) {
     shell.error_message.value = normalizeErrorMessage(
@@ -946,11 +1171,16 @@ async function persistEvidenceDraft(activityId: number) {
   });
 
   const validLinkPendings = pendingEvidenceLinks.value.filter(
-    (pendingLink) => String(pendingLink?.url ?? "").trim() !== "",
+    (pendingLink) =>
+      String(pendingLink?.url ?? "").trim() !== "" &&
+      Number(pendingLink?.file_type_id) > 0,
   );
   const linkResults = await Promise.allSettled(
     validLinkPendings.map((pendingLink) =>
-      add_evidence_link(activityId, { url: String(pendingLink.url).trim() }),
+      add_evidence_link(activityId, {
+        url: String(pendingLink.url).trim(),
+        file_type_id: Number(pendingLink.file_type_id),
+      }),
     ),
   );
 
@@ -979,33 +1209,6 @@ async function persistEvidenceDraft(activityId: number) {
   }
 }
 
-function yearToDate(year: number | null): string | null {
-  if (!year) return null;
-  return `${year}-01-01`;
-}
-
-function dateToYear(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const normalized = String(value).trim();
-  if (!normalized) return null;
-
-  const directYear = Number(normalized.slice(0, 4));
-  if (
-    Number.isInteger(directYear) &&
-    directYear >= 1900 &&
-    directYear <= 2100
-  ) {
-    return directYear;
-  }
-
-  const parsed = new Date(normalized);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.getFullYear();
-  }
-
-  return null;
-}
-
 async function loadDraftFromQuery() {
   const raw = route.query.activity_id;
   const rawValue = Array.isArray(raw) ? raw[0] : raw;
@@ -1023,24 +1226,36 @@ async function loadDraftFromQuery() {
     form.kindId = activity.kind_id ?? form.kindId;
     form.typeId = activity.type_id ?? null;
     form.title = activity.title ?? "";
+    form.abstract = activity.abstract ?? "";
     form.notes = activity.notes ?? "";
-    form.startYear = dateToYear(activity.start_date);
-    form.endYear = dateToYear(activity.end_date);
+    form.startDate = activity.start_date ?? null;
+    form.endDate = activity.end_date ?? null;
 
     if (data.detail_kind === "project_details" && data.detail) {
       const detail = data.detail as any;
       form.projectCode = detail.project_code ?? "";
+      form.projectCategory = detail.project_category ?? "";
+      form.researchField = detail.research_field ?? "";
+      form.objectives = detail.objectives ?? "";
+      form.contentSummary = detail.content_summary ?? "";
+      form.applicationAddress = detail.application_address ?? "";
+      form.implementingUnit = detail.implementing_unit ?? "";
+      form.projectStatus = detail.project_status ?? "";
+      form.mainResults = detail.main_results ?? "";
       form.decisionNo = detail.decision_no ?? "";
       form.decisionDate = detail.decision_date ?? null;
       form.funding = detail.funding ?? null;
-      form.startYear = dateToYear(detail.start_month ?? activity.start_date);
-      form.endYear = dateToYear(detail.end_month ?? activity.end_date);
+      form.startDate = detail.start_month ?? activity.start_date ?? null;
+      form.endDate = detail.end_month ?? activity.end_date ?? null;
     }
 
     form.members = (data.members ?? []).map((member) => ({
-      lecturer_id: member.lecturer_id,
+      lecturer_id: member.lecturer_id ?? null,
       member_role_id: member.member_role_id,
       member_role_code: member.member_role_code ?? null,
+      is_external: !!member.is_external,
+      external_full_name: member.external_full_name ?? null,
+      external_department_name: member.external_department_name ?? null,
     }));
     lecturers.value = mergeLecturerOptionsFromMembers(
       lecturers.value,
@@ -1077,9 +1292,9 @@ const shell = useDeclarationFormShell({
         academic_year_id: form.academicYearId ?? 0,
         status_id: 100, // mock draft status id (from mock_statuses); TODO: lookup by code
         title: form.title,
-        abstract: null,
-        start_date: yearToDate(form.startYear),
-        end_date: yearToDate(form.endYear),
+        abstract: form.abstract || null,
+        start_date: form.startDate,
+        end_date: form.endDate,
         quantity: 1,
         notes: form.notes || null,
         submitted_at: null,
@@ -1095,24 +1310,39 @@ const shell = useDeclarationFormShell({
       // upsert details
       await upsert_project_details({
         activity_id: saved.id,
-        project_code: form.projectCode || null,
+        project_code: form.projectCode,
+        project_category: form.projectCategory || null,
+        research_field: form.researchField || null,
+        objectives: form.objectives || null,
+        content_summary: form.contentSummary || null,
+        application_address: form.applicationAddress || null,
+        implementing_unit: form.implementingUnit,
+        project_status: form.projectStatus,
+        main_results: form.mainResults,
         decision_no: form.decisionNo || null,
         decision_date: form.decisionDate || null,
         funding: form.funding ?? null,
-        start_month: yearToDate(form.startYear),
-        end_month: yearToDate(form.endYear),
+        start_month: form.startDate as string,
+        end_month: form.endDate as string,
       });
 
       // upsert members
       const upsertList = form.members
-        .filter(
-          (m) =>
-            typeof m.lecturer_id === "number" &&
-            typeof m.member_role_id === "number",
-        )
+        .filter((m) => {
+          if (typeof m.member_role_id !== "number") return false;
+          if (m.is_external) return Boolean(m.external_full_name?.trim());
+          return typeof m.lecturer_id === "number";
+        })
         .map((m) => ({
-          lecturer_id: m.lecturer_id as number,
+          lecturer_id: m.is_external ? null : (m.lecturer_id as number),
           member_role_id: m.member_role_id as number,
+          is_external: !!m.is_external,
+          external_full_name: m.is_external
+            ? (m.external_full_name?.trim() ?? null)
+            : null,
+          external_department_name: m.is_external
+            ? (m.external_department_name?.trim() ?? null)
+            : null,
           contribution_share: null,
         }));
       await upsert_members(saved.id, upsertList);
@@ -1159,16 +1389,19 @@ onBeforeUnmount(() => {
 });
 
 onMounted(async () => {
-  await runPageLoad(async () => {
-    await loadCatalogs();
-    await loadDraftFromQuery();
-    allowPreviewAutoRefresh.value = true;
-    scheduleProjectPreviewRefresh();
-  }, {
-    onError: (message) => {
-      shell.error_message.value = message;
+  await runPageLoad(
+    async () => {
+      await loadCatalogs();
+      await loadDraftFromQuery();
+      allowPreviewAutoRefresh.value = true;
+      scheduleProjectPreviewRefresh();
     },
-    fallbackMessage: "Không thể khởi tạo trang kê khai.",
-  });
+    {
+      onError: (message) => {
+        shell.error_message.value = message;
+      },
+      fallbackMessage: "Không thể khởi tạo trang kê khai.",
+    },
+  );
 });
 </script>

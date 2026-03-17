@@ -47,5 +47,37 @@ export function mapPublicResearchDetailDtoToModel(dto: PublicResearchDetailDto):
       roleName: p.role_name,
     })),
     evidenceFiles: Array.isArray(dto.evidence_files) ? dto.evidence_files : [],
+    displayMeta: {
+      article: {
+        journalName: dto.display_meta?.article?.journal_name ?? null,
+        year: dto.display_meta?.article?.year ?? null,
+        volume: dto.display_meta?.article?.volume ?? null,
+        issue: dto.display_meta?.article?.issue ?? null,
+        pageStart: dto.display_meta?.article?.page_start ?? null,
+        pageEnd: dto.display_meta?.article?.page_end ?? null,
+        doi: dto.display_meta?.article?.doi ?? null,
+        articleUrl: dto.display_meta?.article?.article_url ?? null,
+      },
+      project: {
+        projectCode: dto.display_meta?.project?.project_code ?? null,
+        managementLevel: dto.display_meta?.project?.management_level ?? null,
+        startMonth: dto.display_meta?.project?.start_month ?? null,
+        endMonth: dto.display_meta?.project?.end_month ?? null,
+        decisionNo: dto.display_meta?.project?.decision_no ?? null,
+        decisionDate: dto.display_meta?.project?.decision_date ?? null,
+      },
+      book: {
+        publisher: dto.display_meta?.book?.publisher ?? null,
+        isbn: dto.display_meta?.book?.isbn ?? null,
+        year: dto.display_meta?.book?.year ?? null,
+        approvalDecisionNo: dto.display_meta?.book?.approval_decision_no ?? null,
+        approvalDecisionDate: dto.display_meta?.book?.approval_decision_date ?? null,
+      },
+      conference: {
+        conferenceName: dto.display_meta?.conference?.conference_name ?? null,
+        heldOn: dto.display_meta?.conference?.held_on ?? null,
+        location: dto.display_meta?.conference?.location ?? null,
+      },
+    },
   };
 }

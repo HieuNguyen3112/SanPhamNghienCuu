@@ -125,7 +125,7 @@
               @change="setPendingType(idx, $event)"
             >
               <option value="">— Chọn loại minh chứng —</option>
-              <option v-for="fileType in fileTypes" :key="fileType.id" :value="fileType.id">
+              <option v-for="fileType in fileTypeOptions" :key="fileType.id" :value="fileType.id">
                 {{ fileType.name }}
               </option>
             </select>
@@ -152,16 +152,23 @@
         <div
           v-for="link in existingLinks"
           :key="link.id"
-          class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3"
+          class="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 md:flex-row md:items-center md:justify-between"
         >
-          <a
-            class="truncate text-sm text-slate-700 hover:underline"
-            :href="link.url"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {{ link.url }}
-          </a>
+          <div class="min-w-0">
+            <div class="mb-1 flex flex-wrap gap-2 text-xs text-slate-500">
+              <span class="rounded-md bg-slate-100 px-2 py-1 text-slate-700">
+                {{ link.file_type_name ?? `file_type_id=${link.file_type_id}` }}
+              </span>
+            </div>
+            <a
+              class="truncate text-sm text-slate-700 hover:underline"
+              :href="link.url"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {{ link.url }}
+            </a>
+          </div>
           <button
             v-if="!readOnly"
             type="button"
@@ -181,24 +188,49 @@
         <div
           v-for="(pendingLink, idx) in pendingLinks"
           :key="idx"
-          class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3"
+          class="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 md:flex-row md:items-center md:justify-between"
         >
-          <a
-            class="truncate text-sm text-slate-700 hover:underline"
-            :href="pendingLink.url"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {{ pendingLink.url }}
-          </a>
-          <button
-            v-if="!readOnly"
-            type="button"
-            class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            @click="removeLink(idx)"
-          >
-            Xóa
-          </button>
+          <div class="min-w-0">
+            <div class="mb-1 flex flex-wrap gap-2 text-xs text-slate-500">
+              <span class="rounded-md bg-slate-100 px-2 py-1 text-slate-700">
+                {{ resolveTypeName(pendingLink.file_type_id) }}
+              </span>
+            </div>
+            <a
+              class="truncate text-sm text-slate-700 hover:underline"
+              :href="pendingLink.url"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {{ pendingLink.url }}
+            </a>
+          </div>
+          <div class="flex items-center gap-2">
+            <select
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+              :disabled="readOnly"
+              :value="pendingLink.file_type_id ?? ''"
+              @change="setPendingLinkType(idx, $event)"
+            >
+              <option value="">— Chọn loại link minh chứng —</option>
+              <option
+                v-for="fileType in linkTypeOptions"
+                :key="`pending-link-type-${fileType.id}`"
+                :value="fileType.id"
+              >
+                {{ fileType.name }}
+              </option>
+            </select>
+
+            <button
+              v-if="!readOnly"
+              type="button"
+              class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              @click="removeLink(idx)"
+            >
+              Xóa
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -252,6 +284,7 @@ export type PendingEvidenceFile = {
 
 export type PendingEvidenceLink = {
   url: string;
+  file_type_id: number | null;
 };
 
 const props = defineProps<{
@@ -292,6 +325,12 @@ const {
   prefetchPdfPreview,
 } = usePdfPreview();
 const activeDeletingFileId = computed(() => props.deletingFileId ?? null);
+const fileTypeOptions = computed(() =>
+  props.fileTypes.filter((type) => !type.code.includes("_link_")),
+);
+const linkTypeOptions = computed(() =>
+  props.fileTypes.filter((type) => type.code.includes("_link_")),
+);
 const deleteConfirmLoading = computed(() => {
   const targetId = targetDeletingFile.value?.id ?? null;
   return targetId !== null && targetId === activeDeletingFileId.value;
@@ -341,7 +380,7 @@ function removePending(idx: number) {
 function addLink() {
   const url = linkUrl.value.trim();
   if (!url) return;
-  const next = [...props.pendingLinks, { url }];
+  const next = [...props.pendingLinks, { url, file_type_id: null }];
   emit("update:pendingLinks", next);
   linkUrl.value = "";
 }
@@ -349,6 +388,26 @@ function addLink() {
 function removeLink(idx: number) {
   const next = props.pendingLinks.filter((_, index) => index !== idx);
   emit("update:pendingLinks", next);
+}
+
+function setPendingLinkType(idx: number, e: Event) {
+  const value = (e.target as HTMLSelectElement).value;
+  const typeId = value ? Number(value) : null;
+  const next = props.pendingLinks.map((pendingLink, index) =>
+    index === idx
+      ? {
+          ...pendingLink,
+          file_type_id: Number.isFinite(typeId as number) ? (typeId as number) : null,
+        }
+      : pendingLink,
+  );
+  emit("update:pendingLinks", next);
+}
+
+function resolveTypeName(fileTypeId: number | null | undefined): string {
+  if (!fileTypeId) return "Chưa chọn loại link";
+  const matched = props.fileTypes.find((type) => type.id === fileTypeId);
+  return matched?.name ?? `file_type_id=${fileTypeId}`;
 }
 
 function requestDeleteExistingFile(file: EvidenceFileDto) {

@@ -206,6 +206,8 @@ export function useUniversityResearchWorkApprovalProvider() {
     return {
       researchWorkIdentifier: item.activity_id,
       researchWorkTitle: item.title,
+      researchWorkKindDisplayName: item.kind_name ?? null,
+      researchWorkCategoryDisplayName: item.type_name ?? null,
       submittingLecturerDisplayName: `${item.lecturer.full_name} (${item.lecturer.code})`,
       facultyIdentifier,
       facultyDisplayName:
@@ -220,7 +222,7 @@ export function useUniversityResearchWorkApprovalProvider() {
       facultyRejectionReasonType: null,
       facultyRejectionReasonDetail: null,
 
-      universityReviewedAtDateTimeString: null,
+      universityReviewedAtDateTimeString: item.approved_at,
       universityRejectionReasonType: null,
       universityRejectionReasonDetail: null,
 
@@ -298,9 +300,22 @@ export function useUniversityResearchWorkApprovalProvider() {
         };
       });
 
+    const assistantReviewedAt =
+      detail.approvals.find(
+        (approval) =>
+          approval.stage_code === "assistant" && !!approval.decided_at,
+      )?.decided_at ?? null;
+    const managerReviewedAt =
+      detail.approvals.find(
+        (approval) =>
+          approval.stage_code === "manager" && !!approval.decided_at,
+      )?.decided_at ?? null;
+
     return {
       researchWorkIdentifier: item.activity_id,
       researchWorkTitle: item.title,
+      researchWorkKindDisplayName: item.kind_name ?? null,
+      researchWorkCategoryDisplayName: item.type_name ?? null,
       submittingLecturerDisplayName: `${item.lecturer.full_name} (${item.lecturer.code})`,
       facultyIdentifier,
       facultyDisplayName:
@@ -309,13 +324,14 @@ export function useUniversityResearchWorkApprovalProvider() {
       researchWorkType: mapKindCodeToResearchWorkType(item.kind_code),
       submittedAtDateTimeString: item.submitted_at ?? "",
 
-      facultyReviewedAtDateTimeString: null,
+      facultyReviewedAtDateTimeString: assistantReviewedAt,
       facultyApprovedAtDateTimeString: null,
       facultyApprovalNote: null,
       facultyRejectionReasonType: null,
       facultyRejectionReasonDetail: null,
 
-      universityReviewedAtDateTimeString: null,
+      universityReviewedAtDateTimeString:
+        managerReviewedAt ?? item.approved_at ?? null,
       universityRejectionReasonType: null,
       universityRejectionReasonDetail: null,
 
@@ -330,8 +346,7 @@ export function useUniversityResearchWorkApprovalProvider() {
         evidenceAttachmentDisplayName: file.original_name ?? "",
         evidenceAttachmentFileType: file.file_type_name ?? "",
         evidenceAttachmentPreviewUrl: file.preview_url ?? file.url ?? "#",
-        evidenceAttachmentDownloadUrl:
-          file.download_url ?? null,
+        evidenceAttachmentDownloadUrl: file.download_url ?? null,
       })),
       researchWorkAuthorList: authorList as any,
       coAuthorList: [],

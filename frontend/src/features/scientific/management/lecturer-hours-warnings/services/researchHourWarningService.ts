@@ -1,7 +1,5 @@
 import http from "@/lib/http";
 import type {
-  AcademicYearIdentifier,
-  FacultyIdentifier,
   LecturerResearchHourWarningOverviewDTO,
   ResearchHourWarningFilterDTO,
   RequestWarningNotificationDTO,

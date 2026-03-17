@@ -96,9 +96,7 @@
           <div class="flex-1 overflow-y-auto px-4 py-4 lg:px-5">
             <div v-if="selectedResearchWorkApprovalEntry" class="space-y-4">
               <!-- 1. Thông tin chung -->
-              <section
-                class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4"
-              >
+              <section class="rounded-2xl border border-slate-200 bg-white p-4">
                 <div class="text-xs font-semibold text-slate-700">
                   Thông tin chung
                 </div>
@@ -106,32 +104,93 @@
                   {{ selectedResearchWorkApprovalEntry.researchWorkTitle }}
                 </div>
 
-                <div class="mt-3 grid grid-cols-1 gap-2">
-                  <div
-                    class="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2"
-                  >
-                    <div class="text-xs font-medium text-slate-600">
-                      Người kê khai
+                <div class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Loại công trình
                     </div>
-                    <div class="text-sm font-semibold text-slate-900">
+                    <div class="mt-1 text-slate-900">
                       {{
-                        selectedResearchWorkApprovalEntry.submittingLecturerDisplayName
+                        selectedResearchWorkApprovalEntry.researchWorkKindDisplayName ||
+                        mapResearchWorkTypeToDisplayName(
+                          selectedResearchWorkApprovalEntry.researchWorkType,
+                        )
                       }}
                     </div>
                   </div>
 
-                  <div
-                    class="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2"
-                  >
-                    <div class="text-xs font-medium text-slate-600">
-                      Khoa / Đơn vị
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Phân loại
                     </div>
-                    <div class="text-sm font-semibold text-slate-900">
-                      {{ selectedResearchWorkApprovalEntry.facultyDisplayName }}
+                    <div class="mt-1 text-slate-900">
+                      {{
+                        selectedResearchWorkApprovalEntry.researchWorkCategoryDisplayName ||
+                        "—"
+                      }}
                     </div>
                   </div>
 
-                  <p class="mt-1 text-xs text-slate-500">
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Vai trò
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ submittingAuthorRoleDisplayName }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">Năm</div>
+                    <div class="mt-1 text-slate-900">
+                      {{ selectedResearchWorkApprovalEntry.academicYear }}
+                    </div>
+                  </div>
+
+                  <div class="md:col-span-2">
+                    <div class="text-xs font-semibold text-slate-500">
+                      Nơi công bố/đơn vị
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{
+                        selectedResearchWorkApprovalEntry.facultyDisplayName ||
+                        "—"
+                      }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Ngày gửi
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{
+                        formatDateTimeDisplayValue(
+                          selectedResearchWorkApprovalEntry.submittedAtDateTimeString,
+                        )
+                      }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Ngày duyệt
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ reviewedAtDisplayValue }}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-xs font-semibold text-slate-500">
+                      Giờ NCKH của bạn
+                    </div>
+                    <div class="mt-1 text-slate-900">
+                      {{ submittingLecturerHoursDisplayValue }}
+                    </div>
+                  </div>
+
+                  <p class="mt-1 text-xs text-slate-500 md:col-span-2">
                     Thành viên kê khai sẽ được tô nổi bật trong bảng “Thành viên
                     & số giờ”.
                   </p>
@@ -220,8 +279,9 @@
                       Thành viên & số giờ
                     </div>
                     <p class="mt-1 text-xs text-slate-500">
-                      Hiển thị giờ quy đổi dự kiến theo quy tắc tính giờ hiện tại của công trình.
-                      Giờ chính thức chỉ được ghi nhận sau bước duyệt giờ NCKH.
+                      Hiển thị giờ quy đổi dự kiến theo quy tắc tính giờ hiện
+                      tại của công trình. Giờ chính thức chỉ được ghi nhận sau
+                      bước duyệt giờ NCKH.
                     </p>
                   </div>
 
@@ -335,7 +395,12 @@
                           <td class="px-3 py-2">
                             <div class="font-semibold text-slate-900">
                               {{
-                                formatHourValue(a.computedMemberHours ?? a.declaredHours ?? a.recommendedHoursByPolicy ?? a.officialHours)
+                                formatHourValue(
+                                  a.computedMemberHours ??
+                                    a.declaredHours ??
+                                    a.recommendedHoursByPolicy ??
+                                    a.officialHours,
+                                )
                               }}
                             </div>
                           </td>
@@ -653,7 +718,8 @@ watch(
       selectedResearchWorkApprovalEntry.value?.evidenceAttachmentList?.[0] ??
       null;
     if (!firstAttachment) return;
-    const previewUrl = firstAttachment.evidenceAttachmentPreviewUrl?.trim() ?? "";
+    const previewUrl =
+      firstAttachment.evidenceAttachmentPreviewUrl?.trim() ?? "";
     if (!previewUrl || previewUrl === "#") return;
 
     void prefetchPdfPreview({
@@ -833,6 +899,57 @@ const approverConflictMessage = computed(() => {
     entry.approverConflictMessage?.trim() ||
     "Bạn không thể duyệt hoặc từ chối công trình mà mình tham gia. Vui lòng chuyển hồ sơ cho thành viên hội đồng khoa khác."
   );
+});
+
+const submittingAuthorRoleDisplayName = computed(() => {
+  const entry = selectedResearchWorkApprovalEntry.value;
+  if (!entry) return "—";
+  const submitting = entry.researchWorkAuthorList.find(
+    (author) => author.isSubmittingLecturer,
+  );
+  return submitting?.authorRoleDisplayName?.trim() || "—";
+});
+
+const reviewedAtDisplayValue = computed(() => {
+  const entry = selectedResearchWorkApprovalEntry.value;
+  if (!entry) return "—";
+
+  const latestHistoryReviewedAt =
+    [...entry.approvalHistoryList]
+      .reverse()
+      .find((history) => history.reviewedAtDateTimeString?.trim())
+      ?.reviewedAtDateTimeString ?? null;
+
+  const reviewedAt =
+    approvalScopeIdentifier.value === "UNIVERSITY_SCOPE"
+      ? (entry.universityReviewedAtDateTimeString ??
+        entry.facultyReviewedAtDateTimeString ??
+        latestHistoryReviewedAt)
+      : (entry.facultyReviewedAtDateTimeString ?? latestHistoryReviewedAt);
+  if (!reviewedAt) return "—";
+  return formatDateTimeDisplayValue(reviewedAt);
+});
+
+const submittingLecturerHoursDisplayValue = computed(() => {
+  const entry = selectedResearchWorkApprovalEntry.value;
+  if (!entry) return "—";
+
+  // Prefer the hours mapped for the submitting lecturer in member list.
+  const submittingRow = authorHourRows.value.find(
+    (row) => row.isSubmittingLecturer,
+  );
+  const valueFromRow =
+    submittingRow?.computedMemberHours ??
+    submittingRow?.officialHours ??
+    submittingRow?.recommendedHoursByPolicy ??
+    submittingRow?.declaredHours ??
+    null;
+
+  const official = entry.officialResearchHours;
+  const recommended = entry.recommendedResearchHoursByPolicy;
+  const declared = entry.lecturerDeclaredResearchHours;
+  const value = valueFromRow ?? official ?? recommended ?? declared;
+  return Number.isFinite(value) ? formatIntegerValue(value) : "—";
 });
 
 function approveSelectedResearchWork(): void {

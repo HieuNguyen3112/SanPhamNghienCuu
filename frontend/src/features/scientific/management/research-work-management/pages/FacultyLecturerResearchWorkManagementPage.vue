@@ -1,7 +1,9 @@
 <template>
   <div class="min-h-screen bg-slate-50">
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
-      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+      <div
+        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
+      >
         <PageHeader
           title="Quản lý công trình khoa học theo giảng viên"
           subtitle="Theo dõi công trình khoa học của giảng viên trong khoa"
@@ -33,6 +35,7 @@
 
       <LecturerApprovedResearchWorkDrawer
         :is-open="isLecturerDrawerOpen"
+        scope="faculty"
         :lecturer-overview="selectedLecturerOverview"
         :approved-items="approvedItems"
         :pagination="approvedPagination"
@@ -40,6 +43,7 @@
         :error-message="approvedError"
         @close="closeLecturerDrawer"
         @open-detail="openDetail"
+        @review-work="goToFacultyApproval"
         @update-page="updateApprovedPage"
         @update-page-size="updateApprovedPerPage"
       />
@@ -69,9 +73,11 @@ import {
   exportFacultySummaryPdf,
 } from "@/features/scientific/management/research-work-management/services/researchWorkExport.service";
 import { useExportActionFeedback } from "@/shared/composables/useExportActionFeedback";
+import { useRouter } from "vue-router";
 
 const client = createLecturerResearchWorkHttpClient({ scope: "faculty" });
 const { runExport } = useExportActionFeedback();
+const router = useRouter();
 
 const {
   filter,
@@ -111,10 +117,19 @@ function buildExportParams() {
 }
 
 async function handleExportExcel() {
-  await runExport("excel", () => exportFacultySummaryExcel(buildExportParams()));
+  await runExport("excel", () =>
+    exportFacultySummaryExcel(buildExportParams()),
+  );
 }
 
 async function handleExportPdf() {
   await runExport("pdf", () => exportFacultySummaryPdf(buildExportParams()));
+}
+
+function goToFacultyApproval(activityId: number) {
+  void router.push({
+    name: "works.facapprovals",
+    query: { activity_id: String(activityId) },
+  });
 }
 </script>

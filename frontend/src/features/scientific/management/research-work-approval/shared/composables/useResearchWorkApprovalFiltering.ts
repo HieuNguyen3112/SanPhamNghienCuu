@@ -6,6 +6,7 @@ import type {
   ResearchWorkType,
 } from "../models/researchWorkApprovalModels";
 import { useResearchWorkApprovalDisplayMapping } from "./useResearchWorkApprovalDisplayMapping";
+import { toBackendDateTimeTimestamp } from "../../../shared/utils/backendDateTime";
 
 export function useResearchWorkApprovalFiltering(parameters: {
   approvalScopeIdentifier: ResearchWorkApprovalScopeIdentifier;
@@ -119,8 +120,8 @@ export function useResearchWorkApprovalFiltering(parameters: {
           return firstPriority - secondPriority;
 
         return (
-          new Date(secondEntry.submittedAtDateTimeString).getTime() -
-          new Date(firstEntry.submittedAtDateTimeString).getTime()
+          toBackendDateTimeTimestamp(secondEntry.submittedAtDateTimeString) -
+          toBackendDateTimeTimestamp(firstEntry.submittedAtDateTimeString)
         );
       },
     );

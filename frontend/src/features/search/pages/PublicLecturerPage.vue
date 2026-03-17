@@ -77,7 +77,7 @@
                 class="inline-flex items-center gap-2 rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 active:scale-[0.99]"
                 @click="onSearch"
               >
-              <Search class="h-4 w-4" />
+                <Search class="h-4 w-4" />
                 Tìm kiếm
               </button>
 
@@ -86,7 +86,7 @@
                 class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 active:scale-[0.99]"
                 @click="onReset"
               >
-              <RotateCcw class="h-4 w-4" />
+                <RotateCcw class="h-4 w-4" />
                 Đặt lại
               </button>
             </div>
@@ -110,43 +110,16 @@
 
         <!-- List -->
         <div v-else class="space-y-3">
-          <div class="text-sm text-slate-600">
-            Hiển thị <b>{{ items.length }}</b> /
-            <b>{{ pagination.total }}</b> giảng viên
-          </div>
 
           <PublicLecturerGrid
             :lecturers="lecturerCards"
+            :total-item-count="pagination.total"
+            :current-page-number="pagination.page"
+            :page-size="pagination.per_page"
             @jump-work="jumpToWorkType"
-            @open-detail="openDetail"
+            @update:currentPageNumber="goPage"
+            @update:pageSize="handlePageSizeChange"
           />
-
-          <!-- Pagination -->
-          <div
-            v-if="pagination.last_page > 1"
-            class="flex items-center justify-center gap-2 pt-2"
-          >
-            <button
-              class="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-              :disabled="state.page <= 1"
-              @click="goPage(state.page - 1)"
-            >
-              Trước
-            </button>
-
-            <div class="text-sm text-slate-600">
-              Trang <b>{{ pagination.page }}</b> /
-              <b>{{ pagination.last_page }}</b>
-            </div>
-
-            <button
-              class="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-              :disabled="state.page >= pagination.last_page"
-              @click="goPage(state.page + 1)"
-            >
-              Sau
-            </button>
-          </div>
         </div>
       </div>
     </main>
@@ -156,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref  } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
 import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
@@ -223,7 +196,7 @@ async function fetchPublicLecturers(params: {
   if (params.academic_year_id != null)
     sp.set("academic_year_id", String(params.academic_year_id));
   sp.set("page", String(params.page ?? 1));
-  sp.set("per_page", String(params.per_page ?? 12));
+  sp.set("per_page", String(params.per_page ?? 6));
 
   const res = await fetch(`/api/public/lecturers?${sp.toString()}`, {
     method: "GET",
@@ -293,7 +266,7 @@ const state = reactive({
   departmentId: null as number | null,
   academicYearId: null as number | null,
   page: 1,
-  perPage: 12,
+  perPage: 6,
 });
 
 const selectedDepartmentValue = computed(() =>
@@ -305,7 +278,7 @@ const selectedAcademicYearValue = computed(() =>
 );
 
 const items = ref<PublicLecturerItem[]>([]);
-const pagination = ref({ page: 1, per_page: 12, total: 0, last_page: 1 });
+const pagination = ref({ page: 1, per_page: 6, total: 0, last_page: 1 });
 const loading = ref(false);
 const error = ref<string | null>(null);
 
@@ -318,6 +291,13 @@ function parseNumberQuery(v: unknown): number | null {
   if (typeof v !== "string") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+async function handlePageSizeChange(nextPageSize: number) {
+  state.perPage = nextPageSize;
+  state.page = 1;
+  syncQuery();
+  await load();
 }
 
 /** init from query */
@@ -451,15 +431,15 @@ const lecturerCards = computed<LecturerCard[]>(() => {
 function jumpToWorkType(payload: { type: any; lecturerQuery: string }) {
   // Nếu bạn đã chuẩn hoá type: ARTICLE/PROJECT/BOOK/CONFERENCE thì map như sau:
   const routeMap: Record<string, string> = {
-    ARTICLE: "/bai-bao-khoa-hoc",
-    PROJECT: "/de-tai-nghien-cuu",
-    BOOK: "/sach-giao-trinh",
-    CONFERENCE: "/hoi-thao-bao-cao-khoa-hoc",
-    TEXTBOOK: "/sach-giao-trinh",
-    OTHER: "/sach-giao-trinh",
+    ARTICLE: "/research-articles",
+    PROJECT: "/research-projects",
+    BOOK: "/textbooks",
+    CONFERENCE: "/research-conferences",
+    TEXTBOOK: "/textbooks",
+    OTHER: "/textbooks",
   };
 
-  const path = routeMap[payload.type] ?? "/bai-bao-khoa-hoc";
+  const path = routeMap[payload.type] ?? "/research-articles";
 
   router.push({
     path,
@@ -467,7 +447,4 @@ function jumpToWorkType(payload: { type: any; lecturerQuery: string }) {
   });
 }
 
-function openDetail(lecturerCode: string) {
-  router.push({ path: `/giang-vien/${encodeURIComponent(lecturerCode)}` });
-}
 </script>

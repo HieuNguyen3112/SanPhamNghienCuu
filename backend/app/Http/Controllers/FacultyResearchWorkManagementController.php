@@ -19,8 +19,7 @@ class FacultyResearchWorkManagementController extends Controller
 {
     public function __construct(
         private ResearchEvidenceStorageService $evidenceStorageService
-    ) {
-    }
+    ) {}
 
     public function lookups(Request $request)
     {
@@ -34,7 +33,7 @@ class FacultyResearchWorkManagementController extends Controller
             ->orderByDesc('is_active')
             ->orderByDesc('id')
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->id,
                 'code' => $row->code,
                 'is_active' => (bool) $row->is_active,
@@ -128,8 +127,15 @@ class FacultyResearchWorkManagementController extends Controller
                 $q->where('ra.academic_year_id', $yearId);
             })
             ->when($filters['status'], function ($q, $status) {
-                $code = $status === 'pending' ? 'submitted' : $status;
-                $q->where('ast.code', $code);
+                if ($status === 'pending' || $status === 'submitted') {
+                    $q->whereIn('ast.code', ['pending_faculty_review']);
+                    return;
+                }
+                if ($status === 'rejected') {
+                    $q->whereIn('ast.code', ['rejected', 'member_rejected']);
+                    return;
+                }
+                $q->where('ast.code', $status);
             })
             ->when($filters['q'], function ($q, $keyword) {
                 $q->where(function ($sub) use ($keyword) {
@@ -144,12 +150,15 @@ class FacultyResearchWorkManagementController extends Controller
                 'ra.id as activity_id',
                 'ra.activity_code',
                 'ra.title',
+                'ast.code as status_code',
+                'ast.name as status_name',
                 'ra.kind_id',
                 'ak.name as kind_name',
                 'ra.type_id',
                 'at.name as type_name',
                 'ra.academic_year_id',
                 'ay.code as academic_year_code',
+                'ra.submitted_at',
                 'ra.approved_at',
             ]);
 
@@ -178,11 +187,24 @@ class FacultyResearchWorkManagementController extends Controller
             return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
         }
 
+        $validated = $request->validate([
+            'lecturer_id' => ['nullable', 'integer', 'exists:lecturers,id'],
+        ]);
+
+        $lecturerId = isset($validated['lecturer_id']) ? (int) $validated['lecturer_id'] : null;
+        if ($lecturerId !== null && ! $this->lecturerInFaculty($lecturerId, $scope['faculty_id'])) {
+            return response()->json(['message' => 'forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
         $activityQuery = DB::table('research_activities as ra')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
             ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
-            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id');
+            ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
+            ->leftJoin('paper_details as pd', 'pd.activity_id', '=', 'ra.id')
+            ->leftJoin('book_details as bd', 'bd.activity_id', '=', 'ra.id')
+            ->leftJoin('conference_details as cd', 'cd.activity_id', '=', 'ra.id')
+            ->leftJoin('project_details as prd', 'prd.activity_id', '=', 'ra.id');
 
         $this->applyActivityFacultyScope($activityQuery, $scope['faculty_id']);
 
@@ -192,6 +214,7 @@ class FacultyResearchWorkManagementController extends Controller
             ->select([
                 'ra.id as activity_id',
                 'ra.activity_code',
+                'ra.owner_lecturer_id',
                 'ra.title',
                 'ra.abstract',
                 'ra.kind_id',
@@ -200,6 +223,9 @@ class FacultyResearchWorkManagementController extends Controller
                 'at.name as type_name',
                 'ra.academic_year_id',
                 'ay.code as academic_year_code',
+                DB::raw('COALESCE(pd.year, bd.year, YEAR(cd.held_on), YEAR(prd.start_month), YEAR(ra.approved_at), YEAR(ra.submitted_at)) as work_year'),
+                DB::raw('COALESCE(pd.journal_name, bd.publisher, cd.conference_name, prd.project_code) as venue_name'),
+                'ra.submitted_at',
                 'ra.approved_at',
             ])
             ->first();
@@ -272,6 +298,26 @@ class FacultyResearchWorkManagementController extends Controller
             ])
             ->first();
 
+        $memberSnapshot = null;
+        if ($lecturerId !== null) {
+            $memberSnapshot = DB::table('research_activity_members as ram')
+                ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+                ->where('ram.activity_id', $activity)
+                ->where('ram.lecturer_id', $lecturerId)
+                ->select([
+                    'mr.name as member_role_name',
+                    'ram.hours_assigned as lecturer_hours',
+                ])
+                ->first();
+
+            if (! $memberSnapshot && (int) ($activityRow->owner_lecturer_id ?? 0) === $lecturerId) {
+                $memberSnapshot = (object) [
+                    'member_role_name' => 'Tác giả chính',
+                    'lecturer_hours' => null,
+                ];
+            }
+        }
+
         return response()->json([
             'data' => [
                 'activity_id' => $activityRow->activity_id,
@@ -284,6 +330,13 @@ class FacultyResearchWorkManagementController extends Controller
                 'type_name' => $activityRow->type_name,
                 'academic_year_id' => $activityRow->academic_year_id,
                 'academic_year_code' => $activityRow->academic_year_code,
+                'work_year' => $activityRow->work_year !== null ? (int) $activityRow->work_year : null,
+                'venue_name' => $activityRow->venue_name,
+                'submitted_at' => $activityRow->submitted_at,
+                'member_role_name' => $memberSnapshot?->member_role_name,
+                'lecturer_hours' => $memberSnapshot?->lecturer_hours !== null
+                    ? number_format((float) $memberSnapshot->lecturer_hours, 2, '.', '')
+                    : null,
                 'approved_at' => $activityRow->approved_at,
                 'authors' => $authors,
                 'evidence_items' => $evidenceItems,
@@ -511,8 +564,8 @@ class FacultyResearchWorkManagementController extends Controller
                 'al.lecturer_id',
                 DB::raw('COUNT(*) as total_declared_research_work_count'),
                 DB::raw("SUM(CASE WHEN ast.code = 'approved' THEN 1 ELSE 0 END) as approved_research_work_count"),
-                DB::raw("SUM(CASE WHEN ast.code = 'submitted' THEN 1 ELSE 0 END) as pending_research_work_count"),
-                DB::raw("SUM(CASE WHEN ast.code = 'rejected' THEN 1 ELSE 0 END) as rejected_research_work_count"),
+                DB::raw("SUM(CASE WHEN ast.code IN ('pending_faculty_review') THEN 1 ELSE 0 END) as pending_research_work_count"),
+                DB::raw("SUM(CASE WHEN ast.code IN ('rejected','member_rejected') THEN 1 ELSE 0 END) as rejected_research_work_count"),
             ]);
 
         $query = DB::table('lecturers as l')
@@ -685,5 +738,4 @@ class FacultyResearchWorkManagementController extends Controller
             'keyword' => $filters['q'] ?: 'Tất cả',
         ];
     }
-
 }

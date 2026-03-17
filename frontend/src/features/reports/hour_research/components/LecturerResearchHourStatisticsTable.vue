@@ -121,7 +121,7 @@ import type {
   HourResearchReportRow,
 } from "../hourResearchReportTypes";
 
-const componentProperties = defineProps<{
+defineProps<{
   rows: HourResearchReportRow[];
   pagination: HourResearchReportPagination;
   loading: boolean;

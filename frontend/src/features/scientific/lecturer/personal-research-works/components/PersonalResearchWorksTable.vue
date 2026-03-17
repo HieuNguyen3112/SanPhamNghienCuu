@@ -58,23 +58,28 @@
 
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">Giờ quy đổi</th>
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">Trạng thái</th>
-            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">Hành động</th>
           </tr>
         </thead>
 
         <tbody class="divide-y divide-slate-100">
-          <tr v-for="row in rows" :key="row.activityId" class="hover:bg-slate-50">
+          <tr
+            v-for="row in rows"
+            :key="row.activityId"
+            class="cursor-pointer hover:bg-slate-50 focus-within:bg-slate-50"
+            tabindex="0"
+            @click="emit('open-detail', row.activityId)"
+            @keydown.enter.prevent="emit('open-detail', row.activityId)"
+            @keydown.space.prevent="emit('open-detail', row.activityId)"
+          >
             <td class="px-4 py-3">
-              <button type="button" class="text-left" @click="emit('open-detail', row.activityId)">
-                <div class="max-w-[420px] truncate font-semibold text-slate-900 hover:underline">
-                  {{ row.title }}
-                </div>
-                <div class="mt-1 text-xs text-slate-500">
-                  {{ row.activityCode }}
-                  <span class="px-1 text-slate-300">•</span>
-                  {{ row.academicYearCode }}
-                </div>
-              </button>
+              <div class="max-w-[420px] truncate font-semibold text-slate-900 hover:underline">
+                {{ row.title }}
+              </div>
+              <div class="mt-1 text-xs text-slate-500">
+                {{ row.activityCode }}
+                <span class="px-1 text-slate-300">•</span>
+                {{ row.academicYearCode }}
+              </div>
             </td>
 
             <td class="px-4 py-3 text-slate-700">
@@ -98,23 +103,6 @@
                 {{ row.statusName }}
               </span>
             </td>
-
-            <td class="px-4 py-3">
-              <div class="flex justify-end">
-                <WorkRowActionsMenu
-                  :open="openMenuWorkId === row.activityId"
-                  :activity-id="row.activityId"
-                  :status-code="row.statusCode"
-                  :actions="row.actions"
-                  @toggle="(nextOpen) => setMenuOpen(row.activityId, nextOpen)"
-                  @close="closeMenu"
-                  @view="(id) => emit('open-detail', id)"
-                  @edit-draft="(id) => emit('edit-draft', id)"
-                  @copy-rejected="(id) => emit('copy-rejected', id)"
-                  @reinvite="(id) => emit('reinvite', id)"
-                />
-              </div>
-            </td>
           </tr>
         </tbody>
       </table>
@@ -134,14 +122,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
 import type {
   PersonalWorkRow,
   PersonalWorkStatusCode,
 } from "../contracts/personalResearchWorksContracts";
 
 import PaginationControl from "@/shared/components/layout/SharedPaginationControls.vue";
-import WorkRowActionsMenu from "./WorkRowActionsMenu.vue";
 
 type SortKey = "updatedAt" | "title" | "workYear" | "roleName";
 type SortOrder = "asc" | "desc";
@@ -161,37 +147,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "open-detail", workId: number): void;
-  (e: "edit-draft", workId: number): void;
-  (e: "copy-rejected", workId: number): void;
-  (e: "reinvite", workId: number): void;
   (e: "update:currentPageNumber", value: number): void;
   (e: "update:pageSize", value: number): void;
   (e: "sort-change", sortKey: SortKey, sortOrder: SortOrder): void;
 }>();
-
-const openMenuWorkId = ref<number | null>(null);
-
-function setMenuOpen(workId: number, nextOpen: boolean) {
-  openMenuWorkId.value = nextOpen ? workId : null;
-}
-
-function closeMenu() {
-  openMenuWorkId.value = null;
-}
-
-watch(
-  () => [
-    props.activeTab,
-    props.currentPageNumber,
-    props.pageSize,
-    props.rows.length,
-    props.sortKey,
-    props.sortOrder,
-  ],
-  () => {
-    openMenuWorkId.value = null;
-  }
-);
 
 function requestSort(key: SortKey) {
   const currentKey: SortKey = props.sortKey ?? "updatedAt";

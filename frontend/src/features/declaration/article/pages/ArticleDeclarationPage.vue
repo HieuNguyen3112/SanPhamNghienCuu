@@ -631,10 +631,12 @@ const canSubmit = computed(() => {
   if (!form.typeId) return false;
   if (!form.title.trim()) return false;
 
-  const validMembers = form.members.filter(
-    (m) =>
-      typeof m.lecturer_id === "number" && typeof m.member_role_id === "number",
-  );
+  const validMembers = form.members.filter((m) => {
+    const hasRole = typeof m.member_role_id === "number";
+    if (!hasRole) return false;
+    if (m.is_external) return Boolean(m.external_full_name?.trim());
+    return typeof m.lecturer_id === "number";
+  });
   if (validMembers.length === 0) return false;
 
   const invalidPending = pendingEvidenceFiles.value.some(
@@ -643,7 +645,7 @@ const canSubmit = computed(() => {
   if (invalidPending) return false;
 
   const invalidPendingLinks = pendingEvidenceLinks.value.some(
-    (l: any) => !String(l?.url ?? "").trim(),
+    (l: any) => !String(l?.url ?? "").trim() || !l?.file_type_id,
   );
   if (invalidPendingLinks) return false;
 
@@ -713,7 +715,7 @@ async function loadCatalogs() {
       fetch_academic_years(),
       fetch_activity_kinds(),
       fetch_member_roles(),
-      fetch_evidence_file_types(),
+      fetch_evidence_file_types("paper"),
     ]);
 
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
@@ -782,12 +784,12 @@ async function loadDraftFromQuery() {
     }
 
     form.members = (data.members ?? []).map((m) => ({
-      lecturer_id: m.lecturer_id,
+      lecturer_id: m.lecturer_id ?? null,
       member_role_id: m.member_role_id,
       member_role_code: m.member_role_code ?? null,
-      // is_external: m.is_external ?? false,
-      // external_full_name: m.external_full_name ?? null,
-      // external_department_name: m.external_department_name ?? null,
+      is_external: !!m.is_external,
+      external_full_name: m.external_full_name ?? null,
+      external_department_name: m.external_department_name ?? null,
     }));
     lecturers.value = mergeLecturerOptionsFromMembers(
       lecturers.value,
@@ -857,26 +859,29 @@ async function onRemoveExistingEvidence(_id: number) {
   deletingEvidenceFileId.value = _id;
 
   try {
-    await runWithFeedback(() => delete_evidence_file(form.activityId as number, _id), {
-      loading: {
-        enabled: true,
-        title: "Đang xoá minh chứng",
-        message: "Vui lòng đợi trong giây lát...",
-        delayMs: 450,
-        minShowMs: 250,
+    await runWithFeedback(
+      () => delete_evidence_file(form.activityId as number, _id),
+      {
+        loading: {
+          enabled: true,
+          title: "Đang xoá minh chứng",
+          message: "Vui lòng đợi trong giây lát...",
+          delayMs: 450,
+          minShowMs: 250,
+        },
+        success: {
+          enabled: true,
+          title: "Thành công",
+          message: "Đã xoá file minh chứng.",
+        },
+        error: {
+          enabled: true,
+          title: "Không thể xoá",
+          message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
+        },
+        rethrow: true,
       },
-      success: {
-        enabled: true,
-        title: "Thành công",
-        message: "Đã xoá file minh chứng.",
-      },
-      error: {
-        enabled: true,
-        title: "Không thể xoá",
-        message: "Không thể xoá file minh chứng. Vui lòng thử lại.",
-      },
-      rethrow: true,
-    });
+    );
     existingEvidence.value = existingEvidence.value.filter((x) => x.id !== _id);
   } catch (err) {
     shell.error_message.value = normalizeErrorMessage(
@@ -943,11 +948,16 @@ async function persistEvidenceDraft(activityId: number) {
   });
 
   const validLinkPendings = pendingEvidenceLinks.value.filter(
-    (pendingLink) => String(pendingLink?.url ?? "").trim() !== "",
+    (pendingLink) =>
+      String(pendingLink?.url ?? "").trim() !== "" &&
+      Number(pendingLink?.file_type_id) > 0,
   );
   const linkResults = await Promise.allSettled(
     validLinkPendings.map((pendingLink) =>
-      add_evidence_link(activityId, { url: String(pendingLink.url).trim() }),
+      add_evidence_link(activityId, {
+        url: String(pendingLink.url).trim(),
+        file_type_id: Number(pendingLink.file_type_id),
+      }),
     ),
   );
 
@@ -1087,13 +1097,13 @@ const shell = useDeclarationFormShell({
       } as any);
 
       const upsertList = form.members
-        .filter(
-          (m) =>
-            typeof m.lecturer_id === "number" &&
-            typeof m.member_role_id === "number",
-        )
+        .filter((m) => {
+          if (typeof m.member_role_id !== "number") return false;
+          if (m.is_external) return Boolean(m.external_full_name?.trim());
+          return typeof m.lecturer_id === "number";
+        })
         .map((m) => ({
-          lecturer_id: m.lecturer_id as number,
+          lecturer_id: m.is_external ? null : (m.lecturer_id as number),
           member_role_id: m.member_role_id as number,
           contribution_share: null,
           is_external: m.is_external ?? false,
@@ -1216,15 +1226,18 @@ watch(
 );
 
 onMounted(async () => {
-  await runPageLoad(async () => {
-    await loadCatalogs();
-    await loadDraftFromQuery();
-  }, {
-    onError: (message) => {
-      shell.error_message.value = message;
+  await runPageLoad(
+    async () => {
+      await loadCatalogs();
+      await loadDraftFromQuery();
     },
-    fallbackMessage: "Không thể khởi tạo trang kê khai.",
-  });
+    {
+      onError: (message) => {
+        shell.error_message.value = message;
+      },
+      fallbackMessage: "Không thể khởi tạo trang kê khai.",
+    },
+  );
 });
 
 // Fix TS2322: normalize address null -> ""

@@ -210,13 +210,6 @@ function onFacultyChange(event: Event) {
     page: 1,
   });
 }
-function onWorkTypeChange(event: Event) {
-  const raw = (event.target as HTMLSelectElement).value;
-  emit("update-filter", {
-    workType: raw === "" ? null : (raw as any),
-    page: 1,
-  });
-}
 function onAcademicYearChange(event: Event) {
   const raw = (event.target as HTMLSelectElement).value;
   emit("update-filter", {

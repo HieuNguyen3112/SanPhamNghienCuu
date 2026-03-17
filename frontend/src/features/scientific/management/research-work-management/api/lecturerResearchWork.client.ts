@@ -47,17 +47,23 @@ export interface LecturerResearchWorkClient {
 
   loadOverview(
     filter: FilterState,
-    pagination: PaginationRequest
+    pagination: PaginationRequest,
   ): Promise<PaginatedResult<OverviewItem>>;
   loadApprovedWorks(
     lecturerId: number,
     filter: FilterState,
-    pagination: PaginationRequest
+    pagination: PaginationRequest,
   ): Promise<PaginatedResult<ApprovedSummary>>;
-  loadApprovedDetail(activityId: number): Promise<ApprovedDetail>;
+  loadApprovedDetail(
+    activityId: number,
+    lecturerId?: number | null,
+  ): Promise<ApprovedDetail>;
 }
 
-function buildPagination(total: number, pagination: PaginationRequest): Pagination {
+function buildPagination(
+  total: number,
+  pagination: PaginationRequest,
+): Pagination {
   const perPage = Math.max(1, pagination.perPage || total || 1);
   const lastPage = Math.max(1, Math.ceil(total / perPage));
   const page = Math.min(Math.max(1, pagination.page || 1), lastPage);
@@ -69,21 +75,24 @@ function sliceByPagination<T>(items: T[], pagination: Pagination): T[] {
   return items.slice(startIndex, startIndex + pagination.perPage);
 }
 
-function mapPagination(dto?: PaginationDTO | null, fallback?: Pagination): Pagination {
+function mapPagination(
+  dto?: PaginationDTO | null,
+  fallback?: Pagination,
+): Pagination {
   if (dto) return mapper.paginationFromDto(dto);
   if (fallback) return fallback;
   return { page: 1, perPage: 1, total: 0, lastPage: 1 };
 }
 
 export function createLecturerResearchWorkClient(
-  config: ClientConfig
+  config: ClientConfig,
 ): LecturerResearchWorkClient {
   const apiClient = createMockApiClient({ minDelayMs: 200, maxDelayMs: 400 });
   const fixedFacultyId = config.fixedFacultyId ?? 1;
 
   function applyScopeToOverview(
     overviewDtos: ReturnType<typeof buildOverviewDtos>,
-    filterDto: FilterDTO
+    filterDto: FilterDTO,
   ) {
     const scopeFacultyId = config.scope === "faculty" ? fixedFacultyId : null;
 
@@ -104,7 +113,10 @@ export function createLecturerResearchWorkClient(
     });
   }
 
-  function applyStatusMode(items: OverviewItem[], mode: FilterState["statusMode"]) {
+  function applyStatusMode(
+    items: OverviewItem[],
+    mode: FilterState["statusMode"],
+  ) {
     if (mode === "all") return items;
 
     return items.map((item) => {
@@ -137,7 +149,7 @@ export function createLecturerResearchWorkClient(
 
   function canAccessLecturer(lecturerId: number, filterDto: FilterDTO) {
     const lecturer = mockLecturerDirectory.find(
-      (l) => l.lecturer_id === lecturerId
+      (l) => l.lecturer_id === lecturerId,
     );
     if (!lecturer) return false;
 
@@ -167,7 +179,7 @@ export function createLecturerResearchWorkClient(
     async loadAcademicYearOptions() {
       const dtos = await apiClient.request(
         "loadAcademicYearOptions",
-        () => mockAcademicYearOptions
+        () => mockAcademicYearOptions,
       );
       return dtos.map(mapper.academicYearOptionFromDto);
     },
@@ -182,7 +194,7 @@ export function createLecturerResearchWorkClient(
 
       const mapped = applyStatusMode(
         dtos.map(mapper.overviewFromDto),
-        filter.statusMode
+        filter.statusMode,
       );
 
       const paginationState = buildPagination(mapped.length, pagination);
@@ -195,7 +207,7 @@ export function createLecturerResearchWorkClient(
     async loadApprovedWorks(
       lecturerId: number,
       filter: FilterState,
-      pagination: PaginationRequest
+      pagination: PaginationRequest,
     ) {
       const filterDto = mapper.filter.toDto(filter);
 
@@ -215,7 +227,7 @@ export function createLecturerResearchWorkClient(
 
     async loadApprovedDetail(activityId: number) {
       const dto = await apiClient.request("loadApprovedDetail", () =>
-        buildApprovedDetail(activityId)
+        buildApprovedDetail(activityId),
       );
       return mapper.approvedDetailFromDto(dto);
     },
@@ -230,11 +242,12 @@ type FacultyLookupsResponse = {
 };
 
 export function createLecturerResearchWorkHttpClient(
-  config: ClientConfig
+  config: ClientConfig,
 ): LecturerResearchWorkClient {
   const fixedFacultyId = config.fixedFacultyId ?? null;
   let facultyLookupsCache: FacultyLookupsResponse["data"] | null = null;
-  let facultyLookupsPromise: Promise<FacultyLookupsResponse["data"]> | null = null;
+  let facultyLookupsPromise: Promise<FacultyLookupsResponse["data"]> | null =
+    null;
 
   function buildScopedFacultyId(filterDto: FilterDTO) {
     if (config.scope === "faculty" && fixedFacultyId) {
@@ -267,7 +280,7 @@ export function createLecturerResearchWorkHttpClient(
       }
 
       const { data } = await http.get<{ data: FacultyOptionDTO[] }>(
-        "/api/lookups/faculties"
+        "/api/lookups/faculties",
       );
       return data.data.map((dto) => mapper.facultyOptionFromDto(dto));
     },
@@ -276,12 +289,12 @@ export function createLecturerResearchWorkHttpClient(
       if (config.scope === "faculty") {
         const lookups = await loadFacultyLookups();
         return lookups.academic_years.map((dto) =>
-          mapper.academicYearOptionFromDto(dto)
+          mapper.academicYearOptionFromDto(dto),
         );
       }
 
       const { data } = await http.get<{ data: AcademicYearOptionDTO[] }>(
-        "/api/lookups/academic-years"
+        "/api/lookups/academic-years",
       );
       return data.data.map((dto) => mapper.academicYearOptionFromDto(dto));
     },
@@ -325,7 +338,7 @@ export function createLecturerResearchWorkHttpClient(
 
       const { data } = await http.get<{ data: OverviewDTO[] }>(
         "/api/admin/works/lecturers/summary",
-        { params }
+        { params },
       );
 
       const items = data.data.map((dto) => mapper.overviewFromDto(dto));
@@ -340,14 +353,15 @@ export function createLecturerResearchWorkHttpClient(
     async loadApprovedWorks(
       lecturerId: number,
       filter: FilterState,
-      pagination: PaginationRequest
+      pagination: PaginationRequest,
     ) {
       const filterDto = mapper.filter.toDto(filter);
 
       if (config.scope === "faculty") {
+        const status = filter.statusMode === "all" ? null : filter.statusMode;
         const params = {
           academic_year_id: filterDto.academic_year_id,
-          status: "approved",
+          status,
           page: pagination.page,
           per_page: pagination.perPage,
         };
@@ -370,11 +384,12 @@ export function createLecturerResearchWorkHttpClient(
 
       const params = {
         academic_year_id: filterDto.academic_year_id,
+        status: filter.statusMode === "all" ? "all" : filter.statusMode,
       };
 
       const { data } = await http.get<{ data: ApprovedSummaryDTO[] }>(
         `/api/admin/works/lecturers/${lecturerId}/approved`,
-        { params }
+        { params },
       );
 
       const items = data.data.map((dto) => mapper.approvedSummaryFromDto(dto));
@@ -386,13 +401,16 @@ export function createLecturerResearchWorkHttpClient(
       };
     },
 
-    async loadApprovedDetail(activityId: number) {
+    async loadApprovedDetail(activityId: number, lecturerId?: number | null) {
       const url =
         config.scope === "faculty"
           ? `/api/faculty/works/activities/${activityId}/approved`
           : `/api/admin/works/activities/${activityId}/approved`;
 
-      const { data } = await http.get<{ data: ApprovedDetailDTO }>(url);
+      const params = lecturerId ? { lecturer_id: lecturerId } : undefined;
+      const { data } = await http.get<{ data: ApprovedDetailDTO }>(url, {
+        params,
+      });
       return mapper.approvedDetailFromDto(data.data);
     },
   };

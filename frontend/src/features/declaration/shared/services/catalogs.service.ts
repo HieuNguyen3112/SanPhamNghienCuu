@@ -6,6 +6,7 @@ import type {
   EvidenceFileTypeDto,
   LecturerOptionDto,
   MemberRoleDto,
+  PublisherOptionDto,
 } from "../contracts/declarationSharedContract";
 import http from "@/lib/http";
 
@@ -51,18 +52,25 @@ const memberRolesCache: CacheState<MemberRoleDto> = {
   value: null,
   promise: null,
 };
-const evidenceFileTypesCache: CacheState<EvidenceFileTypeDto> = {
-  value: null,
-  promise: null,
-};
+const evidenceFileTypesByKindCache = new Map<string, EvidenceFileTypeDto[]>();
+const evidenceFileTypesByKindPromise = new Map<
+  string,
+  Promise<EvidenceFileTypeDto[]>
+>();
 const activityStatusesCache: CacheState<ActivityStatusDto> = {
   value: null,
   promise: null,
 };
 const activityTypesByKindCache = new Map<number, ActivityTypeDto[]>();
-const activityTypesByKindPromise = new Map<number, Promise<ActivityTypeDto[]>>();
+const activityTypesByKindPromise = new Map<
+  number,
+  Promise<ActivityTypeDto[]>
+>();
 const lecturersBySearchCache = new Map<string, LecturerOptionDto[]>();
-const lecturersBySearchPromise = new Map<string, Promise<LecturerOptionDto[]>>();
+const lecturersBySearchPromise = new Map<
+  string,
+  Promise<LecturerOptionDto[]>
+>();
 
 export type JournalOptionDto = {
   id: number;
@@ -195,15 +203,37 @@ export async function fetch_member_roles(): Promise<MemberRoleDto[]> {
   });
 }
 
-export async function fetch_evidence_file_types(): Promise<
+export async function fetch_evidence_file_types(kindCode?: string): Promise<
   EvidenceFileTypeDto[]
 > {
-  return readCachedList(evidenceFileTypesCache, async () => {
-    const { data } = await http.get<{ data: EvidenceFileTypeDto[] }>(
-      "/api/lookups/evidence-file-types",
-    );
-    return data.data;
-  });
+  const normalizedKind = normalizeSearch(kindCode ?? "");
+
+  if (evidenceFileTypesByKindCache.has(normalizedKind)) {
+    return cloneRows(evidenceFileTypesByKindCache.get(normalizedKind) ?? []);
+  }
+
+  if (evidenceFileTypesByKindPromise.has(normalizedKind)) {
+    const pending = evidenceFileTypesByKindPromise.get(normalizedKind);
+    const rows = pending ? await pending : [];
+    return cloneRows(rows);
+  }
+
+  const request = http
+    .get<{ data: EvidenceFileTypeDto[] }>("/api/lookups/evidence-file-types", {
+      params: normalizedKind ? { kind_code: normalizedKind } : undefined,
+    })
+    .then(({ data }) => data.data)
+    .then((rows) => {
+      evidenceFileTypesByKindCache.set(normalizedKind, rows);
+      return rows;
+    })
+    .finally(() => {
+      evidenceFileTypesByKindPromise.delete(normalizedKind);
+    });
+
+  evidenceFileTypesByKindPromise.set(normalizedKind, request);
+  const rows = await request;
+  return cloneRows(rows);
 }
 
 export async function fetch_activity_statuses(): Promise<ActivityStatusDto[]> {
@@ -252,6 +282,16 @@ export async function search_journals(
 ): Promise<JournalOptionDto[]> {
   const { data } = await http.get<{ data: JournalOptionDto[] }>(
     "/api/lookups/journals",
+    { params: { search, active: 1 } },
+  );
+  return data.data;
+}
+
+export async function search_publishers(
+  search: string,
+): Promise<PublisherOptionDto[]> {
+  const { data } = await http.get<{ data: PublisherOptionDto[] }>(
+    "/api/lookups/publishers",
     { params: { search, active: 1 } },
   );
   return data.data;

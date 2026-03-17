@@ -148,7 +148,7 @@ import { useUserStore } from "@/app/stores/userStore";
 import { buildMenuForRole } from "@/app/config/menu";
 import { useSidebarGroups } from "./useSidebarGroups";
 import type { MenuItem } from "@/app/config/menu.types";
-const props = defineProps<{
+defineProps<{
   isOpen: boolean; // mở/đóng cho mobile drawer
   isCollapsed: boolean; // thu gọn/mở rộng cho desktop
 }>();

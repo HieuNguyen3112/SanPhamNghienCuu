@@ -56,10 +56,44 @@ export type PublicResearchParticipantDto = {
   role_name: string;
 };
 
+export type PublicResearchDisplayMetaDto = {
+  article?: {
+    journal_name?: string | null;
+    year?: number | null;
+    volume?: string | null;
+    issue?: string | null;
+    page_start?: number | null;
+    page_end?: number | null;
+    doi?: string | null;
+    article_url?: string | null;
+  };
+  project?: {
+    project_code?: string | null;
+    management_level?: string | null;
+    start_month?: string | null;
+    end_month?: string | null;
+    decision_no?: string | null;
+    decision_date?: string | null;
+  };
+  book?: {
+    publisher?: string | null;
+    isbn?: string | null;
+    year?: number | null;
+    approval_decision_no?: string | null;
+    approval_decision_date?: string | null;
+  };
+  conference?: {
+    conference_name?: string | null;
+    held_on?: string | null;
+    location?: string | null;
+  };
+};
+
 export type PublicResearchDetailDto = PublicResearchItemDto & {
   activity_code: string;
   participants: PublicResearchParticipantDto[];
   evidence_files?: { label: string; url: string }[];
+  display_meta?: PublicResearchDisplayMetaDto;
 };
 
 export type PublicResearchDetailResponseDto = {

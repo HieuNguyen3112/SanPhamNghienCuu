@@ -128,6 +128,7 @@
                     <tr>
                       <th class="px-3 py-2 font-semibold">Hình thức</th>
                       <th class="px-3 py-2 font-semibold">Tên hội nghị</th>
+                      <th class="px-3 py-2 font-semibold">Tóm tắt</th>
                       <th class="px-3 py-2 font-semibold">Ngày</th>
                       <th class="px-3 py-2 font-semibold">Địa điểm</th>
                       <th class="px-3 py-2 font-semibold">Ghi chú</th>
@@ -175,6 +176,16 @@
                           >
                             {{ rowNameError(row, readOnly) }}
                           </div>
+                        </td>
+
+                        <td class="px-2 py-2 align-top">
+                          <textarea
+                            v-model.trim="row.abstract"
+                            :disabled="readOnly"
+                            maxlength="2000"
+                            placeholder="Tóm tắt ngắn nội dung tham gia (tuỳ chọn)"
+                            class="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                          />
                         </td>
 
                         <td class="px-2 py-2 align-top">
@@ -242,7 +253,7 @@
                         v-if="openEvidenceRowId === row.rowId"
                         class="bg-slate-50"
                       >
-                        <td class="px-3 py-3 text-left" :colspan="7">
+                        <td class="px-3 py-3 text-left" :colspan="8">
                           <EvidenceUpload
                             :existingFiles="row.existingEvidenceFiles"
                             :existingLinks="row.existingEvidenceLinks"
@@ -259,7 +270,10 @@
                             "
                             @remove-existing-link="
                               (linkId) =>
-                                onRemoveRowExistingEvidenceLink(row.rowId, linkId)
+                                onRemoveRowExistingEvidenceLink(
+                                  row.rowId,
+                                  linkId,
+                                )
                             "
                           />
                         </td>
@@ -269,7 +283,7 @@
                     <tr v-if="form.items.length === 0">
                       <td
                         class="px-3 py-6 text-center text-sm text-slate-500"
-                        colspan="7"
+                        colspan="8"
                       >
                         Chưa có dòng nào. Bấm <b>Thêm dòng</b> để bắt đầu kê
                         khai.
@@ -468,6 +482,7 @@ function addRow() {
     rowId: createConferenceRowId(),
     typeId: null,
     conferenceName: "",
+    abstract: "",
     location: "",
     heldOn: null,
     notes: "",
@@ -586,7 +601,10 @@ function normalizeErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message.trim() ? err.message : fallback;
 }
 
-async function persistRowEvidence(activityId: number, row: ConferenceOccurrenceFormItem) {
+async function persistRowEvidence(
+  activityId: number,
+  row: ConferenceOccurrenceFormItem,
+) {
   const failedFiles: any[] = [];
   const failedLinks: any[] = [];
   let firstError: string | null = null;
@@ -622,11 +640,16 @@ async function persistRowEvidence(activityId: number, row: ConferenceOccurrenceF
 
   const allPendingLinks = row.pendingEvidenceLinks ?? [];
   const validLinkPendings = allPendingLinks.filter(
-    (pendingLink) => String(pendingLink?.url ?? "").trim() !== "",
+    (pendingLink) =>
+      String(pendingLink?.url ?? "").trim() !== "" &&
+      Number(pendingLink?.file_type_id) > 0,
   );
   const linkResults = await Promise.allSettled(
     validLinkPendings.map((pendingLink) =>
-      add_evidence_link(activityId, { url: String(pendingLink.url).trim() }),
+      add_evidence_link(activityId, {
+        url: String(pendingLink.url).trim(),
+        file_type_id: Number(pendingLink.file_type_id),
+      }),
     ),
   );
 
@@ -681,6 +704,7 @@ async function loadDraftFromQuery() {
         rowId: createConferenceRowId(),
         typeId: activity.type_id ?? null,
         conferenceName: detail?.conference_name ?? activity.title ?? "",
+        abstract: activity.abstract ?? "",
         location: detail?.location ?? "",
         heldOn: detail?.held_on ?? activity.start_date ?? null,
         notes: activity.notes ?? "",
@@ -713,6 +737,7 @@ const canSubmit = computed(() => {
     if (!row.conferenceName.trim()) return false;
     if (row.conferenceName.length > 255) return false;
     if (row.location.length > 255) return false;
+    if (row.abstract.length > 2000) return false;
     if (row.notes.length > 500) return false;
 
     // pending evidence validation (nếu có thì phải chọn loại file_type_id)
@@ -722,7 +747,7 @@ const canSubmit = computed(() => {
     if (invalidPendingFiles) return false;
 
     const invalidPendingLinks = (row.pendingEvidenceLinks ?? []).some(
-      (l: any) => !String(l.url ?? "").trim(),
+      (l: any) => !String(l.url ?? "").trim() || !l?.file_type_id,
     );
     if (invalidPendingLinks) return false;
 
@@ -736,7 +761,7 @@ async function loadCatalogs() {
   const [years, kinds, fileTypes, roles, lecturerId] = await Promise.all([
     fetch_academic_years(),
     fetch_activity_kinds(),
-    fetch_evidence_file_types(),
+    fetch_evidence_file_types("conference"),
     fetch_member_roles(),
     fetch_current_lecturer_id(),
   ]);
@@ -801,7 +826,7 @@ const shell = useDeclarationFormShell({
           type_id: row.typeId,
           academic_year_id: form.academicYearId,
           title: row.conferenceName.trim(),
-          abstract: null,
+          abstract: row.abstract?.trim() ? row.abstract.trim() : null,
           start_date: row.heldOn ?? null,
           end_date: row.heldOn ?? null,
           quantity: 1,
@@ -865,14 +890,17 @@ const shell = useDeclarationFormShell({
 const { runPageLoad } = useDeclarationPageLoadFeedback();
 
 onMounted(async () => {
-  await runPageLoad(async () => {
-    await loadCatalogs();
-    await loadDraftFromQuery();
-  }, {
-    onError: (message) => {
-      shell.error_message.value = message;
+  await runPageLoad(
+    async () => {
+      await loadCatalogs();
+      await loadDraftFromQuery();
     },
-    fallbackMessage: "Không thể khởi tạo trang kê khai.",
-  });
+    {
+      onError: (message) => {
+        shell.error_message.value = message;
+      },
+      fallbackMessage: "Không thể khởi tạo trang kê khai.",
+    },
+  );
 });
 </script>
