@@ -35,7 +35,7 @@ class ProjectHoursCalculator
 
         $rule = self::RULES[$normalizedTypeCode];
         $normalizedQuantity = max(1, $quantity);
-        $leaderHoursTotal = round($rule['leader_hours'] * $normalizedQuantity, 2);
+        $leaderRuleHoursTotal = round($rule['leader_hours'] * $normalizedQuantity, 2);
         $memberPoolTotal = round($rule['member_pool_hours'] * $normalizedQuantity, 2);
 
         $normalizedMembers = [];
@@ -58,15 +58,15 @@ class ProjectHoursCalculator
             return [
                 'level_code' => $normalizedTypeCode,
                 'level_label' => $rule['level_label'],
-                'leader_hours' => $leaderHoursTotal,
+                'leader_hours' => $leaderRuleHoursTotal,
                 'member_pool_hours' => $memberPoolTotal,
                 'member_pool_count' => 0,
                 'member_pool_each' => 0.0,
-                'total_hours_allocated' => $leaderHoursTotal,
+                'total_hours_allocated' => $leaderRuleHoursTotal,
                 'progress_multiplier_applied' => false,
                 'progress_supported' => false,
                 'progress_note' => 'Chưa áp dụng % tiến độ do chưa có trường dữ liệu trong hệ thống.',
-                'formula_rows' => $this->buildFormulaRows($leaderHoursTotal, $memberPoolTotal, 0, 0.0),
+                'formula_rows' => $this->buildFormulaRows($leaderRuleHoursTotal, $memberPoolTotal, 0, 0.0),
                 'members' => [],
                 'rule_summary' => $this->buildRuleSummary($rule, 0, 0.0),
             ];
@@ -92,12 +92,18 @@ class ProjectHoursCalculator
         }
 
         $leaderIndexes = array_values(array_unique($leaderIndexes));
+        if (count($leaderIndexes) > 1) {
+            $leaderIndexes = [$leaderIndexes[0]];
+        }
         $leaderCount = count($leaderIndexes);
 
         $allIndexes = array_column($normalizedMembers, 'index');
         $memberPoolIndexes = array_values(array_diff($allIndexes, $leaderIndexes));
         $memberPoolCount = count($memberPoolIndexes);
         $memberPoolAppliedTotal = $memberPoolCount > 0 ? $memberPoolTotal : 0.0;
+        $leaderHoursTotal = $memberPoolCount > 0
+            ? round(max(0.0, $leaderRuleHoursTotal - $memberPoolTotal), 2)
+            : $leaderRuleHoursTotal;
         $memberPoolEach = $memberPoolCount > 0
             ? round($memberPoolAppliedTotal / $memberPoolCount, 2)
             : 0.0;
@@ -214,9 +220,13 @@ class ProjectHoursCalculator
 
     private function buildRuleSummary(array $rule, int $memberPoolCount, float $memberPoolEach): string
     {
+        $leaderHours = $memberPoolCount > 0
+            ? round(max(0.0, $rule['leader_hours'] - $rule['member_pool_hours']), 2)
+            : round($rule['leader_hours'], 2);
+
         return $rule['level_label']
             . ': Chủ nhiệm '
-            . round($rule['leader_hours'], 2)
+            . $leaderHours
             . ' giờ, Nhóm thành viên '
             . round($rule['member_pool_hours'], 2)
             . ' / '

@@ -104,8 +104,7 @@ class LecturerDeclarationDraftController extends Controller
         ?string $kindName,
         ?string $typeCode,
         ?string $typeName
-    ): string
-    {
+    ): string {
         $resolvedKindName = $this->mapKindName($kindCode, $kindName);
         $resolvedTypeName = $this->mapTypeName($typeCode, $typeName);
 
@@ -141,7 +140,7 @@ class LecturerDeclarationDraftController extends Controller
 
         $mapped = match (strtolower($code)) {
             'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)',
-            'hdgsnn_600' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)',
+            'hdgsnn_600' => 'Bài báo HDGSNN <= 1 điểm (600 giờ)',
             'hdgsnn_300' => 'Bài báo có ISSN/ISBN (300 giờ)',
             'textbook' => 'Giáo trình',
             'reference' => 'Tài liệu tham khảo',

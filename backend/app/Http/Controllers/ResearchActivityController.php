@@ -1871,6 +1871,7 @@ class ResearchActivityController extends Controller
         $formula = (array) ($calculated['formula'] ?? []);
         $isProjectPoolRule = $this->hoursRuleResolver->isProjectPoolRule($rule);
         $leaderHours = null;
+        $leaderRuleHours = null;
         $memberPoolHours = null;
         $memberPoolAppliedHours = null;
         $memberPoolCount = 0;
@@ -1878,6 +1879,9 @@ class ResearchActivityController extends Controller
 
         if ($isProjectPoolRule) {
             $leaderHours = isset($formula['leader_hours_total']) ? (float) $formula['leader_hours_total'] : null;
+            $leaderRuleHours = isset($formula['leader_rule_hours_total'])
+                ? (float) $formula['leader_rule_hours_total']
+                : $leaderHours;
             $memberPoolHours = isset($formula['member_pool_total']) ? (float) $formula['member_pool_total'] : null;
             $memberPoolAppliedHours = isset($formula['member_pool_applied_total']) ? (float) $formula['member_pool_applied_total'] : 0.0;
             $memberPoolCount = isset($formula['non_principal_count']) ? (int) $formula['non_principal_count'] : 0;
@@ -1891,7 +1895,14 @@ class ResearchActivityController extends Controller
             $formulaRows[] = [
                 'role_label' => 'Chủ nhiệm',
                 'total_hours' => round((float) ($leaderHours ?? 0), 2),
-                'formula_text' => round((float) ($leaderHours ?? 0), 2) . ' giờ (chia đều cho nhóm chủ nhiệm)',
+                'formula_text' => $memberPoolCount > 0
+                    ? round((float) ($leaderRuleHours ?? 0), 2)
+                        . ' - '
+                        . round((float) ($memberPoolHours ?? 0), 2)
+                        . ' = '
+                        . round((float) ($leaderHours ?? 0), 2)
+                        . ' giờ'
+                    : round((float) ($leaderHours ?? 0), 2) . ' giờ (không có thành viên)',
             ];
             $formulaRows[] = [
                 'role_label' => 'Nhóm thành viên',
@@ -1930,9 +1941,7 @@ class ResearchActivityController extends Controller
                     'member_pool_hours' => $memberPoolHours,
                     'member_pool_count' => $memberPoolCount,
                     'member_pool_each' => $memberPoolEach,
-                    'rule_total_hours' => ($leaderHours !== null && $memberPoolHours !== null)
-                        ? round($leaderHours + $memberPoolHours, 2)
-                        : null,
+                    'rule_total_hours' => $leaderRuleHours !== null ? round((float) $leaderRuleHours, 2) : null,
                     'total_hours_allocated' => $calculated['total_hours_activity'] !== null
                         ? (float) $calculated['total_hours_activity']
                         : null,

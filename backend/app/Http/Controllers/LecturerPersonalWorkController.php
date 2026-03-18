@@ -519,7 +519,7 @@ class LecturerPersonalWorkController extends Controller
     private function buildRejectedMembers(int $activityId): array
     {
         return collect($this->buildMemberConfirmations($activityId))
-            ->filter(fn ($row) => ($row['confirmation_status'] ?? null) === 'rejected')
+            ->filter(fn($row) => ($row['confirmation_status'] ?? null) === 'rejected')
             ->values()
             ->all();
     }
@@ -713,7 +713,7 @@ class LecturerPersonalWorkController extends Controller
 
         $mapped = match (strtolower($code)) {
             'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)',
-            'hdgsnn_600' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)',
+            'hdgsnn_600' => 'Bài báo HDGSNN <= 1 điểm (600 giờ)',
             'hdgsnn_300' => 'Bài báo có ISSN/ISBN (300 giờ)',
             'textbook' => 'Giáo trình',
             'reference' => 'Tài liệu tham khảo',

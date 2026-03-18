@@ -36,7 +36,7 @@ class ProjectHoursSplitTest extends TestCase
         $this->seedUsers();
     }
 
-    public function test_preview_hours_for_ministry_project_splits_720_and_480_pool(): void
+    public function test_preview_hours_for_ministry_project_splits_240_and_480_pool_when_has_members(): void
     {
         $member1 = $this->createLecturer('GV002', 'member-1@test.local');
         $member2 = $this->createLecturer('GV003', 'member-2@test.local');
@@ -54,19 +54,19 @@ class ProjectHoursSplitTest extends TestCase
 
         $data = $response->json('data');
         $this->assertSame('bo', $data['type_code']);
-        $this->assertSame(720.0, (float) $data['formula']['leader_hours']);
+        $this->assertSame(240.0, (float) $data['formula']['leader_hours']);
         $this->assertSame(480.0, (float) $data['formula']['member_pool_hours']);
         $this->assertSame(2, (int) $data['formula']['member_pool_count']);
         $this->assertSame(240.0, (float) $data['formula']['member_pool_each']);
-        $this->assertSame(1200.0, (float) $data['formula']['total_hours_allocated']);
+        $this->assertSame(720.0, (float) $data['formula']['total_hours_allocated']);
 
         $byLecturer = collect($data['members'])->keyBy('lecturer_id');
-        $this->assertSame(720.0, (float) $byLecturer[$this->ownerLecturerId]['hours_assigned']);
+        $this->assertSame(240.0, (float) $byLecturer[$this->ownerLecturerId]['hours_assigned']);
         $this->assertSame(240.0, (float) $byLecturer[$member1]['hours_assigned']);
         $this->assertSame(240.0, (float) $byLecturer[$member2]['hours_assigned']);
     }
 
-    public function test_preview_hours_for_university_project_splits_600_and_240_pool(): void
+    public function test_preview_hours_for_university_project_splits_360_and_240_pool_when_has_members(): void
     {
         $member = $this->createLecturer('GV004', 'member-3@test.local');
 
@@ -82,11 +82,11 @@ class ProjectHoursSplitTest extends TestCase
 
         $data = $response->json('data');
         $this->assertSame('coso', $data['type_code']);
-        $this->assertSame(600.0, (float) $data['formula']['leader_hours']);
+        $this->assertSame(360.0, (float) $data['formula']['leader_hours']);
         $this->assertSame(240.0, (float) $data['formula']['member_pool_hours']);
         $this->assertSame(1, (int) $data['formula']['member_pool_count']);
         $this->assertSame(240.0, (float) $data['formula']['member_pool_each']);
-        $this->assertSame(840.0, (float) $data['formula']['total_hours_allocated']);
+        $this->assertSame(600.0, (float) $data['formula']['total_hours_allocated']);
     }
 
     public function test_preview_falls_back_to_owner_as_leader_when_no_principal_role_selected(): void
@@ -105,7 +105,7 @@ class ProjectHoursSplitTest extends TestCase
 
         $data = $response->json('data');
         $byLecturer = collect($data['members'])->keyBy('lecturer_id');
-        $this->assertSame(720.0, (float) $byLecturer[$this->ownerLecturerId]['hours_assigned']);
+        $this->assertSame(240.0, (float) $byLecturer[$this->ownerLecturerId]['hours_assigned']);
         $this->assertSame(480.0, (float) $byLecturer[$member]['hours_assigned']);
     }
 

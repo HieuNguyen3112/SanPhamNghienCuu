@@ -36,7 +36,7 @@ class FacultyResearchWorkApprovalController extends Controller
             ->orderByDesc('is_active')
             ->orderByDesc('id')
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->id,
                 'code' => $row->code,
                 'is_active' => (bool) $row->is_active,
@@ -47,7 +47,7 @@ class FacultyResearchWorkApprovalController extends Controller
             ->select(['id', 'code', 'name'])
             ->orderBy('name')
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->id,
                 'code' => $row->code,
                 'name' => $row->name,
@@ -260,6 +260,7 @@ class FacultyResearchWorkApprovalController extends Controller
                         'faculty_id' => $row->faculty_id,
                         'faculty_name' => $row->faculty_name,
                     ],
+                    'journal' => $this->fetchPaperJournalDetail((int) $activity),
                 ], $this->buildApproverConflictPayload($approverConflict)),
                 'members' => $membersPayload,
                 'evidence_files' => $this->fetchEvidenceFiles($activity),
@@ -717,8 +718,7 @@ class FacultyResearchWorkApprovalController extends Controller
         array $authorsByActivity,
         ?int $actingLecturerId,
         array $participantLecturerIdsByActivity
-    ): array
-    {
+    ): array {
         $activityId = (int) $row->activity_id;
         $approvalStatus = $this->resolveFacultyApprovalStatus($row) ?? self::STATUS_PENDING;
         $approverConflict = $this->resolveApproverConflict(
@@ -792,8 +792,8 @@ class FacultyResearchWorkApprovalController extends Controller
 
         foreach ($grouped as $activityId => $lecturerIds) {
             $grouped[$activityId] = collect($lecturerIds)
-                ->map(fn ($id) => (int) $id)
-                ->filter(fn ($id) => $id > 0)
+                ->map(fn($id) => (int) $id)
+                ->filter(fn($id) => $id > 0)
                 ->unique()
                 ->values()
                 ->all();
@@ -825,8 +825,8 @@ class FacultyResearchWorkApprovalController extends Controller
             $participantLecturerIds = DB::table('research_activity_members')
                 ->where('activity_id', $activityId)
                 ->pluck('lecturer_id')
-                ->map(fn ($id) => (int) $id)
-                ->filter(fn ($id) => $id > 0)
+                ->map(fn($id) => (int) $id)
+                ->filter(fn($id) => $id > 0)
                 ->unique()
                 ->values()
                 ->all();
@@ -1074,8 +1074,84 @@ class FacultyResearchWorkApprovalController extends Controller
                 'aa.note',
             ])
             ->get()
-            ->map(fn ($row) => (array) $row)
+            ->map(fn($row) => (array) $row)
             ->all();
+    }
+
+    private function fetchPaperJournalDetail(int $activityId): ?array
+    {
+        $paper = DB::table('paper_details')
+            ->where('activity_id', $activityId)
+            ->select([
+                'journal_name',
+                'issn',
+                'journal_scope',
+                'journal_source_name',
+                'journal_publisher',
+                'journal_website',
+                'work_score',
+            ])
+            ->first();
+
+        if (! $paper) {
+            return null;
+        }
+
+        $journal = null;
+        $issn = trim((string) ($paper->issn ?? ''));
+        $journalName = trim((string) ($paper->journal_name ?? ''));
+
+        if ($issn !== '') {
+            $journal = DB::table('journals')
+                ->where('issn', $issn)
+                ->select([
+                    'name',
+                    'issn',
+                    'address',
+                    'source_name',
+                    'publisher',
+                    'website',
+                    'point',
+                ])
+                ->first();
+        }
+
+        if (! $journal && $journalName !== '') {
+            $journal = DB::table('journals')
+                ->where('name', $journalName)
+                ->select([
+                    'name',
+                    'issn',
+                    'address',
+                    'source_name',
+                    'publisher',
+                    'website',
+                    'point',
+                ])
+                ->first();
+        }
+
+        if ($journal) {
+            return [
+                'journal_name' => $journal->name,
+                'issn' => $journal->issn,
+                'journal_scope' => $journal->address,
+                'journal_source_name' => $journal->source_name,
+                'journal_publisher' => $journal->publisher,
+                'journal_website' => $journal->website,
+                'work_score' => $journal->point !== null ? (float) $journal->point : null,
+            ];
+        }
+
+        return [
+            'journal_name' => $paper->journal_name,
+            'issn' => $paper->issn,
+            'journal_scope' => $paper->journal_scope,
+            'journal_source_name' => $paper->journal_source_name,
+            'journal_publisher' => $paper->journal_publisher,
+            'journal_website' => $paper->journal_website,
+            'work_score' => $paper->work_score !== null ? (float) $paper->work_score : null,
+        ];
     }
 
     private function fetchEvidenceFiles(int $activityId): array
@@ -1184,12 +1260,12 @@ class FacultyResearchWorkApprovalController extends Controller
             ->where('activity_id', $activityId)
             ->where('confirmation_status', 'accepted')
             ->pluck('lecturer_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         return collect(array_merge([$ownerLecturerId], $memberLecturerIds))
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
             ->unique()
             ->values()
             ->all();

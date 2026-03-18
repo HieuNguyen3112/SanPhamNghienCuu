@@ -262,8 +262,8 @@ class FacultyHoursApprovalSeeder extends Seeder
     private function seedAcademicYears($now): void
     {
         $years = [
-            ['code' => '2024-2025', 'start' => '2024-09-01', 'end' => '2025-08-31', 'is_active' => true],
-            ['code' => '2023-2024', 'start' => '2023-09-01', 'end' => '2024-08-31', 'is_active' => false],
+            ['code' => '2024-2025', 'start' => '2024-11-01', 'end' => '2025-10-31', 'is_active' => true],
+            ['code' => '2023-2024', 'start' => '2023-11-01', 'end' => '2024-10-31', 'is_active' => false],
         ];
 
         foreach ($years as $year) {

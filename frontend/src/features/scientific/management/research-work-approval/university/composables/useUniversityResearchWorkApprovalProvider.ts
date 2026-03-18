@@ -208,6 +208,7 @@ export function useUniversityResearchWorkApprovalProvider() {
       researchWorkTitle: item.title,
       researchWorkKindDisplayName: item.kind_name ?? null,
       researchWorkCategoryDisplayName: item.type_name ?? null,
+      journalInfo: null,
       submittingLecturerDisplayName: `${item.lecturer.full_name} (${item.lecturer.code})`,
       facultyIdentifier,
       facultyDisplayName:
@@ -316,6 +317,19 @@ export function useUniversityResearchWorkApprovalProvider() {
       researchWorkTitle: item.title,
       researchWorkKindDisplayName: item.kind_name ?? null,
       researchWorkCategoryDisplayName: item.type_name ?? null,
+      journalInfo: detail.activity.journal
+        ? {
+            journalName: detail.activity.journal.journal_name ?? null,
+            issn: detail.activity.journal.issn ?? null,
+            journalScope: detail.activity.journal.journal_scope ?? null,
+            journalSourceName:
+              detail.activity.journal.journal_source_name ?? null,
+            journalPublisher:
+              detail.activity.journal.journal_publisher ?? null,
+            journalWebsite: detail.activity.journal.journal_website ?? null,
+            workScore: detail.activity.journal.work_score ?? null,
+          }
+        : null,
       submittingLecturerDisplayName: `${item.lecturer.full_name} (${item.lecturer.code})`,
       facultyIdentifier,
       facultyDisplayName:

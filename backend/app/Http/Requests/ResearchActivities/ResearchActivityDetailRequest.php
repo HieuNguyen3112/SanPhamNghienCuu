@@ -20,6 +20,11 @@ class ResearchActivityDetailRequest extends FormRequest
         $nullableFields = [
             'journal_name',
             'issn',
+            'journal_scope',
+            'journal_source_name',
+            'journal_publisher',
+            'journal_website',
+            'work_score',
             'doi',
             'article_url',
             'volume',
@@ -27,6 +32,8 @@ class ResearchActivityDetailRequest extends FormRequest
             'page_start',
             'page_end',
             'year',
+            'research_field',
+            'publication_status',
             'keywords',
             'publisher',
             'approval_decision_no',
@@ -80,6 +87,11 @@ class ResearchActivityDetailRequest extends FormRequest
                 $rules += [
                     'journal_name' => ['nullable', 'string', 'max:255'],
                     'issn' => ['nullable', 'string', 'max:50'],
+                    'journal_scope' => ['nullable', 'string', 'max:100'],
+                    'journal_source_name' => ['nullable', 'string', 'max:255'],
+                    'journal_publisher' => ['nullable', 'string', 'max:255'],
+                    'journal_website' => ['nullable', 'string', 'max:255'],
+                    'work_score' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
                     'doi' => ['nullable', 'string', 'max:100'],
                     'article_url' => ['nullable', 'string', 'max:500'],
                     'volume' => ['nullable', 'string', 'max:50'],
@@ -87,6 +99,8 @@ class ResearchActivityDetailRequest extends FormRequest
                     'page_start' => ['nullable', 'integer', 'min:1'],
                     'page_end' => ['nullable', 'integer', 'min:1'],
                     'year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+                    'research_field' => ['nullable', 'string', 'max:255'],
+                    'publication_status' => ['nullable', 'string', 'max:100'],
                     'keywords' => ['nullable', 'string', 'max:500'],
                 ];
                 break;

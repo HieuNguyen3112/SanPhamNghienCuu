@@ -48,7 +48,17 @@ export type UniversityApprovalListItem = {
 };
 
 export type UniversityApprovalDetailResponse = {
-  activity: UniversityApprovalListItem;
+  activity: UniversityApprovalListItem & {
+    journal?: {
+      journal_name: string | null;
+      issn: string | null;
+      journal_scope: string | null;
+      journal_source_name: string | null;
+      journal_publisher: string | null;
+      journal_website: string | null;
+      work_score: number | null;
+    } | null;
+  };
   members: {
     lecturer_id: number;
     lecturer_code: string;

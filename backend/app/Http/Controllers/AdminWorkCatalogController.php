@@ -281,13 +281,15 @@ class AdminWorkCatalogController extends Controller
         $data = $request->validate([
             'name'              => ['required', 'string', 'max:255'],
             'issn'              => ['nullable', 'string', 'max:50', 'unique:journals,issn'],
+            'journal_type'      => ['nullable', 'string', 'max:100'],
+            'research_field'    => ['nullable', 'string', 'max:255'],
+            'website'           => ['nullable', 'string', 'max:255'],
             'address'           => ['nullable', 'string', 'max:255'],
             'country'           => ['nullable', 'string', 'max:100'],
             'notes'             => ['nullable', 'string', 'max:255'],
             'source_name'       => ['nullable', 'string', 'max:255'],
             'publisher'         => ['nullable', 'string', 'max:255'],
-            'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2'],
-            'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2', 'gte:point_min'],
+            'point'             => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2'],
             'classification'    => ['nullable', 'string', 'max:30'],
             'research_hours'    => ['nullable', 'integer', 'min:0', 'max:65535'],
             'is_active'         => ['required', 'boolean'],
@@ -300,13 +302,15 @@ class AdminWorkCatalogController extends Controller
         $id = DB::table('journals')->insertGetId([
             'name'           => $data['name'],
             'issn'           => $data['issn'] ?? null,
+            'journal_type'   => $data['journal_type'] ?? null,
+            'research_field' => $data['research_field'] ?? null,
+            'website'        => $data['website'] ?? null,
             'address'        => $data['address'] ?? null,
             'country'        => $data['country'] ?? null,
             'notes'          => $data['notes'] ?? null,
             'source_name'    => $data['source_name'] ?? null,
             'publisher'      => $data['publisher'] ?? null,
-            'point_min'      => $data['point_min'] ?? null,
-            'point_max'      => $data['point_max'] ?? null,
+            'point'          => $data['point'] ?? null,
             'classification' => $derived['classification'],
             'research_hours' => $derived['research_hours'],
             'is_active'      => (bool) $data['is_active'],
@@ -332,13 +336,15 @@ class AdminWorkCatalogController extends Controller
         $data = $request->validate([
             'name'              => ['required', 'string', 'max:255'],
             'issn'              => ['nullable', 'string', 'max:50', Rule::unique('journals', 'issn')->ignore($id)],
+            'journal_type'      => ['nullable', 'string', 'max:100'],
+            'research_field'    => ['nullable', 'string', 'max:255'],
+            'website'           => ['nullable', 'string', 'max:255'],
             'address'           => ['nullable', 'string', 'max:255'],
             'country'           => ['nullable', 'string', 'max:100'],
             'notes'             => ['nullable', 'string', 'max:255'],
             'source_name'       => ['nullable', 'string', 'max:255'],
             'publisher'         => ['nullable', 'string', 'max:255'],
-            'point_min'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2'],
-            'point_max'         => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2', 'gte:point_min'],
+            'point'             => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2'],
             'classification'    => ['nullable', 'string', 'max:30'],
             'research_hours'    => ['nullable', 'integer', 'min:0', 'max:65535'],
             'is_active'         => ['required', 'boolean'],
@@ -351,13 +357,15 @@ class AdminWorkCatalogController extends Controller
             ->update([
                 'name'           => $data['name'],
                 'issn'           => $data['issn'] ?? null,
+                'journal_type'   => $data['journal_type'] ?? null,
+                'research_field' => $data['research_field'] ?? null,
+                'website'        => $data['website'] ?? null,
                 'address'        => $data['address'] ?? null,
                 'country'        => $data['country'] ?? null,
                 'notes'          => $data['notes'] ?? null,
                 'source_name'    => $data['source_name'] ?? null,
                 'publisher'      => $data['publisher'] ?? null,
-                'point_min'      => $data['point_min'] ?? null,
-                'point_max'      => $data['point_max'] ?? null,
+                'point'          => $data['point'] ?? null,
                 'classification' => $derived['classification'],
                 'research_hours' => $derived['research_hours'],
                 'is_active'      => (bool) $data['is_active'],
@@ -851,18 +859,16 @@ class AdminWorkCatalogController extends Controller
 
     private function deriveJournalClassificationAndHours(array $data): array
     {
-        $pointMin = $this->toNullableFloat($data['point_min'] ?? null);
-        $pointMax = $this->toNullableFloat($data['point_max'] ?? null);
-        $maxPoint = $pointMax ?? $pointMin;
+        $point = $this->toNullableFloat($data['point'] ?? null);
         $issn = trim((string) ($data['issn'] ?? ''));
         $providedClassification = $this->normalizeJournalClassification($data['classification'] ?? null);
         $providedHours = isset($data['research_hours']) ? (int) $data['research_hours'] : null;
 
         $classification = 'OTHER';
 
-        if ($maxPoint !== null && $maxPoint >= 2) {
+        if ($point !== null && $point > 1) {
             $classification = 'POINT_GE_2';
-        } elseif ($maxPoint !== null && $maxPoint >= 1) {
+        } elseif ($point !== null && $point > 0 && $point <= 1) {
             $classification = 'POINT_GE_1';
         } elseif ($issn !== '') {
             $classification = 'ISSN_ISBN';
@@ -1025,8 +1031,7 @@ class AdminWorkCatalogController extends Controller
     {
         $derived = $this->deriveJournalClassificationAndHours([
             'issn' => $row->issn,
-            'point_min' => $row->point_min,
-            'point_max' => $row->point_max,
+            'point' => $row->point,
             'classification' => $row->classification,
             'research_hours' => $row->research_hours,
         ]);
@@ -1034,12 +1039,14 @@ class AdminWorkCatalogController extends Controller
         return [
             'id' => (int) $row->id,
             'name' => $row->name,
+            'journal_type' => $row->journal_type,
+            'research_field' => $row->research_field,
+            'website' => $row->website,
             'address' => $row->address,
             'issn' => $row->issn,
             'source_name' => $row->source_name,
             'publisher' => $row->publisher,
-            'point_min' => $row->point_min !== null ? (float) $row->point_min : null,
-            'point_max' => $row->point_max !== null ? (float) $row->point_max : null,
+            'point' => $row->point !== null ? (float) $row->point : null,
             'classification' => $derived['classification'],
             'research_hours' => $derived['research_hours'],
             'country' => $row->country,

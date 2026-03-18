@@ -528,4 +528,6 @@ Route::middleware(['force.json'])
         Route::get('/research-works/lookups', [PublicResearchWorkController::class, 'lookups']);
         Route::get('/research-works', [PublicResearchWorkController::class, 'index']);
         Route::get('/research-works/{activityId}', [PublicResearchWorkController::class, 'show']);
+        Route::get('/research-works/{activityId}/evidence-files/{evidenceId}/download', [PublicResearchWorkController::class, 'downloadEvidence'])
+            ->name('public.research.evidence.download');
     });

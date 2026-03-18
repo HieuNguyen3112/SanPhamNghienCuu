@@ -3,6 +3,7 @@
 namespace App\Http\Requests\ResearchActivities;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Validator;
 
 class ResearchActivityMembersRequest extends FormRequest
@@ -103,6 +104,27 @@ class ResearchActivityMembersRequest extends FormRequest
                 }
 
                 $internalLecturerIds[] = $normalizedLecturerId;
+            }
+
+            $principalRoleId = DB::table('member_roles')
+                ->whereRaw('LOWER(code) = ?', ['principal'])
+                ->value('id');
+
+            if ($principalRoleId) {
+                $principalCount = 0;
+                foreach ($items as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+
+                    if ((int) ($item['member_role_id'] ?? 0) === (int) $principalRoleId) {
+                        $principalCount++;
+                    }
+                }
+
+                if ($principalCount > 1) {
+                    $validator->errors()->add('items', 'Đề tài chỉ được có một Chủ nhiệm.');
+                }
             }
         });
     }

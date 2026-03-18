@@ -58,8 +58,7 @@ class WorkCatalogSeeder extends Seeder
                 'address'        => 'Trường Đại học Sư phạm Thành phố Hồ Chí Minh, TP. Hồ Chí Minh, Việt Nam',
                 'issn'           => '2090-1232',
                 'source_name'    => 'ISI',           // Chuyển ISI từ classification sang đây
-                'point_min'      => 1.00,            // Thêm cột mới
-                'point_max'      => 2.00,            // Thêm cột mới
+                'point'          => 2.00,
                 'classification' => 'HDGSNN_GE_1',   // Cập nhật lại format theo schema
                 'research_hours' => 600,             // Thêm cột mới
                 'country'        => 'Vietnam',
@@ -71,8 +70,7 @@ class WorkCatalogSeeder extends Seeder
                 'address'        => 'Bộ Giáo dục và Đào tạo, Hà Nội, Việt Nam',
                 'issn'           => '0866-708X',
                 'source_name'    => 'Scopus',        // Chuyển SCOPUS từ classification sang đây
-                'point_min'      => 0.50,            // Thêm cột mới
-                'point_max'      => 1.00,            // Thêm cột mới
+                'point'          => 1.00,
                 'classification' => 'HDGSNN_GE_2',   // Cập nhật lại format theo schema
                 'research_hours' => 300,             // Thêm cột mới
                 'country'        => 'Vietnam',
@@ -84,8 +82,7 @@ class WorkCatalogSeeder extends Seeder
                 'address'        => 'TP. Hồ Chí Minh, Việt Nam',
                 'issn'           => null,
                 'source_name'    => null,
-                'point_min'      => null,
-                'point_max'      => null,
+                'point'          => null,
                 'classification' => 'OTHER',
                 'research_hours' => 0,
                 'country'        => 'Vietnam',
@@ -106,8 +103,7 @@ class WorkCatalogSeeder extends Seeder
                     'address'        => $item['address'],
                     'issn'           => $item['issn'],
                     'source_name'    => $item['source_name'],
-                    'point_min'      => $item['point_min'],
-                    'point_max'      => $item['point_max'],
+                    'point'          => $item['point'],
                     'classification' => $item['classification'],
                     'research_hours' => $item['research_hours'],
                     'country'        => $item['country'],

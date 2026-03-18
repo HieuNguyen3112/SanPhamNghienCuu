@@ -4,7 +4,7 @@ import type { PublicResearchDetailDto } from "../dto/publicResearchDtos";
 import type { PublicResearchDetail } from "../models/publicResearchModels";
 
 export function mapPublicResearchItemDtoToModel(
-  dto: PublicResearchItemDto
+  dto: PublicResearchItemDto,
 ): PublicResearchItem {
   return {
     id: dto.id,
@@ -33,7 +33,9 @@ export function mapPublicResearchItemDtoToModel(
   };
 }
 
-export function mapPublicResearchDetailDtoToModel(dto: PublicResearchDetailDto): PublicResearchDetail {
+export function mapPublicResearchDetailDtoToModel(
+  dto: PublicResearchDetailDto,
+): PublicResearchDetail {
   const base = mapPublicResearchItemDtoToModel(dto);
 
   return {
@@ -46,7 +48,13 @@ export function mapPublicResearchDetailDtoToModel(dto: PublicResearchDetailDto):
       facultyName: p.faculty_name,
       roleName: p.role_name,
     })),
-    evidenceFiles: Array.isArray(dto.evidence_files) ? dto.evidence_files : [],
+    evidenceFiles: Array.isArray(dto.evidence_files)
+      ? dto.evidence_files.map((file) => ({
+          label: file.label,
+          url: file.url,
+          isPdf: Boolean(file.is_pdf),
+        }))
+      : [],
     displayMeta: {
       article: {
         journalName: dto.display_meta?.article?.journal_name ?? null,
@@ -70,8 +78,10 @@ export function mapPublicResearchDetailDtoToModel(dto: PublicResearchDetailDto):
         publisher: dto.display_meta?.book?.publisher ?? null,
         isbn: dto.display_meta?.book?.isbn ?? null,
         year: dto.display_meta?.book?.year ?? null,
-        approvalDecisionNo: dto.display_meta?.book?.approval_decision_no ?? null,
-        approvalDecisionDate: dto.display_meta?.book?.approval_decision_date ?? null,
+        approvalDecisionNo:
+          dto.display_meta?.book?.approval_decision_no ?? null,
+        approvalDecisionDate:
+          dto.display_meta?.book?.approval_decision_date ?? null,
       },
       conference: {
         conferenceName: dto.display_meta?.conference?.conference_name ?? null,

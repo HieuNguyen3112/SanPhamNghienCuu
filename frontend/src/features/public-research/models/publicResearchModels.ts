@@ -88,6 +88,6 @@ export type PublicResearchDisplayMeta = {
 export type PublicResearchDetail = PublicResearchItem & {
   activityCode: string;
   participants: PublicResearchParticipant[];
-  evidenceFiles: { label: string; url: string }[];
+  evidenceFiles: { label: string; url: string; isPdf: boolean }[];
   displayMeta: PublicResearchDisplayMeta;
 };

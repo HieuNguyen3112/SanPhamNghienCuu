@@ -92,7 +92,7 @@ export type PublicResearchDisplayMetaDto = {
 export type PublicResearchDetailDto = PublicResearchItemDto & {
   activity_code: string;
   participants: PublicResearchParticipantDto[];
-  evidence_files?: { label: string; url: string }[];
+  evidence_files?: { label: string; url: string; is_pdf?: boolean | null }[];
   display_meta?: PublicResearchDisplayMetaDto;
 };
 

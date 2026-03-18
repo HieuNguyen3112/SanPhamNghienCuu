@@ -54,6 +54,11 @@ type PaperDetailsDto = {
   activity_id: number;
   journal_name: string | null;
   issn: string | null;
+  journal_scope?: string | null;
+  journal_source_name?: string | null;
+  journal_publisher?: string | null;
+  journal_website?: string | null;
+  work_score?: number | null;
   doi: string | null;
   article_url: string | null;
   volume: string | null;
@@ -61,6 +66,8 @@ type PaperDetailsDto = {
   page_start: number | null;
   page_end: number | null;
   year: number | null;
+  research_field?: string | null;
+  publication_status?: string | null;
   keywords?: string | null;
 };
 

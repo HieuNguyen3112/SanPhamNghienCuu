@@ -21,26 +21,30 @@ export function useJournalCatalog() {
     id: number;
     name: string;
     issn: string;
+    journalType: string;
     address: string;
+    researchField: string;
+    website: string;
     country: string;
     notes: string;
     publisher: string;
     isActive: boolean;
     sourceName: string;
-    pointMin: number | null;
-    pointMax: number | null;
+    point: number | null;
   }>({
     id: 0,
     name: "",
     issn: "",
+    journalType: "",
     address: "",
+    researchField: "",
+    website: "",
     country: "",
     notes: "",
     publisher: "",
     isActive: true,
     sourceName: "",
-    pointMin: null,
-    pointMax: null,
+    point: null,
   });
 
   const journalErrors = reactive<FormErrors<typeof journalForm>>({});
@@ -89,34 +93,40 @@ export function useJournalCatalog() {
   });
 
   function openCreateJournal() {
+    clearErrors();
     modalMode.value = "create";
     journalForm.id = 0;
     journalForm.name = "";
     journalForm.issn = "";
+    journalForm.journalType = "";
     journalForm.address = "";
+    journalForm.researchField = "";
+    journalForm.website = "";
     journalForm.country = "";
     journalForm.notes = "";
     journalForm.publisher = "";
     journalForm.isActive = true;
     journalForm.sourceName = "";
-    journalForm.pointMin = null;
-    journalForm.pointMax = null;
+    journalForm.point = null;
     modalJournalOpen.value = true;
   }
 
   function openEditJournal(item: Journal) {
+    clearErrors();
     modalMode.value = "edit";
     journalForm.id = item.id;
     journalForm.name = item.name;
     journalForm.issn = item.issn ?? "";
+    journalForm.journalType = item.journalType ?? "";
     journalForm.address = item.address ?? "";
+    journalForm.researchField = item.researchField ?? "";
+    journalForm.website = item.website ?? "";
     journalForm.country = item.country ?? "";
     journalForm.notes = item.notes ?? "";
     journalForm.publisher = item.publisher ?? "";
     journalForm.isActive = item.isActive;
     journalForm.sourceName = item.sourceName ?? "";
-    journalForm.pointMin = item.pointMin ?? null;
-    journalForm.pointMax = item.pointMax ?? null;
+    journalForm.point = item.point ?? null;
     modalJournalOpen.value = true;
   }
 
@@ -124,52 +134,78 @@ export function useJournalCatalog() {
     id: number;
     name: string;
     issn: string;
+    journalType: string;
     address: string;
+    researchField: string;
+    website: string;
     country: string;
     notes: string;
     publisher: string;
     isActive: boolean;
     sourceName: string;
-    pointMin: number | null;
-    pointMax: number | null;
+    point: number | null;
   }) {
     journalForm.id = v.id;
     journalForm.name = v.name;
     journalForm.issn = v.issn;
+    journalForm.journalType = v.journalType;
     journalForm.address = v.address;
+    journalForm.researchField = v.researchField;
+    journalForm.website = v.website;
     journalForm.country = v.country;
     journalForm.notes = v.notes;
     journalForm.publisher = v.publisher;
     journalForm.isActive = v.isActive;
     journalForm.sourceName = v.sourceName;
-    journalForm.pointMin = v.pointMin;
-    journalForm.pointMax = v.pointMax;
+    journalForm.point = v.point;
   }
 
-  async function saveJournal(): Promise<void> {
+  function validateJournalForm(): boolean {
     clearErrors();
 
     journalErrors.name = validateRequired(journalForm.name, 255) ?? undefined;
-    journalErrors.issn = validateOptional(journalForm.issn, 50) ?? undefined;
+    journalErrors.issn = validateRequired(journalForm.issn, 50) ?? undefined;
     journalErrors.address =
-      validateOptional(journalForm.address, 255) ?? undefined;
+      validateRequired(journalForm.address, 255) ?? undefined;
     journalErrors.country =
       validateOptional(journalForm.country, 100) ?? undefined;
+    journalErrors.website =
+      validateOptional(journalForm.website, 255) ?? undefined;
+    journalErrors.researchField =
+      validateOptional(journalForm.researchField, 255) ?? undefined;
+    journalErrors.journalType =
+      validateOptional(journalForm.journalType, 100) ?? undefined;
     journalErrors.notes = validateOptional(journalForm.notes, 255) ?? undefined;
     journalErrors.publisher =
-      validateOptional(journalForm.publisher, 255) ?? undefined;
+      validateRequired(journalForm.publisher, 255) ?? undefined;
     journalErrors.sourceName =
-      validateOptional(journalForm.sourceName, 255) ?? undefined;
+      validateRequired(journalForm.sourceName, 255) ?? undefined;
+
+    if (journalForm.point === null) {
+      journalErrors.point = "Trường này là bắt buộc.";
+    }
 
     if (
       journalErrors.name ||
       journalErrors.issn ||
       journalErrors.address ||
       journalErrors.country ||
+      journalErrors.website ||
+      journalErrors.researchField ||
+      journalErrors.journalType ||
       journalErrors.notes ||
       journalErrors.publisher ||
-      journalErrors.sourceName
+      journalErrors.sourceName ||
+      journalErrors.point
     ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  async function saveJournal(): Promise<void> {
+    if (!validateJournalForm()) {
       return;
     }
 
@@ -177,6 +213,13 @@ export function useJournalCatalog() {
       id: journalForm.id,
       name: journalForm.name.trim(),
       issn: journalForm.issn.trim() ? journalForm.issn.trim() : null,
+      journal_type: journalForm.journalType.trim()
+        ? journalForm.journalType.trim()
+        : null,
+      research_field: journalForm.researchField.trim()
+        ? journalForm.researchField.trim()
+        : null,
+      website: journalForm.website.trim() ? journalForm.website.trim() : null,
       address: journalForm.address.trim() ? journalForm.address.trim() : null,
       country: journalForm.country.trim() ? journalForm.country.trim() : null,
       notes: journalForm.notes.trim() ? journalForm.notes.trim() : null,
@@ -186,8 +229,7 @@ export function useJournalCatalog() {
       source_name: journalForm.sourceName.trim()
         ? journalForm.sourceName.trim()
         : null,
-      point_min: journalForm.pointMin ?? null,
-      point_max: journalForm.pointMax ?? null,
+      point: journalForm.point ?? null,
       is_active: journalForm.isActive,
     };
 
@@ -211,6 +253,7 @@ export function useJournalCatalog() {
     load,
     openCreateJournal,
     openEditJournal,
+    validateJournalForm,
     saveJournal,
     onUpdateJournalForm,
   };

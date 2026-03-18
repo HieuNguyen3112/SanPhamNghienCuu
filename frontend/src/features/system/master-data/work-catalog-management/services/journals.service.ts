@@ -24,13 +24,15 @@ export const journalService = {
     const payload: Omit<JournalUpsertDTO, "id"> = {
       name: dto.name,
       issn: dto.issn ?? null,
+      journal_type: dto.journal_type ?? null,
+      research_field: dto.research_field ?? null,
+      website: dto.website ?? null,
       address: dto.address ?? null,
       country: dto.country ?? null,
       notes: dto.notes ?? null,
       source_name: dto.source_name ?? null,
       publisher: dto.publisher ?? null,
-      point_min: dto.point_min ?? null,
-      point_max: dto.point_max ?? null,
+      point: dto.point ?? null,
       is_active: dto.is_active,
     };
 
