@@ -768,19 +768,6 @@ const selectedTypeName = computed(() => {
   return selectedType?.name ?? null;
 });
 
-const selectedTypeRoleRule = computed(() => {
-  if (!form.typeId) return null;
-
-  const source = serverProjectPreview.value ?? localHours.value;
-  if (!source || source.leader_hours <= 0) return null;
-
-  return {
-    levelLabel: source.rule_label ?? selectedTypeName.value ?? "Đề tài",
-    leaderHours: source.leader_hours,
-    memberPoolHours: source.member_pool_hours,
-  };
-});
-
 function normalizeServerPreview(
   preview: ProjectHoursPreviewResponseDto,
 ): ProjectHoursComputationResult {

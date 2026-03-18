@@ -4,6 +4,7 @@ namespace App\Http\Requests\ResearchActivities;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Validator;
 
 class SubmitResearchActivityRequest extends FormRequest
@@ -41,6 +42,7 @@ class SubmitResearchActivityRequest extends FormRequest
 
             $activity = DB::table('research_activities as ra')
                 ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+                ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
                 ->where('ra.id', $activityId)
                 ->where('ra.owner_lecturer_id', $lecturerId)
                 ->select([
@@ -48,6 +50,7 @@ class SubmitResearchActivityRequest extends FormRequest
                     'ra.type_id',
                     'ra.title',
                     'ak.code as kind_code',
+                    'at.code as type_code',
                 ])
                 ->first();
 
@@ -72,8 +75,38 @@ class SubmitResearchActivityRequest extends FormRequest
                     ->where('activity_id', $activityId)
                     ->first();
 
-                if (! $detail || ! trim((string) ($detail->journal_name ?? ''))) {
-                    $validator->errors()->add('journal_name', 'Vui lòng chọn tạp chí/kỷ yếu.');
+                $typeCode = Str::lower((string) ($activity->type_code ?? ''));
+                $isConferenceReport = in_array($typeCode, ['report', 'conference_report', 'bao_cao', 'scientific_report'], true);
+
+                if ($isConferenceReport) {
+                    if (! $detail || ! trim((string) ($detail->conference_name ?? ''))) {
+                        $validator->errors()->add('conference_name', 'Vui lòng chọn hoặc nhập hội nghị khoa học.');
+                    }
+
+                    if (! $detail || ! trim((string) ($detail->conference_level ?? ''))) {
+                        $validator->errors()->add('conference_level', 'Vui lòng chọn cấp hội nghị.');
+                    }
+
+                    if (! $detail || ! trim((string) ($detail->conference_research_field ?? ''))) {
+                        $validator->errors()->add('conference_research_field', 'Vui lòng nhập lĩnh vực hội nghị.');
+                    }
+
+                    if (! $detail || ! trim((string) ($detail->conference_organization ?? ''))) {
+                        $validator->errors()->add('conference_organization', 'Vui lòng nhập đơn vị tổ chức hội nghị.');
+                    }
+
+                    if (! $detail || $detail->conference_point === null) {
+                        $validator->errors()->add('conference_point', 'Vui lòng nhập điểm quy đổi hội nghị.');
+                    }
+
+                    $hasIsbn = (bool) ($detail->conference_has_isbn ?? false);
+                    if ($hasIsbn && ! trim((string) ($detail->conference_isbn ?? ''))) {
+                        $validator->errors()->add('conference_isbn', 'Vui lòng nhập ISBN của hội nghị.');
+                    }
+                } else {
+                    if (! $detail || ! trim((string) ($detail->journal_name ?? ''))) {
+                        $validator->errors()->add('journal_name', 'Vui lòng chọn tạp chí/kỷ yếu.');
+                    }
                 }
 
                 if (! $detail || ! $detail->year) {

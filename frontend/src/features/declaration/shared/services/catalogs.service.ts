@@ -76,17 +76,29 @@ export type JournalOptionDto = {
   id: number;
   name: string;
   issn: string | null;
-  journal_type?: string | null;
-  research_field?: string | null;
-  website?: string | null;
   address: string | null;
   country: string | null;
   notes: string | null;
   source_name: string | null;
-  publisher?: string | null;
-  point: string | number | null;
+  point_min: string | number | null;
+  point_max: string | number | null;
   classification: string;
   research_hours: number;
+  is_active: boolean;
+};
+
+export type ConferenceOptionDto = {
+  id: number;
+  name: string;
+  level: "NATIONAL" | "INTERNATIONAL";
+  research_field: string | null;
+  organization: string | null;
+  year: number | null;
+  has_proceedings: boolean;
+  has_isbn: boolean;
+  isbn: string | null;
+  point: string | number | null;
+  notes: string | null;
   is_active: boolean;
 };
 
@@ -285,6 +297,16 @@ export async function search_journals(
 ): Promise<JournalOptionDto[]> {
   const { data } = await http.get<{ data: JournalOptionDto[] }>(
     "/api/lookups/journals",
+    { params: { search, active: 1 } },
+  );
+  return data.data;
+}
+
+export async function search_conferences(
+  search: string,
+): Promise<ConferenceOptionDto[]> {
+  const { data } = await http.get<{ data: ConferenceOptionDto[] }>(
+    "/api/lookups/conferences",
     { params: { search, active: 1 } },
   );
   return data.data;

@@ -55,6 +55,11 @@ export type PublicResearchParticipant = {
 export type PublicResearchDisplayMeta = {
   article?: {
     journalName: string | null;
+    issn: string | null;
+    journalScope: string | null;
+    journalType: string | null;
+    journalSourceName: string | null;
+    researchField: string | null;
     year: number | null;
     volume: string | null;
     issue: string | null;
@@ -66,6 +71,10 @@ export type PublicResearchDisplayMeta = {
   project?: {
     projectCode: string | null;
     managementLevel: string | null;
+    projectCategory: string | null;
+    researchField: string | null;
+    objectives: string | null;
+    contentSummary: string | null;
     startMonth: string | null;
     endMonth: string | null;
     decisionNo: string | null;
@@ -75,6 +84,8 @@ export type PublicResearchDisplayMeta = {
     publisher: string | null;
     isbn: string | null;
     year: number | null;
+    bookType: string | null;
+    researchField: string | null;
     approvalDecisionNo: string | null;
     approvalDecisionDate: string | null;
   };

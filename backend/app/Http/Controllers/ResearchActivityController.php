@@ -78,13 +78,6 @@ class ResearchActivityController extends Controller
         ],
     ];
 
-    private const LEGACY_EVIDENCE_FILE_TYPE_CODES_BY_KIND = [
-        'paper' => ['content', 'publication_decision'],
-        'project' => ['content', 'acceptance_decision'],
-        'book' => ['content', 'cover', 'toc', 'publication_decision'],
-        'conference' => ['content'],
-    ];
-
     private const EVIDENCE_LINK_PREFERRED_CODE_BY_KIND = [
         'paper' => ['paper_link_doi', 'paper_link_journal_page', 'paper_link_pdf', 'paper_link_indexing'],
         'project' => ['project_link_overview_page', 'project_link_summary_report', 'project_link_output_product', 'project_link_acceptance_evidence'],
@@ -742,6 +735,12 @@ class ResearchActivityController extends Controller
             ],
         ], $user);
 
+        $catalogSuggestion = $this->upsertCatalogSuggestionForActivitySource(
+            (int) $activity,
+            (int) $lecturer->id,
+            $user?->id ? (int) $user->id : null,
+        );
+
         return response()->json([
             'message' => 'member invitation resent',
             'data' => array_merge($this->serializeActivity($activity), [
@@ -1017,6 +1016,12 @@ class ResearchActivityController extends Controller
             ];
         })->values()->all();
 
+        $catalogSuggestion = $this->upsertCatalogSuggestionForActivitySource(
+            (int) $activity,
+            (int) $lecturer->id,
+            $user?->id ? (int) $user->id : null,
+        );
+
         return response()->json([
             'message' => $hasPending
                 ? 'request recorded; waiting for member confirmations'
@@ -1028,8 +1033,299 @@ class ResearchActivityController extends Controller
                 'status_code' => $statusCode,
                 'pending_members' => $pendingMembers,
                 'can_faculty_review' => ! $hasPending,
+                'catalog_suggestion' => $catalogSuggestion,
             ],
         ], Response::HTTP_OK);
+    }
+
+    private function upsertCatalogSuggestionForActivitySource(
+        int $activityId,
+        int $lecturerId,
+        ?int $userId = null,
+    ): ?array {
+        $activity = DB::table('research_activities as ra')
+            ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
+            ->where('ra.id', $activityId)
+            ->select([
+                'ak.code as kind_code',
+                'at.code as type_code',
+            ])
+            ->first();
+
+        if (! $activity) {
+            return null;
+        }
+
+        if ($activity->kind_code === 'book') {
+            return $this->upsertPublisherSuggestion($activityId, $lecturerId, $userId);
+        }
+
+        if ($activity->kind_code !== 'paper') {
+            return null;
+        }
+
+        $detail = DB::table('paper_details')
+            ->where('activity_id', $activityId)
+            ->first();
+
+        if (! $detail) {
+            return null;
+        }
+
+        if ($this->isConferenceReportTypeCode($activity->type_code ?? null)) {
+            return $this->upsertConferenceSuggestion($activityId, $lecturerId, $userId, $detail);
+        }
+
+        return $this->upsertJournalSuggestion($activityId, $lecturerId, $userId, $detail);
+    }
+
+    private function upsertPublisherSuggestion(int $activityId, int $lecturerId, ?int $userId): ?array
+    {
+        $detail = DB::table('book_details')
+            ->where('activity_id', $activityId)
+            ->first();
+
+        if (! $detail) {
+            return null;
+        }
+
+        $name = trim((string) ($detail->publisher ?? ''));
+        if ($name === '') {
+            return null;
+        }
+
+        $matchedCatalog = DB::table('publishers')
+            ->whereRaw('LOWER(name) = ?', [Str::lower($name)])
+            ->select(['id', 'name'])
+            ->first();
+
+        if ($matchedCatalog) {
+            DB::table('book_details')
+                ->where('activity_id', $activityId)
+                ->update([
+                    'publisher' => (string) $matchedCatalog->name,
+                    'updated_at' => now(),
+                ]);
+
+            return [
+                'type' => 'publisher',
+                'status' => 'matched',
+                'catalog_id' => (int) $matchedCatalog->id,
+            ];
+        }
+
+        $payload = [
+            'name' => $name,
+            'isbn' => isset($detail->isbn) ? trim((string) $detail->isbn) : null,
+            'year' => isset($detail->year) ? (int) $detail->year : null,
+            'pages' => isset($detail->pages) ? (int) $detail->pages : null,
+        ];
+
+        return $this->upsertWorkCatalogSuggestion(
+            $activityId,
+            'publisher',
+            $name,
+            $lecturerId,
+            $userId,
+            $payload,
+        );
+    }
+
+    private function isConferenceReportTypeCode(?string $typeCode): bool
+    {
+        $normalized = Str::lower(trim((string) $typeCode));
+        return in_array($normalized, ['report', 'conference_report', 'bao_cao', 'scientific_report'], true);
+    }
+
+    private function upsertJournalSuggestion(int $activityId, int $lecturerId, ?int $userId, object $detail): ?array
+    {
+        $journalCatalogId = isset($detail->journal_catalog_id) ? (int) $detail->journal_catalog_id : 0;
+        if ($journalCatalogId > 0) {
+            return null;
+        }
+
+        $name = trim((string) ($detail->journal_name ?? ''));
+        if ($name === '') {
+            return null;
+        }
+
+        $issn = strtoupper(trim((string) ($detail->issn ?? '')));
+        $publisher = trim((string) ($detail->journal_publisher ?? ''));
+
+        $matchedCatalogId = null;
+        if ($issn !== '') {
+            $matchedCatalogId = DB::table('journals')->where('issn', $issn)->value('id');
+        }
+
+        if (! $matchedCatalogId) {
+            $query = DB::table('journals')
+                ->whereRaw('LOWER(name) = ?', [Str::lower($name)]);
+
+            if ($publisher !== '') {
+                $query->whereRaw("LOWER(COALESCE(publisher, '')) = ?", [Str::lower($publisher)]);
+            }
+
+            $matchedCatalogId = $query->value('id');
+        }
+
+        if ($matchedCatalogId) {
+            DB::table('paper_details')
+                ->where('activity_id', $activityId)
+                ->update([
+                    'journal_catalog_id' => (int) $matchedCatalogId,
+                    'updated_at' => now(),
+                ]);
+
+            return [
+                'type' => 'journal',
+                'status' => 'matched',
+                'catalog_id' => (int) $matchedCatalogId,
+            ];
+        }
+
+        $payload = [
+            'name' => $name,
+            'issn' => $issn !== '' ? $issn : null,
+            'scope' => $detail->journal_scope ?? null,
+            'source_name' => $detail->journal_source_name ?? null,
+            'publisher' => $publisher !== '' ? $publisher : null,
+            'website' => $detail->journal_website ?? null,
+            'point' => $detail->work_score !== null ? (float) $detail->work_score : null,
+        ];
+
+        return $this->upsertWorkCatalogSuggestion(
+            $activityId,
+            'journal',
+            $name,
+            $lecturerId,
+            $userId,
+            $payload,
+        );
+    }
+
+    private function upsertConferenceSuggestion(int $activityId, int $lecturerId, ?int $userId, object $detail): ?array
+    {
+        $conferenceCatalogId = isset($detail->conference_catalog_id) ? (int) $detail->conference_catalog_id : 0;
+        if ($conferenceCatalogId > 0) {
+            return null;
+        }
+
+        $name = trim((string) ($detail->conference_name ?? ''));
+        if ($name === '') {
+            return null;
+        }
+
+        $level = strtoupper(trim((string) ($detail->conference_level ?? '')));
+        $organization = trim((string) ($detail->conference_organization ?? ''));
+        $isbn = strtoupper(trim((string) ($detail->conference_isbn ?? '')));
+
+        $matchedCatalogId = null;
+        if ($isbn !== '') {
+            $matchedCatalogId = DB::table('conferences')->where('isbn', $isbn)->value('id');
+        }
+
+        if (! $matchedCatalogId) {
+            $query = DB::table('conferences')
+                ->whereRaw('LOWER(name) = ?', [Str::lower($name)]);
+
+            if ($level !== '') {
+                $query->where('level', $level);
+            }
+
+            if ($organization !== '') {
+                $query->whereRaw("LOWER(COALESCE(organization, '')) = ?", [Str::lower($organization)]);
+            }
+
+            $matchedCatalogId = $query->value('id');
+        }
+
+        if ($matchedCatalogId) {
+            DB::table('paper_details')
+                ->where('activity_id', $activityId)
+                ->update([
+                    'conference_catalog_id' => (int) $matchedCatalogId,
+                    'updated_at' => now(),
+                ]);
+
+            return [
+                'type' => 'conference',
+                'status' => 'matched',
+                'catalog_id' => (int) $matchedCatalogId,
+            ];
+        }
+
+        $payload = [
+            'name' => $name,
+            'level' => $level !== '' ? $level : null,
+            'research_field' => $detail->conference_research_field ?? null,
+            'organization' => $organization !== '' ? $organization : null,
+            'has_isbn' => (bool) ($detail->conference_has_isbn ?? false),
+            'isbn' => $isbn !== '' ? $isbn : null,
+            'point' => $detail->conference_point !== null ? (float) $detail->conference_point : null,
+        ];
+
+        return $this->upsertWorkCatalogSuggestion(
+            $activityId,
+            'conference',
+            $name,
+            $lecturerId,
+            $userId,
+            $payload,
+        );
+    }
+
+    private function upsertWorkCatalogSuggestion(
+        int $activityId,
+        string $type,
+        string $sourceName,
+        int $lecturerId,
+        ?int $userId,
+        array $payload,
+    ): array {
+        $now = now();
+
+        $existing = DB::table('work_catalog_suggestions')
+            ->where('activity_id', $activityId)
+            ->where('suggestion_type', $type)
+            ->first();
+
+        $data = [
+            'source_name' => $sourceName,
+            'status' => 'pending',
+            'submitted_by_lecturer_id' => $lecturerId,
+            'submitted_by_user_id' => $userId,
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'reviewed_by_user_id' => null,
+            'reviewed_at' => null,
+            'review_note' => null,
+            'resolved_catalog_id' => null,
+            'updated_at' => $now,
+        ];
+
+        if (! $existing) {
+            $id = DB::table('work_catalog_suggestions')->insertGetId(array_merge($data, [
+                'activity_id' => $activityId,
+                'suggestion_type' => $type,
+                'created_at' => $now,
+            ]));
+
+            return [
+                'type' => $type,
+                'status' => 'created',
+                'suggestion_id' => (int) $id,
+            ];
+        }
+
+        DB::table('work_catalog_suggestions')
+            ->where('id', (int) $existing->id)
+            ->update($data);
+
+        return [
+            'type' => $type,
+            'status' => 'updated',
+            'suggestion_id' => (int) $existing->id,
+        ];
     }
 
     public function show(Request $request, int $activity)
@@ -1897,11 +2193,11 @@ class ResearchActivityController extends Controller
                 'total_hours' => round((float) ($leaderHours ?? 0), 2),
                 'formula_text' => $memberPoolCount > 0
                     ? round((float) ($leaderRuleHours ?? 0), 2)
-                        . ' - '
-                        . round((float) ($memberPoolHours ?? 0), 2)
-                        . ' = '
-                        . round((float) ($leaderHours ?? 0), 2)
-                        . ' giờ'
+                    . ' - '
+                    . round((float) ($memberPoolHours ?? 0), 2)
+                    . ' = '
+                    . round((float) ($leaderHours ?? 0), 2)
+                    . ' giờ'
                     : round((float) ($leaderHours ?? 0), 2) . ' giờ (không có thành viên)',
             ];
             $formulaRows[] = [
@@ -2303,7 +2599,9 @@ class ResearchActivityController extends Controller
         $preferred = self::EVIDENCE_LINK_PREFERRED_CODE_BY_KIND[$kindCode] ?? [];
 
         if ($preferred === []) {
-            $preferred = ['content', 'cover', 'toc', 'acceptance_decision', 'publication_decision'];
+            $preferred = array_values(array_unique(array_merge(
+                ...array_values(self::EVIDENCE_LINK_PREFERRED_CODE_BY_KIND)
+            )));
         }
 
         $idsByCode = DB::table('evidence_file_types')
@@ -2347,10 +2645,7 @@ class ResearchActivityController extends Controller
 
     private function allowedEvidenceTypeCodesForKind(string $kindCode): array
     {
-        $primary = self::EVIDENCE_FILE_TYPE_CODES_BY_KIND[$kindCode] ?? [];
-        $legacy = self::LEGACY_EVIDENCE_FILE_TYPE_CODES_BY_KIND[$kindCode] ?? [];
-
-        return array_values(array_unique(array_merge($primary, $legacy)));
+        return self::EVIDENCE_FILE_TYPE_CODES_BY_KIND[$kindCode] ?? [];
     }
 
     private function makeEvidenceLinkSha(int $activityId, int $lecturerId, string $url): string

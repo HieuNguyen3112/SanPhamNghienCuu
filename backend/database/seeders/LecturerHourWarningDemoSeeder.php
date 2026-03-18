@@ -34,9 +34,9 @@ class LecturerHourWarningDemoSeeder extends Seeder
 
             ['code' => '2023-2024', 'start_date' => '2023-11-01', 'end_date' => '2024-10-31', 'is_active' => false],
 
-            ['code' => '2024-2025', 'start_date' => '2024-11-01', 'end_date' => '2025-10-31', 'is_active' => true],
+            ['code' => '2024-2025', 'start_date' => '2024-11-01', 'end_date' => '2025-10-31', 'is_active' => false],
 
-            ['code' => '2025-2026', 'start_date' => '2025-11-01', 'end_date' => '2026-10-31', 'is_active' => false],
+            ['code' => '2025-2026', 'start_date' => '2025-11-01', 'end_date' => '2026-10-31', 'is_active' => true],
 
         ];
 
@@ -51,7 +51,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
                 array_merge($year, ['created_at' => $now, 'updated_at' => $now])
 
             );
-
         }
 
 
@@ -61,7 +60,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
         if (! $academicYearId) {
 
             return;
-
         }
 
 
@@ -92,7 +90,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
                 ['name' => $faculty['name'], 'created_at' => $now, 'updated_at' => $now]
 
             );
-
         }
 
 
@@ -112,7 +109,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
             if (! $facultyId) {
 
                 continue;
-
             }
 
 
@@ -134,7 +130,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
                 ]
 
             );
-
         }
 
 
@@ -144,7 +139,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
         if (empty($departmentIds)) {
 
             return;
-
         }
 
 
@@ -172,7 +166,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
             if (! $departmentId) {
 
                 continue;
-
             }
 
 
@@ -200,7 +193,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
                 $lecturerIds[$lecturer['code']] = $existing->id;
 
                 continue;
-
             }
 
 
@@ -230,7 +222,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
                 'updated_at' => $now,
 
             ]);
-
         }
 
 
@@ -268,7 +259,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
             if (! $lecturerId) {
 
                 continue;
-
             }
 
 
@@ -280,7 +270,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
             if ($seed['warned'] && $seed['warned_days_ago'] !== null) {
 
                 $updatedAt = $now->copy()->subDays($seed['warned_days_ago']);
-
             }
 
 
@@ -306,7 +295,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
                 ]
 
             );
-
         }
 
 
@@ -314,7 +302,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
         if (! Schema::hasTable('lecturer_hour_warnings')) {
 
             return;
-
         }
 
 
@@ -324,7 +311,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
         if (! $primaryLecturerId) {
 
             return;
-
         }
 
 
@@ -396,10 +382,6 @@ class LecturerHourWarningDemoSeeder extends Seeder
                 ]
 
             );
-
         }
-
     }
-
 }
-

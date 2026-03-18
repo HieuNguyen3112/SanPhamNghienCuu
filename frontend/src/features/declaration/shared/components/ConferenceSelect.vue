@@ -34,10 +34,7 @@
       />
 
       <button
-        v-if="
-          !disabled &&
-          (modelValue != null || (journalName && journalName.trim().length > 0))
-        "
+        v-if="!disabled && (modelValue != null || (conferenceName && conferenceName.trim().length > 0))"
         type="button"
         class="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-slate-50"
         title="Xoá chọn"
@@ -56,14 +53,11 @@
       {{ error }}
     </p>
 
-    <!-- Dropdown -->
     <div
       v-if="open"
       class="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg"
     >
-      <div
-        class="flex items-center justify-between border-b border-slate-200 px-3 py-2"
-      >
+      <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2">
         <div class="text-xs font-semibold text-slate-700">
           Kết quả tìm kiếm
           <span v-if="loading" class="ml-2 text-slate-500">(đang tải...)</span>
@@ -90,71 +84,43 @@
           @click="choose(it)"
         >
           <div class="mt-0.5">
-            <div
-              class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white"
-            >
-              <Check
-                v-if="modelValue === it.id"
-                class="h-4 w-4 text-emerald-700"
-              />
-              <span v-else class="text-xs font-semibold text-slate-600">J</span>
+            <div class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white">
+              <Check v-if="modelValue === it.id" class="h-4 w-4 text-emerald-700" />
+              <span v-else class="text-xs font-semibold text-slate-600">H</span>
             </div>
           </div>
 
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
-              <div class="truncate text-sm font-semibold text-slate-900">
-                {{ it.name }}
-              </div>
-
-              <span
-                v-if="pointsLabel(it)"
-                class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700"
-                :title="pointsTitle(it)"
-              >
+              <div class="truncate text-sm font-semibold text-slate-900">{{ it.name }}</div>
+              <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                {{ levelLabel(it.level) }}
+              </span>
+              <span v-if="pointsLabel(it)" class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
                 {{ pointsLabel(it) }}
               </span>
             </div>
 
-            <div
-              class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-600"
-            >
-              <span v-if="it.issn">ISSN: {{ it.issn }}</span>
-              <span v-if="it.issn && it.address" class="text-slate-300">•</span>
-              <span v-if="it.address" class="line-clamp-1">{{
-                it.address
-              }}</span>
-              <span
-                v-if="(it.issn || it.address) && it.country"
-                class="text-slate-300"
-                >•</span
-              >
-              <span v-if="it.country">{{ it.country }}</span>
+            <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <span v-if="it.researchField" class="line-clamp-1">{{ it.researchField }}</span>
+              <span v-if="it.researchField && it.organization" class="text-slate-300">•</span>
+              <span v-if="it.organization" class="line-clamp-1">{{ it.organization }}</span>
+              <span v-if="(it.researchField || it.organization) && it.year" class="text-slate-300">•</span>
+              <span v-if="it.year">{{ it.year }}</span>
             </div>
 
-            <div v-if="it.publisher" class="mt-0.5 text-xs text-slate-600">
-              Cơ quan xuất bản: {{ it.publisher }}
-            </div>
-
-            <div class="mt-0.5">
-              <span
-                class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                :class="
-                  it.isActive
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-slate-100 text-slate-600'
-                "
-              >
-                {{ it.isActive ? "Đang dùng" : "Ngừng dùng" }}
+            <div class="mt-0.5 flex flex-wrap gap-1 text-[11px]">
+              <span class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+                {{ it.hasIsbn ? `ISBN: ${it.isbn || '—'}` : 'Không ISBN' }}
+              </span>
+              <span class="rounded-full px-2 py-0.5" :class="it.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'">
+                {{ it.isActive ? 'Đang dùng' : 'Ngừng dùng' }}
               </span>
             </div>
           </div>
         </button>
 
-        <div
-          v-if="!loading && items.length === 0"
-          class="px-3 py-6 text-center text-sm text-slate-500"
-        >
+        <div v-if="!loading && items.length === 0" class="px-3 py-6 text-center text-sm text-slate-500">
           Không có kết quả. Hãy thử từ khoá khác.
         </div>
       </div>
@@ -171,46 +137,39 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { Check, ChevronDown, Search, X } from "lucide-vue-next";
 
-type JournalOptionDto = {
+type ConferenceOptionDto = {
   id: number;
   name: string;
-  issn: string | null;
-  journal_type?: string | null;
-  research_field?: string | null;
-  website?: string | null;
-  address: string | null;
-  country: string | null;
-  notes: string | null;
-  source_name: string | null;
-  publisher?: string | null;
+  level: "NATIONAL" | "INTERNATIONAL";
+  research_field: string | null;
+  organization: string | null;
+  year: number | null;
+  has_proceedings: boolean;
+  has_isbn: boolean;
+  isbn: string | null;
   point: string | number | null;
-  classification: string;
-  research_hours: number;
+  notes: string | null;
   is_active: boolean;
 };
 
-type JournalOption = {
+type ConferenceOption = {
   id: number;
   name: string;
-  issn: string | null;
-  journalType: string | null;
+  level: "NATIONAL" | "INTERNATIONAL";
   researchField: string | null;
-  website: string | null;
-  address: string;
-  country: string | null;
-  notes: string | null;
-  sourceName: string | null;
-  publisher: string | null;
+  organization: string | null;
+  year: number | null;
+  hasProceedings: boolean;
+  hasIsbn: boolean;
+  isbn: string | null;
   point: number | null;
-  classification: string;
-  researchHours: number;
+  notes: string | null;
   isActive: boolean;
 };
 
 const props = defineProps<{
   modelValue: number | null;
-  journalName: string;
-  issn: string;
+  conferenceName: string;
 
   disabled?: boolean;
   required?: boolean;
@@ -219,32 +178,30 @@ const props = defineProps<{
   hint?: string;
   error?: string;
 
-  /** GET /api/lookups/journals?search=...&active=1 */
-  searchFn: (q: string) => Promise<JournalOptionDto[]>;
+  searchFn: (q: string) => Promise<ConferenceOptionDto[]>;
   debounceMs?: number;
 }>();
 
 const emit = defineEmits<{
   (e: "update:modelValue", v: number | null): void;
-  (e: "update:journalName", v: string): void;
-  (e: "update:issn", v: string): void;
-  (e: "select", v: JournalOption): void;
+  (e: "update:conferenceName", v: string): void;
+  (e: "select", v: ConferenceOption): void;
   (e: "clear"): void;
 }>();
 
 const disabled = computed(() => !!props.disabled);
-const placeholder = computed(() => props.placeholder ?? "Gõ để tìm tạp chí...");
+const placeholder = computed(() => props.placeholder ?? "Gõ để tìm hội nghị khoa học...");
 const debounceMs = computed(() => props.debounceMs ?? 250);
 
 const open = ref(false);
 const loading = ref(false);
-const items = ref<JournalOption[]>([]);
+const items = ref<ConferenceOption[]>([]);
 const activeIndex = ref(0);
 
 const rootEl = ref<HTMLElement | null>(null);
 const inputEl = ref<HTMLInputElement | null>(null);
 
-const inputText = computed(() => props.journalName ?? "");
+const inputText = computed(() => props.conferenceName ?? "");
 
 function toNumberOrNull(v: string | number | null): number | null {
   if (v == null) return null;
@@ -253,22 +210,19 @@ function toNumberOrNull(v: string | number | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function dtoToModel(dto: JournalOptionDto): JournalOption {
+function dtoToModel(dto: ConferenceOptionDto): ConferenceOption {
   return {
     id: dto.id,
     name: dto.name,
-    issn: dto.issn,
-    journalType: dto.journal_type ?? null,
+    level: dto.level,
     researchField: dto.research_field ?? null,
-    website: dto.website ?? null,
-    address: dto.address ?? "",
-    country: dto.country,
-    notes: dto.notes,
-    sourceName: dto.source_name,
-    publisher: dto.publisher ?? null,
+    organization: dto.organization ?? null,
+    year: dto.year ?? null,
+    hasProceedings: !!dto.has_proceedings,
+    hasIsbn: !!dto.has_isbn,
+    isbn: dto.isbn ?? null,
     point: toNumberOrNull(dto.point),
-    classification: dto.classification ?? "OTHER",
-    researchHours: dto.research_hours ?? 0,
+    notes: dto.notes ?? null,
     isActive: !!dto.is_active,
   };
 }
@@ -297,7 +251,7 @@ function openDropdown() {
   if (disabled.value) return;
   if (!open.value) {
     open.value = true;
-    scheduleSearch((props.journalName ?? "").trim());
+    scheduleSearch((props.conferenceName ?? "").trim());
   }
 }
 
@@ -313,45 +267,45 @@ function onContainerClick() {
 
 function onInput(e: Event) {
   const v = (e.target as HTMLInputElement).value;
-  emit("update:journalName", v);
+  emit("update:conferenceName", v);
   emit("update:modelValue", null);
-  // không tự động overwrite issn khi gõ
   scheduleSearch(v.trim());
   openDropdown();
 }
 
-function choose(it: JournalOption) {
+function choose(it: ConferenceOption) {
   emit("update:modelValue", it.id);
-  emit("update:journalName", it.name);
-  emit("update:issn", it.issn ?? "");
+  emit("update:conferenceName", it.name);
   emit("select", it);
   closeDropdown();
 }
 
 function clearSelection() {
   emit("update:modelValue", null);
-  emit("update:journalName", "");
-  emit("update:issn", "");
+  emit("update:conferenceName", "");
   emit("clear");
   items.value = [];
   activeIndex.value = 0;
   inputEl.value?.focus();
   openDropdown();
 }
+
 function formatPoint(n: number): string {
-  // 2 chữ số thập phân nhưng bỏ .00 cho gọn
   const s = n.toFixed(2);
   return s.endsWith(".00") ? s.slice(0, -3) : s.replace(/0$/, "");
 }
+
 function pointsLabel(it: { point: number | null }): string | null {
   if (it.point == null) return null;
   return formatPoint(it.point);
 }
 
-function pointsTitle(it: { point: number | null }): string {
-  if (it.point == null) return "";
-  return `Điểm: ${formatPoint(it.point)}`;
+function levelLabel(level: ConferenceOption["level"]): string {
+  if (level === "NATIONAL") return "Quốc gia";
+  if (level === "INTERNATIONAL") return "Quốc tế";
+  return level;
 }
+
 function move(delta: number) {
   if (!open.value) openDropdown();
   if (items.value.length === 0) return;

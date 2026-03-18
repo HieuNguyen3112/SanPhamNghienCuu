@@ -21,6 +21,20 @@
 
         <button
           type="button"
+          class="relative inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          @click="emit('open-suggestions')"
+        >
+          <Mail class="h-4 w-4" />
+          Đề xuất
+          <span
+            class="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-bold text-amber-700"
+          >
+            {{ suggestions.length }}
+          </span>
+        </button>
+
+        <button
+          type="button"
           class="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-3 text-sm font-semibold text-white hover:bg-slate-800"
           @click="emit('create')"
         >
@@ -248,13 +262,175 @@
         </div>
       </div>
     </CatalogUpsertModal>
+
+    <div v-if="suggestionsOpen" class="fixed inset-0 z-50">
+      <div
+        class="absolute inset-0 bg-slate-900/40"
+        @click="emit('close-suggestions')"
+      ></div>
+
+      <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div
+          class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg"
+        >
+          <div
+            class="flex items-center justify-between border-b border-slate-200 px-4 py-3"
+          >
+            <div>
+              <div class="text-sm font-semibold text-slate-900">
+                Đề xuất nhà xuất bản chờ duyệt
+              </div>
+              <div class="text-xs text-slate-500">
+                Duyệt đề xuất để thêm vào danh mục nhà xuất bản chính thức.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              @click="emit('close-suggestions')"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </div>
+
+          <div class="min-h-0 flex-1 overflow-auto p-4">
+            <div
+              v-if="suggestionsLoading"
+              class="py-10 text-center text-sm text-slate-500"
+            >
+              Đang tải danh sách đề xuất...
+            </div>
+
+            <div
+              v-else-if="suggestions.length === 0"
+              class="py-10 text-center text-sm text-slate-500"
+            >
+              Không có đề xuất nhà xuất bản đang chờ duyệt.
+            </div>
+
+            <div v-else class="space-y-3">
+              <div
+                v-for="suggestion in suggestions"
+                :key="suggestion.id"
+                class="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div class="text-sm font-semibold text-slate-900">
+                      {{
+                        suggestionField(suggestion, "name") !== "—"
+                          ? suggestionField(suggestion, "name")
+                          : suggestion.sourceName
+                      }}
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">
+                      Mã kê khai: #{{ suggestion.activityId }} • Tạo lúc:
+                      {{ suggestion.createdAt }}
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      class="inline-flex h-9 items-center rounded-xl border border-rose-300 bg-white px-3 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                      :disabled="approvingSuggestionId === suggestion.id"
+                      @click="
+                        emit(
+                          'reject-suggestion',
+                          suggestion.id,
+                          noteBySuggestion(suggestion.id),
+                        )
+                      "
+                    >
+                      {{
+                        approvingSuggestionId === suggestion.id
+                          ? "Đang xử lý..."
+                          : "Từ chối"
+                      }}
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex h-9 items-center rounded-xl bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                      :disabled="approvingSuggestionId === suggestion.id"
+                      @click="
+                        emit(
+                          'approve-suggestion',
+                          suggestion.id,
+                          noteBySuggestion(suggestion.id),
+                        )
+                      "
+                    >
+                      {{
+                        approvingSuggestionId === suggestion.id
+                          ? "Đang xử lý..."
+                          : "Duyệt"
+                      }}
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  class="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-700 md:grid-cols-2"
+                >
+                  <div>
+                    <span class="font-semibold text-slate-900">Mã NXB:</span>
+                    {{ suggestionField(suggestion, "code") }}
+                  </div>
+                  <div>
+                    <span class="font-semibold text-slate-900">Địa chỉ:</span>
+                    {{ suggestionField(suggestion, "address") }}
+                  </div>
+                  <div>
+                    <span class="font-semibold text-slate-900"
+                      >Điện thoại:</span
+                    >
+                    {{ suggestionField(suggestion, "phone") }}
+                  </div>
+                  <div>
+                    <span class="font-semibold text-slate-900">Email:</span>
+                    {{ suggestionField(suggestion, "email") }}
+                  </div>
+                  <div class="md:col-span-2">
+                    <span class="font-semibold text-slate-900">Website:</span>
+                    {{ suggestionField(suggestion, "website") }}
+                  </div>
+                </div>
+
+                <div class="mt-3">
+                  <label class="text-xs font-medium text-slate-600"
+                    >Ghi chú duyệt/từ chối</label
+                  >
+                  <textarea
+                    rows="2"
+                    :value="noteBySuggestion(suggestion.id)"
+                    @input="
+                      setNoteBySuggestion(
+                        suggestion.id,
+                        ($event.target as HTMLTextAreaElement).value,
+                      )
+                    "
+                    class="mt-1 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+                    placeholder="Nhập ghi chú (không bắt buộc)..."
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Pencil, Plus } from "lucide-vue-next";
+import { ref } from "vue";
+import { Mail, Pencil, Plus, X } from "lucide-vue-next";
 import CatalogUpsertModal from "./CatalogUpsertModal.vue";
-import type { Publisher } from "../contracts/publishers.contract";
+import type {
+  Publisher,
+  PublisherSuggestion,
+} from "../contracts/publishers.contract";
 
 defineProps<{
   rows: Publisher[];
@@ -267,6 +443,10 @@ defineProps<{
   modalOpen: boolean;
   modalTitle: string;
   submitting: boolean;
+  suggestionsOpen: boolean;
+  suggestions: PublisherSuggestion[];
+  suggestionsLoading: boolean;
+  approvingSuggestionId: number | null;
   form: {
     id: number;
     name: string;
@@ -288,6 +468,10 @@ const emit = defineEmits<{
   (e: "update:pageSize", v: number): void;
   (e: "create"): void;
   (e: "edit", id: number): void;
+  (e: "open-suggestions"): void;
+  (e: "close-suggestions"): void;
+  (e: "approve-suggestion", id: number, reviewNote?: string): void;
+  (e: "reject-suggestion", id: number, reviewNote?: string): void;
   (e: "close-modal"): void;
   (e: "submit"): void;
   (
@@ -304,4 +488,27 @@ const emit = defineEmits<{
     },
   ): void;
 }>();
+
+const suggestionNotes = ref<Record<number, string>>({});
+
+function suggestionField(suggestion: PublisherSuggestion, key: string): string {
+  const payload = suggestion.payload ?? {};
+  const value = (payload as Record<string, unknown>)[key];
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  const text = String(value).trim();
+  return text === "" ? "—" : text;
+}
+
+function noteBySuggestion(id: number): string {
+  return suggestionNotes.value[id] ?? "";
+}
+
+function setNoteBySuggestion(id: number, value: string) {
+  suggestionNotes.value = {
+    ...suggestionNotes.value,
+    [id]: value,
+  };
+}
 </script>

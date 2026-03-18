@@ -58,6 +58,12 @@ export function mapPublicResearchDetailDtoToModel(
     displayMeta: {
       article: {
         journalName: dto.display_meta?.article?.journal_name ?? null,
+        issn: dto.display_meta?.article?.issn ?? null,
+        journalScope: dto.display_meta?.article?.journal_scope ?? null,
+        journalType: dto.display_meta?.article?.journal_type ?? null,
+        journalSourceName:
+          dto.display_meta?.article?.journal_source_name ?? null,
+        researchField: dto.display_meta?.article?.research_field ?? null,
         year: dto.display_meta?.article?.year ?? null,
         volume: dto.display_meta?.article?.volume ?? null,
         issue: dto.display_meta?.article?.issue ?? null,
@@ -69,6 +75,10 @@ export function mapPublicResearchDetailDtoToModel(
       project: {
         projectCode: dto.display_meta?.project?.project_code ?? null,
         managementLevel: dto.display_meta?.project?.management_level ?? null,
+        projectCategory: dto.display_meta?.project?.project_category ?? null,
+        researchField: dto.display_meta?.project?.research_field ?? null,
+        objectives: dto.display_meta?.project?.objectives ?? null,
+        contentSummary: dto.display_meta?.project?.content_summary ?? null,
         startMonth: dto.display_meta?.project?.start_month ?? null,
         endMonth: dto.display_meta?.project?.end_month ?? null,
         decisionNo: dto.display_meta?.project?.decision_no ?? null,
@@ -78,6 +88,8 @@ export function mapPublicResearchDetailDtoToModel(
         publisher: dto.display_meta?.book?.publisher ?? null,
         isbn: dto.display_meta?.book?.isbn ?? null,
         year: dto.display_meta?.book?.year ?? null,
+        bookType: dto.display_meta?.book?.book_type ?? null,
+        researchField: dto.display_meta?.book?.research_field ?? null,
         approvalDecisionNo:
           dto.display_meta?.book?.approval_decision_no ?? null,
         approvalDecisionDate:

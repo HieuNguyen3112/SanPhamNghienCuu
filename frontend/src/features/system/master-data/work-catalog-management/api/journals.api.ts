@@ -2,10 +2,12 @@ import http, { ensureCsrfCookie } from "@/lib/http";
 import type { ListResponseDTO } from "../contracts/pagination.contract";
 import type {
   JournalDTO,
+  JournalSuggestionDTO,
   JournalUpsertDTO,
 } from "../contracts/journals.contract";
 
 const base = "/api/admin/work-catalog/journals";
+const suggestionBase = `${base}/suggestions`;
 
 export const journalsApi = {
   async list(params: { keyword?: string; page?: number; per_page?: number }) {
@@ -40,6 +42,42 @@ export const journalsApi = {
       `${base}/${id}/status`,
       payload,
     );
+    return res.data.data;
+  },
+
+  async listSuggestions(params: {
+    keyword?: string;
+    page?: number;
+    per_page?: number;
+  }) {
+    const res = await http.get<{
+      success: boolean;
+      data: ListResponseDTO<JournalSuggestionDTO>;
+    }>(suggestionBase, { params });
+    return res.data.data;
+  },
+
+  async approveSuggestion(id: number, payload?: { review_note?: string }) {
+    await ensureCsrfCookie();
+    const res = await http.post<{
+      success: boolean;
+      data: {
+        suggestion: JournalSuggestionDTO | null;
+        catalog: JournalDTO | null;
+      };
+    }>(`${suggestionBase}/${id}/approve`, payload ?? {});
+    return res.data.data;
+  },
+
+  async rejectSuggestion(id: number, payload?: { review_note?: string }) {
+    await ensureCsrfCookie();
+    const res = await http.post<{
+      success: boolean;
+      data: {
+        suggestion: JournalSuggestionDTO | null;
+        catalog: JournalDTO | null;
+      };
+    }>(`${suggestionBase}/${id}/reject`, payload ?? {});
     return res.data.data;
   },
 };

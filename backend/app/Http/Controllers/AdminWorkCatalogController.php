@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,7 +22,7 @@ class AdminWorkCatalogController extends Controller
         'ISBN' => 'ISSN_ISBN',
     ];
     private const JOURNAL_RANKS = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'OTHER'];
-    private const CONFERENCE_LEVELS = ['FACULTY', 'UNIVERSITY', 'NATIONAL', 'INTERNATIONAL'];
+    private const CONFERENCE_LEVELS = ['NATIONAL', 'INTERNATIONAL'];
     private ?array $paperRuleHoursByTypeCode = null;
 
     // ===== WORK TYPES =====
@@ -457,7 +458,13 @@ class AdminWorkCatalogController extends Controller
 
         $query = DB::table('conferences')
             ->when($keyword !== '', function ($q) use ($keyword) {
-                $q->where('name', 'like', '%' . $keyword . '%');
+                $like = '%' . $keyword . '%';
+                $q->where(function ($sub) use ($like) {
+                    $sub->where('name', 'like', $like)
+                        ->orWhere('organization', 'like', $like)
+                        ->orWhere('research_field', 'like', $like)
+                        ->orWhere('isbn', 'like', $like);
+                });
             })
             ->orderByDesc('updated_at');
 
@@ -468,18 +475,36 @@ class AdminWorkCatalogController extends Controller
 
     public function storeConference(Request $request)
     {
+        $isbnRequired = Rule::requiredIf(fn() => $request->boolean('has_isbn'));
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'level' => ['required', 'string', Rule::in(self::CONFERENCE_LEVELS)],
+            'research_field' => ['nullable', 'string', 'max:255'],
+            'year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'organization' => ['nullable', 'string', 'max:255'],
+            'has_proceedings' => ['nullable', 'boolean'],
+            'has_isbn' => ['nullable', 'boolean'],
+            'isbn' => [$isbnRequired, 'nullable', 'string', 'max:50'],
+            'point' => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2'],
             'notes' => ['nullable', 'string', 'max:255'],
             'is_active' => ['required', 'boolean'],
         ]);
 
+        $normalized = $this->normalizeConferencePayload($data);
+
         $now = now();
         $id = DB::table('conferences')->insertGetId([
-            'name' => $data['name'],
+            'name' => $normalized['name'],
             'level' => $data['level'],
-            'notes' => $data['notes'] ?? null,
+            'research_field' => $normalized['research_field'],
+            'year' => $normalized['year'],
+            'organization' => $normalized['organization'],
+            'has_proceedings' => $normalized['has_proceedings'],
+            'has_isbn' => $normalized['has_isbn'],
+            'isbn' => $normalized['isbn'],
+            'point' => $normalized['point'],
+            'notes' => $normalized['notes'],
             'is_active' => (bool) $data['is_active'],
             'created_at' => $now,
             'updated_at' => $now,
@@ -501,19 +526,37 @@ class AdminWorkCatalogController extends Controller
             return response()->json(['message' => 'Không tìm thấy bản ghi.'], Response::HTTP_NOT_FOUND);
         }
 
+        $isbnRequired = Rule::requiredIf(fn() => $request->boolean('has_isbn'));
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'level' => ['required', 'string', Rule::in(self::CONFERENCE_LEVELS)],
+            'research_field' => ['nullable', 'string', 'max:255'],
+            'year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'organization' => ['nullable', 'string', 'max:255'],
+            'has_proceedings' => ['nullable', 'boolean'],
+            'has_isbn' => ['nullable', 'boolean'],
+            'isbn' => [$isbnRequired, 'nullable', 'string', 'max:50'],
+            'point' => ['nullable', 'numeric', 'min:0', 'max:99.99', 'decimal:0,2'],
             'notes' => ['nullable', 'string', 'max:255'],
             'is_active' => ['required', 'boolean'],
         ]);
 
+        $normalized = $this->normalizeConferencePayload($data);
+
         DB::table('conferences')
             ->where('id', $id)
             ->update([
-                'name' => $data['name'],
+                'name' => $normalized['name'],
                 'level' => $data['level'],
-                'notes' => $data['notes'] ?? null,
+                'research_field' => $normalized['research_field'],
+                'year' => $normalized['year'],
+                'organization' => $normalized['organization'],
+                'has_proceedings' => $normalized['has_proceedings'],
+                'has_isbn' => $normalized['has_isbn'],
+                'isbn' => $normalized['isbn'],
+                'point' => $normalized['point'],
+                'notes' => $normalized['notes'],
                 'is_active' => (bool) $data['is_active'],
                 'updated_at' => now(),
             ]);
@@ -551,6 +594,577 @@ class AdminWorkCatalogController extends Controller
             'success' => true,
             'message' => 'Cập nhật thành công.',
             'data' => $this->conferencePayload($row),
+        ], Response::HTTP_OK);
+    }
+
+    public function listJournalSuggestions(Request $request)
+    {
+        [$keyword, $page, $perPage] = $this->resolveListParams($request);
+
+        $query = $this->suggestionQueryByType('journal')
+            ->when($keyword !== '', function ($q) use ($keyword) {
+                $like = '%' . $keyword . '%';
+                $q->where('s.source_name', 'like', $like);
+            });
+
+        return $this->paginateResponse($query, $page, $perPage, function ($row) {
+            return $this->workCatalogSuggestionPayload($row);
+        });
+    }
+
+    public function approveJournalSuggestion(Request $request, int $id)
+    {
+        $suggestion = $this->findPendingSuggestion($id, 'journal');
+        if (! $suggestion) {
+            return response()->json(['message' => 'Không tìm thấy đề xuất tạp chí đang chờ duyệt.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $validated = $request->validate([
+            'review_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $payload = $this->decodeSuggestionPayload($suggestion->payload ?? null);
+        $name = trim((string) ($payload['name'] ?? $suggestion->source_name ?? ''));
+        if ($name === '') {
+            return response()->json(['message' => 'Đề xuất không có tên tạp chí hợp lệ.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $issn = $this->normalizeNullableTrimmedString($payload['issn'] ?? null);
+        if ($issn !== null) {
+            $issn = strtoupper(preg_replace('/\s+/', '', $issn));
+        }
+
+        $journalType = $this->normalizeNullableTrimmedString($payload['journal_type'] ?? null);
+        $researchField = $this->normalizeNullableTrimmedString($payload['research_field'] ?? null);
+        $website = $this->normalizeNullableTrimmedString($payload['website'] ?? null);
+        $address = $this->normalizeNullableTrimmedString($payload['address'] ?? null);
+        $country = $this->normalizeNullableTrimmedString($payload['country'] ?? null);
+        $notes = $this->normalizeNullableTrimmedString($payload['notes'] ?? null);
+        $sourceName = $this->normalizeNullableTrimmedString($payload['source_name'] ?? null);
+        $publisher = $this->normalizeNullableTrimmedString($payload['publisher'] ?? null);
+        $point = $this->toNullableFloat($payload['point'] ?? null);
+        if ($point !== null) {
+            $point = round($point, 2);
+        }
+
+        $derived = $this->deriveJournalClassificationAndHours([
+            'issn' => $issn,
+            'point' => $point,
+        ]);
+
+        $journalId = DB::transaction(function () use ($suggestion, $validated, $request, $name, $issn, $journalType, $researchField, $website, $address, $country, $notes, $sourceName, $publisher, $point, $derived) {
+            $existingQuery = DB::table('journals');
+            if ($issn !== null) {
+                $existingQuery->where('issn', $issn);
+            } else {
+                $existingQuery->whereRaw('LOWER(name) = ?', [strtolower($name)]);
+            }
+
+            $existingJournalId = $existingQuery->value('id');
+
+            if ($existingJournalId) {
+                $journalId = (int) $existingJournalId;
+            } else {
+                $now = now();
+                $journalId = (int) DB::table('journals')->insertGetId([
+                    'name' => $name,
+                    'issn' => $issn,
+                    'journal_type' => $journalType,
+                    'research_field' => $researchField,
+                    'website' => $website,
+                    'address' => $address,
+                    'country' => $country,
+                    'notes' => $notes,
+                    'source_name' => $sourceName,
+                    'publisher' => $publisher,
+                    'point' => $point,
+                    'classification' => $derived['classification'],
+                    'research_hours' => $derived['research_hours'],
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            DB::table('work_catalog_suggestions')
+                ->where('id', (int) $suggestion->id)
+                ->update([
+                    'status' => 'approved',
+                    'resolved_catalog_id' => $journalId,
+                    'reviewed_by_user_id' => $request->user()?->id,
+                    'reviewed_at' => now(),
+                    'review_note' => $validated['review_note'] ?? null,
+                    'updated_at' => now(),
+                ]);
+
+            DB::table('paper_details')
+                ->where('activity_id', (int) $suggestion->activity_id)
+                ->update([
+                    'journal_catalog_id' => $journalId,
+                    'updated_at' => now(),
+                ]);
+
+            return $journalId;
+        });
+
+        $updatedSuggestion = DB::table('work_catalog_suggestions as s')
+            ->where('s.id', $id)
+            ->select([
+                's.id',
+                's.activity_id',
+                's.suggestion_type',
+                's.source_name',
+                's.status',
+                's.submitted_by_lecturer_id',
+                's.submitted_by_user_id',
+                's.reviewed_by_user_id',
+                's.reviewed_at',
+                's.review_note',
+                's.resolved_catalog_id',
+                's.payload',
+                's.created_at',
+                's.updated_at',
+            ])
+            ->first();
+
+        $journal = $this->journalQuery()->where('j.id', $journalId)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã duyệt đề xuất tạp chí và cập nhật danh mục.',
+            'data' => [
+                'suggestion' => $updatedSuggestion ? $this->workCatalogSuggestionPayload($updatedSuggestion) : null,
+                'catalog' => $journal ? $this->journalPayload($journal) : null,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function rejectJournalSuggestion(Request $request, int $id)
+    {
+        $suggestion = $this->findPendingSuggestion($id, 'journal');
+        if (! $suggestion) {
+            return response()->json(['message' => 'Không tìm thấy đề xuất tạp chí đang chờ duyệt.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $validated = $request->validate([
+            'review_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        DB::table('work_catalog_suggestions')
+            ->where('id', (int) $suggestion->id)
+            ->update([
+                'status' => 'rejected',
+                'resolved_catalog_id' => null,
+                'reviewed_by_user_id' => $request->user()?->id,
+                'reviewed_at' => now(),
+                'review_note' => $validated['review_note'] ?? null,
+                'updated_at' => now(),
+            ]);
+
+        $updatedSuggestion = DB::table('work_catalog_suggestions as s')
+            ->where('s.id', $id)
+            ->select([
+                's.id',
+                's.activity_id',
+                's.suggestion_type',
+                's.source_name',
+                's.status',
+                's.submitted_by_lecturer_id',
+                's.submitted_by_user_id',
+                's.reviewed_by_user_id',
+                's.reviewed_at',
+                's.review_note',
+                's.resolved_catalog_id',
+                's.payload',
+                's.created_at',
+                's.updated_at',
+            ])
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã từ chối đề xuất tạp chí.',
+            'data' => [
+                'suggestion' => $updatedSuggestion ? $this->workCatalogSuggestionPayload($updatedSuggestion) : null,
+                'catalog' => null,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function listConferenceSuggestions(Request $request)
+    {
+        [$keyword, $page, $perPage] = $this->resolveListParams($request);
+
+        $query = $this->suggestionQueryByType('conference')
+            ->when($keyword !== '', function ($q) use ($keyword) {
+                $like = '%' . $keyword . '%';
+                $q->where('s.source_name', 'like', $like);
+            });
+
+        return $this->paginateResponse($query, $page, $perPage, function ($row) {
+            return $this->workCatalogSuggestionPayload($row);
+        });
+    }
+
+    public function approveConferenceSuggestion(Request $request, int $id)
+    {
+        $suggestion = $this->findPendingSuggestion($id, 'conference');
+        if (! $suggestion) {
+            return response()->json(['message' => 'Không tìm thấy đề xuất hội nghị đang chờ duyệt.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $validated = $request->validate([
+            'review_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $payload = $this->decodeSuggestionPayload($suggestion->payload ?? null);
+        $name = trim((string) ($payload['name'] ?? $suggestion->source_name ?? ''));
+        if ($name === '') {
+            return response()->json(['message' => 'Đề xuất không có tên hội nghị hợp lệ.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $normalized = $this->normalizeConferencePayload([
+            'name' => $name,
+            'research_field' => $payload['research_field'] ?? null,
+            'year' => $payload['year'] ?? null,
+            'organization' => $payload['organization'] ?? null,
+            'has_proceedings' => (bool) ($payload['has_proceedings'] ?? false),
+            'has_isbn' => (bool) ($payload['has_isbn'] ?? false),
+            'isbn' => $payload['isbn'] ?? null,
+            'point' => $payload['point'] ?? null,
+            'notes' => $payload['notes'] ?? null,
+        ]);
+
+        $levelRaw = strtoupper(trim((string) ($payload['level'] ?? 'NATIONAL')));
+        $level = in_array($levelRaw, self::CONFERENCE_LEVELS, true) ? $levelRaw : 'NATIONAL';
+
+        $conferenceId = DB::transaction(function () use ($suggestion, $validated, $request, $normalized, $level) {
+            $existingQuery = DB::table('conferences')
+                ->whereRaw('LOWER(name) = ?', [strtolower($normalized['name'])])
+                ->where('level', $level);
+
+            if ($normalized['organization'] !== null) {
+                $existingQuery->whereRaw("LOWER(COALESCE(organization, '')) = ?", [strtolower($normalized['organization'])]);
+            }
+
+            $existingConferenceId = $existingQuery->value('id');
+
+            if ($existingConferenceId) {
+                $conferenceId = (int) $existingConferenceId;
+            } else {
+                $now = now();
+                $conferenceId = (int) DB::table('conferences')->insertGetId([
+                    'name' => $normalized['name'],
+                    'level' => $level,
+                    'research_field' => $normalized['research_field'],
+                    'year' => $normalized['year'],
+                    'organization' => $normalized['organization'],
+                    'has_proceedings' => $normalized['has_proceedings'],
+                    'has_isbn' => $normalized['has_isbn'],
+                    'isbn' => $normalized['isbn'],
+                    'point' => $normalized['point'],
+                    'notes' => $normalized['notes'],
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            DB::table('work_catalog_suggestions')
+                ->where('id', (int) $suggestion->id)
+                ->update([
+                    'status' => 'approved',
+                    'resolved_catalog_id' => $conferenceId,
+                    'reviewed_by_user_id' => $request->user()?->id,
+                    'reviewed_at' => now(),
+                    'review_note' => $validated['review_note'] ?? null,
+                    'updated_at' => now(),
+                ]);
+
+            DB::table('paper_details')
+                ->where('activity_id', (int) $suggestion->activity_id)
+                ->update([
+                    'conference_catalog_id' => $conferenceId,
+                    'updated_at' => now(),
+                ]);
+
+            return $conferenceId;
+        });
+
+        $updatedSuggestion = DB::table('work_catalog_suggestions as s')
+            ->where('s.id', $id)
+            ->select([
+                's.id',
+                's.activity_id',
+                's.suggestion_type',
+                's.source_name',
+                's.status',
+                's.submitted_by_lecturer_id',
+                's.submitted_by_user_id',
+                's.reviewed_by_user_id',
+                's.reviewed_at',
+                's.review_note',
+                's.resolved_catalog_id',
+                's.payload',
+                's.created_at',
+                's.updated_at',
+            ])
+            ->first();
+
+        $conference = DB::table('conferences')->where('id', $conferenceId)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã duyệt đề xuất hội nghị và cập nhật danh mục.',
+            'data' => [
+                'suggestion' => $updatedSuggestion ? $this->workCatalogSuggestionPayload($updatedSuggestion) : null,
+                'catalog' => $conference ? $this->conferencePayload($conference) : null,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function rejectConferenceSuggestion(Request $request, int $id)
+    {
+        $suggestion = $this->findPendingSuggestion($id, 'conference');
+        if (! $suggestion) {
+            return response()->json(['message' => 'Không tìm thấy đề xuất hội nghị đang chờ duyệt.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $validated = $request->validate([
+            'review_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        DB::table('work_catalog_suggestions')
+            ->where('id', (int) $suggestion->id)
+            ->update([
+                'status' => 'rejected',
+                'resolved_catalog_id' => null,
+                'reviewed_by_user_id' => $request->user()?->id,
+                'reviewed_at' => now(),
+                'review_note' => $validated['review_note'] ?? null,
+                'updated_at' => now(),
+            ]);
+
+        $updatedSuggestion = DB::table('work_catalog_suggestions as s')
+            ->where('s.id', $id)
+            ->select([
+                's.id',
+                's.activity_id',
+                's.suggestion_type',
+                's.source_name',
+                's.status',
+                's.submitted_by_lecturer_id',
+                's.submitted_by_user_id',
+                's.reviewed_by_user_id',
+                's.reviewed_at',
+                's.review_note',
+                's.resolved_catalog_id',
+                's.payload',
+                's.created_at',
+                's.updated_at',
+            ])
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã từ chối đề xuất hội nghị.',
+            'data' => [
+                'suggestion' => $updatedSuggestion ? $this->workCatalogSuggestionPayload($updatedSuggestion) : null,
+                'catalog' => null,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function listPublisherSuggestions(Request $request)
+    {
+        [$keyword, $page, $perPage] = $this->resolveListParams($request);
+
+        $query = $this->suggestionQueryByType('publisher')
+            ->when($keyword !== '', function ($q) use ($keyword) {
+                $like = '%' . $keyword . '%';
+                $q->where('s.source_name', 'like', $like);
+            });
+
+        return $this->paginateResponse($query, $page, $perPage, function ($row) {
+            return $this->workCatalogSuggestionPayload($row);
+        });
+    }
+
+    public function approvePublisherSuggestion(Request $request, int $id)
+    {
+        $suggestion = $this->findPendingSuggestion($id, 'publisher');
+        if (! $suggestion) {
+            return response()->json(['message' => 'Không tìm thấy đề xuất nhà xuất bản đang chờ duyệt.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $validated = $request->validate([
+            'review_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $payload = $this->decodeSuggestionPayload($suggestion->payload ?? null);
+        $name = trim((string) ($payload['name'] ?? $suggestion->source_name ?? ''));
+        if ($name === '') {
+            return response()->json(['message' => 'Đề xuất không có tên nhà xuất bản hợp lệ.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $code = $this->normalizeNullableTrimmedString($payload['code'] ?? null);
+        $address = $this->normalizeNullableTrimmedString($payload['address'] ?? null);
+        $phone = $this->normalizeNullableTrimmedString($payload['phone'] ?? null);
+        $email = $this->normalizeNullableTrimmedString($payload['email'] ?? null);
+        $website = $this->normalizeNullableTrimmedString($payload['website'] ?? null);
+
+        if ($code !== null) {
+            $code = strtoupper($code);
+            if (mb_strlen($code) > 50) {
+                $code = mb_substr($code, 0, 50);
+            }
+        }
+
+        if ($address !== null && mb_strlen($address) > 255) {
+            $address = mb_substr($address, 0, 255);
+        }
+        if ($phone !== null && mb_strlen($phone) > 50) {
+            $phone = mb_substr($phone, 0, 50);
+        }
+        if ($email !== null && mb_strlen($email) > 100) {
+            $email = mb_substr($email, 0, 100);
+        }
+        if ($website !== null && mb_strlen($website) > 255) {
+            $website = mb_substr($website, 0, 255);
+        }
+
+        $publisherId = DB::transaction(function () use ($suggestion, $validated, $request, $name, $code, $address, $phone, $email, $website) {
+            $existingQuery = DB::table('publishers');
+
+            if ($code !== null) {
+                $existingQuery->where('code', $code);
+            } else {
+                $existingQuery->whereRaw('LOWER(name) = ?', [Str::lower($name)]);
+            }
+
+            $existingPublisherId = $existingQuery->value('id');
+
+            if ($existingPublisherId) {
+                $publisherId = (int) $existingPublisherId;
+            } else {
+                $now = now();
+                $finalCode = $code ?? $this->generateUniquePublisherCode($name);
+
+                $publisherId = (int) DB::table('publishers')->insertGetId([
+                    'name' => $name,
+                    'code' => $finalCode,
+                    'address' => $address,
+                    'phone' => $phone,
+                    'email' => $email,
+                    'website' => $website,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            DB::table('work_catalog_suggestions')
+                ->where('id', (int) $suggestion->id)
+                ->update([
+                    'status' => 'approved',
+                    'resolved_catalog_id' => $publisherId,
+                    'reviewed_by_user_id' => $request->user()?->id,
+                    'reviewed_at' => now(),
+                    'review_note' => $validated['review_note'] ?? null,
+                    'updated_at' => now(),
+                ]);
+
+            DB::table('book_details')
+                ->where('activity_id', (int) $suggestion->activity_id)
+                ->update([
+                    'publisher' => $name,
+                    'updated_at' => now(),
+                ]);
+
+            return $publisherId;
+        });
+
+        $updatedSuggestion = DB::table('work_catalog_suggestions as s')
+            ->where('s.id', $id)
+            ->select([
+                's.id',
+                's.activity_id',
+                's.suggestion_type',
+                's.source_name',
+                's.status',
+                's.submitted_by_lecturer_id',
+                's.submitted_by_user_id',
+                's.reviewed_by_user_id',
+                's.reviewed_at',
+                's.review_note',
+                's.resolved_catalog_id',
+                's.payload',
+                's.created_at',
+                's.updated_at',
+            ])
+            ->first();
+
+        $publisher = DB::table('publishers')->where('id', $publisherId)->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã duyệt đề xuất nhà xuất bản và cập nhật danh mục.',
+            'data' => [
+                'suggestion' => $updatedSuggestion ? $this->workCatalogSuggestionPayload($updatedSuggestion) : null,
+                'catalog' => $publisher ? $this->publisherPayload($publisher) : null,
+            ],
+        ], Response::HTTP_OK);
+    }
+
+    public function rejectPublisherSuggestion(Request $request, int $id)
+    {
+        $suggestion = $this->findPendingSuggestion($id, 'publisher');
+        if (! $suggestion) {
+            return response()->json(['message' => 'Không tìm thấy đề xuất nhà xuất bản đang chờ duyệt.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $validated = $request->validate([
+            'review_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        DB::table('work_catalog_suggestions')
+            ->where('id', (int) $suggestion->id)
+            ->update([
+                'status' => 'rejected',
+                'resolved_catalog_id' => null,
+                'reviewed_by_user_id' => $request->user()?->id,
+                'reviewed_at' => now(),
+                'review_note' => $validated['review_note'] ?? null,
+                'updated_at' => now(),
+            ]);
+
+        $updatedSuggestion = DB::table('work_catalog_suggestions as s')
+            ->where('s.id', $id)
+            ->select([
+                's.id',
+                's.activity_id',
+                's.suggestion_type',
+                's.source_name',
+                's.status',
+                's.submitted_by_lecturer_id',
+                's.submitted_by_user_id',
+                's.reviewed_by_user_id',
+                's.reviewed_at',
+                's.review_note',
+                's.resolved_catalog_id',
+                's.payload',
+                's.created_at',
+                's.updated_at',
+            ])
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã từ chối đề xuất nhà xuất bản.',
+            'data' => [
+                'suggestion' => $updatedSuggestion ? $this->workCatalogSuggestionPayload($updatedSuggestion) : null,
+                'catalog' => null,
+            ],
         ], Response::HTTP_OK);
     }
 
@@ -1072,12 +1686,179 @@ class AdminWorkCatalogController extends Controller
 
     private function conferencePayload($row): array
     {
+        $researchHours = $this->deriveConferenceResearchHoursFromPoint($row->point ?? null);
+
         return [
             'id' => (int) $row->id,
             'name' => $row->name,
             'level' => $row->level,
+            'research_field' => $row->research_field,
+            'year' => $row->year !== null ? (int) $row->year : null,
+            'organization' => $row->organization,
+            'has_proceedings' => (bool) ($row->has_proceedings ?? false),
+            'has_isbn' => (bool) ($row->has_isbn ?? false),
+            'isbn' => $row->isbn,
+            'point' => $row->point !== null ? (float) $row->point : null,
+            'research_hours' => $researchHours,
             'notes' => $row->notes,
             'is_active' => (bool) $row->is_active,
+            'updated_at' => $row->updated_at,
+        ];
+    }
+
+    private function deriveConferenceResearchHoursFromPoint(mixed $point): ?int
+    {
+        $value = $this->toNullableFloat($point);
+        if ($value === null) {
+            return null;
+        }
+
+        if ($value > 1) {
+            return 900;
+        }
+
+        if ($value > 0) {
+            return 600;
+        }
+
+        return 0;
+    }
+
+    private function normalizeConferencePayload(array $data): array
+    {
+        $name = trim((string) ($data['name'] ?? ''));
+        $researchField = $this->normalizeNullableTrimmedString($data['research_field'] ?? null);
+        $organization = $this->normalizeNullableTrimmedString($data['organization'] ?? null);
+        $notes = $this->normalizeNullableTrimmedString($data['notes'] ?? null);
+
+        $hasProceedings = (bool) ($data['has_proceedings'] ?? false);
+        $hasIsbn = (bool) ($data['has_isbn'] ?? false);
+
+        $isbn = null;
+        if ($hasIsbn) {
+            $rawIsbn = preg_replace('/\s+/', '', (string) ($data['isbn'] ?? ''));
+            $rawIsbn = strtoupper(trim((string) $rawIsbn));
+            $isbn = $rawIsbn !== '' ? $rawIsbn : null;
+        }
+
+        $point = $this->toNullableFloat($data['point'] ?? null);
+        if ($point !== null) {
+            $point = round($point, 2);
+        }
+
+        return [
+            'name' => $name,
+            'research_field' => $researchField,
+            'year' => isset($data['year']) && $data['year'] !== '' ? (int) $data['year'] : null,
+            'organization' => $organization,
+            'has_proceedings' => $hasProceedings,
+            'has_isbn' => $hasIsbn,
+            'isbn' => $isbn,
+            'point' => $point,
+            'notes' => $notes,
+        ];
+    }
+
+    private function normalizeNullableTrimmedString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $trimmed = trim((string) $value);
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function generateUniquePublisherCode(string $name): string
+    {
+        $slug = strtoupper(Str::slug($name, '-'));
+        if ($slug === '') {
+            $slug = 'PUBLISHER';
+        }
+
+        $base = 'NXB-' . $slug;
+        if (mb_strlen($base) > 50) {
+            $base = mb_substr($base, 0, 50);
+        }
+
+        $candidate = $base;
+        $suffix = 1;
+        while (DB::table('publishers')->where('code', $candidate)->exists()) {
+            $suffixText = '-' . $suffix;
+            $maxBaseLength = 50 - mb_strlen($suffixText);
+            $trimmedBase = mb_substr($base, 0, max(1, $maxBaseLength));
+            $candidate = $trimmedBase . $suffixText;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function suggestionQueryByType(string $type)
+    {
+        return DB::table('work_catalog_suggestions as s')
+            ->where('s.suggestion_type', $type)
+            ->where('s.status', 'pending')
+            ->orderByDesc('s.created_at')
+            ->select([
+                's.id',
+                's.activity_id',
+                's.suggestion_type',
+                's.source_name',
+                's.status',
+                's.submitted_by_lecturer_id',
+                's.submitted_by_user_id',
+                's.reviewed_by_user_id',
+                's.reviewed_at',
+                's.review_note',
+                's.resolved_catalog_id',
+                's.payload',
+                's.created_at',
+                's.updated_at',
+            ]);
+    }
+
+    private function findPendingSuggestion(int $id, string $type)
+    {
+        return DB::table('work_catalog_suggestions')
+            ->where('id', $id)
+            ->where('suggestion_type', $type)
+            ->where('status', 'pending')
+            ->first();
+    }
+
+    private function decodeSuggestionPayload(mixed $payload): array
+    {
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        if (! is_string($payload) || trim($payload) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function workCatalogSuggestionPayload($row): array
+    {
+        return [
+            'id' => (int) $row->id,
+            'activity_id' => (int) $row->activity_id,
+            'suggestion_type' => (string) $row->suggestion_type,
+            'source_name' => (string) $row->source_name,
+            'status' => (string) $row->status,
+            'submitted_by_lecturer_id' => $row->submitted_by_lecturer_id !== null ? (int) $row->submitted_by_lecturer_id : null,
+            'submitted_by_user_id' => $row->submitted_by_user_id !== null ? (int) $row->submitted_by_user_id : null,
+            'reviewed_by_user_id' => $row->reviewed_by_user_id !== null ? (int) $row->reviewed_by_user_id : null,
+            'reviewed_at' => $row->reviewed_at,
+            'review_note' => $row->review_note,
+            'resolved_catalog_id' => $row->resolved_catalog_id !== null ? (int) $row->resolved_catalog_id : null,
+            'payload' => $this->decodeSuggestionPayload($row->payload ?? null),
+            'created_at' => $row->created_at,
             'updated_at' => $row->updated_at,
         ];
     }

@@ -69,6 +69,13 @@ type PaperDetailsDto = {
   research_field?: string | null;
   publication_status?: string | null;
   keywords?: string | null;
+  conference_name?: string | null;
+  conference_level?: "NATIONAL" | "INTERNATIONAL" | null;
+  conference_research_field?: string | null;
+  conference_organization?: string | null;
+  conference_has_isbn?: boolean | null;
+  conference_isbn?: string | null;
+  conference_point?: number | null;
 };
 
 type BookDetailsDto = {
@@ -333,6 +340,12 @@ export async function submit_activity(
       member_role_name: string | null;
     }>;
     can_faculty_review?: boolean;
+    catalog_suggestion?: {
+      type?: "journal" | "conference";
+      status?: "matched" | "suggestion_created" | "suggestion_updated";
+      suggestion_id?: number;
+      matched_catalog_id?: number;
+    };
   };
 }> {
   if (!MOCK) {
@@ -351,6 +364,12 @@ export async function submit_activity(
           member_role_name: string | null;
         }>;
         can_faculty_review?: boolean;
+        catalog_suggestion?: {
+          type?: "journal" | "conference";
+          status?: "matched" | "suggestion_created" | "suggestion_updated";
+          suggestion_id?: number;
+          matched_catalog_id?: number;
+        };
       };
     }>(`/api/research-activities/${activity_id}/submit`);
     return data;

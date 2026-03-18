@@ -34,6 +34,16 @@ export type ArticleDeclarationFormModel = {
   journalWebsite: string;
   workScore: number | null;
 
+  conferenceId: number | null;
+  conferenceName: string;
+  conferenceLevel: "NATIONAL" | "INTERNATIONAL" | "";
+  conferenceResearchField: string;
+  conferenceOrganization: string;
+  conferenceHasIsbn: boolean;
+  conferenceIsbn: string;
+  conferencePoint: number | null;
+  conferenceResearchHours: number | null;
+
   members: ParticipantRowModel[];
 };
 export const articleAllowedMemberRoleCodes = [

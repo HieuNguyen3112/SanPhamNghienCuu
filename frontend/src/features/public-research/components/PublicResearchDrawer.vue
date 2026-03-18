@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-[60]">
+    <div v-if="open" class="fixed inset-0 z-60">
       <div class="absolute inset-0 bg-black/30" @click="$emit('close')"></div>
 
       <div
@@ -112,42 +112,150 @@
                     <div class="text-sm font-semibold text-slate-900">
                       Thông tin công khai bài báo
                     </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
+                    <div class="mt-3 space-y-4 text-sm">
                       <div>
-                        <div class="text-xs text-slate-500">Tên tạp chí</div>
+                        <div class="text-xs text-slate-500">Tên bài báo</div>
                         <div class="mt-1 font-medium text-slate-900">
-                          {{ detail?.displayMeta.article?.journalName ?? "—" }}
+                          {{ item.title || "—" }}
                         </div>
                       </div>
-                      <div>
-                        <div class="text-xs text-slate-500">Năm / Tập / Số</div>
-                        <div class="mt-1 font-medium text-slate-900">
-                          {{
-                            formatArticlePublication(
-                              detail?.displayMeta.article,
-                            )
-                          }}
+
+                      <div
+                        class="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                      >
+                        <div
+                          class="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                        >
+                          Tạp chí
+                        </div>
+
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <div class="text-xs text-slate-500">ISSN</div>
+                            <div class="mt-1 font-medium text-slate-900">
+                              {{ detail?.displayMeta.article?.issn ?? "—" }}
+                            </div>
+                          </div>
+                          <div>
+                            <div class="text-xs text-slate-500">
+                              Tên tạp chí
+                            </div>
+                            <div class="mt-1 font-medium text-slate-900">
+                              {{
+                                detail?.displayMeta.article?.journalName ?? "—"
+                              }}
+                            </div>
+                          </div>
+                          <div>
+                            <div class="text-xs text-slate-500">
+                              Phạm vi tạp chí
+                            </div>
+                            <div class="mt-1 font-medium text-slate-900">
+                              {{
+                                detail?.displayMeta.article?.journalScope ?? "—"
+                              }}
+                            </div>
+                          </div>
+                          <div>
+                            <div class="text-xs text-slate-500">
+                              Cấp tạp chí
+                            </div>
+                            <div class="mt-1 font-medium text-slate-900">
+                              {{
+                                detail?.displayMeta.article?.journalType ?? "—"
+                              }}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <div class="text-xs text-slate-500">DOI</div>
-                        <div class="mt-1 font-medium text-slate-900">
-                          {{ detail?.displayMeta.article?.doi ?? "—" }}
+
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <div class="text-xs text-slate-500">Năm đăng</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ detail?.displayMeta.article?.year ?? "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Tập</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ detail?.displayMeta.article?.volume ?? "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Số</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ detail?.displayMeta.article?.issue ?? "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Trang</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              formatPageRange(
+                                detail?.displayMeta.article?.pageStart ?? null,
+                                detail?.displayMeta.article?.pageEnd ?? null,
+                              )
+                            }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Lĩnh vực</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              detail?.displayMeta.article?.researchField ?? "—"
+                            }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Tác giả</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ primaryAuthorLabel }}
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <div class="text-xs text-slate-500">Link bài báo</div>
-                        <div class="mt-1 font-medium text-slate-900">
-                          <a
-                            v-if="detail?.displayMeta.article?.articleUrl"
-                            :href="detail.displayMeta.article.articleUrl"
-                            target="_blank"
-                            rel="noreferrer"
-                            class="text-blue-600 hover:underline"
-                          >
-                            Mở liên kết
-                          </a>
-                          <span v-else>—</span>
+
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <div class="text-xs text-slate-500">Thuộc đề tài</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ belongsToProjectFlag }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">
+                            Nguồn xếp loại
+                          </div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              detail?.displayMeta.article?.journalSourceName ??
+                              "—"
+                            }}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <div class="text-xs text-slate-500">DOI</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ detail?.displayMeta.article?.doi ?? "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Link bài báo</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            <a
+                              v-if="detail?.displayMeta.article?.articleUrl"
+                              :href="detail.displayMeta.article.articleUrl"
+                              target="_blank"
+                              rel="noreferrer"
+                              class="text-blue-600 hover:underline"
+                            >
+                              Mở liên kết
+                            </a>
+                            <span v-else>—</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -160,34 +268,93 @@
                     <div class="text-sm font-semibold text-slate-900">
                       Thông tin công khai đề tài
                     </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
-                      <div>
-                        <div class="text-xs text-slate-500">Mã số đề tài</div>
-                        <div class="mt-1 font-medium text-slate-900">
-                          {{ detail?.displayMeta.project?.projectCode ?? "—" }}
+                    <div class="mt-3 space-y-4 text-sm">
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <div class="text-xs text-slate-500">Mã đề tài</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              detail?.displayMeta.project?.projectCode ?? "—"
+                            }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Tên đề tài</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ item.title || "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Cấp đề tài</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              detail?.displayMeta.project?.managementLevel ??
+                              "—"
+                            }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Lĩnh vực</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              detail?.displayMeta.project?.researchField ?? "—"
+                            }}
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <div class="text-xs text-slate-500">Cấp quản lý</div>
-                        <div class="mt-1 font-medium text-slate-900">
-                          {{
-                            detail?.displayMeta.project?.managementLevel ?? "—"
-                          }}
-                        </div>
-                      </div>
+
                       <div>
                         <div class="text-xs text-slate-500">
-                          Thời gian thực hiện
+                          Mục tiêu đề tài
                         </div>
-                        <div class="mt-1 font-medium text-slate-900">
+                        <p
+                          class="mt-1 whitespace-pre-line font-medium text-slate-900"
+                        >
+                          {{ detail?.displayMeta.project?.objectives ?? "—" }}
+                        </p>
+                      </div>
+
+                      <div>
+                        <div class="text-xs text-slate-500">
+                          Nội dung đề tài
+                        </div>
+                        <p
+                          class="mt-1 whitespace-pre-line font-medium text-slate-900"
+                        >
                           {{
-                            formatDateRange(
-                              detail?.displayMeta.project?.startMonth,
-                              detail?.displayMeta.project?.endMonth,
-                            )
+                            detail?.displayMeta.project?.contentSummary ?? "—"
                           }}
+                        </p>
+                      </div>
+
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <div class="text-xs text-slate-500">Năm bắt đầu</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              formatDate(
+                                detail?.displayMeta.project?.startMonth,
+                              )
+                            }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Năm kết thúc</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              formatDate(detail?.displayMeta.project?.endMonth)
+                            }}
+                          </div>
                         </div>
                       </div>
+
+                      <div>
+                        <div class="text-xs text-slate-500">Người tham gia</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{ projectParticipantsLabel }}
+                        </div>
+                      </div>
+
                       <div>
                         <div class="text-xs text-slate-500">
                           Quyết định công nhận
@@ -211,25 +378,59 @@
                     <div class="text-sm font-semibold text-slate-900">
                       Thông tin công khai giáo trình
                     </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
-                      <div>
-                        <div class="text-xs text-slate-500">Nhà xuất bản</div>
-                        <div class="mt-1 font-medium text-slate-900">
-                          {{ detail?.displayMeta.book?.publisher ?? "—" }}
+                    <div class="mt-3 space-y-4 text-sm">
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <div class="text-xs text-slate-500">ISBN</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ detail?.displayMeta.book?.isbn ?? "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">
+                            Tên sách, giáo trình
+                          </div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ item.title || "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">
+                            Loại sách, giáo trình
+                          </div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ detail?.displayMeta.book?.bookType ?? "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Lĩnh vực</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ detail?.displayMeta.book?.researchField ?? "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Nhà xuất bản</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{ detail?.displayMeta.book?.publisher ?? "—" }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-xs text-slate-500">Năm xuất bản</div>
+                          <div class="mt-1 font-medium text-slate-900">
+                            {{
+                              formatBookPublication(detail?.displayMeta.book)
+                            }}
+                          </div>
                         </div>
                       </div>
+
                       <div>
-                        <div class="text-xs text-slate-500">Năm xuất bản</div>
+                        <div class="text-xs text-slate-500">Tác giả</div>
                         <div class="mt-1 font-medium text-slate-900">
-                          {{ detail?.displayMeta.book?.year ?? "—" }}
+                          {{ bookAuthorsLabel }}
                         </div>
                       </div>
-                      <div>
-                        <div class="text-xs text-slate-500">ISBN</div>
-                        <div class="mt-1 font-medium text-slate-900">
-                          {{ detail?.displayMeta.book?.isbn ?? "—" }}
-                        </div>
-                      </div>
+
                       <div>
                         <div class="text-xs text-slate-500">
                           Quyết định phê duyệt
@@ -396,29 +597,6 @@
                     nhanh.
                   </p>
 
-                  <button
-                    type="button"
-                    class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="!resolvedPdfUrl"
-                    @click="onPdfClick"
-                  >
-                    {{
-                      resolvedPdfUrl
-                        ? "Tải PDF minh chứng"
-                        : "Chưa có PDF công khai"
-                    }}
-                  </button>
-
-                  <a
-                    v-if="resolvedPdfUrl"
-                    class="mt-2 inline-flex w-full items-center justify-center rounded-lg bg-[#234a74] px-3 py-2 text-sm font-semibold text-white hover:brightness-110"
-                    :href="resolvedPdfUrl"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Xem minh chứng
-                  </a>
-
                   <div class="mt-4">
                     <div
                       class="text-xs font-semibold uppercase tracking-wide text-slate-500"
@@ -432,16 +610,20 @@
                       <li
                         v-for="(f, idx) in detail?.evidenceFiles ?? []"
                         :key="`${f.url}-${idx}`"
-                        class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2"
+                        class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2"
                       >
-                        <a
-                          class="font-medium text-blue-700 hover:underline"
-                          :href="f.url"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
+                        <span class="truncate font-medium text-blue-700">
                           {{ f.label }}
-                        </a>
+                        </span>
+                        <button
+                          type="button"
+                          class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100"
+                          :title="`Xem ${f.label}`"
+                          aria-label="Xem tệp minh chứng"
+                          @click="onEvidencePreviewClick(f, idx)"
+                        >
+                          <Eye class="h-4 w-4" />
+                        </button>
                       </li>
                     </ul>
                     <div v-else class="mt-2 text-xs text-slate-500">
@@ -475,15 +657,31 @@
           </div>
         </div>
       </div>
+
+      <PdfPreviewModal
+        :open="previewOpen"
+        :title="previewTitle"
+        :file-name="previewFileName"
+        :preview-url="previewUrl"
+        :loading="previewLoading"
+        :error-message="previewError"
+        :can-download="canDownload"
+        @close="closePdfPreview"
+        @retry="retryOpenPdfPreview"
+        @download="downloadPreviewedPdf"
+      />
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Eye } from "lucide-vue-next";
 import type { PublicResearchItem } from "@/features/public-research/models/publicResearchModels";
 import type { PublicResearchDetail } from "@/features/public-research/models/publicResearchModels";
 import { loadPublicResearchDetailService } from "@/features/public-research/services/publicResearchService";
+import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
+import { usePdfPreview } from "@/shared/composables/usePdfPreview";
 
 const props = defineProps<{
   open: boolean;
@@ -491,6 +689,20 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ (e: "close"): void }>();
+
+const {
+  previewOpen,
+  previewLoading,
+  previewError,
+  previewTitle,
+  previewFileName,
+  previewUrl,
+  canDownload,
+  openPdfPreview,
+  retryOpenPdfPreview,
+  closePdfPreview,
+  downloadPreviewedPdf,
+} = usePdfPreview();
 
 function workTypeLabel(type: PublicResearchItem["workType"]): string {
   if (type === "ARTICLE") return "BÀI BÁO";
@@ -513,13 +725,49 @@ const resolvedPdfUrl = computed(() => {
   return match?.url ?? null;
 });
 
-function onPdfClick() {
+async function onPdfClick() {
   if (!resolvedPdfUrl.value) {
     alert("Công trình chưa có PDF công khai.");
     return;
   }
 
-  window.open(resolvedPdfUrl.value, "_blank", "noopener,noreferrer");
+  const activityId = props.item?.id ?? "unknown";
+  const fallbackFileName = `minh-chung-${activityId}.pdf`;
+
+  await openPdfPreview({
+    cacheKey: `public-research-evidence:${activityId}`,
+    title: "Xem minh chứng",
+    fallbackFileName,
+    previewUrl: resolvedPdfUrl.value,
+    downloadUrl: resolvedPdfUrl.value,
+    errorMessage: "Không thể mở file minh chứng. Vui lòng thử lại.",
+  });
+}
+
+async function onEvidencePreviewClick(
+  file: { label: string; url: string; isPdf: boolean },
+  index: number,
+) {
+  const rawUrl = file.url?.trim();
+  if (!rawUrl) return;
+
+  if (!file.isPdf) {
+    window.open(rawUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  const activityId = props.item?.id ?? "unknown";
+  const fallbackFileName =
+    file.label?.trim() || `minh-chung-${activityId}-${index + 1}.pdf`;
+
+  await openPdfPreview({
+    cacheKey: `public-research-evidence:${activityId}:${index}`,
+    title: "Xem minh chứng",
+    fallbackFileName,
+    previewUrl: rawUrl,
+    downloadUrl: rawUrl,
+    errorMessage: "Không thể mở file minh chứng. Vui lòng thử lại.",
+  });
 }
 
 const displayLecturerRole = computed(() => {
@@ -529,16 +777,49 @@ const displayLecturerRole = computed(() => {
   return lead?.roleName ?? "—";
 });
 
+const primaryAuthorLabel = computed(() => {
+  const participants = detail.value?.participants ?? [];
+  if (participants.length === 0) return "—";
+
+  const owner = participants.find(
+    (p) => p.lecturerCode === props.item?.lecturerCode,
+  );
+
+  if (owner) {
+    return `${owner.lecturerName} (${owner.roleName || "Chính"})`;
+  }
+
+  if (participants.length === 0) return "—";
+  const first = participants[0]!;
+  return `${first.lecturerName} (${first.roleName || "Đồng tác giả"})`;
+});
+
+const belongsToProjectFlag = computed(() => {
+  const linkedProjectCode = detail.value?.displayMeta.project?.projectCode;
+  return linkedProjectCode ? "1" : "0";
+});
+
+const bookAuthorsLabel = computed(() => {
+  const participants = detail.value?.participants ?? [];
+  if (participants.length === 0) return "—";
+  return participants
+    .map((p) => `${p.lecturerName} (${p.roleName || "Tác giả"})`)
+    .join(", ");
+});
+
+const projectParticipantsLabel = computed(() => {
+  const participants = detail.value?.participants ?? [];
+  if (participants.length === 0) return "—";
+  return participants
+    .map((p) => `${p.lecturerName} (${p.roleName || "Thành viên"})`)
+    .join(", ");
+});
+
 function formatDate(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("vi-VN").format(date);
-}
-
-function formatDateRange(start?: string | null, end?: string | null): string {
-  if (!start && !end) return "—";
-  return `${formatDate(start)} - ${formatDate(end)}`;
 }
 
 function formatDecision(no?: string | null, date?: string | null): string {
@@ -547,24 +828,22 @@ function formatDecision(no?: string | null, date?: string | null): string {
   return no ?? formatDate(date);
 }
 
-function formatArticlePublication(article?: {
-  year: number | null;
-  volume: string | null;
-  issue: string | null;
-  pageStart: number | null;
-  pageEnd: number | null;
-}): string {
-  if (!article) return "—";
-  const year = article.year ? `${article.year}` : null;
-  const volume = article.volume ? `Tập ${article.volume}` : null;
-  const issue = article.issue ? `Số ${article.issue}` : null;
-  const pages =
-    article.pageStart !== null || article.pageEnd !== null
-      ? `Trang ${article.pageStart ?? "?"}-${article.pageEnd ?? "?"}`
-      : null;
+function formatPageRange(
+  pageStart?: number | null,
+  pageEnd?: number | null,
+): string {
+  if (pageStart === null && pageEnd === null) return "—";
+  return `${pageStart ?? "?"}-${pageEnd ?? "?"}`;
+}
 
-  const tokens = [year, volume, issue, pages].filter(Boolean);
-  return tokens.length > 0 ? tokens.join(" • ") : "—";
+function formatBookPublication(book?: {
+  year: number | null;
+  approvalDecisionDate: string | null;
+}): string {
+  if (!book) return "—";
+  if (book.approvalDecisionDate) return formatDate(book.approvalDecisionDate);
+  if (book.year !== null) return `${book.year}`;
+  return "—";
 }
 
 // ✅ detail state
@@ -576,6 +855,10 @@ const detailError = ref<string | null>(null);
 watch(
   () => [props.open, props.item?.id] as const,
   async ([open, id]) => {
+    if (!open) {
+      closePdfPreview();
+    }
+
     if (!open || !id) {
       detail.value = null;
       detailError.value = null;

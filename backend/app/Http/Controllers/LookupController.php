@@ -23,8 +23,6 @@ class LookupController extends Controller
             'paper_link_journal_page',
             'paper_link_pdf',
             'paper_link_indexing',
-            'content',
-            'publication_decision',
         ],
         'project' => [
             'project_assignment_or_approval_decision',
@@ -35,8 +33,6 @@ class LookupController extends Controller
             'project_link_summary_report',
             'project_link_output_product',
             'project_link_acceptance_evidence',
-            'content',
-            'acceptance_decision',
         ],
         'book' => [
             'book_assignment_decision',
@@ -47,10 +43,6 @@ class LookupController extends Controller
             'book_link_digital_library',
             'book_link_preview',
             'book_link_pdf',
-            'content',
-            'cover',
-            'toc',
-            'publication_decision',
         ],
         'conference' => [
             'conference_invitation_or_program',
@@ -62,7 +54,6 @@ class LookupController extends Controller
             'conference_link_proceedings',
             'conference_link_paper',
             'conference_link_slide_video',
-            'content',
         ],
     ];
 
@@ -325,6 +316,42 @@ class LookupController extends Controller
                 });
             })
             ->orderBy('j.name')
+            ->limit(50);
+
+        return response()->json(['data' => $query->get()], Response::HTTP_OK);
+    }
+
+    public function conferences(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $activeOnly = $request->boolean('active', true);
+
+        $query = DB::table('conferences as c')
+            ->select([
+                'c.id',
+                'c.name',
+                'c.level',
+                'c.research_field',
+                'c.organization',
+                'c.year',
+                'c.has_proceedings',
+                'c.has_isbn',
+                'c.isbn',
+                'c.point',
+                'c.notes',
+                'c.is_active',
+            ])
+            ->when($activeOnly, fn($q) => $q->where('c.is_active', 1))
+            ->when($search !== '', function ($q) use ($search) {
+                $like = '%' . $search . '%';
+                $q->where(function ($sub) use ($like) {
+                    $sub->where('c.name', 'like', $like)
+                        ->orWhere('c.organization', 'like', $like)
+                        ->orWhere('c.research_field', 'like', $like)
+                        ->orWhere('c.isbn', 'like', $like);
+                });
+            })
+            ->orderBy('c.name')
             ->limit(50);
 
         return response()->json(['data' => $query->get()], Response::HTTP_OK);

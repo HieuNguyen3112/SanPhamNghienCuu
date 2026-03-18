@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Evidence\ResearchEvidenceStorageService;
 use App\Support\StorageDownload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
 class PublicResearchWorkController extends Controller
@@ -48,6 +50,10 @@ class PublicResearchWorkController extends Controller
             'conference_link_website',
         ],
     ];
+
+    public function __construct(
+        private readonly ResearchEvidenceStorageService $evidenceStorageService
+    ) {}
 
     /**
      * GET /api/public/research-works/lookups
@@ -100,6 +106,68 @@ class PublicResearchWorkController extends Controller
                 'academic_years' => $academicYears,
             ],
         ], Response::HTTP_OK);
+    }
+
+    /**
+     * GET /api/public/research-works/{activityId}/evidence-files/{evidenceId}/preview
+     */
+    public function previewEvidence(Request $request, int $activityId, int $evidenceId)
+    {
+        $row = DB::table('evidence_files as ef')
+            ->join('research_activities as ra', 'ra.id', '=', 'ef.activity_id')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
+            ->where('ra.id', $activityId)
+            ->where('ef.id', $evidenceId)
+            ->where('ast.code', 'approved')
+            ->select([
+                'ef.disk',
+                'ef.path',
+                'ef.mime_type',
+                'ef.original_name',
+                'ef.id',
+                'eft.code as file_type_code',
+                'ak.code as kind_code',
+            ])
+            ->first();
+
+        if (! $row) {
+            return response()->json(['message' => 'Không tìm thấy minh chứng công khai.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $allowedCodes = self::PUBLIC_EVIDENCE_TYPE_CODES_BY_KIND[(string) $row->kind_code] ?? [];
+        if ($allowedCodes === [] || ! in_array((string) ($row->file_type_code ?? ''), $allowedCodes, true)) {
+            return response()->json(['message' => 'Minh chứng này không được phép công khai.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $disk = trim((string) $row->disk);
+        $path = trim((string) $row->path);
+        $filename = trim((string) ($row->original_name ?? ''));
+        if ($filename === '') {
+            $filename = 'minh-chung.pdf';
+        }
+
+        if ($this->evidenceStorageService->isRcloneDisk($disk)) {
+            try {
+                return $this->evidenceStorageService->streamPreview(
+                    $request,
+                    $disk,
+                    $path,
+                    $filename,
+                    trim((string) ($row->mime_type ?? '')) ?: 'application/pdf'
+                );
+            } catch (RuntimeException $exception) {
+                return response()->json([
+                    'message' => 'Không thể xem trước tệp minh chứng. Vui lòng thử lại.',
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        return StorageDownload::stream($disk, $path, $filename, [
+            'Content-Type' => trim((string) ($row->mime_type ?? '')) ?: 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . addslashes($filename) . '"',
+        ]);
     }
 
     /**
@@ -342,8 +410,12 @@ class PublicResearchWorkController extends Controller
             ->where('ra.id', $activityId);
 
         $hasFacultyJoin = Schema::hasTable('faculties') && Schema::hasColumn('departments', 'faculty_id');
+        $hasJournalJoin = Schema::hasTable('journals') && Schema::hasColumn('paper_details', 'journal_catalog_id');
         if ($hasFacultyJoin) {
             $base->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id');
+        }
+        if ($hasJournalJoin) {
+            $base->leftJoin('journals as j', 'j.id', '=', 'pd.journal_catalog_id');
         }
 
         $row = $base->select([
@@ -360,6 +432,10 @@ class PublicResearchWorkController extends Controller
             'l.code as lecturer_code',
             'l.full_name as lecturer_name',
             'pd.journal_name as paper_journal_name',
+            'pd.issn as paper_issn',
+            'pd.journal_scope as paper_journal_scope',
+            'pd.journal_source_name as paper_journal_source_name',
+            'pd.research_field as paper_research_field',
             'pd.year as paper_year',
             'pd.volume as paper_volume',
             'pd.issue as paper_issue',
@@ -367,12 +443,17 @@ class PublicResearchWorkController extends Controller
             'pd.page_end as paper_page_end',
             'pd.doi as paper_doi',
             'pd.article_url as paper_article_url',
+            $hasJournalJoin ? 'j.journal_type as paper_journal_type' : DB::raw('NULL as paper_journal_type'),
             'bd.isbn as book_isbn',
             'bd.publisher as book_publisher',
             'bd.year as book_year',
             'bd.approval_decision_no as book_approval_decision_no',
             'bd.approval_decision_date as book_approval_decision_date',
             'pjd.project_code as project_code',
+            'pjd.project_category as project_category',
+            'pjd.research_field as project_research_field',
+            'pjd.objectives as project_objectives',
+            'pjd.content_summary as project_content_summary',
             'pjd.start_month as project_start_month',
             'pjd.end_month as project_end_month',
             'pjd.decision_no as project_decision_no',
@@ -451,6 +532,11 @@ class PublicResearchWorkController extends Controller
         $displayMeta = [
             'article' => [
                 'journal_name' => $this->nullableString($row->paper_journal_name ?? null),
+                'issn' => $this->nullableString($row->paper_issn ?? null),
+                'journal_scope' => $this->nullableString($row->paper_journal_scope ?? null),
+                'journal_type' => $this->nullableString($row->paper_journal_type ?? null),
+                'journal_source_name' => $this->nullableString($row->paper_journal_source_name ?? null),
+                'research_field' => $this->nullableString($row->paper_research_field ?? null),
                 'year' => $this->nullableInt($row->paper_year ?? null),
                 'volume' => $this->nullableString($row->paper_volume ?? null),
                 'issue' => $this->nullableString($row->paper_issue ?? null),
@@ -462,6 +548,10 @@ class PublicResearchWorkController extends Controller
             'project' => [
                 'project_code' => $this->nullableString($row->project_code ?? null),
                 'management_level' => $this->nullableString($row->activity_type_name ?? null),
+                'project_category' => $this->nullableString($row->project_category ?? null),
+                'research_field' => $this->nullableString($row->project_research_field ?? null),
+                'objectives' => $this->nullableString($row->project_objectives ?? null),
+                'content_summary' => $this->nullableString($row->project_content_summary ?? null),
                 'start_month' => $this->nullableDate($row->project_start_month ?? null),
                 'end_month' => $this->nullableDate($row->project_end_month ?? null),
                 'decision_no' => $this->nullableString($row->project_decision_no ?? null),
@@ -471,6 +561,8 @@ class PublicResearchWorkController extends Controller
                 'publisher' => $this->nullableString($row->book_publisher ?? null),
                 'isbn' => $this->nullableString($row->book_isbn ?? null),
                 'year' => $this->nullableInt($row->book_year ?? null),
+                'book_type' => $this->nullableString($row->activity_type_name ?? null),
+                'research_field' => null,
                 'approval_decision_no' => $this->nullableString($row->book_approval_decision_no ?? null),
                 'approval_decision_date' => $this->nullableDate($row->book_approval_decision_date ?? null),
             ],
@@ -605,7 +697,7 @@ class PublicResearchWorkController extends Controller
                 $rawPath = trim((string) ($row->path ?? ''));
                 $url = $rawPath;
                 if ($disk !== 'evidence_link') {
-                    $url = route('public.research.evidence.download', [
+                    $url = route('public.research.evidence.preview', [
                         'activityId' => $activityId,
                         'evidenceId' => (int) $row->id,
                     ]);

@@ -1,5 +1,9 @@
 import { computed, reactive, ref, watch } from "vue";
-import type { Journal, JournalUpsertDTO } from "../contracts/journals.contract";
+import type {
+  Journal,
+  JournalSuggestion,
+  JournalUpsertDTO,
+} from "../contracts/journals.contract";
 import { journalService } from "../services/journals.service";
 
 type FormErrors<T extends Record<string, unknown>> = Partial<
@@ -16,6 +20,10 @@ export function useJournalCatalog() {
 
   const modalJournalOpen = ref(false);
   const modalMode = ref<"create" | "edit">("create");
+  const journalSuggestionModalOpen = ref(false);
+  const journalSuggestions = ref<JournalSuggestion[]>([]);
+  const journalSuggestionLoading = ref(false);
+  const journalApprovingSuggestionId = ref<number | null>(null);
 
   const journalForm = reactive<{
     id: number;
@@ -75,6 +83,54 @@ export function useJournalCatalog() {
 
     journals.value = res.items;
     journalTotal.value = res.pagination.total;
+  }
+
+  async function loadSuggestions(): Promise<void> {
+    journalSuggestionLoading.value = true;
+    try {
+      const res = await journalService.listSuggestions({
+        page: 1,
+        per_page: 100,
+      });
+      journalSuggestions.value = res.items;
+    } finally {
+      journalSuggestionLoading.value = false;
+    }
+  }
+
+  async function openJournalSuggestions(): Promise<void> {
+    journalSuggestionModalOpen.value = true;
+    await loadSuggestions();
+  }
+
+  function closeJournalSuggestions() {
+    journalSuggestionModalOpen.value = false;
+  }
+
+  async function approveJournalSuggestion(
+    id: number,
+    reviewNote?: string,
+  ): Promise<void> {
+    journalApprovingSuggestionId.value = id;
+    try {
+      await journalService.approveSuggestion(id, reviewNote);
+      await Promise.all([loadSuggestions(), load()]);
+    } finally {
+      journalApprovingSuggestionId.value = null;
+    }
+  }
+
+  async function rejectJournalSuggestion(
+    id: number,
+    reviewNote?: string,
+  ): Promise<void> {
+    journalApprovingSuggestionId.value = id;
+    try {
+      await journalService.rejectSuggestion(id, reviewNote);
+      await Promise.all([loadSuggestions(), load()]);
+    } finally {
+      journalApprovingSuggestionId.value = null;
+    }
   }
 
   const filteredJournals = computed(() => journals.value);
@@ -248,11 +304,20 @@ export function useJournalCatalog() {
     pagedJournals,
     modalMode,
     modalJournalOpen,
+    journalSuggestionModalOpen,
+    journalSuggestionLoading,
+    journalApprovingSuggestionId,
+    journalSuggestions,
     journalForm,
     journalErrors,
     load,
+    loadSuggestions,
     openCreateJournal,
     openEditJournal,
+    openJournalSuggestions,
+    closeJournalSuggestions,
+    approveJournalSuggestion,
+    rejectJournalSuggestion,
     validateJournalForm,
     saveJournal,
     onUpdateJournalForm,

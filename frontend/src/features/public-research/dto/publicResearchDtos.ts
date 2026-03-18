@@ -59,6 +59,11 @@ export type PublicResearchParticipantDto = {
 export type PublicResearchDisplayMetaDto = {
   article?: {
     journal_name?: string | null;
+    issn?: string | null;
+    journal_scope?: string | null;
+    journal_type?: string | null;
+    journal_source_name?: string | null;
+    research_field?: string | null;
     year?: number | null;
     volume?: string | null;
     issue?: string | null;
@@ -70,6 +75,10 @@ export type PublicResearchDisplayMetaDto = {
   project?: {
     project_code?: string | null;
     management_level?: string | null;
+    project_category?: string | null;
+    research_field?: string | null;
+    objectives?: string | null;
+    content_summary?: string | null;
     start_month?: string | null;
     end_month?: string | null;
     decision_no?: string | null;
@@ -79,6 +88,8 @@ export type PublicResearchDisplayMetaDto = {
     publisher?: string | null;
     isbn?: string | null;
     year?: number | null;
+    book_type?: string | null;
+    research_field?: string | null;
     approval_decision_no?: string | null;
     approval_decision_date?: string | null;
   };

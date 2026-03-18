@@ -212,6 +212,7 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json'])
         Route::get('/activity-statuses', [LookupController::class, 'activityStatuses']);
         Route::get('/lecturers', [LookupController::class, 'lecturers']);
         Route::get('/journals', [LookupController::class, 'journals']);
+        Route::get('/conferences', [LookupController::class, 'conferences']);
         Route::get('/publishers', [LookupController::class, 'publishers']);
     });
 
@@ -407,17 +408,26 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SC
         Route::post('/journals', [AdminWorkCatalogController::class, 'storeJournal']);
         Route::put('/journals/{id}', [AdminWorkCatalogController::class, 'updateJournal']);
         Route::patch('/journals/{id}/status', [AdminWorkCatalogController::class, 'updateJournalStatus']);
+        Route::get('/journals/suggestions', [AdminWorkCatalogController::class, 'listJournalSuggestions']);
+        Route::post('/journals/suggestions/{id}/approve', [AdminWorkCatalogController::class, 'approveJournalSuggestion']);
+        Route::post('/journals/suggestions/{id}/reject', [AdminWorkCatalogController::class, 'rejectJournalSuggestion']);
         Route::post('/journals/{journalId}/rankings', [AdminWorkCatalogController::class, 'storeJournalRanking']);
 
         Route::get('/publishers', [AdminWorkCatalogController::class, 'listPublishers']);
         Route::post('/publishers', [AdminWorkCatalogController::class, 'storePublisher']);
         Route::put('/publishers/{id}', [AdminWorkCatalogController::class, 'updatePublisher']);
         Route::patch('/publishers/{id}/status', [AdminWorkCatalogController::class, 'updatePublisherStatus']);
+        Route::get('/publishers/suggestions', [AdminWorkCatalogController::class, 'listPublisherSuggestions']);
+        Route::post('/publishers/suggestions/{id}/approve', [AdminWorkCatalogController::class, 'approvePublisherSuggestion']);
+        Route::post('/publishers/suggestions/{id}/reject', [AdminWorkCatalogController::class, 'rejectPublisherSuggestion']);
 
         Route::get('/conferences', [AdminWorkCatalogController::class, 'listConferences']);
         Route::post('/conferences', [AdminWorkCatalogController::class, 'storeConference']);
         Route::put('/conferences/{id}', [AdminWorkCatalogController::class, 'updateConference']);
         Route::patch('/conferences/{id}/status', [AdminWorkCatalogController::class, 'updateConferenceStatus']);
+        Route::get('/conferences/suggestions', [AdminWorkCatalogController::class, 'listConferenceSuggestions']);
+        Route::post('/conferences/suggestions/{id}/approve', [AdminWorkCatalogController::class, 'approveConferenceSuggestion']);
+        Route::post('/conferences/suggestions/{id}/reject', [AdminWorkCatalogController::class, 'rejectConferenceSuggestion']);
 
         Route::get('/research-fields', [AdminWorkCatalogController::class, 'listResearchFields']);
         Route::post('/research-fields', [AdminWorkCatalogController::class, 'storeResearchField']);
@@ -528,6 +538,8 @@ Route::middleware(['force.json'])
         Route::get('/research-works/lookups', [PublicResearchWorkController::class, 'lookups']);
         Route::get('/research-works', [PublicResearchWorkController::class, 'index']);
         Route::get('/research-works/{activityId}', [PublicResearchWorkController::class, 'show']);
+        Route::get('/research-works/{activityId}/evidence-files/{evidenceId}/preview', [PublicResearchWorkController::class, 'previewEvidence'])
+            ->name('public.research.evidence.preview');
         Route::get('/research-works/{activityId}/evidence-files/{evidenceId}/download', [PublicResearchWorkController::class, 'downloadEvidence'])
             ->name('public.research.evidence.download');
     });

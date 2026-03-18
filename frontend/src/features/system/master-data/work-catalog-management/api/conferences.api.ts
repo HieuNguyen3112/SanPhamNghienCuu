@@ -3,10 +3,12 @@ import type { ApiItemResponse, ApiListResponse } from "./workCatalogApi.types";
 import type { ListResponseDTO } from "../contracts/pagination.contract";
 import type {
   ConferenceDTO,
+  ConferenceSuggestionDTO,
   ConferenceUpsertDTO,
 } from "../contracts/conferences.contract";
 
 const BASE = "/api/admin/work-catalog/conferences";
+const SUGGESTION_BASE = `${BASE}/suggestions`;
 
 export async function listConferencesApi(params: {
   keyword?: string;
@@ -51,5 +53,50 @@ export async function updateConferenceStatusApi(
     `${BASE}/${id}/status`,
     { is_active },
   );
+  return data.data;
+}
+
+export async function listConferenceSuggestionsApi(params: {
+  keyword?: string;
+  page?: number;
+  per_page?: number;
+}): Promise<ListResponseDTO<ConferenceSuggestionDTO>> {
+  const { data } = await http.get<
+    ApiListResponse<ListResponseDTO<ConferenceSuggestionDTO>>
+  >(SUGGESTION_BASE, { params });
+  return data.data;
+}
+
+export async function approveConferenceSuggestionApi(
+  id: number,
+  payload?: { review_note?: string },
+): Promise<{
+  suggestion: ConferenceSuggestionDTO | null;
+  catalog: ConferenceDTO | null;
+}> {
+  await ensureCsrfCookie();
+  const { data } = await http.post<
+    ApiItemResponse<{
+      suggestion: ConferenceSuggestionDTO | null;
+      catalog: ConferenceDTO | null;
+    }>
+  >(`${SUGGESTION_BASE}/${id}/approve`, payload ?? {});
+  return data.data;
+}
+
+export async function rejectConferenceSuggestionApi(
+  id: number,
+  payload?: { review_note?: string },
+): Promise<{
+  suggestion: ConferenceSuggestionDTO | null;
+  catalog: ConferenceDTO | null;
+}> {
+  await ensureCsrfCookie();
+  const { data } = await http.post<
+    ApiItemResponse<{
+      suggestion: ConferenceSuggestionDTO | null;
+      catalog: ConferenceDTO | null;
+    }>
+  >(`${SUGGESTION_BASE}/${id}/reject`, payload ?? {});
   return data.data;
 }

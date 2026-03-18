@@ -2,9 +2,14 @@ import type { ListResponseDTO } from "../contracts/pagination.contract";
 import type {
   Journal,
   JournalDTO,
+  JournalSuggestion,
+  JournalSuggestionDTO,
   JournalUpsertDTO,
 } from "../contracts/journals.contract";
-import { journalFromDto } from "../contracts/journals.contract";
+import {
+  journalFromDto,
+  journalSuggestionFromDto,
+} from "../contracts/journals.contract";
 import { journalsApi } from "../api/journals.api";
 
 export const journalService = {
@@ -46,5 +51,56 @@ export const journalService = {
   async setActive(id: number, isActive: boolean): Promise<Journal> {
     const saved = await journalsApi.updateStatus(id, { is_active: isActive });
     return journalFromDto(saved);
+  },
+
+  async listSuggestions(params: {
+    keyword?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<ListResponseDTO<JournalSuggestion>> {
+    const data = await journalsApi.listSuggestions(params);
+    return {
+      items: data.items.map(journalSuggestionFromDto),
+      pagination: data.pagination,
+    };
+  },
+
+  async approveSuggestion(
+    id: number,
+    review_note?: string,
+  ): Promise<{
+    suggestion: JournalSuggestion | null;
+    catalog: Journal | null;
+  }> {
+    const data = await journalsApi.approveSuggestion(
+      id,
+      review_note ? { review_note } : undefined,
+    );
+
+    return {
+      suggestion: data.suggestion
+        ? journalSuggestionFromDto(data.suggestion as JournalSuggestionDTO)
+        : null,
+      catalog: data.catalog ? journalFromDto(data.catalog) : null,
+    };
+  },
+  async rejectSuggestion(
+    id: number,
+    review_note?: string,
+  ): Promise<{
+    suggestion: JournalSuggestion | null;
+    catalog: Journal | null;
+  }> {
+    const data = await journalsApi.rejectSuggestion(
+      id,
+      review_note ? { review_note } : undefined,
+    );
+
+    return {
+      suggestion: data.suggestion
+        ? journalSuggestionFromDto(data.suggestion as JournalSuggestionDTO)
+        : null,
+      catalog: data.catalog ? journalFromDto(data.catalog) : null,
+    };
   },
 };

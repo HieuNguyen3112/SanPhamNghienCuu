@@ -15,7 +15,7 @@
 
       <DeclarationFormShell
         title="Khai báo bài báo khoa học"
-        description="Chọn loại bài báo để xác định giờ chuẩn; giờ chia đều cho số tác giả."
+        description="Phân loại bài báo khoa học hoặc báo cáo khoa học; giờ NCKH chia đều cho số tác giả."
         :icon="FileText"
         :status="shell.status.value"
         :canSubmit="canSubmit"
@@ -74,7 +74,7 @@
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
-                  >Loại bài báo (Tạp chí / Hội thảo)</label
+                  >Phân loại báo cáo khoa học / báo cáo khoa học</label
                 >
                 <select
                   v-model="form.typeId"
@@ -91,12 +91,6 @@
                   </option>
                 </select>
 
-                <div class="mt-1 text-xs text-slate-500">
-                  Giờ chuẩn:
-                  <span class="font-semibold text-slate-900">{{
-                    baseHoursText
-                  }}</span>
-                </div>
                 <p v-if="formErrors.typeId" class="mt-1 text-xs text-rose-600">
                   {{ formErrors.typeId }}
                 </p>
@@ -109,7 +103,7 @@
             class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
           >
             <div class="text-sm font-semibold text-slate-900">
-              B. Thông tin bài báo
+              B. Thông tin công trình
             </div>
 
             <div class="mt-4 grid gap-3 md:grid-cols-2">
@@ -131,23 +125,32 @@
 
               <div class="md:col-span-2">
                 <div class="mb-2 flex items-center justify-between gap-2">
-                  <label class="text-xs font-medium text-slate-600"
-                    >Tạp chí / Kỷ yếu</label
-                  >
+                  <label class="text-xs font-medium text-slate-600">{{
+                    isConferenceType ? "Hội nghị khoa học" : "Tạp chí"
+                  }}</label>
                   <button
                     v-if="!readOnly"
                     type="button"
                     class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    @click="toggleManualJournalForm"
+                    @click="
+                      isConferenceType
+                        ? toggleManualConferenceForm()
+                        : toggleManualJournalForm()
+                    "
                   >
                     {{
-                      showManualJournalForm
-                        ? "Tắt nhập tạp chí ngoài danh mục"
-                        : "Nhập tạp chí ngoài danh mục"
+                      isConferenceType
+                        ? showManualConferenceForm
+                          ? "Tắt nhập hội nghị ngoài danh mục"
+                          : "Nhập hội nghị ngoài danh mục"
+                        : showManualJournalForm
+                          ? "Tắt nhập tạp chí ngoài danh mục"
+                          : "Nhập tạp chí ngoài danh mục"
                     }}
                   </button>
                 </div>
                 <JournalSelect
+                  v-if="!isConferenceType"
                   v-model="form.journalId"
                   v-model:journalName="form.journalName"
                   v-model:issn="form.issn"
@@ -159,8 +162,20 @@
                   @select="onJournalSelect"
                   @clear="onJournalClear"
                 />
+                <ConferenceSelect
+                  v-else
+                  v-model="form.conferenceId"
+                  v-model:conferenceName="form.conferenceName"
+                  :disabled="readOnly || showManualConferenceForm"
+                  label=""
+                  hint="Gợi ý tìm và chọn hội nghị từ danh mục (do QLKH/Hội đồng nhập)."
+                  :search-fn="searchConferences"
+                  :error="formErrors.journalName ?? undefined"
+                  @select="onConferenceSelect"
+                  @clear="onConferenceClear"
+                />
                 <div
-                  v-if="showManualJournalForm"
+                  v-if="!isConferenceType && showManualJournalForm"
                   class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
                 >
                   <div class="grid gap-3 md:grid-cols-2">
@@ -249,7 +264,8 @@
 
                     <div>
                       <label class="text-xs font-medium text-slate-600"
-                        >Điểm tạp chí <span class="text-rose-600">*</span></label
+                        >Điểm tạp chí
+                        <span class="text-rose-600">*</span></label
                       >
                       <input
                         v-model.number="form.workScore"
@@ -265,9 +281,13 @@
                       <div
                         class="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
                       >
-                        <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div
+                          class="flex flex-wrap items-center justify-between gap-2"
+                        >
                           <div>
-                            <span class="font-semibold text-slate-900">Xếp loại:</span>
+                            <span class="font-semibold text-slate-900"
+                              >Xếp loại:</span
+                            >
                             {{ manualDerivedCategoryLabel }}
                           </div>
                           <div class="font-semibold text-slate-900">
@@ -276,16 +296,151 @@
                         </div>
                       </div>
                     </div>
-
                   </div>
 
                   <p class="mt-2 text-xs text-slate-500">
                     Khi đang nhập ngoài danh mục, ô tìm tạp chí sẽ tạm khóa.
                   </p>
                 </div>
-                <p v-if="!isJournalFromCatalog" class="mt-2 text-xs text-amber-700">
+                <div
+                  v-if="isConferenceType && showManualConferenceForm"
+                  class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <div class="md:col-span-2">
+                      <label class="text-xs font-medium text-slate-600"
+                        >Tên hội nghị khoa học
+                        <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.conferenceName"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: Hội nghị Khoa học Quốc gia 2026"
+                        :class="inputClass(formErrors.journalName)"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Cấp hội nghị
+                        <span class="text-rose-600">*</span></label
+                      >
+                      <select
+                        v-model="form.conferenceLevel"
+                        :disabled="readOnly"
+                        :class="selectClass()"
+                      >
+                        <option value="">-- Chọn cấp hội nghị --</option>
+                        <option value="NATIONAL">Quốc gia</option>
+                        <option value="INTERNATIONAL">Quốc tế</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Lĩnh vực <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.conferenceResearchField"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: Trí tuệ nhân tạo"
+                        :class="inputClass()"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Đơn vị tổ chức
+                        <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.conferenceOrganization"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: Trường Đại học ..."
+                        :class="inputClass()"
+                      />
+                    </div>
+
+                    <label
+                      class="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                    >
+                      <input
+                        v-model="form.conferenceHasIsbn"
+                        :disabled="readOnly"
+                        type="checkbox"
+                      />
+                      Có ISBN
+                    </label>
+
+                    <div v-if="form.conferenceHasIsbn">
+                      <label class="text-xs font-medium text-slate-600"
+                        >ISBN <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.conferenceIsbn"
+                        :disabled="readOnly"
+                        maxlength="50"
+                        placeholder="VD: 978-..."
+                        :class="inputClass()"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Điểm quy đổi
+                        <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.number="form.conferencePoint"
+                        type="number"
+                        min="0"
+                        max="99.99"
+                        step="0.01"
+                        :disabled="readOnly"
+                        placeholder="VD: 1.5"
+                        :class="inputClass()"
+                      />
+
+                      <div
+                        class="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+                      >
+                        <div
+                          class="flex flex-wrap items-center justify-between gap-2"
+                        >
+                          <div>
+                            <span class="font-semibold text-slate-900"
+                              >Xếp loại:</span
+                            >
+                            {{ manualConferenceDerivedCategoryLabel }}
+                          </div>
+                          <div class="font-semibold text-slate-900">
+                            {{ manualConferenceDerivedHours }} giờ NCKH
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p class="mt-2 text-xs text-slate-500">
+                    Khi đang nhập ngoài danh mục, ô tìm hội nghị sẽ tạm khóa.
+                  </p>
+                </div>
+                <p
+                  v-if="!isConferenceType && !isJournalFromCatalog"
+                  class="mt-2 text-xs text-amber-700"
+                >
                   Lưu ý: Nếu tự nhập tên tạp chí, vui lòng chọn loại bài báo ở
                   trên để hệ thống tính giờ đúng.
+                </p>
+                <p
+                  v-if="isConferenceType && !isConferenceFromCatalog"
+                  class="mt-2 text-xs text-amber-700"
+                >
+                  Lưu ý: Nếu tự nhập hội nghị, vui lòng điền đủ cấp hội nghị,
+                  lĩnh vực, đơn vị tổ chức, ISBN và điểm quy đổi.
                 </p>
               </div>
               <div v-if="form.typeId" class="mt-2 text-xs text-slate-600">
@@ -324,13 +479,12 @@
                 </div>
               </div>
 
-              <div v-if="!showManualJournalForm">
+              <div v-if="!isConferenceType && !showManualJournalForm">
                 <label class="text-xs font-medium text-slate-600"
                   >ISSN
-                  <span
-                    v-if="showManualJournalForm"
-                    class="text-rose-600"
-                    >*</span></label
+                  <span v-if="showManualJournalForm" class="text-rose-600"
+                    >*</span
+                  ></label
                 >
                 <input
                   v-model.trim="form.issn"
@@ -520,6 +674,7 @@ import { useRoute, useRouter } from "vue-router";
 import { FileText } from "lucide-vue-next";
 import ActionResultModal from "@/shared/components/ActionResultModal.vue";
 import JournalSelect from "../../shared/components/JournalSelect.vue";
+import ConferenceSelect from "../../shared/components/ConferenceSelect.vue";
 
 import DeclarationFormShell from "../../shared/components/DeclarationFormShell.vue";
 import ParticipantsTable from "../../shared/components/ParticipantsTable.vue";
@@ -548,6 +703,7 @@ import {
   fetch_evidence_file_types,
   search_lecturer_options,
   search_journals,
+  search_conferences,
 } from "../../shared/services/catalogs.service";
 import {
   fetch_activity,
@@ -582,7 +738,10 @@ const kindId = ref<number>(0);
 const currentLecturerId = ref<number>(0);
 const selectedJournalClassification = ref<string | null>(null);
 const selectedJournalResearchHours = ref<number | null>(null);
+const selectedConferenceClassification = ref<string | null>(null);
+const selectedConferenceResearchHours = ref<number | null>(null);
 const showManualJournalForm = ref(false);
+const showManualConferenceForm = ref(false);
 
 // Keywords (UI + persist)
 const keywords = ref("");
@@ -618,6 +777,15 @@ const form = reactive<ArticleDeclarationFormModel>({
   journalPublisher: "",
   journalWebsite: "",
   workScore: null,
+  conferenceId: null,
+  conferenceName: "",
+  conferenceLevel: "",
+  conferenceResearchField: "",
+  conferenceOrganization: "",
+  conferenceHasIsbn: false,
+  conferenceIsbn: "",
+  conferencePoint: null,
+  conferenceResearchHours: null,
   members: [],
 });
 
@@ -685,9 +853,17 @@ const typeHoursById = computed(() =>
     ]),
   ),
 );
+
+type ArticleTypeOption = {
+  id: number;
+  code: string;
+  name: string;
+  mode: "journal" | "conference";
+};
+
 const articleTypeOptions = computed(() => {
   const first = types.value[0];
-  if (!first) return [] as ActivityTypeDto[];
+  if (!first) return [] as ArticleTypeOption[];
 
   const journalSource =
     types.value.find((t) =>
@@ -699,16 +875,34 @@ const articleTypeOptions = computed(() => {
       (t) =>
         !["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"].includes(t.code) &&
         t.id !== journalSource.id,
-    ) ?? types.value.find((t) => t.id !== journalSource.id) ?? null;
+    ) ??
+    types.value.find((t) => t.id !== journalSource.id) ??
+    null;
 
-  const rows: ActivityTypeDto[] = [
-    { ...journalSource, name: "Bài báo tạp chí" },
+  const rows: ArticleTypeOption[] = [
+    {
+      id: journalSource.id,
+      code: journalSource.code,
+      name: "Bài báo khoa học",
+      mode: "journal",
+    },
   ];
   if (conferenceSource) {
-    rows.push({ ...conferenceSource, name: "Bài báo hội thảo" });
+    rows.push({
+      id: conferenceSource.id,
+      code: conferenceSource.code,
+      name: "Báo cáo khoa học",
+      mode: "conference",
+    });
   }
   return rows;
 });
+const selectedArticleTypeOption = computed(
+  () => articleTypeOptions.value.find((opt) => opt.id === form.typeId) ?? null,
+);
+const isConferenceType = computed(
+  () => selectedArticleTypeOption.value?.mode === "conference",
+);
 const lecturerNameById = computed(() =>
   Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name])),
 );
@@ -722,7 +916,7 @@ const hours = computed(() =>
   computeArticleHours(form, {
     typeCodeById: typeCodeById.value,
     typeHoursById: typeHoursById.value,
-    explicitBaseHours: journalDrivenHours.value,
+    explicitBaseHours: venueDrivenHours.value,
     lecturerNameById: lecturerNameById.value,
     memberRoleNameById: memberRoleNameById.value,
     currentLecturerId: currentLecturerId.value,
@@ -735,9 +929,12 @@ const hoursByLecturerId = computed(() => {
   return map;
 });
 
-const baseHoursText = computed(() => `${journalDrivenHours.value} giờ`);
+const baseHoursText = computed(() => `${venueDrivenHours.value} giờ`);
 
 const isJournalFromCatalog = computed(() => typeof form.journalId === "number");
+const isConferenceFromCatalog = computed(
+  () => typeof form.conferenceId === "number",
+);
 
 function hasIssnOrIsbn(v: string | null | undefined): boolean {
   return !!(v && v.trim().length > 0);
@@ -753,14 +950,40 @@ function deriveJournalCategory(
   return "OTHER";
 }
 
+function deriveConferenceCategory(
+  hasIsbn: boolean,
+  isbn: string | null | undefined,
+  point: number | null,
+): "POINT_GE_2" | "POINT_GE_1" | "ISSN_ISBN" | "OTHER" {
+  if (point !== null && point > 1) return "POINT_GE_2";
+  if (point !== null && point > 0 && point <= 1) return "POINT_GE_1";
+  if (hasIsbn || hasIssnOrIsbn(isbn)) return "ISSN_ISBN";
+  return "OTHER";
+}
+
 const manualDerivedCategory = computed(() =>
   deriveJournalCategory(form.issn, form.workScore ?? null),
+);
+
+const manualConferenceDerivedCategory = computed(() =>
+  deriveConferenceCategory(
+    form.conferenceHasIsbn,
+    form.conferenceIsbn,
+    form.conferencePoint ?? null,
+  ),
 );
 
 const manualDerivedHours = computed(() => {
   if (manualDerivedCategory.value === "POINT_GE_2") return 900;
   if (manualDerivedCategory.value === "POINT_GE_1") return 600;
   if (manualDerivedCategory.value === "ISSN_ISBN") return 300;
+  return 0;
+});
+
+const manualConferenceDerivedHours = computed(() => {
+  if (manualConferenceDerivedCategory.value === "POINT_GE_2") return 900;
+  if (manualConferenceDerivedCategory.value === "POINT_GE_1") return 600;
+  if (manualConferenceDerivedCategory.value === "ISSN_ISBN") return 300;
   return 0;
 });
 
@@ -771,8 +994,21 @@ const manualDerivedCategoryLabel = computed(() => {
   return "Khác";
 });
 
-function hoursFromClassification(code: string | null | undefined): number | null {
-  const normalized = String(code ?? "").trim().toUpperCase();
+const manualConferenceDerivedCategoryLabel = computed(() => {
+  if (manualConferenceDerivedCategory.value === "POINT_GE_2")
+    return "HDGSNN 1-2 điểm";
+  if (manualConferenceDerivedCategory.value === "POINT_GE_1")
+    return "HDGSNN <= 1 điểm";
+  if (manualConferenceDerivedCategory.value === "ISSN_ISBN") return "Có ISBN";
+  return "Khác";
+});
+
+function hoursFromClassification(
+  code: string | null | undefined,
+): number | null {
+  const normalized = String(code ?? "")
+    .trim()
+    .toUpperCase();
   if (normalized === "HDGSNN_GE_2" || normalized === "POINT_GE_2") return 900;
   if (normalized === "HDGSNN_GE_1" || normalized === "POINT_GE_1") return 600;
   if (normalized === "ISSN_ISBN") return 300;
@@ -799,8 +1035,40 @@ const journalDrivenHours = computed(() => {
   return 0;
 });
 
+const conferenceDrivenHours = computed(() => {
+  if (
+    typeof selectedConferenceResearchHours.value === "number" &&
+    Number.isFinite(selectedConferenceResearchHours.value)
+  ) {
+    return Number(selectedConferenceResearchHours.value);
+  }
+
+  const byClassification = hoursFromClassification(
+    selectedConferenceClassification.value,
+  );
+  if (byClassification !== null) return byClassification;
+
+  if (form.conferenceName.trim()) {
+    return manualConferenceDerivedHours.value;
+  }
+
+  return 0;
+});
+
+const venueDrivenHours = computed(() =>
+  isConferenceType.value
+    ? conferenceDrivenHours.value
+    : journalDrivenHours.value,
+);
+
 const hoursNote = computed(() => {
-  if (!form.journalName.trim()) return "Chọn hoặc nhập tạp chí để xác định giờ chuẩn.";
+  if (isConferenceType.value) {
+    if (!form.conferenceName.trim()) {
+      return "Chọn hoặc nhập hội nghị khoa học để xác định giờ chuẩn.";
+    }
+  } else if (!form.journalName.trim()) {
+    return "Chọn hoặc nhập tạp chí để xác định giờ chuẩn.";
+  }
   if (hours.value.distribution.length === 0)
     return "Cần chọn danh sách tác giả để chia đều giờ.";
   return null;
@@ -873,7 +1141,8 @@ function applyValidationErrors(err: unknown): string | null {
   formErrors.academicYearId = errors.academic_year_id?.[0] ?? null;
   formErrors.typeId = errors.type_id?.[0] ?? null;
   formErrors.title = errors.title?.[0] ?? null;
-  formErrors.journalName = errors.journal_name?.[0] ?? null;
+  formErrors.journalName =
+    errors.journal_name?.[0] ?? errors.conference_name?.[0] ?? null;
   formErrors.year = errors.year?.[0] ?? null;
 
   return "Vui lòng kiểm tra các trường bắt buộc.";
@@ -888,15 +1157,21 @@ function normalizeErrorMessage(err: unknown, fallback: string): string {
 }
 
 async function loadCatalogs() {
-  const [currentLecturerOption, lecturerOptions, years, kinds, roles, fileTypes] =
-    await Promise.all([
-      fetch_current_lecturer_option(),
-      search_lecturer_options(""),
-      fetch_academic_years(),
-      fetch_activity_kinds(),
-      fetch_member_roles(),
-      fetch_evidence_file_types("paper"),
-    ]);
+  const [
+    currentLecturerOption,
+    lecturerOptions,
+    years,
+    kinds,
+    roles,
+    fileTypes,
+  ] = await Promise.all([
+    fetch_current_lecturer_option(),
+    search_lecturer_options(""),
+    fetch_academic_years(),
+    fetch_activity_kinds(),
+    fetch_member_roles(),
+    fetch_evidence_file_types("paper"),
+  ]);
 
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
   lecturers.value = currentLecturerOption
@@ -958,6 +1233,18 @@ async function loadDraftFromQuery() {
       form.journalPublisher = detail.journal_publisher ?? "";
       form.journalWebsite = detail.journal_website ?? "";
       form.workScore = detail.work_score ?? null;
+      form.conferenceName = detail.conference_name ?? "";
+      form.conferenceLevel =
+        detail.conference_level === "INTERNATIONAL"
+          ? "INTERNATIONAL"
+          : detail.conference_level
+            ? "NATIONAL"
+            : "";
+      form.conferenceResearchField = detail.conference_research_field ?? "";
+      form.conferenceOrganization = detail.conference_organization ?? "";
+      form.conferenceHasIsbn = !!detail.conference_has_isbn;
+      form.conferenceIsbn = detail.conference_isbn ?? "";
+      form.conferencePoint = detail.conference_point ?? null;
       form.doi = detail.doi ?? "";
       form.articleUrl = detail.article_url ?? "";
       form.volume = detail.volume ?? "";
@@ -1048,10 +1335,61 @@ function onJournalClear() {
   form.journalResearchHours = null;
 }
 
+function onConferenceSelect(option: {
+  id: number;
+  name: string;
+  level: "NATIONAL" | "INTERNATIONAL";
+  researchField: string | null;
+  organization: string | null;
+  hasIsbn: boolean;
+  isbn: string | null;
+  point: number | null;
+}) {
+  form.conferenceId = option.id;
+  form.conferenceName = option.name;
+  form.conferenceLevel = option.level;
+  form.conferenceResearchField = option.researchField ?? "";
+  form.conferenceOrganization = option.organization ?? "";
+  form.conferenceHasIsbn = !!option.hasIsbn;
+  form.conferenceIsbn = option.isbn ?? "";
+  form.conferencePoint = typeof option.point === "number" ? option.point : null;
+  form.conferenceResearchHours = null;
+
+  selectedConferenceClassification.value = deriveConferenceCategory(
+    form.conferenceHasIsbn,
+    form.conferenceIsbn,
+    form.conferencePoint,
+  );
+  selectedConferenceResearchHours.value = null;
+
+  clearFieldError("journalName");
+}
+
+function onConferenceClear() {
+  form.conferenceId = null;
+  form.conferenceName = "";
+  form.conferenceLevel = "";
+  form.conferenceResearchField = "";
+  form.conferenceOrganization = "";
+  form.conferenceHasIsbn = false;
+  form.conferenceIsbn = "";
+  form.conferencePoint = null;
+  form.conferenceResearchHours = null;
+  selectedConferenceClassification.value = null;
+  selectedConferenceResearchHours.value = null;
+}
+
 function toggleManualJournalForm() {
   showManualJournalForm.value = !showManualJournalForm.value;
   if (showManualJournalForm.value) {
     onJournalClear();
+  }
+}
+
+function toggleManualConferenceForm() {
+  showManualConferenceForm.value = !showManualConferenceForm.value;
+  if (showManualConferenceForm.value) {
+    onConferenceClear();
   }
 }
 
@@ -1221,21 +1559,44 @@ function collectMissingFields(mode: "draft" | "submit") {
       missing.push("Loại bài báo");
       formErrors.typeId = "Vui lòng chọn loại bài báo.";
     }
-    if (!form.journalName.trim()) {
-      missing.push("Tạp chí / Kỷ yếu");
-      formErrors.journalName = "Vui lòng chọn tạp chí/kỷ yếu.";
+    if (isConferenceType.value) {
+      if (!form.conferenceName.trim()) {
+        missing.push("Hội nghị khoa học");
+        formErrors.journalName = "Vui lòng chọn hoặc nhập hội nghị khoa học.";
+      }
+    } else if (!form.journalName.trim()) {
+      missing.push("Tạp chí");
+      formErrors.journalName = "Vui lòng chọn tạp chí.";
     }
     if (!form.year) {
       missing.push("Năm xuất bản");
       formErrors.year = "Vui lòng nhập năm xuất bản.";
     }
 
-    if (showManualJournalForm.value && !isJournalFromCatalog.value) {
+    if (
+      !isConferenceType.value &&
+      showManualJournalForm.value &&
+      !isJournalFromCatalog.value
+    ) {
       if (!form.issn.trim()) missing.push("ISSN");
       if (!form.journalScope.trim()) missing.push("Phạm vi");
       if (!form.journalPublisher.trim()) missing.push("Cơ quan xuất bản");
       if (!form.journalSourceName.trim()) missing.push("Nguồn xếp loại");
       if (form.workScore === null) missing.push("Điểm tạp chí");
+    }
+
+    if (
+      isConferenceType.value &&
+      showManualConferenceForm.value &&
+      !isConferenceFromCatalog.value
+    ) {
+      if (!form.conferenceName.trim()) missing.push("Tên hội nghị");
+      if (!form.conferenceLevel) missing.push("Cấp hội nghị");
+      if (!form.conferenceResearchField.trim()) missing.push("Lĩnh vực");
+      if (!form.conferenceOrganization.trim()) missing.push("Đơn vị tổ chức");
+      if (form.conferenceHasIsbn && !form.conferenceIsbn.trim())
+        missing.push("ISBN hội nghị");
+      if (form.conferencePoint === null) missing.push("Điểm quy đổi hội nghị");
     }
 
     const validMembers = form.members.filter(
@@ -1300,13 +1661,34 @@ const shell = useDeclarationFormShell({
 
       await upsert_paper_details({
         activity_id: saved.id,
-        journal_name: form.journalName || null,
-        issn: form.issn || null,
+        journal_name: isConferenceType.value ? null : form.journalName || null,
+        issn: isConferenceType.value ? null : form.issn || null,
         journal_scope: form.journalScope || null,
         journal_source_name: form.journalSourceName || null,
         journal_publisher: form.journalPublisher || null,
         journal_website: form.journalWebsite || null,
         work_score: form.workScore ?? null,
+        conference_name: isConferenceType.value
+          ? form.conferenceName || null
+          : null,
+        conference_level: isConferenceType.value
+          ? form.conferenceLevel || null
+          : null,
+        conference_research_field: isConferenceType.value
+          ? form.conferenceResearchField || null
+          : null,
+        conference_organization: isConferenceType.value
+          ? form.conferenceOrganization || null
+          : null,
+        conference_has_isbn: isConferenceType.value
+          ? form.conferenceHasIsbn
+          : false,
+        conference_isbn: isConferenceType.value
+          ? form.conferenceIsbn || null
+          : null,
+        conference_point: isConferenceType.value
+          ? (form.conferencePoint ?? null)
+          : null,
         doi: form.doi || null,
         article_url: form.articleUrl || null,
         volume: form.volume || null,
@@ -1346,9 +1728,8 @@ const shell = useDeclarationFormShell({
   on_submit: async () => {
     resetErrors();
     try {
-      if (!form.activityId) {
-        await shell.save_draft({ silent_success: true });
-      }
+      // Always persist latest edits before submit so backend validates fresh data.
+      await shell.save_draft({ silent_success: true });
       if (!form.activityId) return;
       const submitResponse = await submit_activity(form.activityId);
       const nextStatusCode =
@@ -1415,7 +1796,17 @@ watch(
 );
 watch(
   () => form.typeId,
-  () => clearFieldError("typeId"),
+  () => {
+    clearFieldError("typeId");
+    clearFieldError("journalName");
+    if (isConferenceType.value) {
+      showManualJournalForm.value = false;
+      onJournalClear();
+    } else {
+      showManualConferenceForm.value = false;
+      onConferenceClear();
+    }
+  },
 );
 
 watch(
@@ -1435,10 +1826,30 @@ watch(
 );
 
 watch(
+  () => form.conferenceName,
+  () => {
+    clearFieldError("journalName");
+    if (form.conferenceId === null) {
+      selectedConferenceClassification.value = null;
+      selectedConferenceResearchHours.value = null;
+      form.conferenceResearchHours = null;
+    }
+  },
+);
+
+watch(
   () => form.journalId,
   (nextId) => {
     if (typeof nextId === "number") {
       showManualJournalForm.value = false;
+    }
+  },
+);
+watch(
+  () => form.conferenceId,
+  (nextId) => {
+    if (typeof nextId === "number") {
+      showManualConferenceForm.value = false;
     }
   },
 );
@@ -1461,8 +1872,15 @@ onMounted(async () => {
     },
   );
 
-  if (!form.journalId && form.journalName.trim()) {
+  if (!isConferenceType.value && !form.journalId && form.journalName.trim()) {
     showManualJournalForm.value = true;
+  }
+  if (
+    isConferenceType.value &&
+    !form.conferenceId &&
+    form.conferenceName.trim()
+  ) {
+    showManualConferenceForm.value = true;
   }
 });
 
@@ -1478,7 +1896,33 @@ async function searchJournals(q: string) {
   return rows.map((r) => ({
     ...r,
     address: (r as any).address ?? "",
-    point: (r as any).point ?? (r as any).point_max ?? (r as any).point_min ?? null,
+    point:
+      (r as any).point ?? (r as any).point_max ?? (r as any).point_min ?? null,
   })) as JournalSelectOptionDto[];
+}
+
+async function searchConferences(q: string) {
+  const rows = await search_conferences(q);
+  return rows.map((r) => {
+    const point =
+      r.point !== null &&
+      r.point !== undefined &&
+      Number.isFinite(Number(r.point))
+        ? Number(r.point)
+        : null;
+
+    const classification = deriveConferenceCategory(
+      !!r.has_isbn,
+      r.isbn ?? null,
+      point,
+    );
+
+    return {
+      ...r,
+      point,
+      classification,
+      research_hours: hoursFromClassification(classification) ?? 0,
+    };
+  });
 }
 </script>

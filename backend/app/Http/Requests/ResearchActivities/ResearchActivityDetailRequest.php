@@ -35,6 +35,13 @@ class ResearchActivityDetailRequest extends FormRequest
             'research_field',
             'publication_status',
             'keywords',
+            'conference_name',
+            'conference_level',
+            'conference_research_field',
+            'conference_organization',
+            'conference_has_isbn',
+            'conference_isbn',
+            'conference_point',
             'publisher',
             'approval_decision_no',
             'approval_decision_date',
@@ -64,6 +71,10 @@ class ResearchActivityDetailRequest extends FormRequest
             if (array_key_exists($field, $input) && $input[$field] === '') {
                 $input[$field] = null;
             }
+        }
+
+        if ($detail === 'paper_details') {
+            $input['conference_has_isbn'] = (bool) ($input['conference_has_isbn'] ?? false);
         }
 
         $this->replace($input);
@@ -102,6 +113,13 @@ class ResearchActivityDetailRequest extends FormRequest
                     'research_field' => ['nullable', 'string', 'max:255'],
                     'publication_status' => ['nullable', 'string', 'max:100'],
                     'keywords' => ['nullable', 'string', 'max:500'],
+                    'conference_name' => ['nullable', 'string', 'max:255'],
+                    'conference_level' => ['nullable', 'string', Rule::in(['NATIONAL', 'INTERNATIONAL'])],
+                    'conference_research_field' => ['nullable', 'string', 'max:255'],
+                    'conference_organization' => ['nullable', 'string', 'max:255'],
+                    'conference_has_isbn' => ['nullable', 'boolean'],
+                    'conference_isbn' => ['nullable', 'string', 'max:50'],
+                    'conference_point' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
                 ];
                 break;
             case 'book_details':

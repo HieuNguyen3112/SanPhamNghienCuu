@@ -144,11 +144,6 @@ class ResearchLookupSeeder extends Seeder
         }
 
         $evidenceTypes = [
-            ['code' => 'content', 'name' => 'Toàn văn'],
-            ['code' => 'cover', 'name' => 'Trang bìa'],
-            ['code' => 'toc', 'name' => 'Mục lục'],
-            ['code' => 'acceptance_decision', 'name' => 'Quyết định nghiệm thu'],
-            ['code' => 'publication_decision', 'name' => 'Quyết định xuất bản'],
             ['code' => 'paper_first_page', 'name' => 'Trang đầu bài báo'],
             ['code' => 'paper_doi_or_article_link', 'name' => 'DOI hoặc liên kết bài báo'],
             ['code' => 'paper_journal_publication_info', 'name' => 'Thông tin tạp chí xuất bản'],

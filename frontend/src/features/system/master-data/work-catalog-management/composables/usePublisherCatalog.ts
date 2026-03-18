@@ -2,6 +2,7 @@ import { computed, reactive, ref, watch } from "vue";
 import {
   publisherFromDto,
   type Publisher,
+  type PublisherSuggestion,
   type PublisherUpsertDTO,
 } from "../contracts/publishers.contract";
 import { publisherService } from "../services/publishers.service";
@@ -20,6 +21,10 @@ export function usePublisherCatalog() {
 
   const modalPublisherOpen = ref(false);
   const modalMode = ref<"create" | "edit">("create");
+  const publisherSuggestionModalOpen = ref(false);
+  const publisherSuggestions = ref<PublisherSuggestion[]>([]);
+  const publisherSuggestionLoading = ref(false);
+  const publisherApprovingSuggestionId = ref<number | null>(null);
 
   const publisherForm = reactive<{
     id: number;
@@ -78,6 +83,54 @@ export function usePublisherCatalog() {
 
     publishers.value = res.items.map(publisherFromDto);
     publisherTotal.value = res.pagination.total;
+  }
+
+  async function loadSuggestions(): Promise<void> {
+    publisherSuggestionLoading.value = true;
+    try {
+      const res = await publisherService.listSuggestions({
+        page: 1,
+        per_page: 100,
+      });
+      publisherSuggestions.value = res.items;
+    } finally {
+      publisherSuggestionLoading.value = false;
+    }
+  }
+
+  async function openPublisherSuggestions(): Promise<void> {
+    publisherSuggestionModalOpen.value = true;
+    await loadSuggestions();
+  }
+
+  function closePublisherSuggestions() {
+    publisherSuggestionModalOpen.value = false;
+  }
+
+  async function approvePublisherSuggestion(
+    id: number,
+    reviewNote?: string,
+  ): Promise<void> {
+    publisherApprovingSuggestionId.value = id;
+    try {
+      await publisherService.approveSuggestion(id, reviewNote);
+      await Promise.all([loadSuggestions(), load()]);
+    } finally {
+      publisherApprovingSuggestionId.value = null;
+    }
+  }
+
+  async function rejectPublisherSuggestion(
+    id: number,
+    reviewNote?: string,
+  ): Promise<void> {
+    publisherApprovingSuggestionId.value = id;
+    try {
+      await publisherService.rejectSuggestion(id, reviewNote);
+      await Promise.all([loadSuggestions(), load()]);
+    } finally {
+      publisherApprovingSuggestionId.value = null;
+    }
   }
 
   const pagedPublishers = computed(() => publishers.value);
@@ -201,11 +254,20 @@ export function usePublisherCatalog() {
     pagedPublishers,
     modalMode,
     modalPublisherOpen,
+    publisherSuggestionModalOpen,
+    publisherSuggestions,
+    publisherSuggestionLoading,
+    publisherApprovingSuggestionId,
     publisherForm,
     publisherErrors,
     load,
+    loadSuggestions,
     openCreatePublisher,
     openEditPublisher,
+    openPublisherSuggestions,
+    closePublisherSuggestions,
+    approvePublisherSuggestion,
+    rejectPublisherSuggestion,
     onUpdatePublisherForm,
     savePublisher,
   };

@@ -3,10 +3,12 @@ import type { ApiItemResponse, ApiListResponse } from "./workCatalogApi.types";
 import type { ListResponseDTO } from "../contracts/pagination.contract";
 import type {
   PublisherDTO,
+  PublisherSuggestionDTO,
   PublisherUpsertDTO,
 } from "../contracts/publishers.contract";
 
 const BASE = "/api/admin/work-catalog/publishers";
+const SUGGESTION_BASE = `${BASE}/suggestions`;
 
 export async function listPublishersApi(params: {
   keyword?: string;
@@ -51,5 +53,50 @@ export async function updatePublisherStatusApi(
     `${BASE}/${id}/status`,
     { is_active },
   );
+  return data.data;
+}
+
+export async function listPublisherSuggestionsApi(params: {
+  keyword?: string;
+  page?: number;
+  per_page?: number;
+}): Promise<ListResponseDTO<PublisherSuggestionDTO>> {
+  const { data } = await http.get<
+    ApiListResponse<ListResponseDTO<PublisherSuggestionDTO>>
+  >(SUGGESTION_BASE, { params });
+  return data.data;
+}
+
+export async function approvePublisherSuggestionApi(
+  id: number,
+  payload?: { review_note?: string },
+): Promise<{
+  suggestion: PublisherSuggestionDTO | null;
+  catalog: PublisherDTO | null;
+}> {
+  await ensureCsrfCookie();
+  const { data } = await http.post<
+    ApiItemResponse<{
+      suggestion: PublisherSuggestionDTO | null;
+      catalog: PublisherDTO | null;
+    }>
+  >(`${SUGGESTION_BASE}/${id}/approve`, payload ?? {});
+  return data.data;
+}
+
+export async function rejectPublisherSuggestionApi(
+  id: number,
+  payload?: { review_note?: string },
+): Promise<{
+  suggestion: PublisherSuggestionDTO | null;
+  catalog: PublisherDTO | null;
+}> {
+  await ensureCsrfCookie();
+  const { data } = await http.post<
+    ApiItemResponse<{
+      suggestion: PublisherSuggestionDTO | null;
+      catalog: PublisherDTO | null;
+    }>
+  >(`${SUGGESTION_BASE}/${id}/reject`, payload ?? {});
   return data.data;
 }

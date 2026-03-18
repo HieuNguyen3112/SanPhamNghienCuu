@@ -107,11 +107,19 @@
             :submitting="loading"
             :form="journalForm"
             :errors="journalErrors"
+            :suggestions-open="journalSuggestionModalOpen"
+            :suggestions="journalSuggestions"
+            :suggestions-loading="journalSuggestionLoading"
+            :approving-suggestion-id="journalApprovingSuggestionId"
             @update:search="qJournal = $event"
             @update:page="pageJournal = $event"
             @update:pageSize="pageSizeJournal = $event"
             @create="openCreateJournal"
             @edit="onEditJournal"
+            @open-suggestions="handleOpenJournalSuggestions"
+            @close-suggestions="closeJournalSuggestions"
+            @approve-suggestion="handleApproveJournalSuggestion"
+            @reject-suggestion="handleRejectJournalSuggestion"
             @close-modal="modalJournalOpen = false"
             @submit="handleSaveJournal"
             @update:form="onUpdateJournalForm"
@@ -134,11 +142,19 @@
             :submitting="loading"
             :form="publisherForm"
             :errors="publisherErrors"
+            :suggestions-open="publisherSuggestionModalOpen"
+            :suggestions="publisherSuggestions"
+            :suggestions-loading="publisherSuggestionLoading"
+            :approving-suggestion-id="publisherApprovingSuggestionId"
             @update:search="qPublisher = $event"
             @update:page="pagePublisher = $event"
             @update:pageSize="pageSizePublisher = $event"
             @create="openCreatePublisher"
             @edit="onEditPublisher"
+            @open-suggestions="handleOpenPublisherSuggestions"
+            @close-suggestions="closePublisherSuggestions"
+            @approve-suggestion="handleApprovePublisherSuggestion"
+            @reject-suggestion="handleRejectPublisherSuggestion"
             @close-modal="modalPublisherOpen = false"
             @submit="handleSavePublisher"
             @update:form="onUpdatePublisherForm"
@@ -161,11 +177,19 @@
             :submitting="loading"
             :form="conferenceForm"
             :errors="conferenceErrors"
+            :suggestions-open="conferenceSuggestionModalOpen"
+            :suggestions="conferenceSuggestions"
+            :suggestions-loading="conferenceSuggestionLoading"
+            :approving-suggestion-id="conferenceApprovingSuggestionId"
             @update:search="qConference = $event"
             @update:page="pageConference = $event"
             @update:pageSize="pageSizeConference = $event"
             @create="openCreateConference"
             @edit="onEditConference"
+            @open-suggestions="handleOpenConferenceSuggestions"
+            @close-suggestions="closeConferenceSuggestions"
+            @approve-suggestion="handleApproveConferenceSuggestion"
+            @reject-suggestion="handleRejectConferenceSuggestion"
             @close-modal="modalConferenceOpen = false"
             @submit="handleSaveConference"
             @update:form="onUpdateConferenceForm"
@@ -311,10 +335,22 @@ const {
   workLevelErrors,
   journalForm,
   journalErrors,
+  journalSuggestionModalOpen,
+  journalSuggestionLoading,
+  journalApprovingSuggestionId,
+  journalSuggestions,
   publisherForm,
   publisherErrors,
+  publisherSuggestionModalOpen,
+  publisherSuggestionLoading,
+  publisherApprovingSuggestionId,
+  publisherSuggestions,
   conferenceForm,
   conferenceErrors,
+  conferenceSuggestionModalOpen,
+  conferenceSuggestionLoading,
+  conferenceApprovingSuggestionId,
+  conferenceSuggestions,
   researchFieldForm,
   researchFieldErrors,
 
@@ -330,17 +366,29 @@ const {
 
   openCreateJournal,
   openEditJournal,
+  openJournalSuggestions,
+  closeJournalSuggestions,
+  approveJournalSuggestion,
+  rejectJournalSuggestion,
   validateJournalForm,
   saveJournal,
   onUpdateJournalForm,
 
   openCreatePublisher,
   openEditPublisher,
+  openPublisherSuggestions,
+  closePublisherSuggestions,
+  approvePublisherSuggestion,
+  rejectPublisherSuggestion,
   savePublisher,
   onUpdatePublisherForm,
 
   openCreateConference,
   openEditConference,
+  openConferenceSuggestions,
+  closeConferenceSuggestions,
+  approveConferenceSuggestion,
+  rejectConferenceSuggestion,
   saveConference,
   onUpdateConferenceForm,
 
@@ -474,6 +522,31 @@ async function handleSaveJournal() {
   await runCatalogAction(() => saveJournal(), successMessage);
 }
 
+async function handleOpenJournalSuggestions() {
+  try {
+    await openJournalSuggestions();
+  } catch (error) {
+    errorMessage.value = resolveActionErrorMessage(
+      error,
+      "Không tải được danh sách đề xuất tạp chí.",
+    );
+  }
+}
+
+async function handleApproveJournalSuggestion(id: number, reviewNote?: string) {
+  await runCatalogAction(
+    () => approveJournalSuggestion(id, reviewNote),
+    "Đã duyệt đề xuất tạp chí và lưu vào danh mục.",
+  );
+}
+
+async function handleRejectJournalSuggestion(id: number, reviewNote?: string) {
+  await runCatalogAction(
+    () => rejectJournalSuggestion(id, reviewNote),
+    "Đã từ chối đề xuất tạp chí.",
+  );
+}
+
 async function handleSavePublisher() {
   const successMessage = buildStatusActionText(
     modalModePublisher.value,
@@ -484,6 +557,37 @@ async function handleSavePublisher() {
   await runCatalogAction(() => savePublisher(), successMessage);
 }
 
+async function handleOpenPublisherSuggestions() {
+  try {
+    await openPublisherSuggestions();
+  } catch (error) {
+    errorMessage.value = resolveActionErrorMessage(
+      error,
+      "Không tải được danh sách đề xuất nhà xuất bản.",
+    );
+  }
+}
+
+async function handleApprovePublisherSuggestion(
+  id: number,
+  reviewNote?: string,
+) {
+  await runCatalogAction(
+    () => approvePublisherSuggestion(id, reviewNote),
+    "Đã duyệt đề xuất nhà xuất bản và lưu vào danh mục.",
+  );
+}
+
+async function handleRejectPublisherSuggestion(
+  id: number,
+  reviewNote?: string,
+) {
+  await runCatalogAction(
+    () => rejectPublisherSuggestion(id, reviewNote),
+    "Đã từ chối đề xuất nhà xuất bản.",
+  );
+}
+
 async function handleSaveConference() {
   const successMessage = buildStatusActionText(
     modalModeConference.value,
@@ -492,6 +596,37 @@ async function handleSaveConference() {
     "Cập nhật hội nghị khoa học thành công.",
   );
   await runCatalogAction(() => saveConference(), successMessage);
+}
+
+async function handleOpenConferenceSuggestions() {
+  try {
+    await openConferenceSuggestions();
+  } catch (error) {
+    errorMessage.value = resolveActionErrorMessage(
+      error,
+      "Không tải được danh sách đề xuất hội nghị.",
+    );
+  }
+}
+
+async function handleApproveConferenceSuggestion(
+  id: number,
+  reviewNote?: string,
+) {
+  await runCatalogAction(
+    () => approveConferenceSuggestion(id, reviewNote),
+    "Đã duyệt đề xuất hội nghị và lưu vào danh mục.",
+  );
+}
+
+async function handleRejectConferenceSuggestion(
+  id: number,
+  reviewNote?: string,
+) {
+  await runCatalogAction(
+    () => rejectConferenceSuggestion(id, reviewNote),
+    "Đã từ chối đề xuất hội nghị.",
+  );
 }
 
 async function handleSaveResearchField() {
