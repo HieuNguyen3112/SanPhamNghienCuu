@@ -34,7 +34,7 @@ return [
     */
 
     // Thêm /me + profile/* vì SPA dùng session/cookie ở các endpoint này (không nằm dưới /api)
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'me', 'profile/*'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'me', 'profile/*', 'password/forgot', 'password/reset'],
 
     'allowed_methods' => ['*'],
 

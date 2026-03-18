@@ -9,23 +9,8 @@
           Quên mật khẩu
         </h2>
         <p class="text-sm text-slate-600">
-          Nhập email đăng nhập. Nếu thông tin hợp lệ, hệ thống sẽ gửi liên kết
-          đặt lại mật khẩu đến hộp thư của bạn.
+          Nhập email đăng nhập để nhận liên kết đặt lại mật khẩu.
         </p>
-      </div>
-
-      <div
-        v-if="successMessage"
-        class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
-      >
-        {{ successMessage }}
-      </div>
-
-      <div
-        v-else-if="requestError"
-        class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
-      >
-        {{ requestError }}
       </div>
 
       <BaseInput
@@ -72,6 +57,7 @@
 import { ref } from "vue";
 import { BaseButton, BaseInput } from "../../../shared/form/index";
 import { forgotPassword } from "@/features/auth/api";
+import { useActionFeedback } from "@/shared/composables/useActionFeedback";
 
 const emit = defineEmits<{
   (e: "back-to-login"): void;
@@ -88,10 +74,10 @@ type AuthHttpError = {
   };
 };
 
+const { runWithFeedback } = useActionFeedback();
+
 const email = ref("");
 const emailError = ref<string | null>(null);
-const requestError = ref("");
-const successMessage = ref("");
 const submitting = ref(false);
 
 function resolveForgotPasswordErrorMessage(error: unknown): string {
@@ -105,7 +91,7 @@ function resolveForgotPasswordErrorMessage(error: unknown): string {
   }
 
   if (status === 422) {
-    return "Vui lòng nhập đúng địa chỉ email để nhận hướng dẫn đặt lại mật khẩu.";
+    return "Vui lòng nhập đúng địa chỉ email để nhận liên kết đặt lại mật khẩu.";
   }
 
   if (status !== null && status >= 500) {
@@ -121,7 +107,6 @@ function resolveForgotPasswordErrorMessage(error: unknown): string {
 
 function validate(): boolean {
   emailError.value = null;
-  requestError.value = "";
 
   const normalizedEmail = email.value.trim();
   if (!normalizedEmail) {
@@ -143,16 +128,35 @@ async function onSubmit(): Promise<void> {
   if (!validate()) return;
 
   submitting.value = true;
-  successMessage.value = "";
 
   try {
     const normalizedEmail = email.value.trim().toLowerCase();
-    const response = await forgotPassword({ email: normalizedEmail });
-    successMessage.value =
-      response.data?.message ??
-      "Nếu thông tin hợp lệ, hướng dẫn đặt lại mật khẩu đã được gửi tới email của bạn.";
-  } catch (error) {
-    requestError.value = resolveForgotPasswordErrorMessage(error);
+
+    await runWithFeedback(
+      () => forgotPassword({ email: normalizedEmail }),
+      {
+        loading: {
+          enabled: true,
+          title: "Đang gửi liên kết",
+          message: "Hệ thống đang xử lý yêu cầu đặt lại mật khẩu...",
+          delayMs: 200,
+          minShowMs: 250,
+        },
+        success: {
+          enabled: true,
+          title: "Kiểm tra email",
+          message:
+            "Nếu thông tin hợp lệ, hướng dẫn đặt lại mật khẩu đã được gửi tới email của bạn.",
+        },
+        error: {
+          enabled: true,
+          title: "Gửi yêu cầu thất bại",
+          message: (error) => resolveForgotPasswordErrorMessage(error),
+        },
+      },
+    );
+  } catch {
+    // Modal feedback đã được hiển thị bởi runWithFeedback.
   } finally {
     submitting.value = false;
   }
