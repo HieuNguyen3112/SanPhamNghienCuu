@@ -461,16 +461,24 @@ const canSubmit = computed(() => {
 });
 
 async function loadCatalogs() {
-  const [currentLecturerOption, years, kinds, roles, fileTypes] =
+  const [currentLecturerOption, lecturerOptions, years, kinds, roles, fileTypes] =
     await Promise.all([
       fetch_current_lecturer_option(),
+      search_lecturer_options(""),
       fetch_academic_years(),
       fetch_activity_kinds(),
       fetch_member_roles(),
       fetch_evidence_file_types("book"),
     ]);
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
-  lecturers.value = currentLecturerOption ? [currentLecturerOption] : [];
+  lecturers.value = currentLecturerOption
+    ? [
+        currentLecturerOption,
+        ...lecturerOptions.filter(
+          (lecturer) => lecturer.id !== currentLecturerOption.id,
+        ),
+      ]
+    : lecturerOptions;
   academicYears.value = years;
   memberRoles.value = roles;
   evidenceFileTypes.value = fileTypes;

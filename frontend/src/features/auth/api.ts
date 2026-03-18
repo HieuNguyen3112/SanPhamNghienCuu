@@ -13,6 +13,21 @@ export const getCsrfCookie = () => fetchCsrfCookie();
 
 export const login = (payload: LoginRequest) => http.post("/login", payload);
 
+export const forgotPassword = async (payload: { email: string }) => {
+  await fetchCsrfCookie();
+  return http.post("/password/forgot", payload);
+};
+
+export const resetPassword = async (payload: {
+  token: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+}) => {
+  await fetchCsrfCookie();
+  return http.post("/password/reset", payload);
+};
+
 export const logout = async () => {
   await fetchCsrfCookie();
   return http.post("/logout");

@@ -995,8 +995,14 @@ async function loadCatalogs() {
     search_lecturer_options(""),
   ]);
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
+
   const baseLecturers = currentLecturerOption
-    ? [currentLecturerOption, ...initialLecturers]
+    ? [
+        currentLecturerOption,
+        ...initialLecturers.filter(
+          (lecturer) => lecturer.id !== currentLecturerOption.id,
+        ),
+      ]
     : initialLecturers;
   lecturers.value = mergeLecturerOptionsFromMembers(
     baseLecturers,

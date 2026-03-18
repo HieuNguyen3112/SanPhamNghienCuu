@@ -8,6 +8,7 @@ import { useUserStore } from "@/app/stores/userStore";
 // Layouts
 import MainLayout from "@/layouts/MainLayout.vue";
 import LoginPage from "@/features/auth/pages/LoginPage.vue";
+import ResetPasswordPage from "@/features/auth/pages/ResetPasswordPage.vue";
 
 // ✅ Public HomePage
 import HomePage from "@/features/search/pages/HomePage.vue";
@@ -29,6 +30,11 @@ const routes: RouteRecordRaw[] = [
     name: "login",
     component: LoginPage,
     meta: { guestOnly: true },
+  },
+  {
+    path: "/reset-password",
+    name: "reset-password",
+    component: ResetPasswordPage,
   },
 
   /**
