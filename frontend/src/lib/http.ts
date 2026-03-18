@@ -43,5 +43,3 @@ export const getCsrfCookie = async () => {
 export const ensureCsrfCookie = () => getCsrfCookie();
 
 export default http;
-
-

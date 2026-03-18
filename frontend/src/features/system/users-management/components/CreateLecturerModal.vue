@@ -75,13 +75,19 @@
             <label class="mb-1 block text-xs font-medium text-slate-700"
               >Email</label
             >
-            <input
-              v-model="form.email"
-              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
-              placeholder="VD: nguyenvana@hcmue.edu.vn hoặc nguyenvana"
-            />
+            <div class="flex items-stretch overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <input
+                v-model="form.emailLocalPart"
+                class="w-full border-0 px-3 py-2 text-sm focus:border-0 focus:outline-none focus:ring-0"
+                placeholder="VD: nguyenvana"
+                autocomplete="off"
+              />
+              <span class="inline-flex shrink-0 items-center border-l border-slate-200 bg-slate-50 px-3 text-sm text-slate-600">
+                @{{ DEFAULT_EMAIL_DOMAIN }}
+              </span>
+            </div>
             <div class="mt-1 text-xs text-slate-500">
-              Nếu chỉ nhập phần trước @, hệ thống tự thêm @hcmue.edu.vn.
+              Chỉ nhập phần trước @, hệ thống tự ghép email đầy đủ.
             </div>
           </div>
 
@@ -185,7 +191,7 @@ const emit = defineEmits<{
 const form = reactive({
   lecturerCode: "",
   fullName: "",
-  email: "",
+  emailLocalPart: "",
   unitId: null as number | null,
   phoneNumber: "",
   academicTitle: "",
@@ -207,7 +213,7 @@ watch(
     localError.value = null;
     form.lecturerCode = "";
     form.fullName = "";
-    form.email = "";
+    form.emailLocalPart = "";
     form.unitId = props.unitOptions[0]?.id ?? null;
     form.phoneNumber = "";
     form.academicTitle = "";
@@ -222,10 +228,13 @@ function isValidEmail(value: string) {
 }
 
 function normalizeEmailInput(value: string) {
-  const email = value.trim().toLowerCase();
-  if (!email) return "";
-  if (email.includes("@")) return email;
-  return `${email}@${DEFAULT_EMAIL_DOMAIN}`;
+  const raw = value.trim().toLowerCase();
+  if (!raw) return "";
+
+  const localPart = raw.includes("@") ? raw.split("@")[0] : raw;
+  if (!localPart) return "";
+
+  return `${localPart}@${DEFAULT_EMAIL_DOMAIN}`;
 }
 
 function onSubmit() {
@@ -233,7 +242,7 @@ function onSubmit() {
 
   const lecturerCode = form.lecturerCode.trim().toUpperCase();
   const fullName = form.fullName.trim();
-  const email = normalizeEmailInput(form.email);
+  const email = normalizeEmailInput(form.emailLocalPart);
 
   if (!lecturerCode) {
     localError.value = "Mã giảng viên không được để trống.";
