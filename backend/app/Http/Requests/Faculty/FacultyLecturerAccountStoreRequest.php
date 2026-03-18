@@ -21,7 +21,7 @@ class FacultyLecturerAccountStoreRequest extends FormRequest
         $this->merge([
             'lecturer_code' => is_string($this->lecturer_code) ? trim($this->lecturer_code) : $this->lecturer_code,
             'full_name' => is_string($this->full_name) ? trim($this->full_name) : $this->full_name,
-            'email' => is_string($this->email) ? trim($this->email) : $this->email,
+            'email' => is_string($this->email) ? $this->normalizeEmailInput($this->email) : $this->email,
             'phone_number' => is_string($this->phone_number) ? trim($this->phone_number) : $this->phone_number,
             'academic_title' => is_string($this->academic_title) ? trim($this->academic_title) : $this->academic_title,
             'status' => is_string($this->status) ? strtoupper(trim($this->status)) : $this->status,
@@ -47,5 +47,17 @@ class FacultyLecturerAccountStoreRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $this->addFacultyScopedUnitValidation($validator);
+    }
+
+    private function normalizeEmailInput(string $rawEmail): string
+    {
+        $email = strtolower(trim($rawEmail));
+        if ($email === '' || str_contains($email, '@')) {
+            return $email;
+        }
+
+        $domain = strtolower((string) config('users_management.default_email_domain', 'hcmue.edu.vn'));
+
+        return $email . '@' . ltrim($domain, '@');
     }
 }

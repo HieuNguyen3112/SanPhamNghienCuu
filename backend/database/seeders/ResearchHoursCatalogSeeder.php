@@ -14,8 +14,8 @@ class ResearchHoursCatalogSeeder extends Seeder
 
         $academicYears = [
             ['code' => '2023-2024', 'start_date' => '2023-09-01', 'end_date' => '2024-08-31', 'is_active' => false],
-            ['code' => '2024-2025', 'start_date' => '2024-09-01', 'end_date' => '2025-08-31', 'is_active' => true],
-            ['code' => '2025-2026', 'start_date' => '2025-09-01', 'end_date' => '2026-08-31', 'is_active' => false],
+            ['code' => '2024-2025', 'start_date' => '2024-09-01', 'end_date' => '2025-08-31', 'is_active' => false],
+            ['code' => '2025-2026', 'start_date' => '2025-09-01', 'end_date' => '2026-08-31', 'is_active' => true],
         ];
 
         foreach ($academicYears as $year) {
@@ -107,7 +107,7 @@ class ResearchHoursCatalogSeeder extends Seeder
                 'type' => 'coso',
                 'type_aliases' => ['coso', 'co_so', 'university', 'cap_truong', 'project_university'],
                 'distribution_strategy' => 'principal_fraction_others_equal',
-                // Quy tắc đề tài cấp Trường: Chủ nhiệm 600h + quỹ giờ thành viên 240h.
+                // Quy tắc đề tài cấp cơ sở: Chủ nhiệm 600h + quỹ giờ thành viên 240h.
                 'hours_total_per_activity' => 600,
                 'hours_per_occurrence' => 240,
             ],
@@ -176,7 +176,7 @@ class ResearchHoursCatalogSeeder extends Seeder
         }
 
         $normalizedAliases = collect($aliases)
-            ->map(fn ($alias) => $this->normalizeToken((string) $alias))
+            ->map(fn($alias) => $this->normalizeToken((string) $alias))
             ->filter()
             ->values()
             ->all();

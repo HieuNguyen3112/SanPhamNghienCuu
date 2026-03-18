@@ -30,7 +30,7 @@ class NormalizeVietnameseLabelsCommand extends Command
                 'textbook' => 'Giáo trình',
                 'reference' => 'Tài liệu tham khảo',
                 'bo' => 'Đề tài cấp Bộ (2 năm)',
-                'coso' => 'Đề tài cấp Trường (1 năm)',
+                'coso' => 'Đề tài cấp cơ sở (1 năm)',
                 'report' => 'Báo cáo hội thảo',
                 'attend' => 'Tham dự hội thảo',
             ],

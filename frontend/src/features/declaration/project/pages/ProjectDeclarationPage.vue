@@ -23,7 +23,7 @@
               </div>
               <ul class="mt-1 list-disc space-y-1 pl-5 text-slate-600">
                 <li>
-                  Đề tài cấp Trường: không có thành viên thì Chủ nhiệm 600 giờ;
+                  Đề tài cấp cơ sở: không có thành viên thì Chủ nhiệm 600 giờ;
                   có thành viên thì Chủ nhiệm 360 giờ, nhóm thành viên chia đều
                   240 giờ.
                 </li>
@@ -621,8 +621,8 @@ const router = useRouter();
 const PROJECT_TYPE_LABELS: Record<string, string> = {
   bo: "Đề tài cấp Bộ (2 năm)",
   ministry: "Đề tài cấp Bộ (2 năm)",
-  coso: "Đề tài cấp Trường (1 năm)",
-  university: "Đề tài cấp Trường (1 năm)",
+  coso: "Đề tài cấp cơ sở (1 năm)",
+  university: "Đề tài cấp cơ sở (1 năm)",
 };
 const ALLOWED_PROJECT_TYPE_CODES = new Set(
   Object.keys(PROJECT_TYPE_LABELS).map((code) => code.toLowerCase()),

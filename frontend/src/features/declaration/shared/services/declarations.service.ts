@@ -81,6 +81,10 @@ type PaperDetailsDto = {
 type BookDetailsDto = {
   activity_id: number;
   publisher: string;
+  publisher_address?: string | null;
+  publisher_phone?: string | null;
+  publisher_email?: string | null;
+  publisher_website?: string | null;
   approval_decision_no: string | null;
   approval_decision_date: string | null;
   isbn: string | null;

@@ -11,7 +11,7 @@ class ProjectHoursCalculator
             'member_pool_hours' => 480.0,
         ],
         'coso' => [
-            'level_label' => 'Đề tài cấp Trường (1 năm)',
+            'level_label' => 'Đề tài cấp cơ sở (1 năm)',
             'leader_hours' => 600.0,
             'member_pool_hours' => 240.0,
         ],

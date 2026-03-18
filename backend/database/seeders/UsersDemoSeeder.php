@@ -11,9 +11,12 @@ class UsersDemoSeeder extends Seeder
     public function run(): void
     {
         $users = [
-            ['email' => 'truong@local.test', 'name' => 'Nguyễn Thành Nam', 'role' => 'SCIENCE_OFFICE'],
-            ['email' => 'khoa@local.test',   'name' => 'Đặng Thu Hà', 'role' => 'DEPARTMENT_BOARD'],
-            ['email' => 'gv@local.test',     'name' => 'Nguyễn Minh Tuấn', 'role' => 'LECTURER'],
+            // Tài khoản mẫu hệ thống
+            ['email' => 'truong@hcmue.edu.vn', 'name' => 'ACC TRUONG', 'role' => 'SCIENCE_OFFICE'],
+            ['email' => 'bcnkhoa@hcmue.edu.vn', 'name' => 'ACC BAN CHU NHIEM KHOA', 'role' => 'DEPARTMENT_BOARD'],
+            ['email' => 'giangvien@hcmue.edu.vn', 'name' => 'ACC GIẢNG VIÊN DEMO', 'role' => 'LECTURER'],
+
+
         ];
 
         foreach ($users as $u) {
@@ -21,7 +24,7 @@ class UsersDemoSeeder extends Seeder
                 ['email' => $u['email']],
                 [
                     'name' => $u['name'],
-                    'password' => Hash::make('Password!123')
+                    'password' => Hash::make((string) config('users_management.default_lecturer_password', 'hcmue@123')),
                 ]
             );
 

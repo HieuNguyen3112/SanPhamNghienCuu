@@ -13,10 +13,7 @@ export const declarationTypeCardsMockDTO: DeclarationTypeCardDTO[] = [
   {
     type_key: "project",
     title: "Đề tài nghiên cứu",
-    description_lines: [
-      "Cấp khoa / cấp trường / cấp bộ",
-      "Có quyết định phê duyệt",
-    ],
+    description_lines: ["Cấp khoa / cấp cơ sở", "Có quyết định phê duyệt"],
     to: "/declarations/projects",
   },
   {

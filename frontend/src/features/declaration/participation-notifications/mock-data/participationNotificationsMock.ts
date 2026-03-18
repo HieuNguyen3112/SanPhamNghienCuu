@@ -76,7 +76,7 @@ export const participationNotificationMockStore: ParticipationNotificationDto[] 
       owner_name: "Lê Minh C",
       requested_at: "2025-09-18T08:40:00.000Z",
       status: "ACCEPTED",
-      work_short_info: "Đề tài Cấp Trường • 2024–2025",
+      work_short_info: "Đề tài cấp cơ sở • 2024–2025",
       work_system_status: "Chờ duyệt",
       confirmation_log: {
         status: "ACCEPTED",

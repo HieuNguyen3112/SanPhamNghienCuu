@@ -29,8 +29,8 @@ const ACTIVITY_TYPE_LABELS_VI: Record<string, string> = {
   attend: "Tham dự hội thảo",
   bo: "Đề tài cấp Bộ (2 năm)",
   ministry: "Đề tài cấp Bộ (2 năm)",
-  coso: "Đề tài cấp Trường (1 năm)",
-  university: "Đề tài cấp Trường (1 năm)",
+  coso: "Đề tài cấp cơ sở (1 năm)",
+  university: "Đề tài cấp cơ sở (1 năm)",
 };
 
 const EXPECTED_ACADEMIC_YEAR_CODES = ["2024-2025", "2025-2026"];

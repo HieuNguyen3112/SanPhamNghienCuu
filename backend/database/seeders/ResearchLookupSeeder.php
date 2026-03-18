@@ -53,7 +53,7 @@ class ResearchLookupSeeder extends Seeder
             ['code' => 'textbook', 'name' => 'Giáo trình', 'kind_code' => 'book'],
             ['code' => 'reference', 'name' => 'Tài liệu tham khảo', 'kind_code' => 'book'],
             ['code' => 'bo', 'name' => 'Đề tài cấp Bộ (2 năm)', 'kind_code' => 'project'],
-            ['code' => 'coso', 'name' => 'Đề tài cấp Trường (1 năm)', 'kind_code' => 'project'],
+            ['code' => 'coso', 'name' => 'Đề tài cấp cơ sở (1 năm)', 'kind_code' => 'project'],
             ['code' => 'report', 'name' => 'Báo cáo hội thảo', 'kind_code' => 'conference'],
             ['code' => 'attend', 'name' => 'Tham dự hội thảo', 'kind_code' => 'conference'],
         ];
@@ -78,7 +78,7 @@ class ResearchLookupSeeder extends Seeder
         // Tương thích dữ liệu cũ: giữ code cũ nếu đã tồn tại, chỉ Việt hóa nhãn.
         $legacyTypeLabels = [
             'ministry' => 'Đề tài cấp Bộ (2 năm)',
-            'university' => 'Đề tài cấp Trường (1 năm)',
+            'university' => 'Đề tài cấp cơ sở (1 năm)',
             'province' => 'Đề tài cấp Tỉnh',
             'faculty' => 'Đề tài cấp Khoa',
             'other' => 'Khác',

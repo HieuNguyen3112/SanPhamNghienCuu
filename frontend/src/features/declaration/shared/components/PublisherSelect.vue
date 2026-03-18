@@ -136,9 +136,17 @@
 
         <div
           v-if="!loading && items.length === 0"
-          class="px-3 py-6 text-center text-sm text-slate-500"
+          class="space-y-2 px-3 py-6 text-center text-sm"
         >
-          Không có kết quả. Hãy thử từ khoá khác.
+          <p class="text-slate-500">Không có kết quả trong danh mục.</p>
+          <p
+            v-if="trimmedInput.length > 0"
+            class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          >
+            Bạn vẫn có thể nhập “{{ trimmedInput }}”. Hệ thống sẽ gửi đề xuất
+            nhà xuất bản mới khi bạn bấm gửi duyệt.
+          </p>
+          <p v-else class="text-xs text-slate-400">Hãy thử từ khoá khác.</p>
         </div>
       </div>
 
@@ -190,6 +198,7 @@ const rootEl = ref<HTMLElement | null>(null);
 const inputEl = ref<HTMLInputElement | null>(null);
 
 const inputText = computed(() => props.publisherName ?? "");
+const trimmedInput = computed(() => (props.publisherName ?? "").trim());
 
 let timer: number | null = null;
 

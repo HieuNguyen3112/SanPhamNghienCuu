@@ -41,7 +41,7 @@ class CreateFacultyLecturerAccountService
             $user = $this->lecturerAccountRepository->createUser([
                 'name' => $data->fullName,
                 'email' => $data->email,
-                'password' => Hash::make((string) config('users_management.default_lecturer_password', 'Password!123')),
+                'password' => Hash::make((string) config('users_management.default_lecturer_password', 'hcmue@123')),
                 'must_change_password' => false,
                 'email_verified_at' => now(),
             ]);

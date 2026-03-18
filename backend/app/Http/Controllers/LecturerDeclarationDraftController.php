@@ -145,7 +145,7 @@ class LecturerDeclarationDraftController extends Controller
             'textbook' => 'Giáo trình',
             'reference' => 'Tài liệu tham khảo',
             'bo', 'ministry' => 'Đề tài cấp Bộ (2 năm)',
-            'coso', 'university' => 'Đề tài cấp Trường (1 năm)',
+            'coso', 'university' => 'Đề tài cấp cơ sở (1 năm)',
             'report' => 'Báo cáo hội thảo',
             'attend' => 'Tham dự hội thảo',
             default => null,

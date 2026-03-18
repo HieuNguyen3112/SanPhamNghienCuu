@@ -18,17 +18,8 @@ class DatabaseSeeder extends Seeder
         LookupSeeder::class,
         RolesPermissionsSeeder::class,
         UsersDemoSeeder::class,
-        LecturerProfileDemoSeeder::class,
         ResearchLookupSeeder::class,
         ResearchHoursCatalogSeeder::class,
-        ResearchActivityDemoSeeder::class,
-        LecturerPersonalHoursOverviewSeeder::class,
-        ResearchHoursUsageSeeder::class,
-        LecturerHourApprovalDemoSeeder::class,
-        WorkCatalogSeeder::class,
-        AuditLogSeeder::class,
-        FacultyHoursApprovalSeeder::class,
-        NotificationIconDemoSeeder::class,
     ]);
 }
 

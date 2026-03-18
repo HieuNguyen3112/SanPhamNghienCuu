@@ -1117,6 +1117,10 @@ class ResearchActivityController extends Controller
 
         $payload = [
             'name' => $name,
+            'address' => isset($detail->publisher_address) ? trim((string) $detail->publisher_address) : null,
+            'phone' => isset($detail->publisher_phone) ? trim((string) $detail->publisher_phone) : null,
+            'email' => isset($detail->publisher_email) ? trim((string) $detail->publisher_email) : null,
+            'website' => isset($detail->publisher_website) ? trim((string) $detail->publisher_website) : null,
             'isbn' => isset($detail->isbn) ? trim((string) $detail->isbn) : null,
             'year' => isset($detail->year) ? (int) $detail->year : null,
             'pages' => isset($detail->pages) ? (int) $detail->pages : null,

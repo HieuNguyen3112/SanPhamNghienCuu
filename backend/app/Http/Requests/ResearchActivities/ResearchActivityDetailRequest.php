@@ -43,6 +43,10 @@ class ResearchActivityDetailRequest extends FormRequest
             'conference_isbn',
             'conference_point',
             'publisher',
+            'publisher_address',
+            'publisher_phone',
+            'publisher_email',
+            'publisher_website',
             'approval_decision_no',
             'approval_decision_date',
             'isbn',
@@ -125,6 +129,10 @@ class ResearchActivityDetailRequest extends FormRequest
             case 'book_details':
                 $rules += [
                     'publisher' => ['required', 'string', 'max:255'],
+                    'publisher_address' => ['nullable', 'string', 'max:255'],
+                    'publisher_phone' => ['nullable', 'string', 'max:50'],
+                    'publisher_email' => ['nullable', 'email', 'max:100'],
+                    'publisher_website' => ['nullable', 'string', 'max:255'],
                     'approval_decision_no' => ['nullable', 'string', 'max:100'],
                     'approval_decision_date' => ['nullable', 'date'],
                     'isbn' => ['nullable', 'string', 'max:50'],

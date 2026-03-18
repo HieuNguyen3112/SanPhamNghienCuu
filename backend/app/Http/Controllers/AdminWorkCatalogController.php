@@ -21,7 +21,6 @@ class AdminWorkCatalogController extends Controller
         'ISSN' => 'ISSN_ISBN',
         'ISBN' => 'ISSN_ISBN',
     ];
-    private const JOURNAL_RANKS = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'OTHER'];
     private const CONFERENCE_LEVELS = ['NATIONAL', 'INTERNATIONAL'];
     private ?array $paperRuleHoursByTypeCode = null;
 
@@ -242,25 +241,8 @@ class AdminWorkCatalogController extends Controller
     {
         [$keyword, $page, $perPage] = $this->resolveListParams($request);
 
-        $today = Carbon::now()->toDateString();
-
-        $latestRanking = DB::table('journal_rankings')
-            ->select('journal_id', DB::raw('MAX(effective_from) as max_effective_from'))
-            ->where('effective_from', '<=', $today)
-            ->groupBy('journal_id');
-
         $query = DB::table('journals as j')
-            ->leftJoinSub($latestRanking, 'lr', 'lr.journal_id', '=', 'j.id')
-            ->leftJoin('journal_rankings as jr', function ($join) {
-                $join->on('jr.journal_id', '=', 'j.id')
-                    ->on('jr.effective_from', '=', 'lr.max_effective_from');
-            })
-            ->select([
-                'j.*',
-                'jr.rank as current_rank',
-                'jr.effective_from as current_rank_effective_from',
-                // có thể thêm: 'jr.note as current_rank_note' nếu muốn
-            ])
+            ->select(['j.*'])
             ->when($keyword !== '', function ($q) use ($keyword) {
                 $like = '%' . $keyword . '%';
                 $q->where(function ($sub) use ($like) {
@@ -407,48 +389,6 @@ class AdminWorkCatalogController extends Controller
             'message' => 'Cập nhật thành công.',
             'data' => $this->journalPayload($row),
         ], Response::HTTP_OK);
-    }
-
-    public function storeJournalRanking(Request $request, int $journalId)
-    {
-        $journal = DB::table('journals')->where('id', $journalId)->first();
-        if (! $journal) {
-            return response()->json(['message' => 'Không tìm thấy tạp chí.'], Response::HTTP_NOT_FOUND);
-        }
-
-        $data = $request->validate([
-            'rank'          => ['required', 'string', Rule::in(self::JOURNAL_RANKS ?? ['Q1', 'Q2', 'Q3', 'Q4', 'A', 'B', 'C'])],
-            'effective_from' => ['required', 'date'],
-            'note'          => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $now = now();
-
-        DB::table('journal_rankings')->insert([
-            'journal_id'     => $journalId,
-            'rank'           => $data['rank'],
-            'effective_from' => $data['effective_from'],
-            'note'           => $data['note'] ?? null,
-            'created_at'     => $now,
-            'updated_at'     => $now,
-        ]);
-
-        // Cập nhật timestamp của journal để dễ sort / nhận biết có thay đổi ranking
-        DB::table('journals')
-            ->where('id', $journalId)
-            ->update(['updated_at' => $now]);
-
-        // Trả về ranking vừa tạo + thông tin journal nếu cần
-        $newRanking = DB::table('journal_rankings')
-            ->where('journal_id', $journalId)
-            ->where('effective_from', $data['effective_from'])
-            ->first();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Đã thêm xếp hạng tạp chí.',
-            'data'    => $this->journalRankingPayload($newRanking),
-        ], Response::HTTP_CREATED);
     }
 
     // ===== CONFERENCES =====
@@ -1452,23 +1392,8 @@ class AdminWorkCatalogController extends Controller
 
     private function journalQuery()
     {
-        $today = Carbon::now()->toDateString();
-        $latestRanking = DB::table('journal_rankings')
-            ->select('journal_id', DB::raw('MAX(effective_from) as effective_from'))
-            ->where('effective_from', '<=', $today)
-            ->groupBy('journal_id');
-
         return DB::table('journals as j')
-            ->leftJoinSub($latestRanking, 'lr', 'lr.journal_id', '=', 'j.id')
-            ->leftJoin('journal_rankings as jr', function ($join) {
-                $join->on('jr.journal_id', '=', 'j.id')
-                    ->on('jr.effective_from', '=', 'lr.effective_from');
-            })
-            ->select([
-                'j.*',
-                'jr.rank as current_rank',
-                'jr.effective_from as current_rank_effective_from',
-            ]);
+            ->select(['j.*']);
     }
 
     private function deriveJournalClassificationAndHours(array $data): array
@@ -1667,20 +1592,8 @@ class AdminWorkCatalogController extends Controller
             'notes' => $row->notes,
             'is_active' => (bool) $row->is_active,
             'updated_at' => $row->updated_at,
-            'current_rank' => $row->current_rank,
-            'current_rank_effective_from' => $row->current_rank_effective_from,
-        ];
-    }
-
-    private function journalRankingPayload($row): array
-    {
-        return [
-            'id' => (int) $row->id,
-            'journal_id' => (int) $row->journal_id,
-            'rank' => $row->rank,
-            'effective_from' => $row->effective_from,
-            'note' => $row->note,
-            'created_at' => $row->created_at,
+            'current_rank' => null,
+            'current_rank_effective_from' => null,
         ];
     }
 

@@ -411,7 +411,6 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SC
         Route::get('/journals/suggestions', [AdminWorkCatalogController::class, 'listJournalSuggestions']);
         Route::post('/journals/suggestions/{id}/approve', [AdminWorkCatalogController::class, 'approveJournalSuggestion']);
         Route::post('/journals/suggestions/{id}/reject', [AdminWorkCatalogController::class, 'rejectJournalSuggestion']);
-        Route::post('/journals/{journalId}/rankings', [AdminWorkCatalogController::class, 'storeJournalRanking']);
 
         Route::get('/publishers', [AdminWorkCatalogController::class, 'listPublishers']);
         Route::post('/publishers', [AdminWorkCatalogController::class, 'storePublisher']);

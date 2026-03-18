@@ -67,7 +67,7 @@ const PROJECT_SPLIT_RULES: readonly ProjectSplitRule[] = [
   },
   {
     type_codes: ["coso", "university"],
-    rule_label: "Đề tài cấp Trường (1 năm)",
+    rule_label: "Đề tài cấp cơ sở (1 năm)",
     leader_hours: 600,
     member_pool_hours: 240,
   },

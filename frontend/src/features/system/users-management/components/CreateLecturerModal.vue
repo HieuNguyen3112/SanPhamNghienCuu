@@ -16,8 +16,8 @@
               </div>
               <div class="mt-1 text-xs text-slate-500">
                 Mật khẩu mặc định là
-                <span class="font-semibold">Password!123</span>. Giảng viên có
-                thể đổi mật khẩu sau khi đăng nhập, không bắt buộc ở lần đầu.
+                <span class="font-semibold">hcmue@123</span>. Giảng viên có thể
+                đổi mật khẩu sau khi đăng nhập, không bắt buộc ở lần đầu.
               </div>
             </div>
             <button
@@ -78,8 +78,11 @@
             <input
               v-model="form.email"
               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:ring-0"
-              placeholder="Email đăng nhập"
+              placeholder="VD: nguyenvana@hcmue.edu.vn hoặc nguyenvana"
             />
+            <div class="mt-1 text-xs text-slate-500">
+              Nếu chỉ nhập phần trước @, hệ thống tự thêm @hcmue.edu.vn.
+            </div>
           </div>
 
           <div class="md:col-span-2">
@@ -189,6 +192,8 @@ const form = reactive({
   status: "ACTIVE" as "ACTIVE" | "INACTIVE",
 });
 
+const DEFAULT_EMAIL_DOMAIN = "hcmue.edu.vn";
+
 const localError = ref<string | null>(null);
 const organizationLabel = computed(() => props.organizationLabel ?? "Đơn vị");
 const placeholderText = computed(() =>
@@ -216,12 +221,19 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
+function normalizeEmailInput(value: string) {
+  const email = value.trim().toLowerCase();
+  if (!email) return "";
+  if (email.includes("@")) return email;
+  return `${email}@${DEFAULT_EMAIL_DOMAIN}`;
+}
+
 function onSubmit() {
   localError.value = null;
 
   const lecturerCode = form.lecturerCode.trim().toUpperCase();
   const fullName = form.fullName.trim();
-  const email = form.email.trim().toLowerCase();
+  const email = normalizeEmailInput(form.email);
 
   if (!lecturerCode) {
     localError.value = "Mã giảng viên không được để trống.";

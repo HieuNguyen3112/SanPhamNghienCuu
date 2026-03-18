@@ -109,15 +109,112 @@
               </div>
 
               <div class="md:col-span-2">
+                <div class="mb-2 flex items-center justify-between gap-2">
+                  <label class="text-xs font-medium text-slate-600"
+                    >Nhà xuất bản <span class="text-rose-600">*</span></label
+                  >
+                  <button
+                    v-if="!readOnly"
+                    type="button"
+                    class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    @click="toggleManualPublisherForm"
+                  >
+                    {{
+                      showManualPublisherForm
+                        ? "Tắt nhập nhà xuất bản ngoài danh mục"
+                        : "Nhập nhà xuất bản ngoài danh mục"
+                    }}
+                  </button>
+                </div>
+
                 <PublisherSelect
                   v-model="selectedPublisherId"
                   v-model:publisherName="form.publisher"
-                  :disabled="readOnly"
-                  label="Nhà xuất bản"
+                  :disabled="readOnly || showManualPublisherForm"
+                  label=""
                   :required="true"
-                  hint="Gõ để tìm trong danh mục nhà xuất bản và chọn nhanh."
+                  hint="Gợi ý tìm và chọn từ danh mục nhà xuất bản."
                   :search-fn="searchPublishers"
+                  @select="onPublisherSelect"
+                  @clear="onPublisherClear"
                 />
+
+                <div
+                  v-if="showManualPublisherForm"
+                  class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <div class="md:col-span-2">
+                      <label class="text-xs font-medium text-slate-600"
+                        >Tên nhà xuất bản ngoài danh mục
+                        <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.publisher"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: Nhà xuất bản ABC"
+                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Địa chỉ <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.publisherAddress"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: 280 An Dương Vương, Q.5, TP.HCM"
+                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Điện thoại <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.publisherPhone"
+                        :disabled="readOnly"
+                        maxlength="50"
+                        placeholder="VD: 02838293829"
+                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Email <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.publisherEmail"
+                        :disabled="readOnly"
+                        maxlength="100"
+                        placeholder="VD: contact@nxb.vn"
+                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Website <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.publisherWebsite"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: https://nxb.vn"
+                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-300 focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
+                  <p class="mt-2 text-xs text-slate-500">
+                    Khi gửi duyệt, tên mới sẽ tự động được tạo đề xuất để quản
+                    trị viên thêm vào danh mục.
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -312,6 +409,7 @@ const lecturers = ref<LecturerOptionDto[]>([]);
 const types = ref<ActivityTypeDto[]>([]);
 const kindId = ref<number>(0);
 const selectedPublisherId = ref<number | null>(null);
+const showManualPublisherForm = ref(false);
 
 const currentLecturerId = ref<number>(0);
 
@@ -324,6 +422,10 @@ const form = reactive<BookDeclarationFormModel>({
   abstract: "",
   notes: "",
   publisher: "",
+  publisherAddress: "",
+  publisherPhone: "",
+  publisherEmail: "",
+  publisherWebsite: "",
   year: null,
   isbn: "",
   pages: null,
@@ -436,11 +538,24 @@ const hoursNote = computed(() => {
   return null;
 });
 
+function isValidEmail(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
 const canSubmit = computed(() => {
   if (!form.academicYearId) return false;
   if (!form.typeId) return false;
   if (!form.title.trim()) return false;
   if (!form.publisher.trim()) return false; // book_details.publisher required
+  if (!showManualPublisherForm.value && !selectedPublisherId.value) return false;
+  if (showManualPublisherForm.value) {
+    if (!form.publisherAddress.trim()) return false;
+    if (!form.publisherPhone.trim()) return false;
+    if (!form.publisherWebsite.trim()) return false;
+    if (!isValidEmail(form.publisherEmail)) return false;
+  }
   const validMembers = form.members.filter((m) => {
     const hasRole = typeof m.member_role_id === "number";
     if (!hasRole) return false;
@@ -504,6 +619,34 @@ async function onSearchLecturers(q: string) {
 
 async function searchPublishers(q: string) {
   return await search_publishers(q);
+}
+
+function clearPublisherSelection() {
+  selectedPublisherId.value = null;
+  form.publisher = "";
+  form.publisherAddress = "";
+  form.publisherPhone = "";
+  form.publisherEmail = "";
+  form.publisherWebsite = "";
+}
+
+function onPublisherSelect() {
+  showManualPublisherForm.value = false;
+  form.publisherAddress = "";
+  form.publisherPhone = "";
+  form.publisherEmail = "";
+  form.publisherWebsite = "";
+}
+
+function onPublisherClear() {
+  selectedPublisherId.value = null;
+}
+
+function toggleManualPublisherForm() {
+  showManualPublisherForm.value = !showManualPublisherForm.value;
+  if (showManualPublisherForm.value) {
+    clearPublisherSelection();
+  }
 }
 
 function normalizeErrorMessage(err: unknown, fallback: string): string {
@@ -677,6 +820,30 @@ async function loadDraftFromQuery() {
       const detail = data.detail as any;
       form.publisher = detail.publisher ?? "";
       selectedPublisherId.value = null;
+      form.publisherAddress = detail.publisher_address ?? "";
+      form.publisherPhone = detail.publisher_phone ?? "";
+      form.publisherEmail = detail.publisher_email ?? "";
+      form.publisherWebsite = detail.publisher_website ?? "";
+
+      const publisherName = form.publisher.trim();
+      if (publisherName) {
+        const options = await searchPublishers(publisherName);
+        const matched = options.find(
+          (option) =>
+            option.name.trim().toLowerCase() === publisherName.toLowerCase(),
+        );
+        selectedPublisherId.value = matched?.id ?? null;
+      }
+
+      showManualPublisherForm.value =
+        !selectedPublisherId.value &&
+        Boolean(
+          publisherName ||
+            form.publisherAddress.trim() ||
+            form.publisherPhone.trim() ||
+            form.publisherEmail.trim() ||
+            form.publisherWebsite.trim(),
+        );
       form.approvalDecisionNo = detail.approval_decision_no ?? "";
       form.approvalDecisionDate = detail.approval_decision_date ?? null;
       form.isbn = detail.isbn ?? "";
@@ -748,6 +915,10 @@ const shell = useDeclarationFormShell({
       await upsert_book_details({
         activity_id: saved.id,
         publisher: form.publisher,
+        publisher_address: form.publisherAddress || null,
+        publisher_phone: form.publisherPhone || null,
+        publisher_email: form.publisherEmail || null,
+        publisher_website: form.publisherWebsite || null,
         approval_decision_no: form.approvalDecisionNo || null,
         approval_decision_date: form.approvalDecisionDate || null,
         isbn: form.isbn || null,

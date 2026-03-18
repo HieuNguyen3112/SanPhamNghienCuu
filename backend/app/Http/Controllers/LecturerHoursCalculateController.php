@@ -1547,7 +1547,7 @@ class LecturerHoursCalculateController extends Controller
             return 'Đề tài cấp Bộ';
         }
         if ($kind === 'project' && $type === 'coso') {
-            return 'Đề tài cấp Trường';
+            return 'Đề tài cấp cơ sở';
         }
         if ($kind === 'paper' && $type === 'hdgsnn_900') {
             return 'Bài báo HDGSNN 1-2 điểm';
@@ -1707,7 +1707,7 @@ class LecturerHoursCalculateController extends Controller
             $kindCode === 'book' && $typeCode === 'textbook' => 'Giáo trình ISBN',
             $kindCode === 'book' && $typeCode === 'reference' => 'Tài liệu tham khảo',
             $kindCode === 'project' && $typeCode === 'bo' => 'Đề tài cấp Bộ',
-            $kindCode === 'project' && $typeCode === 'coso' => 'Đề tài cấp Trường',
+            $kindCode === 'project' && $typeCode === 'coso' => 'Đề tài cấp cơ sở',
             $kindCode === 'conference' && $typeCode === 'report' => 'Hội nghị/Hội thảo - Báo cáo',
             $kindCode === 'conference' && $typeCode === 'attend' => 'Hội nghị/Hội thảo - Tham dự',
             default => 'Quy tắc ' . $strategy,

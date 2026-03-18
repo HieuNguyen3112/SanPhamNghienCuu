@@ -170,7 +170,7 @@ class ProjectHoursSplitTest extends TestCase
         $this->typeCosoId = DB::table('activity_types')->insertGetId([
             'kind_id' => $this->projectKindId,
             'code' => 'coso',
-            'name' => 'Đề tài cấp Trường',
+            'name' => 'Đề tài cấp cơ sở',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

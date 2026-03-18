@@ -74,7 +74,7 @@ class HoursListFiltersTest extends TestCase
 
         $returnedActivityIds = collect($response->json('data.items'))
             ->pluck('activity_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         $this->assertContains($activityId, $returnedActivityIds);
@@ -246,7 +246,7 @@ class HoursListFiltersTest extends TestCase
 
         $activityIds = collect($response->json('data.items'))
             ->pluck('activity_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         $this->assertContains($currentYearActivityId, $activityIds);
@@ -334,7 +334,7 @@ class HoursListFiltersTest extends TestCase
 
         $activityIds = collect($response->json('data.items'))
             ->pluck('activity_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         $this->assertContains($activityId, $activityIds);
@@ -383,7 +383,7 @@ class HoursListFiltersTest extends TestCase
 
         $activityIds = collect($response->json('data.items'))
             ->pluck('activity_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         $this->assertContains($activityId, $activityIds);
@@ -447,13 +447,13 @@ class HoursListFiltersTest extends TestCase
         $this->assertCount(1, $pageTwo->json('data.items'));
 
         $items = collect($widePage->json('data.items'));
-        $activityIds = $items->pluck('activity_id')->map(fn ($id) => (int) $id)->all();
+        $activityIds = $items->pluck('activity_id')->map(fn($id) => (int) $id)->all();
 
         $this->assertContains($missingA, $activityIds);
         $this->assertContains($missingB, $activityIds);
         $this->assertContains($linkOnly, $activityIds);
         $this->assertNotContains($withPdf, $activityIds);
-        $this->assertTrue($items->every(fn (array $item) => (int) ($item['evidence_count'] ?? -1) === 0));
+        $this->assertTrue($items->every(fn(array $item) => (int) ($item['evidence_count'] ?? -1) === 0));
     }
 
     private function seedBaseData(): void

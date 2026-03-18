@@ -712,38 +712,6 @@ function workTypeLabel(type: PublicResearchItem["workType"]): string {
   return "KHÁC";
 }
 
-const resolvedPdfUrl = computed(() => {
-  const direct = props.item?.pdfUrl?.trim();
-  if (direct) return direct;
-
-  const links = detail.value?.evidenceFiles ?? [];
-  const match = links.find((entry) => {
-    if (entry.isPdf) return true;
-    const url = entry.url.toLowerCase();
-    return url.endsWith(".pdf") || url.includes(".pdf?");
-  });
-  return match?.url ?? null;
-});
-
-async function onPdfClick() {
-  if (!resolvedPdfUrl.value) {
-    alert("Công trình chưa có PDF công khai.");
-    return;
-  }
-
-  const activityId = props.item?.id ?? "unknown";
-  const fallbackFileName = `minh-chung-${activityId}.pdf`;
-
-  await openPdfPreview({
-    cacheKey: `public-research-evidence:${activityId}`,
-    title: "Xem minh chứng",
-    fallbackFileName,
-    previewUrl: resolvedPdfUrl.value,
-    downloadUrl: resolvedPdfUrl.value,
-    errorMessage: "Không thể mở file minh chứng. Vui lòng thử lại.",
-  });
-}
-
 async function onEvidencePreviewClick(
   file: { label: string; url: string; isPdf: boolean },
   index: number,

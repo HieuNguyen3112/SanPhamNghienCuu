@@ -24,6 +24,12 @@ class AdminLecturerAccountController extends Controller
 
     public function store(Request $request)
     {
+        if (is_string($request->input('email'))) {
+            $request->merge([
+                'email' => $this->normalizeEmailInput((string) $request->input('email')),
+            ]);
+        }
+
         $validated = $request->validate([
             'lecturer_code' => ['required', 'string', 'max:50', Rule::unique('lecturers', 'code')],
             'full_name' => ['required', 'string', 'max:255'],
@@ -377,6 +383,18 @@ class AdminLecturerAccountController extends Controller
         }
 
         return array_values(array_unique($normalized));
+    }
+
+    private function normalizeEmailInput(string $rawEmail): string
+    {
+        $email = strtolower(trim($rawEmail));
+        if ($email === '' || str_contains($email, '@')) {
+            return $email;
+        }
+
+        $domain = strtolower((string) config('users_management.default_email_domain', 'hcmue.edu.vn'));
+
+        return $email . '@' . ltrim($domain, '@');
     }
 
     private function parseSort(?string $sort): array

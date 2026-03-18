@@ -16,6 +16,10 @@ export type BookDeclarationFormModel = {
   notes: string;
 
   publisher: string;
+  publisherAddress: string;
+  publisherPhone: string;
+  publisherEmail: string;
+  publisherWebsite: string;
   year: number | null;
   isbn: string;
   pages: number | null;
