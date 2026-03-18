@@ -14,8 +14,8 @@ class ResearchLookupSeeder extends Seeder
         $academicYears = [
             [
                 'code' => '2024-2025',
-                'start_date' => '2024-09-01',
-                'end_date' => '2025-08-31',
+                'start_date' => '2024-11-01',
+                'end_date' => '2025-10-31',
                 'is_active' => true,
             ],
         ];
@@ -48,7 +48,7 @@ class ResearchLookupSeeder extends Seeder
 
         $types = [
             ['code' => 'hdgsnn_900', 'name' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)', 'kind_code' => 'paper'],
-            ['code' => 'hdgsnn_600', 'name' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)', 'kind_code' => 'paper'],
+            ['code' => 'hdgsnn_600', 'name' => 'Bài báo HDGSNN <= 1 điểm (600 giờ)', 'kind_code' => 'paper'],
             ['code' => 'hdgsnn_300', 'name' => 'Bài báo có ISSN/ISBN (300 giờ)', 'kind_code' => 'paper'],
             ['code' => 'textbook', 'name' => 'Giáo trình', 'kind_code' => 'book'],
             ['code' => 'reference', 'name' => 'Tài liệu tham khảo', 'kind_code' => 'book'],

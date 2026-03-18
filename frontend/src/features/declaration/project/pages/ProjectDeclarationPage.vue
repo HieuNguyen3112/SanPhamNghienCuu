@@ -23,12 +23,14 @@
               </div>
               <ul class="mt-1 list-disc space-y-1 pl-5 text-slate-600">
                 <li>
-                  Chọn cấp đề tài để áp dụng quy tắc giờ: cấp Bộ (720 + 480)
-                  hoặc cấp Trường (600 + 240).
+                  Đề tài cấp Trường: không có thành viên thì Chủ nhiệm 600 giờ;
+                  có thành viên thì Chủ nhiệm 360 giờ, nhóm thành viên chia đều
+                  240 giờ.
                 </li>
                 <li>
-                  Chủ nhiệm nhận 100% phần chủ nhiệm, nhóm thành viên chia đều
-                  quỹ giờ thành viên.
+                  Đề tài cấp Bộ: không có thành viên thì Chủ nhiệm 720 giờ; có
+                  thành viên thì Chủ nhiệm 240 giờ, nhóm thành viên chia đều 480
+                  giờ.
                 </li>
                 <li>Giảng viên không nhập giờ thủ công.</li>
               </ul>
@@ -84,38 +86,6 @@
                   Cấp đề tài quyết định phần giờ Chủ nhiệm và quỹ giờ thành
                   viên.
                 </div>
-              </div>
-            </div>
-
-            <div
-              v-if="selectedTypeRoleRule"
-              class="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3"
-            >
-              <div class="text-xs font-semibold text-sky-900">
-                Quy định giờ theo vai trò ({{
-                  selectedTypeRoleRule.levelLabel
-                }})
-              </div>
-              <div class="mt-2 grid gap-2 md:grid-cols-2">
-                <div
-                  class="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm"
-                >
-                  <div class="text-slate-600">Chủ nhiệm</div>
-                  <div class="font-semibold text-slate-900">
-                    {{ selectedTypeRoleRule.leaderHours.toFixed(2) }} giờ
-                  </div>
-                </div>
-                <div
-                  class="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm"
-                >
-                  <div class="text-slate-600">Quỹ giờ thành viên</div>
-                  <div class="font-semibold text-slate-900">
-                    {{ selectedTypeRoleRule.memberPoolHours.toFixed(2) }} giờ
-                  </div>
-                </div>
-              </div>
-              <div class="mt-2 text-xs text-slate-600">
-                Giờ mỗi thành viên = quỹ giờ thành viên / số thành viên thực tế.
               </div>
             </div>
           </div>
@@ -289,7 +259,8 @@
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
-                  >Thời gian kết thúc <span class="text-rose-600">*</span></label
+                  >Thời gian kết thúc
+                  <span class="text-rose-600">*</span></label
                 >
                 <input
                   v-model="form.endDate"
@@ -332,7 +303,8 @@
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
                 />
                 <div class="mt-1 text-xs text-slate-500">
-                  Chọn vai trò <b>Chủ nhiệm</b> trong danh sách thành viên ở phần bên dưới.
+                  Chọn vai trò <b>Chủ nhiệm</b> trong danh sách thành viên ở
+                  phần bên dưới.
                 </div>
               </div>
 
@@ -416,12 +388,15 @@
           />
 
           <!-- Section D -->
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+          <div
+            class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
+          >
             <div class="text-sm font-semibold text-slate-900">
               D. Minh chứng và link liên quan
             </div>
             <div class="mt-1 text-xs text-slate-500">
-              <span class="text-rose-600">*</span> Bắt buộc có ít nhất 1 file minh chứng. Link liên quan là khuyến nghị.
+              <span class="text-rose-600">*</span> Bắt buộc có ít nhất 1 file
+              minh chứng. Link liên quan là khuyến nghị.
             </div>
           </div>
           <EvidenceUpload
@@ -822,8 +797,9 @@ function normalizeServerPreview(
   }));
 
   const currentLecturerHours =
-    distribution.find((member) => member.lecturer_id === currentLecturerId.value)
-      ?.hours ?? 0;
+    distribution.find(
+      (member) => member.lecturer_id === currentLecturerId.value,
+    )?.hours ?? 0;
 
   return {
     total_hours: preview.formula.total_hours_allocated ?? 0,
@@ -1003,20 +979,29 @@ const filteredMemberRoles = computed(() => {
   return list.length > 0 ? list : memberRoles.value;
 });
 async function loadCatalogs() {
-  const [currentLecturerOption, years, kinds, roles, fileTypes, initialLecturers] =
-    await Promise.all([
-      fetch_current_lecturer_option(),
-      fetch_academic_years(),
-      fetch_activity_kinds(),
-      fetch_member_roles(),
-      fetch_evidence_file_types("project"),
-      search_lecturer_options(""),
-    ]);
+  const [
+    currentLecturerOption,
+    years,
+    kinds,
+    roles,
+    fileTypes,
+    initialLecturers,
+  ] = await Promise.all([
+    fetch_current_lecturer_option(),
+    fetch_academic_years(),
+    fetch_activity_kinds(),
+    fetch_member_roles(),
+    fetch_evidence_file_types("project"),
+    search_lecturer_options(""),
+  ]);
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
   const baseLecturers = currentLecturerOption
     ? [currentLecturerOption, ...initialLecturers]
     : initialLecturers;
-  lecturers.value = mergeLecturerOptionsFromMembers(baseLecturers, form.members);
+  lecturers.value = mergeLecturerOptionsFromMembers(
+    baseLecturers,
+    form.members,
+  );
   academicYears.value = years;
   memberRoles.value = roles;
   evidenceFileTypes.value = fileTypes;
@@ -1038,7 +1023,11 @@ async function loadCatalogs() {
   }
 
   // Mặc định form mới luôn có người kê khai trong danh sách thành viên.
-  if (!form.activityId && form.members.length === 0 && currentLecturerId.value) {
+  if (
+    !form.activityId &&
+    form.members.length === 0 &&
+    currentLecturerId.value
+  ) {
     const principalRole = roles.find((r) => r.code === "principal");
     form.members.push({
       lecturer_id: currentLecturerId.value,
@@ -1046,7 +1035,6 @@ async function loadCatalogs() {
       member_role_code: principalRole?.code ?? null,
     });
   }
-
 }
 
 async function onSearchLecturers(q: string) {
@@ -1274,13 +1262,17 @@ const shell = useDeclarationFormShell({
   initial_status: "DRAFT",
   on_save_draft: async () => {
     try {
+      if (!form.academicYearId) {
+        throw new Error("Vui lòng chọn năm học trước khi lưu bản nháp.");
+      }
+
       // upsert base research_activities
       const saved = await upsert_activity_base({
         id: form.activityId ?? undefined,
         owner_lecturer_id: currentLecturerId.value,
         kind_id: form.kindId,
         type_id: form.typeId,
-        academic_year_id: form.academicYearId ?? 0,
+        academic_year_id: form.academicYearId,
         status_id: 100, // mock draft status id (from mock_statuses); TODO: lookup by code
         title: form.title,
         abstract: form.abstract || null,
@@ -1339,6 +1331,7 @@ const shell = useDeclarationFormShell({
       await upsert_members(saved.id, upsertList);
 
       await persistEvidenceDraft(saved.id);
+      await loadDraftFromQuery();
     } catch (err) {
       throw new Error(
         normalizeErrorMessage(err, "Không thể lưu bản nháp. Vui lòng thử lại."),

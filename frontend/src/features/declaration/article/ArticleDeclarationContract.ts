@@ -26,6 +26,13 @@ export type ArticleDeclarationFormModel = {
   year: number | null;
   pageStart: number | null;
   pageEnd: number | null;
+  publicationStatus: string;
+
+  journalScope: string;
+  journalSourceName: string;
+  journalPublisher: string;
+  journalWebsite: string;
+  workScore: number | null;
 
   members: ParticipantRowModel[];
 };
@@ -45,6 +52,7 @@ export function computeArticleHours(
   ctx: {
     typeCodeById: Record<number, string>;
     typeHoursById: Record<number, number>;
+    explicitBaseHours?: number | null;
     lecturerNameById: Record<number, string>;
     memberRoleNameById: Record<number, string>;
     currentLecturerId: number;
@@ -58,7 +66,17 @@ export function computeArticleHours(
   const byTypeFallback = typeCode
     ? (articleBaseHoursByTypeCode[typeCode] ?? 0)
     : 0;
-  const baseHours = byTypeConfig > 0 ? byTypeConfig : byTypeFallback;
+  const overrideHours =
+    typeof ctx.explicitBaseHours === "number" &&
+    Number.isFinite(ctx.explicitBaseHours)
+      ? Number(ctx.explicitBaseHours)
+      : null;
+  const baseHours =
+    overrideHours !== null
+      ? overrideHours
+      : byTypeConfig > 0
+        ? byTypeConfig
+        : byTypeFallback;
 
   const participants = normalizeParticipantsForHours(model.members);
 

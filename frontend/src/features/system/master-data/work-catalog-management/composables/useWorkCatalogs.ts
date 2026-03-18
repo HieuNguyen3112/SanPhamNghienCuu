@@ -103,6 +103,7 @@ export function useWorkCatalogs() {
     journalErrors: journal.journalErrors,
     openCreateJournal: journal.openCreateJournal,
     openEditJournal: journal.openEditJournal,
+    validateJournalForm: journal.validateJournalForm,
     saveJournal: journal.saveJournal,
     onUpdateJournalForm: journal.onUpdateJournalForm,
 

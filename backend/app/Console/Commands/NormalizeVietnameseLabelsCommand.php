@@ -25,7 +25,7 @@ class NormalizeVietnameseLabelsCommand extends Command
             ],
             'activity_types' => [
                 'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)',
-                'hdgsnn_600' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)',
+                'hdgsnn_600' => 'Bài báo HDGSNN <= 1 điểm (600 giờ)',
                 'hdgsnn_300' => 'Bài báo có ISSN/ISBN (300 giờ)',
                 'textbook' => 'Giáo trình',
                 'reference' => 'Tài liệu tham khảo',
@@ -96,8 +96,8 @@ class NormalizeVietnameseLabelsCommand extends Command
 
         $this->info(
             'Hoàn tất chuẩn hóa nhãn tiếng Việt'
-            . ($dryRun ? ' (dry-run)' : '')
-            . '. Số bản ghi thay đổi: ' . $totalUpdated
+                . ($dryRun ? ' (dry-run)' : '')
+                . '. Số bản ghi thay đổi: ' . $totalUpdated
         );
 
         return self::SUCCESS;
@@ -144,13 +144,13 @@ class NormalizeVietnameseLabelsCommand extends Command
 
                 $this->line(
                     '[hour_rules] id=' . $row->id
-                    . ' (type=' . $typeCode . '): '
-                    . 'strategy=' . $row->distribution_strategy
-                    . ', total=' . $row->hours_total_per_activity
-                    . ', pool=' . $row->hours_per_occurrence
-                    . ' => strategy=principal_fraction_others_equal'
-                    . ', total=' . $target['leader']
-                    . ', pool=' . $target['member_pool']
+                        . ' (type=' . $typeCode . '): '
+                        . 'strategy=' . $row->distribution_strategy
+                        . ', total=' . $row->hours_total_per_activity
+                        . ', pool=' . $row->hours_per_occurrence
+                        . ' => strategy=principal_fraction_others_equal'
+                        . ', total=' . $target['leader']
+                        . ', pool=' . $target['member_pool']
                 );
                 $totalUpdated++;
 

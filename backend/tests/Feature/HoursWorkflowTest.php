@@ -332,7 +332,7 @@ class HoursWorkflowTest extends TestCase
             'uploaded_by_user_id' => $this->lecturerUser->id,
         ]);
 
-        Storage::disk('local')->assertExists($storedPath);
+        $this->assertTrue(Storage::disk('local')->exists((string) $storedPath));
 
         $this->getJson("/api/lecturer/hours/calculate/{$activityId}/evidence")
             ->assertOk()
@@ -1299,22 +1299,22 @@ class HoursWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('research_activities', [
             'id' => $activityId,
-            'total_hours_calc' => 1200.0,
+            'total_hours_calc' => 720.0,
             'status_id' => $this->statusId('approved'),
         ]);
 
         $this->assertDatabaseHas('research_activity_members', [
             'activity_id' => $activityId,
             'lecturer_id' => $this->lecturerId,
-            'hours_assigned' => 720.0,
-            'contribution_share' => 0.6,
+            'hours_assigned' => 240.0,
+            'contribution_share' => 0.3333,
         ]);
 
         $this->assertDatabaseHas('research_activity_members', [
             'activity_id' => $activityId,
             'lecturer_id' => $this->memberLecturerId,
             'hours_assigned' => 480.0,
-            'contribution_share' => 0.4,
+            'contribution_share' => 0.6667,
         ]);
     }
 

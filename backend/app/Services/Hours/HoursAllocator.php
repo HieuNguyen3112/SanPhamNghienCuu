@@ -50,7 +50,7 @@ class HoursAllocator
                     : null;
             }
         } elseif ($this->isProjectPoolRule($rule)) {
-            $leaderHoursTotal = round((float) $rule->hours_total_per_activity * $normalizedQuantity, 2);
+            $leaderRuleTotal = round((float) $rule->hours_total_per_activity * $normalizedQuantity, 2);
             $memberPoolTotal = round((float) $rule->hours_per_occurrence * $normalizedQuantity, 2);
 
             $principalIndexes = $this->principalIndexes($members);
@@ -63,16 +63,24 @@ class HoursAllocator
                 }
             }
 
+            if ($principalCount > 1) {
+                $principalIndexes = [(int) $principalIndexes[0]];
+                $principalCount = 1;
+            }
+
             $nonPrincipalIndexes = array_values(array_diff(range(0, $memberCount - 1), $principalIndexes));
             $nonPrincipalCount = count($nonPrincipalIndexes);
             $appliedMemberPoolTotal = $nonPrincipalCount > 0 ? $memberPoolTotal : 0.0;
-            $totalHours = round($leaderHoursTotal + $appliedMemberPoolTotal, 2);
+            $appliedLeaderHoursTotal = $nonPrincipalCount > 0
+                ? round(max(0.0, $leaderRuleTotal - $memberPoolTotal), 2)
+                : $leaderRuleTotal;
+            $totalHours = round($appliedLeaderHoursTotal + $appliedMemberPoolTotal, 2);
 
             if ($principalCount === 0) {
                 $equalShare = round($totalHours / $memberCount, 2);
                 $memberHours = array_fill(0, $memberCount, $equalShare);
             } else {
-                $principalShare = round($leaderHoursTotal / $principalCount, 2);
+                $principalShare = round($appliedLeaderHoursTotal / $principalCount, 2);
                 foreach ($principalIndexes as $index) {
                     $memberHours[$index] = $principalShare;
                 }
@@ -86,7 +94,8 @@ class HoursAllocator
             }
 
             $formula['mode'] = 'project_leader_and_member_pool';
-            $formula['leader_hours_total'] = $leaderHoursTotal;
+            $formula['leader_hours_total'] = $appliedLeaderHoursTotal;
+            $formula['leader_rule_hours_total'] = $leaderRuleTotal;
             $formula['member_pool_total'] = $memberPoolTotal;
             $formula['member_pool_applied_total'] = $appliedMemberPoolTotal;
             $formula['principal_count'] = $principalCount;

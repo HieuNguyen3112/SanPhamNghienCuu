@@ -211,6 +211,7 @@ class AdminUniversityApprovalController extends Controller
                         'faculty_id' => $row->faculty_id,
                         'faculty_name' => $row->faculty_name,
                     ],
+                    'journal' => $this->fetchPaperJournalDetail((int) $activity),
                 ],
                 'members' => $membersPayload,
                 'evidence_files' => $this->fetchEvidenceFiles($activity),
@@ -599,6 +600,82 @@ class AdminUniversityApprovalController extends Controller
                 return $payload;
             })
             ->all();
+    }
+
+    private function fetchPaperJournalDetail(int $activityId): ?array
+    {
+        $paper = DB::table('paper_details')
+            ->where('activity_id', $activityId)
+            ->select([
+                'journal_name',
+                'issn',
+                'journal_scope',
+                'journal_source_name',
+                'journal_publisher',
+                'journal_website',
+                'work_score',
+            ])
+            ->first();
+
+        if (! $paper) {
+            return null;
+        }
+
+        $journal = null;
+        $issn = trim((string) ($paper->issn ?? ''));
+        $journalName = trim((string) ($paper->journal_name ?? ''));
+
+        if ($issn !== '') {
+            $journal = DB::table('journals')
+                ->where('issn', $issn)
+                ->select([
+                    'name',
+                    'issn',
+                    'address',
+                    'source_name',
+                    'publisher',
+                    'website',
+                    'point',
+                ])
+                ->first();
+        }
+
+        if (! $journal && $journalName !== '') {
+            $journal = DB::table('journals')
+                ->where('name', $journalName)
+                ->select([
+                    'name',
+                    'issn',
+                    'address',
+                    'source_name',
+                    'publisher',
+                    'website',
+                    'point',
+                ])
+                ->first();
+        }
+
+        if ($journal) {
+            return [
+                'journal_name' => $journal->name,
+                'issn' => $journal->issn,
+                'journal_scope' => $journal->address,
+                'journal_source_name' => $journal->source_name,
+                'journal_publisher' => $journal->publisher,
+                'journal_website' => $journal->website,
+                'work_score' => $journal->point !== null ? (float) $journal->point : null,
+            ];
+        }
+
+        return [
+            'journal_name' => $paper->journal_name,
+            'issn' => $paper->issn,
+            'journal_scope' => $paper->journal_scope,
+            'journal_source_name' => $paper->journal_source_name,
+            'journal_publisher' => $paper->journal_publisher,
+            'journal_website' => $paper->journal_website,
+            'work_score' => $paper->work_score !== null ? (float) $paper->work_score : null,
+        ];
     }
 
     private function getStageIds(): array

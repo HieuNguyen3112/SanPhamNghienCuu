@@ -21,7 +21,7 @@ const ROLE_LABELS_VI: Record<string, string> = {
 
 const ACTIVITY_TYPE_LABELS_VI: Record<string, string> = {
   hdgsnn_900: "HDGSNN 1-2 điểm (900 giờ)",
-  hdgsnn_600: "HDGSNN >= 1 điểm (600 giờ)",
+  hdgsnn_600: "HDGSNN <= 1 điểm (600 giờ)",
   hdgsnn_300: "Có ISSN/ISBN (300 giờ)",
   textbook: "Giáo trình",
   reference: "Tài liệu tham khảo",
@@ -76,12 +76,15 @@ export type JournalOptionDto = {
   id: number;
   name: string;
   issn: string | null;
+  journal_type?: string | null;
+  research_field?: string | null;
+  website?: string | null;
   address: string | null;
   country: string | null;
   notes: string | null;
   source_name: string | null;
-  point_min: string | number | null;
-  point_max: string | number | null;
+  publisher?: string | null;
+  point: string | number | null;
   classification: string;
   research_hours: number;
   is_active: boolean;
@@ -203,9 +206,9 @@ export async function fetch_member_roles(): Promise<MemberRoleDto[]> {
   });
 }
 
-export async function fetch_evidence_file_types(kindCode?: string): Promise<
-  EvidenceFileTypeDto[]
-> {
+export async function fetch_evidence_file_types(
+  kindCode?: string,
+): Promise<EvidenceFileTypeDto[]> {
   const normalizedKind = normalizeSearch(kindCode ?? "");
 
   if (evidenceFileTypesByKindCache.has(normalizedKind)) {

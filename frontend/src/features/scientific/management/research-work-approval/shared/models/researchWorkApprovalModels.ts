@@ -74,6 +74,15 @@ export interface ResearchWorkApprovalEntry {
 
   researchWorkKindDisplayName?: string | null;
   researchWorkCategoryDisplayName?: string | null;
+  journalInfo?: {
+    journalName: string | null;
+    issn: string | null;
+    journalScope: string | null;
+    journalSourceName: string | null;
+    journalPublisher: string | null;
+    journalWebsite: string | null;
+    workScore: number | null;
+  } | null;
 
   submittingLecturerDisplayName: string;
 

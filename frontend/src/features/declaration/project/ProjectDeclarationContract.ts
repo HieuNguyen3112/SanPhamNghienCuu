@@ -124,7 +124,7 @@ export function computeProjectHours(
     };
   });
 
-  const leaderHours = rule?.leader_hours ?? 0;
+  const leaderRuleHours = rule?.leader_hours ?? 0;
   const memberPoolHours = rule?.member_pool_hours ?? 0;
 
   const explicitLeader = internal.find((member) =>
@@ -143,6 +143,10 @@ export function computeProjectHours(
   const memberPoolCount = poolMembers.length;
   const memberPoolEach =
     memberPoolCount > 0 ? round2(memberPoolHours / memberPoolCount) : 0;
+  const leaderHours =
+    memberPoolCount > 0
+      ? round2(Math.max(0, leaderRuleHours - memberPoolHours))
+      : leaderRuleHours;
   const totalHours = round2(
     leaderHours + (memberPoolCount > 0 ? memberPoolHours : 0),
   );
@@ -171,8 +175,13 @@ export function computeProjectHours(
     ? [
         {
           role_label: "Chủ nhiệm",
-          total_hours: rule.leader_hours,
-          formula_text: `${rule.leader_hours} giờ (100%)`,
+          total_hours: leaderHours,
+          formula_text:
+            memberPoolCount > 0
+              ? `${rule.leader_hours} - ${rule.member_pool_hours} = ${leaderHours.toFixed(
+                  2,
+                )} giờ`
+              : `${rule.leader_hours} giờ (không có thành viên)`,
         },
         {
           role_label: "Nhóm thành viên",

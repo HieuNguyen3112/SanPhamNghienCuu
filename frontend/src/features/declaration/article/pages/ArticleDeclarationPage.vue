@@ -34,7 +34,7 @@
             <div class="font-semibold text-slate-900">Bảng giờ chuẩn</div>
             <ul class="mt-1 list-disc space-y-1 pl-5 text-slate-600">
               <li>HDGSNN 1-2 điểm: 900 giờ</li>
-              <li>HDGSNN &gt;= 1 điểm: 600 giờ</li>
+              <li>HDGSNN &lt;= 1 điểm: 600 giờ</li>
               <li>Có ISSN/ISBN: 300 giờ</li>
             </ul>
           </div>
@@ -74,15 +74,19 @@
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
-                  >Loại bài báo</label
+                  >Loại bài báo (Tạp chí / Hội thảo)</label
                 >
                 <select
                   v-model="form.typeId"
-                  :disabled="readOnly || isTypeLockedByJournal"
+                  :disabled="readOnly"
                   :class="selectClass(formErrors.typeId)"
                 >
                   <option :value="null">-- Chọn loại --</option>
-                  <option v-for="t in types" :key="t.id" :value="t.id">
+                  <option
+                    v-for="t in articleTypeOptions"
+                    :key="t.id"
+                    :value="t.id"
+                  >
                     {{ t.name }}
                   </option>
                 </select>
@@ -92,12 +96,6 @@
                   <span class="font-semibold text-slate-900">{{
                     baseHoursText
                   }}</span>
-                </div>
-                <div
-                  v-if="isTypeLockedByJournal"
-                  class="mt-1 text-xs text-sky-700"
-                >
-                  Loại bài báo được tự động xác định theo tạp chí đã chọn.
                 </div>
                 <p v-if="formErrors.typeId" class="mt-1 text-xs text-rose-600">
                   {{ formErrors.typeId }}
@@ -132,22 +130,160 @@
               </div>
 
               <div class="md:col-span-2">
+                <div class="mb-2 flex items-center justify-between gap-2">
+                  <label class="text-xs font-medium text-slate-600"
+                    >Tạp chí / Kỷ yếu</label
+                  >
+                  <button
+                    v-if="!readOnly"
+                    type="button"
+                    class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    @click="toggleManualJournalForm"
+                  >
+                    {{
+                      showManualJournalForm
+                        ? "Tắt nhập tạp chí ngoài danh mục"
+                        : "Nhập tạp chí ngoài danh mục"
+                    }}
+                  </button>
+                </div>
                 <JournalSelect
                   v-model="form.journalId"
                   v-model:journalName="form.journalName"
                   v-model:issn="form.issn"
-                  :disabled="readOnly"
-                  label="Tạp chí / Kỷ yếu"
+                  :disabled="readOnly || showManualJournalForm"
+                  label=""
                   hint="Gợi ý tìm và chọn từ danh mục (do QLKH/Hội đồng nhập)."
                   :search-fn="searchJournals"
                   :error="formErrors.journalName ?? undefined"
                   @select="onJournalSelect"
                   @clear="onJournalClear"
                 />
-                <p
-                  v-if="!isJournalFromCatalog"
-                  class="mt-2 text-xs text-amber-700"
+                <div
+                  v-if="showManualJournalForm"
+                  class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
                 >
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <div class="md:col-span-2">
+                      <label class="text-xs font-medium text-slate-600"
+                        >Tên tạp chí ngoài danh mục
+                        <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.journalName"
+                        :disabled="readOnly"
+                        maxlength="500"
+                        placeholder="VD: Journal of Advanced Research"
+                        :class="inputClass(formErrors.journalName)"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >ISSN <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.issn"
+                        :disabled="readOnly"
+                        maxlength="50"
+                        placeholder="VD: 1234-5678"
+                        :class="inputClass()"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Phạm vi <span class="text-rose-600">*</span></label
+                      >
+                      <select
+                        v-model="form.journalScope"
+                        :disabled="readOnly"
+                        :class="selectClass()"
+                      >
+                        <option value="">-- Chọn phạm vi --</option>
+                        <option value="Trong nước">Trong nước</option>
+                        <option value="Quốc tế">Quốc tế</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Nguồn xếp loại
+                        <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.journalSourceName"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: Scopus / WoS"
+                        :class="inputClass()"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Cơ quan xuất bản
+                        <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.trim="form.journalPublisher"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: Elsevier"
+                        :class="inputClass()"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Website tạp chí</label
+                      >
+                      <input
+                        v-model.trim="form.journalWebsite"
+                        :disabled="readOnly"
+                        maxlength="255"
+                        placeholder="VD: https://journal.example.com"
+                        :class="inputClass()"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Điểm tạp chí <span class="text-rose-600">*</span></label
+                      >
+                      <input
+                        v-model.number="form.workScore"
+                        type="number"
+                        min="0"
+                        max="99.99"
+                        step="0.01"
+                        :disabled="readOnly"
+                        placeholder="VD: 1.5"
+                        :class="inputClass()"
+                      />
+
+                      <div
+                        class="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+                      >
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span class="font-semibold text-slate-900">Xếp loại:</span>
+                            {{ manualDerivedCategoryLabel }}
+                          </div>
+                          <div class="font-semibold text-slate-900">
+                            {{ manualDerivedHours }} giờ NCKH
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <p class="mt-2 text-xs text-slate-500">
+                    Khi đang nhập ngoài danh mục, ô tìm tạp chí sẽ tạm khóa.
+                  </p>
+                </div>
+                <p v-if="!isJournalFromCatalog" class="mt-2 text-xs text-amber-700">
                   Lưu ý: Nếu tự nhập tên tạp chí, vui lòng chọn loại bài báo ở
                   trên để hệ thống tính giờ đúng.
                 </p>
@@ -188,8 +324,14 @@
                 </div>
               </div>
 
-              <div>
-                <label class="text-xs font-medium text-slate-600">ISSN</label>
+              <div v-if="!showManualJournalForm">
+                <label class="text-xs font-medium text-slate-600"
+                  >ISSN
+                  <span
+                    v-if="showManualJournalForm"
+                    class="text-rose-600"
+                    >*</span></label
+                >
                 <input
                   v-model.trim="form.issn"
                   :disabled="readOnly"
@@ -424,7 +566,6 @@ import {
 import {
   computeArticleHours,
   type ArticleDeclarationFormModel,
-  articleBaseHoursByTypeCode,
   articleAllowedMemberRoleCodes,
 } from "../ArticleDeclarationContract";
 
@@ -441,6 +582,7 @@ const kindId = ref<number>(0);
 const currentLecturerId = ref<number>(0);
 const selectedJournalClassification = ref<string | null>(null);
 const selectedJournalResearchHours = ref<number | null>(null);
+const showManualJournalForm = ref(false);
 
 // Keywords (UI + persist)
 const keywords = ref("");
@@ -470,6 +612,12 @@ const form = reactive<ArticleDeclarationFormModel>({
   year: null,
   pageStart: null,
   pageEnd: null,
+  publicationStatus: "",
+  journalScope: "",
+  journalSourceName: "",
+  journalPublisher: "",
+  journalWebsite: "",
+  workScore: null,
   members: [],
 });
 
@@ -537,9 +685,30 @@ const typeHoursById = computed(() =>
     ]),
   ),
 );
-const typeIdByCode = computed(() =>
-  Object.fromEntries(types.value.map((t) => [t.code, t.id])),
-);
+const articleTypeOptions = computed(() => {
+  const first = types.value[0];
+  if (!first) return [] as ActivityTypeDto[];
+
+  const journalSource =
+    types.value.find((t) =>
+      ["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"].includes(t.code),
+    ) ?? first;
+
+  const conferenceSource =
+    types.value.find(
+      (t) =>
+        !["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"].includes(t.code) &&
+        t.id !== journalSource.id,
+    ) ?? types.value.find((t) => t.id !== journalSource.id) ?? null;
+
+  const rows: ActivityTypeDto[] = [
+    { ...journalSource, name: "Bài báo tạp chí" },
+  ];
+  if (conferenceSource) {
+    rows.push({ ...conferenceSource, name: "Bài báo hội thảo" });
+  }
+  return rows;
+});
 const lecturerNameById = computed(() =>
   Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name])),
 );
@@ -553,6 +722,7 @@ const hours = computed(() =>
   computeArticleHours(form, {
     typeCodeById: typeCodeById.value,
     typeHoursById: typeHoursById.value,
+    explicitBaseHours: journalDrivenHours.value,
     lecturerNameById: lecturerNameById.value,
     memberRoleNameById: memberRoleNameById.value,
     currentLecturerId: currentLecturerId.value,
@@ -565,62 +735,72 @@ const hoursByLecturerId = computed(() => {
   return map;
 });
 
-const baseHoursText = computed(() => {
-  const byTypeConfig =
-    form.typeId && Number.isFinite(typeHoursById.value[form.typeId])
-      ? Number(typeHoursById.value[form.typeId])
-      : 0;
-  if (byTypeConfig > 0) return `${byTypeConfig} giờ`;
-
-  const code = form.typeId ? typeCodeById.value[form.typeId] : null;
-  const byType = code ? (articleBaseHoursByTypeCode[code] ?? 0) : 0;
-  return `${byType} giờ`;
-});
+const baseHoursText = computed(() => `${journalDrivenHours.value} giờ`);
 
 const isJournalFromCatalog = computed(() => typeof form.journalId === "number");
 
-const mappedTypeCodeFromJournal = computed(() => {
-  const normalizedClassification = String(
-    selectedJournalClassification.value ?? "",
-  )
-    .trim()
-    .toUpperCase();
+function hasIssnOrIsbn(v: string | null | undefined): boolean {
+  return !!(v && v.trim().length > 0);
+}
 
-  const typeCodeByClassification: Record<string, string> = {
-    HDGSNN_GE_2: "hdgsnn_900",
-    POINT_GE_2: "hdgsnn_900",
-    HDGSNN_GE_1: "hdgsnn_600",
-    POINT_GE_1: "hdgsnn_600",
-    ISSN_ISBN: "hdgsnn_300",
-  };
+function deriveJournalCategory(
+  issn: string | null | undefined,
+  point: number | null,
+): "POINT_GE_2" | "POINT_GE_1" | "ISSN_ISBN" | "OTHER" {
+  if (point !== null && point > 1) return "POINT_GE_2";
+  if (point !== null && point > 0 && point <= 1) return "POINT_GE_1";
+  if (hasIssnOrIsbn(issn)) return "ISSN_ISBN";
+  return "OTHER";
+}
 
-  const mappedFromClassification =
-    typeCodeByClassification[normalizedClassification];
-  if (mappedFromClassification) return mappedFromClassification;
-
-  const hours = selectedJournalResearchHours.value;
-  if (typeof hours === "number") {
-    if (hours >= 900) return "hdgsnn_900";
-    if (hours >= 600) return "hdgsnn_600";
-    if (hours > 0) return "hdgsnn_300";
-  }
-
-  return null;
-});
-
-const mappedTypeIdFromJournal = computed(() => {
-  const mappedCode = mappedTypeCodeFromJournal.value;
-  if (!mappedCode) return null;
-  const mappedId = typeIdByCode.value[mappedCode];
-  return typeof mappedId === "number" ? mappedId : null;
-});
-
-const isTypeLockedByJournal = computed(
-  () => isJournalFromCatalog.value && mappedTypeIdFromJournal.value !== null,
+const manualDerivedCategory = computed(() =>
+  deriveJournalCategory(form.issn, form.workScore ?? null),
 );
 
+const manualDerivedHours = computed(() => {
+  if (manualDerivedCategory.value === "POINT_GE_2") return 900;
+  if (manualDerivedCategory.value === "POINT_GE_1") return 600;
+  if (manualDerivedCategory.value === "ISSN_ISBN") return 300;
+  return 0;
+});
+
+const manualDerivedCategoryLabel = computed(() => {
+  if (manualDerivedCategory.value === "POINT_GE_2") return "HDGSNN 1-2 điểm";
+  if (manualDerivedCategory.value === "POINT_GE_1") return "HDGSNN <= 1 điểm";
+  if (manualDerivedCategory.value === "ISSN_ISBN") return "Có ISSN/ISBN";
+  return "Khác";
+});
+
+function hoursFromClassification(code: string | null | undefined): number | null {
+  const normalized = String(code ?? "").trim().toUpperCase();
+  if (normalized === "HDGSNN_GE_2" || normalized === "POINT_GE_2") return 900;
+  if (normalized === "HDGSNN_GE_1" || normalized === "POINT_GE_1") return 600;
+  if (normalized === "ISSN_ISBN") return 300;
+  return null;
+}
+
+const journalDrivenHours = computed(() => {
+  if (
+    typeof selectedJournalResearchHours.value === "number" &&
+    Number.isFinite(selectedJournalResearchHours.value)
+  ) {
+    return Number(selectedJournalResearchHours.value);
+  }
+
+  const byClassification = hoursFromClassification(
+    selectedJournalClassification.value,
+  );
+  if (byClassification !== null) return byClassification;
+
+  if (form.journalName.trim()) {
+    return manualDerivedHours.value;
+  }
+
+  return 0;
+});
+
 const hoursNote = computed(() => {
-  if (!form.typeId) return "Chọn loại bài báo để xác định giờ chuẩn.";
+  if (!form.journalName.trim()) return "Chọn hoặc nhập tạp chí để xác định giờ chuẩn.";
   if (hours.value.distribution.length === 0)
     return "Cần chọn danh sách tác giả để chia đều giờ.";
   return null;
@@ -765,6 +945,11 @@ async function loadDraftFromQuery() {
       const detail = data.detail as any;
       form.journalName = detail.journal_name ?? "";
       form.issn = detail.issn ?? "";
+      form.journalScope = detail.journal_scope ?? "";
+      form.journalSourceName = detail.journal_source_name ?? "";
+      form.journalPublisher = detail.journal_publisher ?? "";
+      form.journalWebsite = detail.journal_website ?? "";
+      form.workScore = detail.work_score ?? null;
       form.doi = detail.doi ?? "";
       form.articleUrl = detail.article_url ?? "";
       form.volume = detail.volume ?? "";
@@ -772,6 +957,7 @@ async function loadDraftFromQuery() {
       form.year = detail.year ?? null;
       form.pageStart = detail.page_start ?? null;
       form.pageEnd = detail.page_end ?? null;
+      form.publicationStatus = detail.publication_status ?? "";
       keywords.value = detail.keywords ?? "";
     }
 
@@ -813,6 +999,12 @@ function onJournalSelect(option: {
   id: number;
   name: string;
   issn: string | null;
+  address?: string | null;
+  journalType?: string | null;
+  website?: string | null;
+  sourceName?: string | null;
+  publisher?: string | null;
+  point?: number | null;
   classification?: string | null;
   researchHours?: number;
 }) {
@@ -821,22 +1013,38 @@ function onJournalSelect(option: {
   form.issn = option.issn ?? "";
   form.journalResearchHours =
     typeof option.researchHours === "number" ? option.researchHours : null;
+  form.journalScope = option.address ?? "";
+  form.journalWebsite = option.website ?? "";
+  form.journalSourceName = option.sourceName ?? "";
+  form.journalPublisher = option.publisher ?? "";
+  form.workScore = typeof option.point === "number" ? option.point : null;
 
   selectedJournalClassification.value = option.classification ?? null;
   selectedJournalResearchHours.value =
     typeof option.researchHours === "number" ? option.researchHours : null;
 
-  if (mappedTypeIdFromJournal.value !== null) {
-    form.typeId = mappedTypeIdFromJournal.value;
-  }
-
   clearFieldError("journalName");
 }
 
 function onJournalClear() {
+  form.journalId = null;
+  form.journalName = "";
+  form.issn = "";
+  form.journalScope = "";
+  form.journalSourceName = "";
+  form.journalPublisher = "";
+  form.journalWebsite = "";
+  form.workScore = null;
   selectedJournalClassification.value = null;
   selectedJournalResearchHours.value = null;
   form.journalResearchHours = null;
+}
+
+function toggleManualJournalForm() {
+  showManualJournalForm.value = !showManualJournalForm.value;
+  if (showManualJournalForm.value) {
+    onJournalClear();
+  }
 }
 
 const { runWithFeedback } = useActionFeedback();
@@ -1014,6 +1222,14 @@ function collectMissingFields(mode: "draft" | "submit") {
       formErrors.year = "Vui lòng nhập năm xuất bản.";
     }
 
+    if (showManualJournalForm.value && !isJournalFromCatalog.value) {
+      if (!form.issn.trim()) missing.push("ISSN");
+      if (!form.journalScope.trim()) missing.push("Phạm vi");
+      if (!form.journalPublisher.trim()) missing.push("Cơ quan xuất bản");
+      if (!form.journalSourceName.trim()) missing.push("Nguồn xếp loại");
+      if (form.workScore === null) missing.push("Điểm tạp chí");
+    }
+
     const validMembers = form.members.filter(
       (m) =>
         typeof m.lecturer_id === "number" &&
@@ -1078,6 +1294,11 @@ const shell = useDeclarationFormShell({
         activity_id: saved.id,
         journal_name: form.journalName || null,
         issn: form.issn || null,
+        journal_scope: form.journalScope || null,
+        journal_source_name: form.journalSourceName || null,
+        journal_publisher: form.journalPublisher || null,
+        journal_website: form.journalWebsite || null,
+        work_score: form.workScore ?? null,
         doi: form.doi || null,
         article_url: form.articleUrl || null,
         volume: form.volume || null,
@@ -1188,6 +1409,7 @@ watch(
   () => form.typeId,
   () => clearFieldError("typeId"),
 );
+
 watch(
   () => form.title,
   () => clearFieldError("title"),
@@ -1205,10 +1427,10 @@ watch(
 );
 
 watch(
-  () => mappedTypeIdFromJournal.value,
-  (nextTypeId) => {
-    if (isJournalFromCatalog.value && nextTypeId !== null) {
-      form.typeId = nextTypeId;
+  () => form.journalId,
+  (nextId) => {
+    if (typeof nextId === "number") {
+      showManualJournalForm.value = false;
     }
   },
 );
@@ -1230,17 +1452,25 @@ onMounted(async () => {
       fallbackMessage: "Không thể khởi tạo trang kê khai.",
     },
   );
+
+  if (!form.journalId && form.journalName.trim()) {
+    showManualJournalForm.value = true;
+  }
 });
 
 // Fix TS2322: normalize address null -> ""
 async function searchJournals(q: string) {
   type JournalRow = Awaited<ReturnType<typeof search_journals>>[number];
-  type JournalSelectOptionDto = JournalRow & { address: string };
+  type JournalSelectOptionDto = JournalRow & {
+    address: string;
+    point: string | number | null;
+  };
 
   const rows = await search_journals(q);
   return rows.map((r) => ({
     ...r,
     address: (r as any).address ?? "",
+    point: (r as any).point ?? (r as any).point_max ?? (r as any).point_min ?? null,
   })) as JournalSelectOptionDto[];
 }
 </script>

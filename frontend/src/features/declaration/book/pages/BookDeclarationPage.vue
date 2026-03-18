@@ -710,12 +710,16 @@ const shell = useDeclarationFormShell({
   initial_status: "DRAFT",
   on_save_draft: async () => {
     try {
+      if (!form.academicYearId) {
+        throw new Error("Vui lòng chọn năm học trước khi lưu bản nháp.");
+      }
+
       const saved = await upsert_activity_base({
         id: form.activityId ?? undefined,
         owner_lecturer_id: currentLecturerId.value,
         kind_id: form.kindId,
         type_id: form.typeId,
-        academic_year_id: form.academicYearId ?? 0,
+        academic_year_id: form.academicYearId,
         status_id: 100,
         title: form.title,
         abstract: form.abstract || null,
@@ -764,6 +768,7 @@ const shell = useDeclarationFormShell({
       await upsert_members(saved.id, upsertList);
 
       await persistEvidenceDraft(saved.id);
+      await loadDraftFromQuery();
     } catch (err) {
       throw new Error(
         normalizeErrorMessage(err, "Không thể lưu bản nháp. Vui lòng thử lại."),

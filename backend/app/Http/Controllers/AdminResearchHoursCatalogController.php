@@ -30,7 +30,7 @@ class AdminResearchHoursCatalogController extends Controller
             ->select(['id', 'code', 'name'])
             ->orderBy('name')
             ->get()
-            ->map(fn ($row) => (object) [
+            ->map(fn($row) => (object) [
                 'id' => (int) $row->id,
                 'code' => $row->code,
                 'name' => $this->mapKindDisplayName($row->code, $row->name),
@@ -40,7 +40,7 @@ class AdminResearchHoursCatalogController extends Controller
             ->select(['id', 'kind_id', 'code', 'name'])
             ->orderBy('name')
             ->get()
-            ->map(fn ($row) => (object) [
+            ->map(fn($row) => (object) [
                 'id' => (int) $row->id,
                 'kind_id' => (int) $row->kind_id,
                 'code' => $row->code,
@@ -776,15 +776,15 @@ class AdminResearchHoursCatalogController extends Controller
         $end = Carbon::parse($data['end_date']);
 
         $errors = [];
-        if ($start->month !== 9 || $start->day !== 1) {
-            $errors['start_date'] = ['Năm học phải bắt đầu từ ngày 01/09.'];
+        if ($start->month !== 11 || $start->day !== 1) {
+            $errors['start_date'] = ['Năm học phải bắt đầu từ ngày 01/11.'];
         }
-        if ($end->month !== 8 || $end->day !== 31) {
-            $errors['end_date'] = ['Năm học phải kết thúc vào ngày 31/08 năm sau.'];
+        if ($end->month !== 10 || $end->day !== 31) {
+            $errors['end_date'] = ['Năm học phải kết thúc vào ngày 31/10 năm sau.'];
         }
 
         if ($end->year !== ($start->year + 1)) {
-            $errors['end_date'][] = 'Năm học phải kéo dài từ tháng 09 năm nay đến tháng 08 năm sau.';
+            $errors['end_date'][] = 'Năm học phải kéo dài từ tháng 11 năm nay đến tháng 10 năm sau.';
         }
 
         if (! preg_match('/^\d{4}-\d{4}$/', (string) $data['code'])) {
@@ -912,7 +912,7 @@ class AdminResearchHoursCatalogController extends Controller
 
         $mapped = match (strtolower($code)) {
             'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)',
-            'hdgsnn_600' => 'Bài báo HDGSNN >= 1 điểm (600 giờ)',
+            'hdgsnn_600' => 'Bài báo HDGSNN <= 1 điểm (600 giờ)',
             'hdgsnn_300' => 'Bài báo có ISSN/ISBN (300 giờ)',
             'textbook' => 'Giáo trình',
             'reference' => 'Tài liệu tham khảo',

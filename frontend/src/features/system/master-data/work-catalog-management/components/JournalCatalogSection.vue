@@ -79,7 +79,7 @@
             </td>
 
             <td class="px-4 py-3 text-slate-700">
-              {{ formatPointRange(row.pointMin ?? null, row.pointMax ?? null) }}
+              {{ formatPoint(row.point ?? null) }}
             </td>
 
             <td class="px-4 py-3">
@@ -159,7 +159,7 @@
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
-            <label class="text-xs font-medium text-slate-600">ISSN/ISBN</label>
+            <label class="text-xs font-medium text-slate-600">ISSN *</label>
             <input
               :value="localForm.issn"
               @input="
@@ -175,7 +175,9 @@
           </div>
 
           <div>
-            <label class="text-xs font-medium text-slate-600">Trạng thái</label>
+            <label class="text-xs font-medium text-slate-600"
+              >Trạng thái *</label
+            >
             <div class="mt-2 flex items-center gap-3">
               <label
                 class="inline-flex items-center gap-2 text-sm text-slate-700"
@@ -201,9 +203,46 @@
           </div>
         </div>
 
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label class="text-xs font-medium text-slate-600"
+              >Loại tạp chí</label
+            >
+            <select
+              v-model="localForm.journalType"
+              @change="patchForm({ journalType: localForm.journalType })"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+            >
+              <option value="" disabled>Chọn loại tạp chí</option>
+              <option value="Tạp chí">Tạp chí</option>
+              <option value="Báo cáo khoa học">Báo cáo khoa học</option>
+              <option value="Thông báo khoa học">Thông báo khoa học</option>
+              <option value="Chuyên san">Chuyên san</option>
+              <option value="Tập san">Tập san</option>
+              <option value="Thông tin khoa học">Thông tin khoa học</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-xs font-medium text-slate-600">Phạm vi *</label>
+            <select
+              v-model="localForm.address"
+              @change="patchForm({ address: localForm.address })"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+            >
+              <option value="" disabled>Chọn phạm vi</option>
+              <option value="Trong nước">Trong nước</option>
+              <option value="Quốc tế">Quốc tế</option>
+            </select>
+            <p v-if="errors.address" class="mt-1 text-xs text-rose-600">
+              {{ errors.address }}
+            </p>
+          </div>
+        </div>
+
         <div>
           <label class="text-xs font-medium text-slate-600"
-            >Cơ quan xuất bản</label
+            >Cơ quan xuất bản *</label
           >
           <input
             :value="localForm.publisher ?? ''"
@@ -222,9 +261,9 @@
         </div>
 
         <div>
-          <label class="text-xs font-medium text-slate-600">
-            Nguồn uy tín (link/ghi chú)
-          </label>
+          <label class="text-xs font-medium text-slate-600"
+            >Nguồn xếp loại *</label
+          >
           <input
             :value="localForm.sourceName ?? ''"
             @input="
@@ -234,7 +273,7 @@
             "
             type="text"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-            placeholder="Ví dụ: HDGSNN 2025 / Scopus / Web of Science"
+            placeholder="Ví dụ: HDGSNN 2025 / Scopus / Web of Science / ISI"
           />
           <p v-if="errors.sourceName" class="mt-1 text-xs text-rose-600">
             {{ errors.sourceName }}
@@ -243,57 +282,31 @@
 
         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div class="text-xs font-semibold text-slate-900">
-            Điểm công trình (theo nguồn uy tín)
+            Điểm tạp chí (theo nguồn xếp loại)
           </div>
 
-          <div class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <label class="text-xs font-medium text-slate-600"
-                >Điểm tối thiểu</label
-              >
-              <input
-                :value="localForm.pointMin ?? ''"
-                @input="
-                  patchForm({
-                    pointMin: toNumberOrNull(
-                      ($event.target as HTMLInputElement).value,
-                    ),
-                  })
-                "
-                type="number"
-                step="0.1"
-                min="0"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-                placeholder="Ví dụ: 0"
-              />
-              <p v-if="errors.pointMin" class="mt-1 text-xs text-rose-600">
-                {{ errors.pointMin }}
-              </p>
-            </div>
-
-            <div>
-              <label class="text-xs font-medium text-slate-600"
-                >Điểm tối đa</label
-              >
-              <input
-                :value="localForm.pointMax ?? ''"
-                @input="
-                  patchForm({
-                    pointMax: toNumberOrNull(
-                      ($event.target as HTMLInputElement).value,
-                    ),
-                  })
-                "
-                type="number"
-                step="0.1"
-                min="0"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
-                placeholder="Ví dụ: 1.5 / 2 / 3"
-              />
-              <p v-if="errors.pointMax" class="mt-1 text-xs text-rose-600">
-                {{ errors.pointMax }}
-              </p>
-            </div>
+          <div class="mt-2">
+            <label class="text-xs font-medium text-slate-600"
+              >Điểm tạp chí *</label
+            >
+            <input
+              :value="localForm.point ?? ''"
+              @input="
+                patchForm({
+                  point: toNumberOrNull(
+                    ($event.target as HTMLInputElement).value,
+                  ),
+                })
+              "
+              type="number"
+              step="0.1"
+              min="0"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+              placeholder="Ví dụ: 1.5"
+            />
+            <p v-if="errors.point" class="mt-1 text-xs text-rose-600">
+              {{ errors.point }}
+            </p>
           </div>
 
           <div
@@ -301,8 +314,8 @@
           >
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span class="font-semibold text-slate-900">Khoảng điểm:</span>
-                {{ derivedRangeText }}
+                <span class="font-semibold text-slate-900">Điểm:</span>
+                {{ formatPoint(localForm.point ?? null) }}
               </div>
               <div class="font-semibold text-slate-900">
                 {{ derivedHours }} giờ NCKH
@@ -320,25 +333,38 @@
             </div>
 
             <div class="mt-2 text-slate-600">
-              Xếp loại theo điểm/ISSN. Giờ NCKH khi lưu sẽ lấy theo cấu hình
-              Quy đổi giờ theo công trình (paper: HDGSNN 900/600/300) hiện hành.
+              Xếp loại theo điểm/ISSN. Giờ NCKH khi lưu sẽ lấy theo cấu hình Quy
+              đổi giờ theo công trình (paper: HDGSNN 900/600/300) hiện hành.
             </div>
           </div>
         </div>
 
         <div>
-          <label class="text-xs font-medium text-slate-600">Địa chỉ</label>
+          <label class="text-xs font-medium text-slate-600">Lĩnh vực</label>
           <input
-            :value="localForm.address ?? ''"
+            :value="localForm.researchField ?? ''"
             @input="
-              patchForm({ address: ($event.target as HTMLInputElement).value })
+              patchForm({
+                researchField: ($event.target as HTMLInputElement).value,
+              })
             "
             type="text"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+            placeholder="Ví dụ: Khoa học giáo dục"
           />
-          <p v-if="errors.address" class="mt-1 text-xs text-rose-600">
-            {{ errors.address }}
-          </p>
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-slate-600">Website</label>
+          <input
+            :value="localForm.website ?? ''"
+            @input="
+              patchForm({ website: ($event.target as HTMLInputElement).value })
+            "
+            type="url"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-300"
+            placeholder="https://journal.example.com"
+          />
         </div>
 
         <div>
@@ -396,24 +422,28 @@ export interface JournalRow {
   country?: string | null;
   sourceName?: string | null;
   publisher?: string | null;
-  pointMin?: number | null;
-  pointMax?: number | null;
+  point?: number | null;
   classification?: DerivedCategory;
   researchHours?: number;
+  journalType?: string | null;
+  researchField?: string | null;
+  website?: string | null;
 }
 
 export interface JournalFormModel {
   id: number;
   name: string;
   issn: string;
+  journalType: string;
   address: string;
+  researchField: string;
+  website: string;
   country: string;
   notes: string;
   publisher: string;
   isActive: boolean;
   sourceName: string;
-  pointMin: number | null;
-  pointMax: number | null;
+  point: number | null;
 }
 
 type JournalFormErrors = Partial<
@@ -422,11 +452,13 @@ type JournalFormErrors = Partial<
     | "address"
     | "country"
     | "issn"
+    | "journalType"
     | "notes"
+    | "researchField"
+    | "website"
     | "publisher"
     | "sourceName"
-    | "pointMin"
-    | "pointMax",
+    | "point",
     string
   >
 >;
@@ -458,12 +490,20 @@ const emit = defineEmits<{
   (e: "update:form", v: JournalFormModel): void;
 }>();
 
-const localForm = ref<JournalFormModel>({ ...props.form });
+function normalizeJournalForm(form: JournalFormModel): JournalFormModel {
+  return {
+    ...form,
+    journalType: form.journalType ?? "",
+    address: form.address ?? "",
+  };
+}
+
+const localForm = ref<JournalFormModel>(normalizeJournalForm(props.form));
 
 watch(
   () => props.form,
   (v) => {
-    localForm.value = { ...v };
+    localForm.value = normalizeJournalForm(v);
   },
   { deep: true },
 );
@@ -479,49 +519,21 @@ function toNumberOrNull(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function formatPointRange(min: number | null, max: number | null): string {
-  if (min === null && max === null) return "—";
-  if (min !== null && max === null) return `>= ${min}`;
-  if (min === null && max !== null) return `<= ${max}`;
-  return `${min} – ${max}`;
+function formatPoint(point: number | null): string {
+  if (point === null) return "—";
+  return String(point);
 }
 
 function hasIssnIsbn(v: string | null): boolean {
   return !!(v && v.trim().length > 0);
 }
 
-function normalizePoints(pointMin: number | null, pointMax: number | null) {
-  if (pointMin === null && pointMax === null) {
-    return {
-      min: null as number | null,
-      max: null as number | null,
-      maxPoint: null as number | null,
-    };
-  }
-
-  if (pointMin !== null && pointMax === null) {
-    return { min: pointMin, max: null, maxPoint: pointMin };
-  }
-
-  if (pointMin === null && pointMax !== null) {
-    return { min: null, max: pointMax, maxPoint: pointMax };
-  }
-
-  const min = Math.min(pointMin!, pointMax!);
-  const max = Math.max(pointMin!, pointMax!);
-
-  return { min, max, maxPoint: max };
-}
-
 function deriveCategory(
   issn: string | null,
-  pointMin: number | null,
-  pointMax: number | null,
+  point: number | null,
 ): DerivedCategory {
-  const { maxPoint } = normalizePoints(pointMin, pointMax);
-
-  if (maxPoint !== null && maxPoint >= 2) return "POINT_GE_2";
-  if (maxPoint !== null && maxPoint >= 1) return "POINT_GE_1";
+  if (point !== null && point > 1) return "POINT_GE_2";
+  if (point !== null && point > 0 && point <= 1) return "POINT_GE_1";
   if (hasIssnIsbn(issn)) return "ISSN_ISBN";
   return "OTHER";
 }
@@ -536,7 +548,7 @@ const CATEGORY_RULES: Record<
     badgeClass: "bg-emerald-50 text-emerald-700",
   },
   POINT_GE_1: {
-    label: "HDGSNN >= 1 điểm",
+    label: "HDGSNN <= 1 điểm",
     hours: 600,
     badgeClass: "bg-sky-50 text-sky-700",
   },
@@ -558,11 +570,7 @@ function resolveCategoryCode(row: JournalRow): DerivedCategory {
     return fromApi;
   }
 
-  return deriveCategory(
-    row.issn ?? null,
-    row.pointMin ?? null,
-    row.pointMax ?? null,
-  );
+  return deriveCategory(row.issn ?? null, row.point ?? null);
 }
 
 function resolveCategoryMeta(row: JournalRow) {
@@ -581,11 +589,7 @@ function resolveResearchHours(row: JournalRow): number {
 }
 
 const derivedCategoryValue = computed(() =>
-  deriveCategory(
-    localForm.value.issn ?? null,
-    localForm.value.pointMin ?? null,
-    localForm.value.pointMax ?? null,
-  ),
+  deriveCategory(localForm.value.issn ?? null, localForm.value.point ?? null),
 );
 
 const derivedHours = computed(
@@ -596,11 +600,5 @@ const derivedLabel = computed(
 );
 const derivedBadgeClass = computed(
   () => CATEGORY_RULES[derivedCategoryValue.value].badgeClass,
-);
-const derivedRangeText = computed(() =>
-  formatPointRange(
-    localForm.value.pointMin ?? null,
-    localForm.value.pointMax ?? null,
-  ),
 );
 </script>

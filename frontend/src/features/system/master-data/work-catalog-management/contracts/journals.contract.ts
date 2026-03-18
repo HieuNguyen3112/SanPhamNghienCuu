@@ -8,14 +8,16 @@ export type JournalDTO = {
   id: number;
   name: string;
   issn: string | null;
+  journal_type: string | null;
+  research_field: string | null;
+  website: string | null;
   address: string | null;
   country: string | null;
   notes: string | null;
 
   source_name: string | null;
   publisher: string | null;
-  point_min: number | null;
-  point_max: number | null;
+  point: number | null;
 
   classification: JournalClassificationDTO;
   research_hours: number;
@@ -29,14 +31,16 @@ export type JournalUpsertDTO = {
   name: string;
 
   issn: string | null;
+  journal_type: string | null;
+  research_field: string | null;
+  website: string | null;
   address: string | null;
   country: string | null;
   notes: string | null;
 
   source_name: string | null;
   publisher: string | null;
-  point_min: number | null;
-  point_max: number | null;
+  point: number | null;
 
   is_active: boolean;
 };
@@ -48,11 +52,13 @@ export type Journal = {
   address: string | null;
   country: string | null;
   notes: string | null;
+  journalType?: string | null;
+  researchField?: string | null;
+  website?: string | null;
 
   sourceName: string | null;
   publisher: string | null;
-  pointMin: number | null;
-  pointMax: number | null;
+  point: number | null;
 
   classification: JournalClassificationDTO;
   researchHours: number;
@@ -66,14 +72,16 @@ export function journalFromDto(dto: JournalDTO): Journal {
     id: dto.id,
     name: dto.name,
     issn: dto.issn ?? null,
+    journalType: dto.journal_type ?? null,
+    researchField: dto.research_field ?? null,
+    website: dto.website ?? null,
     address: dto.address ?? null,
     country: dto.country ?? null,
     notes: dto.notes ?? null,
 
     sourceName: dto.source_name ?? null,
     publisher: dto.publisher ?? null,
-    pointMin: dto.point_min ?? null,
-    pointMax: dto.point_max ?? null,
+    point: dto.point ?? null,
 
     classification: dto.classification,
     researchHours: dto.research_hours ?? 0,

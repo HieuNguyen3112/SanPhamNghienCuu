@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StorageDownload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -11,54 +12,40 @@ class PublicResearchWorkController extends Controller
 {
     private const PUBLIC_EVIDENCE_TYPE_CODES_BY_KIND = [
         'paper' => [
-            'paper_link_doi',
-            'paper_link_journal_page',
             'paper_link_pdf',
-            'paper_link_indexing',
             'paper_first_page',
             'paper_doi_or_article_link',
+            'paper_link_doi',
+            'paper_link_journal_page',
+            'paper_link_indexing',
             'paper_journal_publication_info',
             'paper_acceptance_letter',
-            'content',
-            'publication_decision',
         ],
         'project' => [
-            'project_link_overview_page',
             'project_link_summary_report',
-            'project_link_output_product',
-            'project_link_acceptance_evidence',
-            'project_assignment_or_approval_decision',
-            'project_proposal_document',
             'project_final_or_summary_report',
+            'project_link_output_product',
             'project_acceptance_minutes_or_recognition_decision',
+            'project_link_acceptance_evidence',
             'acceptance_decision',
-            'content',
+            'project_link_overview_page',
         ],
         'book' => [
+            'book_link_pdf',
+            'book_link_preview',
+            'book_cover_or_publication_info_isbn',
             'book_link_publisher',
             'book_link_digital_library',
-            'book_link_preview',
-            'book_link_pdf',
-            'book_assignment_decision',
-            'book_complete_manuscript',
-            'book_appraisal_minutes_or_approval_decision',
-            'book_cover_or_publication_info_isbn',
-            'cover',
-            'toc',
-            'publication_decision',
-            'content',
         ],
         'conference' => [
-            'conference_link_website',
-            'conference_link_program',
-            'conference_link_proceedings',
             'conference_link_paper',
-            'conference_link_slide_video',
-            'conference_invitation_or_program',
             'conference_paper_or_slides',
+            'conference_link_proceedings',
             'conference_proceedings_page',
+            'conference_link_slide_video',
             'conference_participation_certificate',
-            'content',
+            'conference_link_program',
+            'conference_link_website',
         ],
     ];
 
@@ -113,6 +100,50 @@ class PublicResearchWorkController extends Controller
                 'academic_years' => $academicYears,
             ],
         ], Response::HTTP_OK);
+    }
+
+    /**
+     * GET /api/public/research-works/{activityId}/evidence-files/{evidenceId}/download
+     */
+    public function downloadEvidence(Request $request, int $activityId, int $evidenceId)
+    {
+        $row = DB::table('evidence_files as ef')
+            ->join('research_activities as ra', 'ra.id', '=', 'ef.activity_id')
+            ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
+            ->where('ra.id', $activityId)
+            ->where('ef.id', $evidenceId)
+            ->where('ast.code', 'approved')
+            ->select([
+                'ef.disk',
+                'ef.path',
+                'ef.mime_type',
+                'ef.original_name',
+                'eft.code as file_type_code',
+                'ak.code as kind_code',
+            ])
+            ->first();
+
+        if (! $row) {
+            return response()->json(['message' => 'Không tìm thấy minh chứng công khai.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $allowedCodes = self::PUBLIC_EVIDENCE_TYPE_CODES_BY_KIND[(string) $row->kind_code] ?? [];
+        if ($allowedCodes === [] || ! in_array((string) ($row->file_type_code ?? ''), $allowedCodes, true)) {
+            return response()->json(['message' => 'Minh chứng này không được phép công khai.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $disk = trim((string) $row->disk);
+        $path = trim((string) $row->path);
+        $filename = trim((string) ($row->original_name ?? ''));
+        if ($filename === '') {
+            $filename = 'minh-chung.pdf';
+        }
+
+        return StorageDownload::stream($disk, $path, $filename, [
+            'Content-Type' => trim((string) ($row->mime_type ?? '')) ?: 'application/pdf',
+        ]);
     }
 
     /**
@@ -558,6 +589,7 @@ class PublicResearchWorkController extends Controller
                 'eft.code as file_type_code',
                 'eft.name as file_type_name',
                 'ef.original_name',
+                'ef.disk',
                 'ef.path',
                 'ef.mime_type',
                 'ef.id',
@@ -568,17 +600,31 @@ class PublicResearchWorkController extends Controller
         $priority = array_flip($allowedCodes);
 
         return collect($rows)
-            ->map(function (object $row) {
-                $url = trim((string)($row->path ?? ''));
+            ->map(function (object $row) use ($activityId) {
+                $disk = strtolower(trim((string) ($row->disk ?? '')));
+                $rawPath = trim((string) ($row->path ?? ''));
+                $url = $rawPath;
+                if ($disk !== 'evidence_link') {
+                    $url = route('public.research.evidence.download', [
+                        'activityId' => $activityId,
+                        'evidenceId' => (int) $row->id,
+                    ]);
+                }
+
                 if (!filter_var($url, FILTER_VALIDATE_URL)) {
                     return null;
                 }
+
+                $mime = strtolower(trim((string) ($row->mime_type ?? '')));
+                $name = strtolower(trim((string) ($row->original_name ?? '')));
+                $isPdf = str_contains($mime, 'pdf') || str_ends_with($name, '.pdf') || str_contains($url, '.pdf?') || str_ends_with($url, '.pdf');
 
                 return [
                     'label' => trim((string) ($row->file_type_name ?? '')) !== ''
                         ? (string) $row->file_type_name
                         : (trim((string)($row->original_name ?? '')) !== '' ? (string) $row->original_name : 'Link minh chứng'),
                     'url' => $url,
+                    'is_pdf' => $isPdf,
                     'file_type_code' => (string) ($row->file_type_code ?? ''),
                 ];
             })

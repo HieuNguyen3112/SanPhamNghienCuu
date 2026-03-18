@@ -171,12 +171,15 @@ type JournalOptionDto = {
   id: number;
   name: string;
   issn: string | null;
+  journal_type?: string | null;
+  research_field?: string | null;
+  website?: string | null;
   address: string | null;
   country: string | null;
   notes: string | null;
   source_name: string | null;
-  point_min: string | number | null;
-  point_max: string | number | null;
+  publisher?: string | null;
+  point: string | number | null;
   classification: string;
   research_hours: number;
   is_active: boolean;
@@ -186,12 +189,15 @@ type JournalOption = {
   id: number;
   name: string;
   issn: string | null;
+  journalType: string | null;
+  researchField: string | null;
+  website: string | null;
   address: string;
   country: string | null;
   notes: string | null;
   sourceName: string | null;
-  pointMin: number | null;
-  pointMax: number | null;
+  publisher: string | null;
+  point: number | null;
   classification: string;
   researchHours: number;
   isActive: boolean;
@@ -248,12 +254,15 @@ function dtoToModel(dto: JournalOptionDto): JournalOption {
     id: dto.id,
     name: dto.name,
     issn: dto.issn,
+    journalType: dto.journal_type ?? null,
+    researchField: dto.research_field ?? null,
+    website: dto.website ?? null,
     address: dto.address ?? "",
     country: dto.country,
     notes: dto.notes,
     sourceName: dto.source_name,
-    pointMin: toNumberOrNull(dto.point_min),
-    pointMax: toNumberOrNull(dto.point_max),
+    publisher: dto.publisher ?? null,
+    point: toNumberOrNull(dto.point),
     classification: dto.classification ?? "OTHER",
     researchHours: dto.research_hours ?? 0,
     isActive: !!dto.is_active,
@@ -330,30 +339,14 @@ function formatPoint(n: number): string {
   const s = n.toFixed(2);
   return s.endsWith(".00") ? s.slice(0, -3) : s.replace(/0$/, "");
 }
-function pointsLabel(it: {
-  pointMin: number | null;
-  pointMax: number | null;
-}): string | null {
-  const min = it.pointMin;
-  const max = it.pointMax;
-  if (min == null && max == null) return null;
-  if (min != null && max != null)
-    return `${formatPoint(min)}–${formatPoint(max)}`;
-  if (min != null) return `≥ ${formatPoint(min)}`;
-  return `≤ ${formatPoint(max!)}`;
+function pointsLabel(it: { point: number | null }): string | null {
+  if (it.point == null) return null;
+  return formatPoint(it.point);
 }
 
-function pointsTitle(it: {
-  pointMin: number | null;
-  pointMax: number | null;
-}): string {
-  const min = it.pointMin;
-  const max = it.pointMax;
-  if (min != null && max != null)
-    return `Khoảng điểm: ${formatPoint(min)} đến ${formatPoint(max)}`;
-  if (min != null) return `Điểm tối thiểu: ${formatPoint(min)}`;
-  if (max != null) return `Điểm tối đa: ${formatPoint(max)}`;
-  return "";
+function pointsTitle(it: { point: number | null }): string {
+  if (it.point == null) return "";
+  return `Điểm: ${formatPoint(it.point)}`;
 }
 function move(delta: number) {
   if (!open.value) openDropdown();

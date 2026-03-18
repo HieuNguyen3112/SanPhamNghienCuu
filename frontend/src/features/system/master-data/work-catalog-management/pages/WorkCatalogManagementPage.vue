@@ -330,6 +330,7 @@ const {
 
   openCreateJournal,
   openEditJournal,
+  validateJournalForm,
   saveJournal,
   onUpdateJournalForm,
 
@@ -460,6 +461,10 @@ async function handleSaveWorkLevel() {
 }
 
 async function handleSaveJournal() {
+  if (!validateJournalForm()) {
+    return;
+  }
+
   const successMessage = buildStatusActionText(
     modalModeJournal.value,
     journalForm.isActive,

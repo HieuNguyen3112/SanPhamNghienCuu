@@ -3,16 +3,23 @@
     <div v-if="open" class="fixed inset-0 z-[60]">
       <div class="absolute inset-0 bg-black/30" @click="$emit('close')"></div>
 
-      <div class="absolute right-0 top-0 h-full w-full max-w-4xl bg-white shadow-xl">
+      <div
+        class="absolute right-0 top-0 h-full w-full max-w-4xl bg-white shadow-xl"
+      >
         <div class="flex h-full flex-col">
-          <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+          <div
+            class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4"
+          >
             <div class="min-w-0">
               <div class="text-xs text-slate-500">
-                Trang chủ / Công trình / {{ item ? workTypeLabel(item.workType) : "" }}
+                Trang chủ / Công trình /
+                {{ item ? workTypeLabel(item.workType) : "" }}
               </div>
 
               <div class="mt-2 flex flex-wrap items-center gap-2">
-                <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                <span
+                  class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700"
+                >
                   🟢 Đã được phê duyệt
                 </span>
 
@@ -32,7 +39,9 @@
           </div>
 
           <div class="flex-1 overflow-y-auto p-5">
-            <div v-if="!item" class="text-sm text-slate-500">Không có dữ liệu.</div>
+            <div v-if="!item" class="text-sm text-slate-500">
+              Không có dữ liệu.
+            </div>
 
             <div v-else class="grid gap-6 md:grid-cols-12">
               <div class="md:col-span-8">
@@ -47,17 +56,27 @@
                   {{ item.lecturerCode }} • {{ item.facultyName }}
                 </div>
 
-                <div v-if="detailLoading" class="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                <div
+                  v-if="detailLoading"
+                  class="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600"
+                >
                   Đang tải thông tin chi tiết...
                 </div>
 
-                <div v-else-if="detailError" class="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                <div
+                  v-else-if="detailError"
+                  class="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
+                >
                   {{ detailError }}
                 </div>
 
                 <template v-else>
-                  <div class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-sm font-semibold text-slate-900">Thông tin công trình</div>
+                  <div
+                    class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div class="text-sm font-semibold text-slate-900">
+                      Thông tin công trình
+                    </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                       <div>
                         <div class="text-xs text-slate-500">Mã công trình</div>
@@ -71,26 +90,49 @@
                           {{ item.academicYearCode }}
                         </div>
                       </div>
+                      <div>
+                        <div class="text-xs text-slate-500">Chuyên mục</div>
+                        <div class="mt-1 text-sm font-semibold text-slate-900">
+                          {{ workTypeLabel(item.workType) }}
+                        </div>
+                      </div>
+                      <div>
+                        <div class="text-xs text-slate-500">Khoa</div>
+                        <div class="mt-1 text-sm font-semibold text-slate-900">
+                          {{ item.facultyName }}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div v-if="item.workType === 'ARTICLE'" class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-sm font-semibold text-slate-900">Thông tin công khai bài báo</div>
+                  <div
+                    v-if="item.workType === 'ARTICLE'"
+                    class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div class="text-sm font-semibold text-slate-900">
+                      Thông tin công khai bài báo
+                    </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
                       <div>
                         <div class="text-xs text-slate-500">Tên tạp chí</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ detail?.displayMeta.article?.journalName ?? '—' }}</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{ detail?.displayMeta.article?.journalName ?? "—" }}
+                        </div>
                       </div>
                       <div>
                         <div class="text-xs text-slate-500">Năm / Tập / Số</div>
                         <div class="mt-1 font-medium text-slate-900">
-                          {{ formatArticlePublication(detail?.displayMeta.article) }}
+                          {{
+                            formatArticlePublication(
+                              detail?.displayMeta.article,
+                            )
+                          }}
                         </div>
                       </div>
                       <div>
                         <div class="text-xs text-slate-500">DOI</div>
                         <div class="mt-1 font-medium text-slate-900">
-                          {{ detail?.displayMeta.article?.doi ?? '—' }}
+                          {{ detail?.displayMeta.article?.doi ?? "—" }}
                         </div>
                       </div>
                       <div>
@@ -111,81 +153,148 @@
                     </div>
                   </div>
 
-                  <div v-else-if="item.workType === 'PROJECT'" class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-sm font-semibold text-slate-900">Thông tin công khai đề tài</div>
+                  <div
+                    v-else-if="item.workType === 'PROJECT'"
+                    class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div class="text-sm font-semibold text-slate-900">
+                      Thông tin công khai đề tài
+                    </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
                       <div>
                         <div class="text-xs text-slate-500">Mã số đề tài</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ detail?.displayMeta.project?.projectCode ?? '—' }}</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{ detail?.displayMeta.project?.projectCode ?? "—" }}
+                        </div>
                       </div>
                       <div>
                         <div class="text-xs text-slate-500">Cấp quản lý</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ detail?.displayMeta.project?.managementLevel ?? '—' }}</div>
-                      </div>
-                      <div>
-                        <div class="text-xs text-slate-500">Thời gian thực hiện</div>
                         <div class="mt-1 font-medium text-slate-900">
-                          {{ formatDateRange(detail?.displayMeta.project?.startMonth, detail?.displayMeta.project?.endMonth) }}
+                          {{
+                            detail?.displayMeta.project?.managementLevel ?? "—"
+                          }}
                         </div>
                       </div>
                       <div>
-                        <div class="text-xs text-slate-500">Quyết định công nhận</div>
+                        <div class="text-xs text-slate-500">
+                          Thời gian thực hiện
+                        </div>
                         <div class="mt-1 font-medium text-slate-900">
-                          {{ formatDecision(detail?.displayMeta.project?.decisionNo, detail?.displayMeta.project?.decisionDate) }}
+                          {{
+                            formatDateRange(
+                              detail?.displayMeta.project?.startMonth,
+                              detail?.displayMeta.project?.endMonth,
+                            )
+                          }}
+                        </div>
+                      </div>
+                      <div>
+                        <div class="text-xs text-slate-500">
+                          Quyết định công nhận
+                        </div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{
+                            formatDecision(
+                              detail?.displayMeta.project?.decisionNo,
+                              detail?.displayMeta.project?.decisionDate,
+                            )
+                          }}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div v-else-if="item.workType === 'BOOK'" class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-sm font-semibold text-slate-900">Thông tin công khai giáo trình</div>
+                  <div
+                    v-else-if="item.workType === 'BOOK'"
+                    class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div class="text-sm font-semibold text-slate-900">
+                      Thông tin công khai giáo trình
+                    </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
                       <div>
                         <div class="text-xs text-slate-500">Nhà xuất bản</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ detail?.displayMeta.book?.publisher ?? '—' }}</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{ detail?.displayMeta.book?.publisher ?? "—" }}
+                        </div>
                       </div>
                       <div>
                         <div class="text-xs text-slate-500">Năm xuất bản</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ detail?.displayMeta.book?.year ?? '—' }}</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{ detail?.displayMeta.book?.year ?? "—" }}
+                        </div>
                       </div>
                       <div>
                         <div class="text-xs text-slate-500">ISBN</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ detail?.displayMeta.book?.isbn ?? '—' }}</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{ detail?.displayMeta.book?.isbn ?? "—" }}
+                        </div>
                       </div>
                       <div>
-                        <div class="text-xs text-slate-500">Quyết định phê duyệt</div>
+                        <div class="text-xs text-slate-500">
+                          Quyết định phê duyệt
+                        </div>
                         <div class="mt-1 font-medium text-slate-900">
-                          {{ formatDecision(detail?.displayMeta.book?.approvalDecisionNo, detail?.displayMeta.book?.approvalDecisionDate) }}
+                          {{
+                            formatDecision(
+                              detail?.displayMeta.book?.approvalDecisionNo,
+                              detail?.displayMeta.book?.approvalDecisionDate,
+                            )
+                          }}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div v-else-if="item.workType === 'CONFERENCE'" class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="text-sm font-semibold text-slate-900">Thông tin công khai hội thảo</div>
+                  <div
+                    v-else-if="item.workType === 'CONFERENCE'"
+                    class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div class="text-sm font-semibold text-slate-900">
+                      Thông tin công khai hội thảo
+                    </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
                       <div>
                         <div class="text-xs text-slate-500">Tên hội thảo</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ detail?.displayMeta.conference?.conferenceName ?? '—' }}</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{
+                            detail?.displayMeta.conference?.conferenceName ??
+                            "—"
+                          }}
+                        </div>
                       </div>
                       <div>
                         <div class="text-xs text-slate-500">Thời gian</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ formatDate(detail?.displayMeta.conference?.heldOn) }}</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{
+                            formatDate(detail?.displayMeta.conference?.heldOn)
+                          }}
+                        </div>
                       </div>
                       <div>
                         <div class="text-xs text-slate-500">Địa điểm</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ detail?.displayMeta.conference?.location ?? '—' }}</div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{ detail?.displayMeta.conference?.location ?? "—" }}
+                        </div>
                       </div>
                       <div>
-                        <div class="text-xs text-slate-500">Vai trò giảng viên</div>
-                        <div class="mt-1 font-medium text-slate-900">{{ displayLecturerRole }}</div>
+                        <div class="text-xs text-slate-500">
+                          Vai trò giảng viên
+                        </div>
+                        <div class="mt-1 font-medium text-slate-900">
+                          {{ displayLecturerRole }}
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   <div class="mt-6">
-                    <div class="text-sm font-semibold text-slate-900">Danh sách giảng viên tham gia</div>
-                    <div class="mt-2 overflow-hidden rounded-xl border border-slate-200">
+                    <div class="text-sm font-semibold text-slate-900">
+                      Danh sách giảng viên tham gia
+                    </div>
+                    <div
+                      class="mt-2 overflow-hidden rounded-xl border border-slate-200"
+                    >
                       <table class="w-full text-left text-sm">
                         <thead class="bg-slate-50 text-slate-700">
                           <tr>
@@ -195,13 +304,25 @@
                           </tr>
                         </thead>
                         <tbody>
-                          <tr v-for="p in detail?.participants ?? []" :key="`${p.lecturerCode}-${p.roleName}`" class="border-t">
-                            <td class="px-4 py-3 font-normal text-slate-900">{{ p.lecturerName }}</td>
-                            <td class="px-4 py-3 text-slate-700">{{ p.facultyName }}</td>
-                            <td class="px-4 py-3 text-slate-700">{{ p.roleName }}</td>
+                          <tr
+                            v-for="p in detail?.participants ?? []"
+                            :key="`${p.lecturerCode}-${p.roleName}`"
+                            class="border-t"
+                          >
+                            <td class="px-4 py-3 font-normal text-slate-900">
+                              {{ p.lecturerName }}
+                            </td>
+                            <td class="px-4 py-3 text-slate-700">
+                              {{ p.facultyName }}
+                            </td>
+                            <td class="px-4 py-3 text-slate-700">
+                              {{ p.roleName }}
+                            </td>
                           </tr>
                           <tr v-if="(detail?.participants?.length ?? 0) === 0">
-                            <td class="px-4 py-3 text-slate-500" colspan="3">—</td>
+                            <td class="px-4 py-3 text-slate-500" colspan="3">
+                              —
+                            </td>
                           </tr>
                         </tbody>
                       </table>
@@ -209,7 +330,9 @@
                   </div>
 
                   <div class="mt-6" v-if="item.keywords.length > 0">
-                    <div class="text-sm font-extrabold text-slate-900">Từ khóa</div>
+                    <div class="text-sm font-extrabold text-slate-900">
+                      Từ khóa
+                    </div>
                     <div class="mt-2 flex flex-wrap gap-2">
                       <span
                         v-for="keyword in item.keywords"
@@ -222,13 +345,26 @@
                   </div>
 
                   <div class="mt-6">
-                    <div class="text-sm font-semibold text-slate-900">Minh chứng & tệp đính kèm</div>
-                    <div v-if="(detail?.evidenceFiles?.length ?? 0) === 0" class="mt-2 text-sm text-slate-600">
+                    <div class="text-sm font-semibold text-slate-900">
+                      Minh chứng & tệp đính kèm
+                    </div>
+                    <div
+                      v-if="(detail?.evidenceFiles?.length ?? 0) === 0"
+                      class="mt-2 text-sm text-slate-600"
+                    >
                       Không có tệp/đường dẫn công khai.
                     </div>
                     <ul v-else class="mt-2 list-disc pl-5 text-sm">
-                      <li v-for="(f, idx) in detail?.evidenceFiles ?? []" :key="`${f.url}-${idx}`">
-                        <a class="text-blue-600 hover:underline" :href="f.url" target="_blank" rel="noreferrer">
+                      <li
+                        v-for="(f, idx) in detail?.evidenceFiles ?? []"
+                        :key="`${f.url}-${idx}`"
+                      >
+                        <a
+                          class="text-blue-600 hover:underline"
+                          :href="f.url"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
                           {{ f.label }}
                         </a>
                       </li>
@@ -236,8 +372,12 @@
                   </div>
 
                   <div class="mt-6">
-                    <div class="text-sm font-extrabold text-slate-900">Tóm tắt</div>
-                    <p class="mt-2 whitespace-pre-line text-sm leading-7 text-slate-700">
+                    <div class="text-sm font-extrabold text-slate-900">
+                      Tóm tắt
+                    </div>
+                    <p
+                      class="mt-2 whitespace-pre-line text-sm leading-7 text-slate-700"
+                    >
                       {{ item.abstract || "—" }}
                     </p>
                   </div>
@@ -245,19 +385,28 @@
               </div>
 
               <aside class="md:col-span-4">
-                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div class="aspect-[3/4] w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                    <div class="flex h-full items-center justify-center text-xs font-semibold text-slate-400">
-                      Ảnh bìa (mock)
-                    </div>
+                <div
+                  class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div class="text-sm font-semibold text-slate-900">
+                    Minh chứng công khai
                   </div>
+                  <p class="mt-1 text-xs leading-5 text-slate-600">
+                    Ưu tiên hiển thị file PDF phù hợp để sinh viên truy cập
+                    nhanh.
+                  </p>
 
                   <button
                     type="button"
-                    class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    :disabled="!resolvedPdfUrl"
                     @click="onPdfClick"
                   >
-                    {{ resolvedPdfUrl ? "Mở PDF" : "PDF" }}
+                    {{
+                      resolvedPdfUrl
+                        ? "Tải PDF minh chứng"
+                        : "Chưa có PDF công khai"
+                    }}
                   </button>
 
                   <a
@@ -270,18 +419,54 @@
                     Xem minh chứng
                   </a>
 
+                  <div class="mt-4">
+                    <div
+                      class="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                    >
+                      Tệp/Link có thể công khai
+                    </div>
+                    <ul
+                      v-if="(detail?.evidenceFiles?.length ?? 0) > 0"
+                      class="mt-2 space-y-2 text-xs"
+                    >
+                      <li
+                        v-for="(f, idx) in detail?.evidenceFiles ?? []"
+                        :key="`${f.url}-${idx}`"
+                        class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2"
+                      >
+                        <a
+                          class="font-medium text-blue-700 hover:underline"
+                          :href="f.url"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {{ f.label }}
+                        </a>
+                      </li>
+                    </ul>
+                    <div v-else class="mt-2 text-xs text-slate-500">
+                      Chưa có minh chứng công khai.
+                    </div>
+                  </div>
+
                   <div class="mt-4 text-xs text-slate-500">
                     <div class="flex justify-between gap-2 py-1">
                       <span>Chuyên mục</span>
-                      <span class="font-medium text-slate-700">{{ workTypeLabel(item.workType) }}</span>
+                      <span class="font-medium text-slate-700">{{
+                        workTypeLabel(item.workType)
+                      }}</span>
                     </div>
                     <div class="flex justify-between gap-2 py-1">
                       <span>Năm học</span>
-                      <span class="font-medium text-slate-700">{{ item.academicYearCode }}</span>
+                      <span class="font-medium text-slate-700">{{
+                        item.academicYearCode
+                      }}</span>
                     </div>
                     <div class="flex justify-between gap-2 py-1">
                       <span>Khoa</span>
-                      <span class="font-medium text-slate-700">{{ item.facultyName }}</span>
+                      <span class="font-medium text-slate-700">{{
+                        item.facultyName
+                      }}</span>
                     </div>
                   </div>
                 </div>
@@ -321,6 +506,7 @@ const resolvedPdfUrl = computed(() => {
 
   const links = detail.value?.evidenceFiles ?? [];
   const match = links.find((entry) => {
+    if (entry.isPdf) return true;
     const url = entry.url.toLowerCase();
     return url.endsWith(".pdf") || url.includes(".pdf?");
   });
@@ -361,15 +547,13 @@ function formatDecision(no?: string | null, date?: string | null): string {
   return no ?? formatDate(date);
 }
 
-function formatArticlePublication(
-  article?: {
-    year: number | null;
-    volume: string | null;
-    issue: string | null;
-    pageStart: number | null;
-    pageEnd: number | null;
-  },
-): string {
+function formatArticlePublication(article?: {
+  year: number | null;
+  volume: string | null;
+  issue: string | null;
+  pageStart: number | null;
+  pageEnd: number | null;
+}): string {
   if (!article) return "—";
   const year = article.year ? `${article.year}` : null;
   const volume = article.volume ? `Tập ${article.volume}` : null;
@@ -410,6 +594,6 @@ watch(
       detailLoading.value = false;
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>

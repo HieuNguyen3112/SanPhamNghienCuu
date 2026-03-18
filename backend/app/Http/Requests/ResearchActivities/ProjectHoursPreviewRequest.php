@@ -3,6 +3,8 @@
 namespace App\Http\Requests\ResearchActivities;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Validator;
 
 class ProjectHoursPreviewRequest extends FormRequest
 {
@@ -53,6 +55,39 @@ class ProjectHoursPreviewRequest extends FormRequest
             'members.*.lecturer_id' => ['nullable', 'integer', 'exists:lecturers,id'],
             'members.*.member_role_id' => ['nullable', 'integer', 'exists:member_roles,id'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $members = $this->input('members', []);
+            if (! is_array($members)) {
+                return;
+            }
+
+            $principalRoleId = DB::table('member_roles')
+                ->whereRaw('LOWER(code) = ?', ['principal'])
+                ->value('id');
+
+            if (! $principalRoleId) {
+                return;
+            }
+
+            $principalCount = 0;
+            foreach ($members as $member) {
+                if (! is_array($member)) {
+                    continue;
+                }
+
+                if ((int) ($member['member_role_id'] ?? 0) === (int) $principalRoleId) {
+                    $principalCount++;
+                }
+            }
+
+            if ($principalCount > 1) {
+                $validator->errors()->add('members', 'Đề tài chỉ được có một Chủ nhiệm.');
+            }
+        });
     }
 }
 
