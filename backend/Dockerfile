@@ -6,12 +6,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     libpq-dev \
     libzip-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
     libicu-dev \
     zip \
-    && docker-php-ext-install pdo pdo_pgsql pgsql mbstring bcmath exif pcntl zip intl \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql pgsql gd mbstring bcmath exif pcntl zip intl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
