@@ -15,12 +15,24 @@ return new class extends Migration {
             $table->index('is_external');
         });
 
-        DB::statement('ALTER TABLE research_activity_members MODIFY lecturer_id BIGINT UNSIGNED NULL');
+        $driver = DB::getDriverName();
+
+        if ($driver === 'pgsql') {
+            DB::statement('ALTER TABLE research_activity_members ALTER COLUMN lecturer_id DROP NOT NULL');
+        } else {
+            DB::statement('ALTER TABLE research_activity_members MODIFY lecturer_id BIGINT UNSIGNED NULL');
+        }
     }
 
     public function down(): void
     {
-        DB::statement('ALTER TABLE research_activity_members MODIFY lecturer_id BIGINT UNSIGNED NOT NULL');
+        $driver = DB::getDriverName();
+
+        if ($driver === 'pgsql') {
+            DB::statement('ALTER TABLE research_activity_members ALTER COLUMN lecturer_id SET NOT NULL');
+        } else {
+            DB::statement('ALTER TABLE research_activity_members MODIFY lecturer_id BIGINT UNSIGNED NOT NULL');
+        }
 
         Schema::table('research_activity_members', function (Blueprint $table) {
             $table->dropIndex(['is_external']);
