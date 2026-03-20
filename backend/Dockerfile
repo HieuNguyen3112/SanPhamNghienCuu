@@ -37,4 +37,4 @@ RUN mkdir -p storage/framework/cache \
 
 EXPOSE 10000
 
-CMD sh -c "mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache && chmod -R 775 storage bootstrap/cache && php artisan optimize:clear || true && php artisan package:discover --ansi || true && php artisan migrate --force || true && php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"
+CMD sh -c "mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache && chmod -R 775 storage bootstrap/cache && php artisan optimize:clear || true && php artisan package:discover --ansi || true && php artisan migrate --force || true && if [ \"${RUN_DB_SEED:-false}\" = \"true\" ]; then php artisan db:seed --class=${DB_SEED_CLASS:-DatabaseSeeder} --force || true; fi && php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"
