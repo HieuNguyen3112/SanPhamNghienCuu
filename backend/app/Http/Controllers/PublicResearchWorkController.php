@@ -12,6 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PublicResearchWorkController extends Controller
 {
+    private ResearchEvidenceStorageService $evidenceStorageService;
+
     private const PUBLIC_EVIDENCE_TYPE_CODES_BY_KIND = [
         'paper' => [
             'paper_link_pdf',
@@ -51,9 +53,10 @@ class PublicResearchWorkController extends Controller
         ],
     ];
 
-    public function __construct(
-        private readonly ResearchEvidenceStorageService $evidenceStorageService
-    ) {}
+    public function __construct(ResearchEvidenceStorageService $evidenceStorageService)
+    {
+        $this->evidenceStorageService = $evidenceStorageService;
+    }
 
     /**
      * GET /api/public/research-works/lookups

@@ -45,7 +45,7 @@
               <input
                 :type="showOldPassword ? 'text' : 'password'"
                 v-model="form.oldPassword"
-                class="block w-full rounded border px-3 py-2 text-sm outline-none transition focus:ring-1"
+                class="block w-full rounded border px-3 py-2 pr-10 text-sm outline-none transition focus:ring-1"
                 :class="
                   errors.oldPassword
                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
@@ -54,7 +54,7 @@
               />
               <button
                 type="button"
-                class="absolute inset-y-0 right-2 flex items-center text-slate-500 hover:text-slate-700"
+                class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-700"
                 @click="showOldPassword = !showOldPassword"
               >
                 <!-- icon con mắt đơn giản -->
@@ -88,7 +88,7 @@
               <input
                 :type="showNewPassword ? 'text' : 'password'"
                 v-model="form.newPassword"
-                class="block w-full rounded border px-3 py-2 text-sm outline-none transition focus:ring-1"
+                class="block w-full rounded border px-3 py-2 pr-10 text-sm outline-none transition focus:ring-1"
                 :class="
                   errors.newPassword
                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
@@ -97,7 +97,7 @@
               />
               <button
                 type="button"
-                class="absolute inset-y-0 right-2 flex items-center text-slate-500 hover:text-slate-700"
+                class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-700"
                 @click="showNewPassword = !showNewPassword"
               >
                 <svg
@@ -132,7 +132,7 @@
               <input
                 :type="showConfirmPassword ? 'text' : 'password'"
                 v-model="form.confirmPassword"
-                class="block w-full rounded border px-3 py-2 text-sm outline-none transition focus:ring-1"
+                class="block w-full rounded border px-3 py-2 pr-10 text-sm outline-none transition focus:ring-1"
                 :class="
                   errors.confirmPassword
                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
@@ -141,7 +141,7 @@
               />
               <button
                 type="button"
-                class="absolute inset-y-0 right-2 flex items-center text-slate-500 hover:text-slate-700"
+                class="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-700"
                 @click="showConfirmPassword = !showConfirmPassword"
               >
                 <svg
