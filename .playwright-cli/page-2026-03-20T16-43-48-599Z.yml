@@ -1,0 +1,44 @@
+- generic [ref=e1]:
+  - main [ref=e120]:
+    - generic [ref=e121]:
+      - generic "University introduction" [ref=e123]:
+        - link "Về trang chủ" [ref=e125] [cursor=pointer]:
+          - /url: /
+          - img "University logo" [ref=e126]
+        - generic [ref=e127]:
+          - heading "TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH" [level=1] [ref=e128]:
+            - text: TRƯỜNG ĐẠI HỌC SƯ PHẠM
+            - text: THÀNH PHỐ HỒ CHÍ MINH
+          - heading "Quản lý công trình nghiên cứu khoa học" [level=2] [ref=e129]
+      - region "Sign in form" [ref=e131]:
+        - generic [ref=e132]:
+          - heading "ĐĂNG NHẬP" [level=2] [ref=e133]
+          - generic [ref=e134]:
+            - generic [ref=e135]: Tên đăng nhập *
+            - textbox "Tên đăng nhập *" [ref=e136]:
+              - /placeholder: Nhập tên đăng nhập
+              - text: gv@local.test
+          - generic [ref=e137]:
+            - generic [ref=e138]: Mật khẩu *
+            - textbox "Mật khẩu *" [ref=e139]:
+              - /placeholder: Nhập mật khẩu
+              - text: Password!123
+          - generic [ref=e140]:
+            - generic [ref=e141]: Vai trò
+            - combobox [ref=e142]:
+              - option "Giảng viên" [selected]
+              - option "Ban chủ nhiệm khoa"
+              - option "Phòng quản lý khoa học"
+          - button "Đăng nhập" [ref=e144]:
+            - generic [ref=e145]: Đăng nhập
+          - separator [ref=e146]
+          - button "Quên mật khẩu?" [ref=e147]
+  - dialog "Đăng nhập thất bại" [ref=e149]:
+    - generic [ref=e150]:
+      - banner [ref=e151]:
+        - heading "Đăng nhập thất bại" [level=2] [ref=e152]
+      - generic [ref=e154]:
+        - img [ref=e156]
+        - paragraph [ref=e158]: Thông tin đăng nhập không chính xác. Vui lòng thử lại.
+      - contentinfo [ref=e159]:
+        - button "Đóng" [active] [ref=e160]

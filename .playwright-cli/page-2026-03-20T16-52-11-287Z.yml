@@ -1,0 +1,132 @@
+- generic [ref=e3]:
+  - button "Đóng menu điều hướng" [ref=e241]
+  - complementary "Thanh điều hướng chính" [active] [ref=e242]:
+    - generic [ref=e5]:
+      - button "Đóng menu điều hướng" [ref=e243]:
+        - generic [ref=e170]: ×
+      - link "Về trang chủ" [ref=e244] [cursor=pointer]:
+        - /url: /
+        - img "Logo trường đại học" [ref=e245]
+    - generic [ref=e9]:
+      - generic [ref=e11]: D
+      - generic [ref=e197]:
+        - generic [ref=e198]: ACC GIẢNG VIÊN DEMO
+        - generic [ref=e199]: Giảng viên
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - button "Hồ sơ cá nhân ▾" [ref=e246]:
+          - generic [ref=e174]: Hồ sơ cá nhân
+          - generic [ref=e175]: ▾
+        - link "Hồ sơ khoa học" [ref=e247] [cursor=pointer]:
+          - /url: /profile
+          - img [ref=e22]
+          - generic [ref=e200]: Hồ sơ khoa học
+      - generic [ref=e25]:
+        - button "Kê khai khoa học ▾" [ref=e248]:
+          - generic [ref=e178]: Kê khai khoa học
+          - generic [ref=e179]: ▾
+        - generic [ref=e26]:
+          - link "Kê khai công trình" [ref=e249] [cursor=pointer]:
+            - /url: /declarations/gateway
+            - img [ref=e29]
+            - generic [ref=e201]: Kê khai công trình
+          - link "Thông báo xác nhận" [ref=e250] [cursor=pointer]:
+            - /url: /declarations/participatier
+            - img [ref=e34]
+            - generic [ref=e202]: Thông báo xác nhận
+          - link "Công trình của tôi" [ref=e251] [cursor=pointer]:
+            - /url: /works/personal
+            - img [ref=e40]
+            - generic [ref=e203]: Công trình của tôi
+          - link "Tính giờ NCKH cá nhân" [ref=e252] [cursor=pointer]:
+            - /url: /hours/calculate
+            - img [ref=e45]
+            - generic [ref=e204]: Tính giờ NCKH cá nhân
+          - link "Giờ NCKH cá nhân" [ref=e253] [cursor=pointer]:
+            - /url: /hours/personal
+            - img [ref=e49]
+            - generic [ref=e205]: Giờ NCKH cá nhân
+          - link "Thông báo cảnh báo" [ref=e254] [cursor=pointer]:
+            - /url: /hours/personal_warnings
+            - img [ref=e54]
+            - generic [ref=e206]: Thông báo cảnh báo
+      - generic [ref=e57]:
+        - button "Tra cứu ▾" [ref=e255]:
+          - generic [ref=e187]: Tra cứu
+          - generic [ref=e188]: ▾
+        - link "Tra cứu công trình" [ref=e256] [cursor=pointer]:
+          - /url: /search
+          - img [ref=e61]
+          - generic [ref=e207]: Tra cứu công trình
+    - paragraph [ref=e190]: © 2026 Phần mềm quản lý NCKH
+  - generic [ref=e65]:
+    - banner [ref=e66]:
+      - generic [ref=e67]:
+        - button "Đóng menu điều hướng" [expanded] [ref=e257]:
+          - generic [ref=e192]: Đóng menu điều hướng
+        - generic [ref=e69]: TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH
+      - generic [ref=e70]:
+        - button "Mở danh sách thông báo" [ref=e72]:
+          - img [ref=e73]
+        - button "Tài khoản" [ref=e77]:
+          - generic [ref=e78]: Tài khoản
+          - img [ref=e79]
+    - main [ref=e81]:
+      - generic [ref=e83]:
+        - generic [ref=e85]:
+          - img [ref=e87]
+          - generic [ref=e89]:
+            - generic [ref=e90]: Kê khai công trình nghiên cứu khoa học
+            - generic [ref=e91]: Chọn loại công trình phù hợp để bắt đầu kê khai. Bạn có thể lưu bản nháp và hoàn tất sau.
+        - generic [ref=e92]:
+          - generic [ref=e94]:
+            - generic [ref=e95]: Chọn loại công trình
+            - generic [ref=e96]: Chạm vào card hoặc nhấn “Kê khai” để đi tới trang tương ứng.
+          - generic [ref=e97]:
+            - generic [ref=e99] [cursor=pointer]:
+              - img [ref=e101]
+              - generic [ref=e104]:
+                - generic [ref=e105]: Bài báo khoa học
+                - list [ref=e106]:
+                  - listitem [ref=e107]:
+                    - generic [ref=e109]: Khai báo bài báo trong tạp chí hoặc kỷ yếu.
+                  - listitem [ref=e110]:
+                    - generic [ref=e112]: Hệ thống tự tính giờ theo quy định.
+                - button "Kê khai" [ref=e113]
+            - generic [ref=e115] [cursor=pointer]:
+              - img [ref=e117]
+              - generic [ref=e119]:
+                - generic [ref=e120]: Đề tài nghiên cứu
+                - list [ref=e121]:
+                  - listitem [ref=e122]:
+                    - generic [ref=e124]: Khai báo đề tài/dự án nghiên cứu.
+                  - listitem [ref=e125]:
+                    - generic [ref=e127]: Áp dụng quy đổi giờ theo phân vai.
+                - button "Kê khai" [ref=e128]
+            - generic [ref=e130] [cursor=pointer]:
+              - img [ref=e132]
+              - generic [ref=e134]:
+                - generic [ref=e135]: Sách/Giáo trình
+                - list [ref=e136]:
+                  - listitem [ref=e137]:
+                    - generic [ref=e139]: Khai báo sách hoặc giáo trình.
+                  - listitem [ref=e140]:
+                    - generic [ref=e142]: Nhập đầy đủ thông tin xuất bản.
+                - button "Kê khai" [ref=e143]
+            - generic [ref=e145] [cursor=pointer]:
+              - img [ref=e147]
+              - generic [ref=e150]:
+                - generic [ref=e151]: Hội nghị/Hội thảo
+                - list [ref=e152]:
+                  - listitem [ref=e153]:
+                    - generic [ref=e155]: Khai báo báo cáo hội nghị/hội thảo.
+                  - listitem [ref=e156]:
+                    - generic [ref=e158]: Nhập thông tin hội nghị và vai trò.
+                - button "Kê khai" [ref=e159]
+        - generic [ref=e160]:
+          - generic [ref=e162]:
+            - generic [ref=e163]: Bản nháp đang lưu
+            - generic [ref=e164]: Tiếp tục kê khai các mục bạn đang làm dở.
+          - generic [ref=e165]:
+            - generic [ref=e166]: Bạn chưa có bản nháp nào
+            - generic [ref=e167]: Hãy bắt đầu kê khai từ các loại công trình phía trên.

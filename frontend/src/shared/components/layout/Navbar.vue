@@ -1,14 +1,17 @@
 <template>
   <header
-    class="flex h-14 w-full items-center justify-between bg-[#234a74] px-4 text-slate-100 shadow-sm md:h-16 md:px-8"
+    class="flex h-14 w-full items-center justify-between gap-3 bg-[#234a74] px-3 text-slate-100 shadow-sm sm:px-4 lg:h-16 lg:px-8"
   >
-    <div class="flex items-center gap-3">
+    <div class="flex min-w-0 items-center gap-3">
       <button
         type="button"
-        class="flex h-9 w-9 items-center justify-center rounded-md border border-white/20 bg-white/10 text-slate-100 shadow-sm hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/60 md:hidden"
+        class="flex h-9 w-9 items-center justify-center rounded-md border border-white/20 bg-white/10 text-slate-100 shadow-sm transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/60 lg:hidden"
+        aria-controls="app-sidebar"
+        :aria-expanded="isDesktop ? undefined : isSidebarDrawerOpen"
+        :aria-label="sidebarToggleLabel"
         @click="emit('toggle-sidebar')"
       >
-        <span class="sr-only">Mở/đóng thanh điều hướng</span>
+        <span class="sr-only">{{ sidebarToggleLabel }}</span>
         <span class="space-y-1">
           <span class="block h-0.5 w-4 bg-current"></span>
           <span class="block h-0.5 w-4 bg-current"></span>
@@ -16,20 +19,20 @@
         </span>
       </button>
 
-      <div class="flex items-center gap-3">
+      <div class="flex min-w-0 items-center gap-3">
         <span
-          class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-100 md:text-sm"
+          class="block min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-100 sm:text-xs lg:text-sm lg:tracking-[0.18em]"
         >
           {{ title }}
         </span>
       </div>
     </div>
 
-    <div class="flex items-center gap-4 md:gap-6">
+    <div class="flex shrink-0 items-center gap-3 sm:gap-4 lg:gap-6">
       <div ref="notificationRootRef" class="relative">
         <button
           type="button"
-          class="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-100 shadow-sm hover:bg-white/20"
+          class="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-100 shadow-sm transition hover:bg-white/20"
           :aria-expanded="isNotificationOpen"
           aria-haspopup="menu"
           aria-label="Mở danh sách thông báo"
@@ -47,21 +50,19 @@
 
         <transition
           enter-active-class="transition duration-150 ease-out"
-          enter-from-class="opacity-0 translate-y-1"
-          enter-to-class="opacity-100 translate-y-0"
+          enter-from-class="translate-y-1 opacity-0"
+          enter-to-class="translate-y-0 opacity-100"
           leave-active-class="transition duration-100 ease-in"
-          leave-from-class="opacity-100 translate-y-0"
-          leave-to-class="opacity-0 translate-y-1"
+          leave-from-class="translate-y-0 opacity-100"
+          leave-to-class="translate-y-1 opacity-0"
         >
           <div
             v-if="isNotificationOpen"
-            class="absolute right-0 top-11 z-[90] w-[380px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-xl"
+            class="absolute right-0 top-11 z-[70] w-[380px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-xl"
             role="menu"
             aria-label="Danh sách thông báo"
           >
-            <div
-              class="flex items-center justify-between border-b border-slate-200 px-4 py-3"
-            >
+            <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
               <div class="text-sm font-semibold text-slate-900">Thông báo</div>
               <div class="flex items-center gap-3">
                 <button
@@ -137,11 +138,7 @@
                         />
                       </div>
 
-                      <button
-                        type="button"
-                        class="flex-1 text-left"
-                        @click="openNotification(entry.item)"
-                      >
+                      <button type="button" class="flex-1 text-left" @click="openNotification(entry.item)">
                         <p
                           class="line-clamp-1 text-sm"
                           :class="
@@ -174,9 +171,7 @@
                         <span
                           class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-slate-400"
                         >
-                          <span
-                            class="inline-block h-1.5 w-1.5 rounded-full bg-slate-300"
-                          ></span>
+                          <span class="inline-block h-1.5 w-1.5 rounded-full bg-slate-300"></span>
                           Đã đọc
                         </span>
                         <button
@@ -202,7 +197,7 @@
         <button
           ref="avatarBtnRef"
           type="button"
-          class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-300 text-slate-700 shadow-sm hover:bg-slate-200"
+          class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-300 text-slate-700 shadow-sm transition hover:bg-slate-200"
           @click="toggleUserMenu"
         >
           <span class="sr-only">Tài khoản</span>
@@ -234,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, toRefs, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Bell, Trash2 } from "lucide-vue-next";
 import { useUserStore, type UserRole } from "@/app/stores/userStore";
@@ -264,13 +259,17 @@ const props = withDefaults(
     notificationCount?: number;
     userName?: string;
     userCode?: string;
+    isDesktop?: boolean;
+    isSidebarDrawerOpen?: boolean;
   }>(),
   {
     title: "TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH",
     notificationCount: 0,
     userName: "",
     userCode: "",
-  }
+    isDesktop: false,
+    isSidebarDrawerOpen: false,
+  },
 );
 
 const router = useRouter();
@@ -303,15 +302,19 @@ const displayNotificationCount = computed(() => {
   return Math.max(unreadCount.value, fallbackCount);
 });
 
+const sidebarToggleLabel = computed(() =>
+  props.isSidebarDrawerOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng",
+);
+
 const notificationsWithVisual = computed(() =>
   notifications.value.map((item) => ({
     item,
     visual: getNotificationVisual(item),
-  }))
+  })),
 );
 
 const readNotificationCount = computed(
-  () => notifications.value.filter((item) => !item.is_unread).length
+  () => notifications.value.filter((item) => !item.is_unread).length,
 );
 
 const defaultTargetByRole: Record<NotificationRole, string> = {
@@ -413,7 +416,7 @@ async function markAsReadOnly(notificationId: string) {
             is_unread: false,
             read_at: item.read_at ?? new Date().toISOString(),
           }
-        : item
+        : item,
     );
     unreadCount.value = Math.max(0, unreadCount.value - 1);
   } catch (error) {
@@ -468,7 +471,7 @@ async function deleteNotification(notificationId: string) {
     await deleteNotificationByRole(role, notificationId);
     const removed = notifications.value.find((item) => item.id === notificationId);
     notifications.value = notifications.value.filter(
-      (item) => item.id !== notificationId
+      (item) => item.id !== notificationId,
     );
 
     if (removed?.is_unread) {
@@ -547,5 +550,6 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", handleEsc);
 });
 
-const { userName, userCode, title } = props;
+const { userName, userCode, title, isDesktop, isSidebarDrawerOpen } =
+  toRefs(props);
 </script>

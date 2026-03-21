@@ -2,18 +2,34 @@ import { defineStore } from "pinia";
 
 const KEY = "sidebar_collapsed";
 
+function readInitialSidebarCollapsed() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(KEY) === "1";
+}
+
+function persistSidebarCollapsed(value: boolean) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(KEY, value ? "1" : "0");
+}
+
 export const useLayoutStore = defineStore("layout", {
   state: () => ({
-    isSidebarCollapsed: localStorage.getItem(KEY) === "1",
+    isSidebarCollapsed: readInitialSidebarCollapsed(),
   }),
   actions: {
     toggleSidebarCollapse() {
       this.isSidebarCollapsed = !this.isSidebarCollapsed;
-      localStorage.setItem(KEY, this.isSidebarCollapsed ? "1" : "0");
+      persistSidebarCollapsed(this.isSidebarCollapsed);
     },
-    setSidebarCollapse(v: boolean) {
-      this.isSidebarCollapsed = v;
-      localStorage.setItem(KEY, v ? "1" : "0");
+    setSidebarCollapse(value: boolean) {
+      this.isSidebarCollapsed = value;
+      persistSidebarCollapsed(value);
     },
   },
 });

@@ -6,7 +6,7 @@ export type MenuGroup = { header: MenuItem; children: MenuItem[] };
 
 export function useSidebarGroups(
   menuItems: Ref<MenuItem[]>,
-  route: RouteLocationNormalizedLoaded
+  route: RouteLocationNormalizedLoaded,
 ) {
   const groupOpen = reactive<Record<string, boolean>>({});
 
@@ -14,22 +14,28 @@ export function useSidebarGroups(
     const groups: MenuGroup[] = [];
     let current: MenuGroup | null = null;
 
-    for (const it of menuItems.value) {
-      if (!it.routeName) {
-        current = { header: it, children: [] };
+    for (const item of menuItems.value) {
+      if (!item.routeName) {
+        current = { header: item, children: [] };
         groups.push(current);
-        if (groupOpen[it.id] === undefined) groupOpen[it.id] = true;
-      } else {
-        if (!current) {
-          const fallback: MenuItem = { id: "misc", label: "Khác" };
-          if (groupOpen[fallback.id] === undefined)
-            groupOpen[fallback.id] = true;
-          current = { header: fallback, children: [] };
-          groups.push(current);
+        if (groupOpen[item.id] === undefined) {
+          groupOpen[item.id] = true;
         }
-        current.children.push(it);
+        continue;
       }
+
+      if (!current) {
+        const fallback: MenuItem = { id: "misc", label: "Khác" };
+        if (groupOpen[fallback.id] === undefined) {
+          groupOpen[fallback.id] = true;
+        }
+        current = { header: fallback, children: [] };
+        groups.push(current);
+      }
+
+      current.children.push(item);
     }
+
     return groups;
   });
 
@@ -37,16 +43,18 @@ export function useSidebarGroups(
     groupOpen[groupId] = !groupOpen[groupId];
   };
 
-  // Auto-open: chỉ mở group có route active, các group khác giữ nguyên hoặc đóng (tuỳ bạn)
+  // Tự mở group chứa route đang active, các group khác giữ trạng thái hiện tại.
   watch(
     () => route.name,
     () => {
-      for (const g of menuGroups.value) {
-        const isActive = g.children.some((c) => c.routeName === route.name);
-        if (isActive) groupOpen[g.header.id] = true;
+      for (const group of menuGroups.value) {
+        const isActive = group.children.some((child) => child.routeName === route.name);
+        if (isActive) {
+          groupOpen[group.header.id] = true;
+        }
       }
     },
-    { immediate: true }
+    { immediate: true },
   );
 
   return { menuGroups, groupOpen, toggleGroup };

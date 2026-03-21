@@ -1,0 +1,252 @@
+- generic [ref=e161]:
+  - complementary "Thanh điều hướng chính" [ref=e162]:
+    - link "Về trang chủ" [ref=e164] [cursor=pointer]:
+      - /url: /
+      - img "Logo trường đại học" [ref=e165]
+    - generic [ref=e167]:
+      - generic [ref=e169]: D
+      - generic [ref=e170]:
+        - generic [ref=e171]: ACC GIẢNG VIÊN DEMO
+        - generic [ref=e172]: Giảng viên
+    - button "‹" [ref=e175]:
+      - generic [ref=e176]: ‹
+    - generic [ref=e178]:
+      - generic [ref=e179]:
+        - button "Hồ sơ cá nhân ▾" [ref=e180]:
+          - generic [ref=e181]: Hồ sơ cá nhân
+          - generic [ref=e182]: ▾
+        - link "Hồ sơ khoa học" [ref=e184] [cursor=pointer]:
+          - /url: /profile
+          - img [ref=e186]
+          - generic [ref=e189]: Hồ sơ khoa học
+      - generic [ref=e190]:
+        - button "Kê khai khoa học ▾" [ref=e191]:
+          - generic [ref=e192]: Kê khai khoa học
+          - generic [ref=e193]: ▾
+        - generic [ref=e194]:
+          - link "Kê khai công trình" [ref=e195] [cursor=pointer]:
+            - /url: /declarations/gateway
+            - img [ref=e197]
+            - generic [ref=e200]: Kê khai công trình
+          - link "Thông báo xác nhận" [ref=e201] [cursor=pointer]:
+            - /url: /declarations/participatier
+            - img [ref=e203]
+            - generic [ref=e207]: Thông báo xác nhận
+          - link "Công trình của tôi" [ref=e208] [cursor=pointer]:
+            - /url: /works/personal
+            - img [ref=e210]
+            - generic [ref=e213]: Công trình của tôi
+          - link "Tính giờ NCKH cá nhân" [ref=e214] [cursor=pointer]:
+            - /url: /hours/calculate
+            - img [ref=e216]
+            - generic [ref=e218]: Tính giờ NCKH cá nhân
+          - link "Giờ NCKH cá nhân" [ref=e219] [cursor=pointer]:
+            - /url: /hours/personal
+            - img [ref=e221]
+            - generic [ref=e224]: Giờ NCKH cá nhân
+          - link "Thông báo cảnh báo" [ref=e225] [cursor=pointer]:
+            - /url: /hours/personal_warnings
+            - img [ref=e227]
+            - generic [ref=e230]: Thông báo cảnh báo
+      - generic [ref=e231]:
+        - button "Tra cứu ▾" [ref=e232]:
+          - generic [ref=e233]: Tra cứu
+          - generic [ref=e234]: ▾
+        - link "Tra cứu công trình" [ref=e236] [cursor=pointer]:
+          - /url: /search
+          - img [ref=e238]
+          - generic [ref=e241]: Tra cứu công trình
+    - paragraph [ref=e243]: © 2026 Phần mềm quản lý NCKH
+  - generic [ref=e244]:
+    - banner [ref=e245]:
+      - generic [ref=e248]: TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH
+      - generic [ref=e249]:
+        - button "Mở danh sách thông báo" [ref=e251]:
+          - img [ref=e252]
+        - button "Tài khoản" [ref=e256]:
+          - generic [ref=e257]: Tài khoản
+          - img [ref=e258]
+    - main [ref=e260]:
+      - generic [ref=e262]:
+        - generic [ref=e265]:
+          - heading "Hồ sơ khoa học & Công trình NCKH" [level=1] [ref=e266]
+          - paragraph [ref=e267]: Xem và cập nhật thông tin cá nhân, hồ sơ khoa học; tổng hợp công trình đã duyệt.
+        - generic [ref=e268]:
+          - generic [ref=e269]:
+            - generic [ref=e270]:
+              - generic [ref=e271]:
+                - heading "Thông tin cá nhân" [level=2] [ref=e272]
+                - paragraph [ref=e273]: Một số thông tin do hệ thống quản lý sẽ ở trạng thái chỉ xem.
+              - button "Chỉnh sửa" [ref=e275]:
+                - img [ref=e276]
+                - text: Chỉnh sửa
+            - generic [ref=e279]:
+              - generic [ref=e282]: AD
+              - generic [ref=e283]:
+                - generic [ref=e284]: ACC GIẢNG VIÊN DEMO
+                - generic [ref=e285]:
+                  - generic [ref=e286]: GV-3
+                  - generic [ref=e287]: •
+                  - generic [ref=e288]: Bộ môn Văn học Việt Nam
+            - generic [ref=e289]:
+              - generic [ref=e290]:
+                - generic [ref=e291]: Mã giảng viên
+                - generic [ref=e292]: GV-3
+              - generic [ref=e293]:
+                - generic [ref=e294]: Đơn vị công tác
+                - generic [ref=e295]: Bộ môn Văn học Việt Nam
+              - generic [ref=e296]:
+                - generic [ref=e297]: Họ và tên
+                - generic [ref=e298]: ACC GIẢNG VIÊN DEMO
+              - generic [ref=e299]:
+                - generic [ref=e300]: Ngày sinh
+                - generic [ref=e301]: —
+              - generic [ref=e302]:
+                - generic [ref=e303]: Giới tính
+                - generic [ref=e304]: Khác
+              - generic [ref=e305]:
+                - generic [ref=e306]: Chức danh nghề nghiệp
+                - generic [ref=e307]: —
+              - generic [ref=e308]:
+                - generic [ref=e309]: Loại cán bộ
+                - generic [ref=e310]: Cơ hữu
+              - generic [ref=e311]:
+                - generic [ref=e312]: Tình trạng công tác
+                - generic [ref=e313]: Đang công tác
+          - generic [ref=e314]:
+            - generic [ref=e315]:
+              - generic [ref=e316]:
+                - generic [ref=e317]: Thông tin liên hệ
+                - paragraph [ref=e318]: Bạn có thể cập nhật email cá nhân, số điện thoại, địa chỉ và các liên kết hồ sơ.
+              - button "Chỉnh sửa" [ref=e320]:
+                - img [ref=e321]
+                - text: Chỉnh sửa
+            - generic [ref=e325]:
+              - generic [ref=e326]:
+                - generic [ref=e328]:
+                  - img [ref=e329]
+                  - generic [ref=e332]:
+                    - generic [ref=e333]: Email công vụ
+                    - link "giangvien@hcmue.edu.vn" [ref=e334] [cursor=pointer]:
+                      - /url: mailto:giangvien@hcmue.edu.vn
+                - generic [ref=e336]:
+                  - img [ref=e337]
+                  - generic [ref=e340]:
+                    - generic [ref=e341]: Email cá nhân
+                    - generic [ref=e342]: —
+              - generic [ref=e343]:
+                - generic [ref=e345]:
+                  - img [ref=e346]
+                  - generic [ref=e348]:
+                    - generic [ref=e349]: Số điện thoại
+                    - generic [ref=e350]: —
+                - generic [ref=e352]:
+                  - img [ref=e353]
+                  - generic [ref=e356]:
+                    - generic [ref=e357]: Địa chỉ liên hệ
+                    - generic [ref=e358]: —
+              - generic [ref=e359]:
+                - generic [ref=e361]:
+                  - img [ref=e362]
+                  - generic [ref=e365]:
+                    - generic [ref=e366]: Website cá nhân
+                    - generic [ref=e367]: —
+                - generic [ref=e369]:
+                  - img [ref=e370]
+                  - generic [ref=e374]:
+                    - generic [ref=e375]: Google Scholar
+                    - generic [ref=e376]: —
+              - generic [ref=e379]:
+                - img [ref=e380]
+                - generic [ref=e383]:
+                  - generic [ref=e384]: ORCID
+                  - generic [ref=e385]: —
+          - generic [ref=e387]:
+            - generic [ref=e388]:
+              - generic [ref=e389]:
+                - generic [ref=e390]: Hồ sơ khoa học
+                - paragraph [ref=e391]: Trình độ, lĩnh vực nghiên cứu và ngoại ngữ.
+              - button "Chỉnh sửa" [ref=e393]:
+                - img [ref=e394]
+                - text: Chỉnh sửa
+            - generic [ref=e397]:
+              - generic [ref=e398]:
+                - generic [ref=e399]:
+                  - img [ref=e400]
+                  - generic [ref=e403]: Trình độ & học hàm
+                - generic [ref=e404]:
+                  - generic [ref=e405]:
+                    - generic [ref=e406]: Badge
+                    - generic [ref=e408]: —
+                  - generic [ref=e409]:
+                    - generic [ref=e410]: Năm ghi nhận
+                    - generic [ref=e411]: "Học vị: — •Học hàm: —"
+                  - generic [ref=e412]:
+                    - generic [ref=e413]: Trình độ / ngành đào tạo
+                    - generic [ref=e414]: — • —
+              - generic [ref=e415]:
+                - generic [ref=e416]:
+                  - img [ref=e417]
+                  - generic [ref=e419]: Lĩnh vực nghiên cứu
+                - generic [ref=e420]:
+                  - generic [ref=e421]:
+                    - generic [ref=e422]: Lĩnh vực chính
+                    - generic [ref=e423]: —
+                  - generic [ref=e424]:
+                    - generic [ref=e425]: Lĩnh vực phụ
+                    - generic [ref=e426]: —
+                  - generic [ref=e427]:
+                    - generic [ref=e428]: Từ khóa (keywords)
+                    - generic [ref=e430]: —
+              - generic [ref=e431]:
+                - generic [ref=e432]:
+                  - img [ref=e433]
+                  - generic [ref=e437]: Ngoại ngữ
+                - table [ref=e439]:
+                  - rowgroup [ref=e440]:
+                    - row "Ngoại ngữ Trình độ" [ref=e441]:
+                      - columnheader "Ngoại ngữ" [ref=e442]
+                      - columnheader "Trình độ" [ref=e443]
+                  - rowgroup [ref=e444]:
+                    - row "Chưa có ngoại ngữ nào." [ref=e445]:
+                      - cell "Chưa có ngoại ngữ nào." [ref=e446]
+          - generic [ref=e447]:
+            - generic [ref=e448]:
+              - generic [ref=e449]:
+                - generic [ref=e450]: Công trình khoa học
+                - paragraph [ref=e451]: Chỉ hiển thị công trình đã duyệt (read-only).
+              - button "Kê khai mới" [ref=e453]:
+                - img [ref=e454]
+                - text: Kê khai mới
+            - generic [ref=e455]:
+              - button "Bài báo khoa học 0" [ref=e456]:
+                - img [ref=e457]
+                - text: Bài báo khoa học
+                - generic [ref=e460]: "0"
+              - button "Đề tài nghiên cứu 0" [ref=e461]:
+                - img [ref=e462]
+                - text: Đề tài nghiên cứu
+                - generic [ref=e464]: "0"
+              - button "Sách / Giáo trình 0" [ref=e465]:
+                - img [ref=e466]
+                - text: Sách / Giáo trình
+                - generic [ref=e468]: "0"
+              - button "Báo cáo hội thảo 0" [ref=e469]:
+                - img [ref=e470]
+                - text: Báo cáo hội thảo
+                - generic [ref=e473]: "0"
+            - table [ref=e476]:
+              - rowgroup [ref=e477]:
+                - row "Tên công trình Thông tin Năm Vai trò Hành động" [ref=e478]:
+                  - columnheader "Tên công trình" [ref=e479]
+                  - columnheader "Thông tin" [ref=e480]
+                  - columnheader "Năm" [ref=e481]
+                  - columnheader "Vai trò" [ref=e482]
+                  - columnheader "Hành động" [ref=e483]
+              - rowgroup [ref=e484]:
+                - row "Bạn chưa có bài báo khoa học đã duyệt. Đi tới trang kê khai" [ref=e485]:
+                  - cell "Bạn chưa có bài báo khoa học đã duyệt. Đi tới trang kê khai" [ref=e486]:
+                    - text: Bạn chưa có bài báo khoa học đã duyệt.
+                    - button "Đi tới trang kê khai" [ref=e488]:
+                      - img [ref=e489]
+                      - text: Đi tới trang kê khai
