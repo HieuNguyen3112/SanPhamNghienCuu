@@ -363,56 +363,14 @@ import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback
 import PublicResearchDrawer from "@/features/public-research/components/PublicResearchDrawer.vue";
 import { loadPublicResearchItemsService } from "@/features/public-research/services/publicResearchService";
 import type { PublicResearchItem } from "@/features/public-research/models/publicResearchModels";
+import {
+  fetchPublicLecturerDetail,
+  type PublicLecturerDetailRes as DetailRes,
+} from "@/features/search/api/publicLecturersApi";
 
 import PublicHomeTopHeader from "@/features/search/components/PublicHomeTopHeader.vue";
 import PublicHomeNavBar from "@/features/search/components/PublicHomeNavBar.vue";
 import PublicHomeFooter from "@/features/search/components/PublicHomeFooter.vue";
-
-type DetailRes = {
-  success: boolean;
-  data: {
-    lecturer: {
-      id: number;
-      code: string;
-      full_name: string;
-      department_name: string | null;
-      degree_name: string | null;
-      academic_rank_name: string | null;
-      email?: string | null;
-      phone?: string | null;
-    };
-    profile: {
-      gender?: string | null;
-      date_of_birth?: string | null;
-      address?: string | null;
-      current_position?: string | null;
-      current_unit?: string | null;
-      research_area?: string | null;
-      teaching_specialization?: string | null;
-      personal_email?: string | null;
-    } | null;
-    research_works: {
-      counts_by_kind: {
-        paper: number;
-        project: number;
-        conference: number;
-        book_only: number;
-        textbook: number;
-        total: number;
-      };
-    };
-    work_histories: Array<any>;
-    educations: Array<any>;
-  };
-};
-
-async function fetchLecturerDetail(code: string): Promise<DetailRes> {
-  const res = await fetch(`/api/public/lecturers/${encodeURIComponent(code)}`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
 
 const route = useRoute();
 const userStore = useUserStore();
@@ -511,7 +469,7 @@ onMounted(async () => {
   loading.value = true;
   error.value = null;
   try {
-    const res = await fetchLecturerDetail(lecturerCode.value);
+    const res = await fetchPublicLecturerDetail(lecturerCode.value);
     lecturer.value = res.data.lecturer;
     profile.value = res.data.profile;
     workHistories.value = res.data.work_histories ?? [];

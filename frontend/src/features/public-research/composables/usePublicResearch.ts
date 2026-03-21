@@ -8,6 +8,7 @@ import type {
 import type { PublicResearchListQueryDto } from "../dto/publicResearchDtos";
 import { loadPublicResearchItemsService } from "../services/publicResearchService";
 import { fetchPublicResearchLookupsApi } from "../api/publicResearchLookupsApi";
+import { fetchPublicLecturers } from "@/features/search/api/publicLecturersApi";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -27,45 +28,13 @@ type PublicResearchOverviewStats = {
   conferenceCount: number;
 };
 
-type PublicLecturerListRes = {
-  success: boolean;
-  data: {
-    items: unknown[];
-    pagination: {
-      page: number;
-      per_page: number;
-      total: number;
-      last_page: number;
-    };
-  };
-};
-
 async function fetchPublicLecturerTotal(): Promise<number> {
-  const sp = new URLSearchParams();
-  sp.set("page", "1");
-  sp.set("per_page", "1");
-
-  const url = `/api/public/lecturers?${sp.toString()}`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { Accept: "application/json" },
+  const response = await fetchPublicLecturers({
+    page: 1,
+    per_page: 1,
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.error("fetchPublicLecturerTotal failed:", {
-      url,
-      status: res.status,
-      body: text,
-    });
-    throw new Error(text || `HTTP ${res.status}`);
-  }
-
-  const json = (await res.json()) as PublicLecturerListRes;
-  console.log("fetchPublicLecturerTotal success:", json);
-
-  return Number(json.data?.pagination?.total ?? 0);
+  return Number(response.data?.pagination?.total ?? 0);
 }
 
 export function usePublicResearch() {
