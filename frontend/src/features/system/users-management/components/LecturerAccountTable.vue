@@ -1,7 +1,7 @@
 <!-- File: src/features/lecturer-account-management/components/LecturerAccountTable.vue -->
 <template>
   <div
-    class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
   >
     <div v-if="loading" class="p-4 text-sm text-slate-700">
       Đang tải danh sách...
@@ -26,8 +26,12 @@
     </div>
 
     <!-- Table scroll -->
-    <div v-else class="max-h-[620px] overflow-auto" @scroll="closeMenu">
-      <table class="min-w-full text-left text-sm">
+    <div
+      v-else
+      class="max-h-[620px] overflow-x-auto overflow-y-auto"
+      @scroll="closeMenu"
+    >
+      <table class="min-w-[980px] w-full text-left text-sm xl:min-w-full">
         <thead
           class="sticky top-0 z-10 bg-slate-50 text-xs font-semibold text-slate-600"
         >

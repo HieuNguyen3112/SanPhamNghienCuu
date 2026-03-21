@@ -2,8 +2,8 @@
   <div
     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
   >
-    <div class="grid gap-3 md:items-end" :class="controlGridClassName">
-      <div>
+    <div class="grid gap-3 lg:items-end" :class="controlGridClassName">
+      <div class="min-w-0">
         <label class="text-xs font-medium text-slate-600">Từ khóa</label>
         <div class="relative mt-1">
           <Search
@@ -32,7 +32,7 @@
         </div>
       </div>
 
-      <div v-if="showUnitFilter" ref="unitMenuWrapRef">
+      <div v-if="showUnitFilter" ref="unitMenuWrapRef" class="min-w-0">
         <label class="text-xs font-medium text-slate-600">{{
           unitLabel
         }}</label>
@@ -130,7 +130,7 @@
         </div>
       </div>
 
-      <div ref="statusMenuWrapRef">
+      <div ref="statusMenuWrapRef" class="min-w-0">
         <label class="text-xs font-medium text-slate-600">Trạng thái</label>
         <div class="relative mt-1">
           <button
@@ -196,7 +196,7 @@
         </div>
       </div>
 
-      <div ref="roleMenuWrapRef">
+      <div ref="roleMenuWrapRef" class="min-w-0">
         <label class="text-xs font-medium text-slate-600">Vai trò</label>
 
         <div class="relative mt-1">
@@ -298,10 +298,12 @@
         </div>
       </div>
 
-      <div class="flex items-end justify-end gap-2">
+      <div
+        class="flex flex-wrap items-stretch gap-2 md:col-span-2 xl:col-span-1 xl:justify-end"
+      >
         <button
           type="button"
-          class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 sm:flex-none"
           :disabled="loading"
           @click="emit('reset')"
         >
@@ -311,7 +313,7 @@
 
         <button
           type="button"
-          class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+          class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60 sm:flex-none"
           :disabled="loading"
           @click="emit('search')"
         >
@@ -430,8 +432,8 @@ const roleSummaryText = computed(() => {
 
 const controlGridClassName = computed(() => {
   return showUnitFilter.value
-    ? "grid-cols-1 md:grid-cols-[2.6fr_1.6fr_1.1fr_1.4fr_auto]"
-    : "grid-cols-1 md:grid-cols-[3.2fr_1.2fr_1.6fr_auto]";
+    ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(0,2.4fr)_minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,1.35fr)_auto]"
+    : "grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_auto]";
 });
 
 function update<K extends keyof LecturerAccountFilterState>(
