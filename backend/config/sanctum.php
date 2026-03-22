@@ -2,6 +2,63 @@
 
 use Laravel\Sanctum\Sanctum;
 
+$normalizeStatefulDomain = static function (?string $value): ?string {
+    $value = trim((string) $value);
+
+    if ($value === '') {
+        return null;
+    }
+
+    if (str_contains($value, '://')) {
+        $parts = parse_url($value);
+
+        if ($parts === false || ! isset($parts['host'])) {
+            return null;
+        }
+
+        return isset($parts['port'])
+            ? $parts['host'] . ':' . $parts['port']
+            : $parts['host'];
+    }
+
+    $value = trim($value, '/');
+
+    if (str_contains($value, '/')) {
+        $value = explode('/', $value, 2)[0];
+    }
+
+    return $value !== '' ? $value : null;
+};
+
+$defaultStatefulDomains = [
+    'localhost',
+    'localhost:3000',
+    'localhost:5173',
+    '127.0.0.1',
+    '127.0.0.1:8000',
+    '127.0.0.1:5173',
+    '::1',
+    'spa.example.test',
+];
+
+$configuredStatefulDomains = array_filter(array_map(
+    $normalizeStatefulDomain,
+    explode(',', env('SANCTUM_STATEFUL_DOMAINS', ''))
+));
+
+foreach ([env('FRONTEND_URL', ''), env('APP_URL', ''), Sanctum::currentApplicationUrlWithPort()] as $candidate) {
+    $normalizedCandidate = $normalizeStatefulDomain($candidate);
+
+    if ($normalizedCandidate !== null) {
+        $configuredStatefulDomains[] = $normalizedCandidate;
+    }
+}
+
+$statefulDomains = array_values(array_unique(array_merge(
+    $defaultStatefulDomains,
+    $configuredStatefulDomains,
+)));
+
 return [
 
     /*
@@ -15,11 +72,7 @@ return [
     |
     */
 
-    'stateful' => array_filter(array_map('trim', explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,localhost:5173,127.0.0.1,127.0.0.1:8000,127.0.0.1:5173,::1,spa.example.test',
-        Sanctum::currentApplicationUrlWithPort()
-    ))))),
+    'stateful' => $statefulDomains,
 
     /*
     |--------------------------------------------------------------------------

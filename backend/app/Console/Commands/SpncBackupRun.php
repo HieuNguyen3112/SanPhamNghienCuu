@@ -63,6 +63,7 @@ class SpncBackupRun extends Command
                 'trigger' => $trigger,
                 'requested_by_user_id' => $initiatedBy,
                 'requested_at' => now()->toIso8601String(),
+                'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
             ]);
         } else {
             $this->stateStore->update($runId, [
@@ -153,6 +154,7 @@ class SpncBackupRun extends Command
                     'trigger' => $trigger,
                     'requested_by_user_id' => $initiatedBy,
                     'requested_at' => now()->toIso8601String(),
+                    'launcher_log_relative_path' => $this->launcher->logRelativePath($postProcessRunId),
                     'parent_run_id' => $runId,
                     'snapshot_id' => $snapshotId,
                     'message' => 'Đã xếp lịch hoàn thiện export sao lưu.',

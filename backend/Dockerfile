@@ -4,6 +4,8 @@ RUN apt-get update && apt-get install -y \
     git \
     unzip \
     curl \
+    restic \
+    rclone \
     libpq-dev \
     libzip-dev \
     libfreetype6-dev \

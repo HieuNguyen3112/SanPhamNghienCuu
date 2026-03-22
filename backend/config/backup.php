@@ -31,9 +31,9 @@ return [
     ],
 
     'network' => [
-        'http_proxy' => env('SPNC_BACKUP_HTTP_PROXY', env('HTTP_PROXY', '')),
-        'https_proxy' => env('SPNC_BACKUP_HTTPS_PROXY', env('HTTPS_PROXY', '')),
-        'no_proxy' => env('SPNC_BACKUP_NO_PROXY', env('NO_PROXY', '')),
+        'http_proxy' => env('SPNC_BACKUP_HTTP_PROXY', ''),
+        'https_proxy' => env('SPNC_BACKUP_HTTPS_PROXY', ''),
+        'no_proxy' => env('SPNC_BACKUP_NO_PROXY', ''),
     ],
 
     'mysql' => [

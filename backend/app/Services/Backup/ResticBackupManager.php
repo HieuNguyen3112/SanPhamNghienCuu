@@ -435,13 +435,20 @@ class ResticBackupManager
     {
         $repository = trim((string) config('backup.restic.repository', ''));
         $destination = $this->deriveExportDestination($repository);
+        $readiness = $this->buildReadinessReport();
 
         return [
             'enabled' => (bool) config('backup.exports.enabled', true),
             'repository' => $repository,
             'repository_type' => $destination['repository_type'],
-            'export_root' => $destination['display_root'],
+            'export_root' => ($destination['valid'] ?? false) ? ($destination['display_root'] ?? null) : null,
             'export_folder_name' => (string) config('backup.exports.folder_name', 'exports'),
+            'available' => (bool) ($destination['valid'] ?? false),
+            'error_code' => $destination['error_code'] ?? null,
+            'error_message' => $destination['error_message'] ?? null,
+            'repository_env_configured' => (bool) ($readiness['repository_env_configured'] ?? false),
+            'runtime_ready' => (bool) ($readiness['runtime_ready'] ?? false),
+            'ready_for_operations' => (bool) ($readiness['ready_for_operations'] ?? false),
             'note' => "Th\u{01B0} m\u{1EE5}c restic-repo gi\u{1EEF} l\u{1EDB}p sao l\u{01B0}u k\u{1EF9} thu\u{1EAD}t. L\u{1EDB}p exports ch\u{1EC9} ch\u{1EE9}a README.txt, tong-quan.json, database/, cong-trinh/, giang-vien/ v\u{00E0} _he-thong/.",
         ];
     }
@@ -642,6 +649,93 @@ class ResticBackupManager
             'keep_last' => max(1, (int) config('backup.retention.keep_last', 12)),
             'keep_weekly' => max(1, (int) config('backup.retention.keep_weekly', 8)),
             'keep_monthly' => max(1, (int) config('backup.retention.keep_monthly', 6)),
+        ];
+    }
+
+    public function buildReadinessReport(): array
+    {
+        $repository = trim((string) config('backup.restic.repository', ''));
+        $passwordSet = trim((string) config('backup.restic.password', '')) !== '';
+        $resticEnv = $this->resticEnv();
+        $backupConfig = $this->doctorBackupConfig($resticEnv);
+        $destination = $this->deriveExportDestination($repository);
+
+        $repositoryType = (string) ($destination['repository_type'] ?? 'unknown');
+        $requiresRclone = $repositoryType === 'rclone' || (($destination['target_type'] ?? null) === 'rclone');
+        $resticBinaryOk = (bool) (($backupConfig['restic_binary']['exists'] ?? false) === true);
+        $rcloneBinaryOk = ! $requiresRclone || (bool) (($backupConfig['rclone_binary']['exists'] ?? false) === true);
+        $rcloneConfigOk = ! $requiresRclone || (bool) (($backupConfig['rclone_config']['readable'] ?? false) === true);
+        $repositoryEnvConfigured = $repository !== '' && $passwordSet;
+        $runtimeReady = $resticBinaryOk && $rcloneBinaryOk && $rcloneConfigOk;
+
+        $blockingIssues = [];
+
+        if ($repository === '') {
+            $blockingIssues[] = [
+                'code' => 'BACKUP_REPOSITORY_MISSING',
+                'message' => 'Thiếu SPNC_BACKUP_REPOSITORY nên hệ thống chưa xác định được repository backup.',
+            ];
+        }
+
+        if (! $passwordSet) {
+            $blockingIssues[] = [
+                'code' => 'BACKUP_PASSWORD_MISSING',
+                'message' => 'Thiếu SPNC_BACKUP_PASSWORD nên không thể truy cập repository restic.',
+            ];
+        }
+
+        if (! $resticBinaryOk) {
+            $blockingIssues[] = [
+                'code' => 'RESTIC_BINARY_INVALID',
+                'message' => 'Không tìm thấy restic binary trong runtime hiện tại.',
+            ];
+        }
+
+        if ($requiresRclone && ! $rcloneBinaryOk) {
+            $blockingIssues[] = [
+                'code' => 'RCLONE_BINARY_INVALID',
+                'message' => 'Không tìm thấy rclone binary trong runtime hiện tại.',
+            ];
+        }
+
+        if ($requiresRclone && ! $rcloneConfigOk) {
+            $blockingIssues[] = [
+                'code' => 'RCLONE_CONFIG_INVALID',
+                'message' => 'Không đọc được tệp rclone.conf dùng cho backup.',
+            ];
+        }
+
+        if (! ($destination['valid'] ?? false)) {
+            $blockingIssues[] = [
+                'code' => (string) ($destination['error_code'] ?? 'EXPORT_TARGET_INVALID'),
+                'message' => (string) ($destination['error_message'] ?? 'Không suy ra được đích export từ cấu hình backup hiện tại.'),
+            ];
+        }
+
+        return [
+            'repository_env_configured' => $repositoryEnvConfigured,
+            'runtime_ready' => $runtimeReady,
+            'ready_for_operations' => $repositoryEnvConfigured && $runtimeReady && (bool) ($destination['valid'] ?? false),
+            'repository' => [
+                'value' => $repository !== '' ? $repository : null,
+                'type' => $repositoryType !== 'unknown' ? $repositoryType : null,
+                'password_set' => $passwordSet,
+            ],
+            'runtime' => [
+                'restic_binary' => $backupConfig['restic_binary'] ?? null,
+                'rclone_binary' => $backupConfig['rclone_binary'] ?? null,
+                'rclone_config' => $backupConfig['rclone_config'] ?? null,
+                'rclone_program' => $backupConfig['rclone_program'] ?? null,
+            ],
+            'export_destination' => [
+                'valid' => (bool) ($destination['valid'] ?? false),
+                'repository_type' => $destination['repository_type'] ?? null,
+                'target_type' => $destination['target_type'] ?? null,
+                'display_root' => ($destination['valid'] ?? false) ? ($destination['display_root'] ?? null) : null,
+                'error_code' => $destination['error_code'] ?? null,
+                'error_message' => $destination['error_message'] ?? null,
+            ],
+            'blocking_issues' => $blockingIssues,
         ];
     }
 
@@ -1213,6 +1307,11 @@ class ResticBackupManager
         ?\DateTimeInterface $generatedAt = null
     ): array {
         $destination = $this->deriveExportDestination((string) config('backup.restic.repository', ''));
+        if (! ($destination['valid'] ?? false)) {
+            throw new BackupRuntimeException(
+                (string) ($destination['error_message'] ?? 'Không suy ra được đích export từ cấu hình backup hiện tại.')
+            );
+        }
         $generatedAt ??= now();
         $folderName = $this->buildFriendlyExportFolderName($generatedAt, $snapshotId);
 
@@ -2560,23 +2659,57 @@ class ResticBackupManager
         }
 
         $configuredTarget = trim((string) config('backup.exports.target', ''));
+        $repositoryType = str_starts_with(Str::lower($repository), 'rclone:')
+            ? 'rclone'
+            : ($repository !== '' ? 'local' : 'unknown');
+
         if ($configuredTarget !== '') {
             if (str_starts_with(Str::lower($configuredTarget), 'rclone:')) {
                 $raw = trim((string) Str::after($configuredTarget, 'rclone:'));
+                if ($raw === '') {
+                    return [
+                        'valid' => false,
+                        'repository_type' => $repositoryType,
+                        'target_type' => 'rclone',
+                        'target_root' => null,
+                        'display_root' => null,
+                        'error_code' => 'EXPORT_TARGET_INVALID',
+                        'error_message' => 'SPNC_BACKUP_EXPORT_TARGET đang để dạng rclone nhưng thiếu remote/path.',
+                    ];
+                }
+
                 return [
-                    'repository_type' => str_starts_with(Str::lower($repository), 'rclone:') ? 'rclone' : 'local',
+                    'valid' => true,
+                    'repository_type' => $repositoryType,
                     'target_type' => 'rclone',
                     'target_root' => $raw,
                     'display_root' => 'rclone:' . $raw,
+                    'error_code' => null,
+                    'error_message' => null,
                 ];
             }
 
             $absolute = $this->resolveAbsolutePath($configuredTarget);
             return [
-                'repository_type' => str_starts_with(Str::lower($repository), 'rclone:') ? 'rclone' : 'local',
+                'valid' => true,
+                'repository_type' => $repositoryType,
                 'target_type' => 'local',
                 'target_root' => $absolute,
                 'display_root' => str_replace('\\', '/', $absolute),
+                'error_code' => null,
+                'error_message' => null,
+            ];
+        }
+
+        if ($repository === '') {
+            return [
+                'valid' => false,
+                'repository_type' => 'unknown',
+                'target_type' => null,
+                'target_root' => null,
+                'display_root' => null,
+                'error_code' => 'BACKUP_REPOSITORY_MISSING',
+                'error_message' => 'Thiếu SPNC_BACKUP_REPOSITORY nên chưa thể suy ra thư mục exports.',
             ];
         }
 
@@ -2597,12 +2730,25 @@ class ResticBackupManager
                 $root = $remoteName . ':' . $targetPath;
 
                 return [
+                    'valid' => true,
                     'repository_type' => 'rclone',
                     'target_type' => 'rclone',
                     'target_root' => $root,
                     'display_root' => 'rclone:' . $root,
+                    'error_code' => null,
+                    'error_message' => null,
                 ];
             }
+
+            return [
+                'valid' => false,
+                'repository_type' => 'rclone',
+                'target_type' => null,
+                'target_root' => null,
+                'display_root' => null,
+                'error_code' => 'RCLONE_REMOTE_INVALID',
+                'error_message' => 'SPNC_BACKUP_REPOSITORY đang ở dạng rclone nhưng không chứa remote hợp lệ.',
+            ];
         }
 
         $resolvedRepo = $this->resolveAbsolutePath($repository);
@@ -2610,10 +2756,13 @@ class ResticBackupManager
         $targetRoot = rtrim($repoParent, '/\\') . DIRECTORY_SEPARATOR . $folderName;
 
         return [
+            'valid' => true,
             'repository_type' => 'local',
             'target_type' => 'local',
             'target_root' => $targetRoot,
             'display_root' => str_replace('\\', '/', $targetRoot),
+            'error_code' => null,
+            'error_message' => null,
         ];
     }
 
@@ -3306,6 +3455,9 @@ class ResticBackupManager
         $httpProxy = trim((string) config('backup.network.http_proxy', ''));
         $httpsProxy = trim((string) config('backup.network.https_proxy', ''));
         $noProxy = trim((string) config('backup.network.no_proxy', ''));
+        if (($httpProxy !== '' || $httpsProxy !== '') && $noProxy === '') {
+            $noProxy = 'localhost,127.0.0.1,::1';
+        }
 
         if ($httpProxy !== '') {
             $env['HTTP_PROXY'] = $httpProxy;

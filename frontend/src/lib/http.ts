@@ -1,8 +1,13 @@
 import axios from "axios";
 
+const normalizeBaseUrl = (value?: string) => {
+  const rawValue = (value || "http://localhost:8000").trim();
+  return rawValue.replace(/\/+$/, "");
+};
+
 const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
-  withCredentials: true, // bắt buộc cho Sanctum cookie
+  baseURL: normalizeBaseUrl(import.meta.env.VITE_API_URL),
+  withCredentials: true, // Required for Sanctum session cookies.
   xsrfCookieName: "XSRF-TOKEN",
   xsrfHeaderName: "X-XSRF-TOKEN",
 });
@@ -15,7 +20,7 @@ const readCookie = (name: string) => {
 
 let csrfPromise: Promise<void> | null = null;
 
-// Axios chỉ tự thêm XSRF header cho same-origin; SPA chạy khác port nên cần tự gắn header.
+// Axios only auto-adds the XSRF header for same-origin requests, so attach it manually here.
 http.interceptors.request.use((config) => {
   const token = readCookie("XSRF-TOKEN");
   if (token) {
@@ -25,7 +30,7 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// Đảm bảo lấy CSRF cookie trước khi gửi POST/PUT/PATCH/DELETE
+// Ensure the SPA has a fresh CSRF cookie before mutating requests.
 export const getCsrfCookie = async () => {
   if (readCookie("XSRF-TOKEN")) return;
   if (csrfPromise) return csrfPromise;

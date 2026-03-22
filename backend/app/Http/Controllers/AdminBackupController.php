@@ -78,6 +78,7 @@ class AdminBackupController extends Controller
             $schedule = $this->backupManager->buildScheduleMeta();
             $scheduleRuntime = $this->latestScheduleRunSummary();
             $retention = $this->backupManager->buildRetentionMeta();
+            $readiness = $this->backupManager->buildReadinessReport();
             $exportOverview = $this->backupManager->buildExportOverview();
             $lastSuccess = $this->stateStore->latestSuccessfulBackup();
 
@@ -186,6 +187,9 @@ class AdminBackupController extends Controller
                 'snapshot_refresh',
                 'failed'
             );
+            $readinessIssue = $this->primaryReadinessIssue($readiness);
+            $repositoryError = $cacheLastError['user_message']
+                ?? ($readinessIssue['message'] ?? null);
 
             return response()->json([
                 'success' => true,
@@ -219,8 +223,13 @@ class AdminBackupController extends Controller
                         'restore' => 'Khi cần khôi phục, vui lòng dùng chức năng Khôi phục trong hệ thống.',
                     ],
                     'last_successful_backup_at' => $lastSuccess['finished_at'] ?? null,
-                    'repository_configured' => true,
-                    'repository_error' => $cacheLastError['user_message'],
+                    'repository_configured' => (bool) ($readiness['ready_for_operations'] ?? false),
+                    'repository_env_configured' => (bool) ($readiness['repository_env_configured'] ?? false),
+                    'runtime_ready' => (bool) ($readiness['runtime_ready'] ?? false),
+                    'repository_error' => $repositoryError,
+                    'repository_error_code' => $cacheLastError['error_code']
+                        ?? ($readinessIssue['code'] ?? null),
+                    'runtime_readiness' => $readiness,
                     'performance' => [
                         'served_in_ms' => $durationMs,
                     ],
@@ -239,8 +248,10 @@ class AdminBackupController extends Controller
     public function exportsInfo(Request $request)
     {
         try {
+            $readiness = $this->backupManager->buildReadinessReport();
             $overview = $this->backupManager->buildExportOverview();
             $openUrl = trim((string) config('backup.exports.open_url', ''));
+            $readinessIssue = $this->primaryReadinessIssue($readiness);
 
             return response()->json([
                 'success' => true,
@@ -250,6 +261,13 @@ class AdminBackupController extends Controller
                     'exports_drive_path' => $overview['export_root'] ?? null,
                     'exports_folder_name' => $overview['export_folder_name'] ?? 'exports',
                     'repository_type' => $overview['repository_type'] ?? null,
+                    'available' => (bool) ($overview['available'] ?? false),
+                    'error_code' => $overview['error_code'] ?? ($readinessIssue['code'] ?? null),
+                    'error_message' => $overview['error_message'] ?? ($readinessIssue['message'] ?? null),
+                    'repository_configured' => (bool) ($readiness['ready_for_operations'] ?? false),
+                    'repository_env_configured' => (bool) ($readiness['repository_env_configured'] ?? false),
+                    'runtime_ready' => (bool) ($readiness['runtime_ready'] ?? false),
+                    'runtime_readiness' => $readiness,
                     'open_url' => $openUrl !== '' ? $openUrl : null,
                     'note' => $overview['note'] ?? null,
                 ],
@@ -280,6 +298,7 @@ class AdminBackupController extends Controller
             'trigger' => 'manual',
             'requested_by_user_id' => $user ? (int) $user->id : null,
             'requested_at' => now()->toIso8601String(),
+            'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
             'message' => 'Đã xếp lịch chạy backup.',
         ]);
 
@@ -468,6 +487,7 @@ class AdminBackupController extends Controller
             'trigger' => 'manual',
             'requested_by_user_id' => $user ? (int) $user->id : null,
             'requested_at' => now()->toIso8601String(),
+            'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
             'message' => 'Đã xếp lịch dọn snapshot cũ.',
         ]);
 
@@ -563,6 +583,7 @@ class AdminBackupController extends Controller
             'trigger' => 'manual',
             'requested_by_user_id' => $user ? (int) $user->id : null,
             'requested_at' => now()->toIso8601String(),
+            'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
             'snapshot_id' => $snapshotId,
             'scope' => (string) $validated['scope'],
             'target' => (string) $validated['target'],
@@ -806,6 +827,7 @@ class AdminBackupController extends Controller
             'trigger' => 'manual',
             'requested_by_user_id' => $user ? (int) $user->id : null,
             'requested_at' => now()->toIso8601String(),
+            'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
             'snapshot_ids' => $snapshotIds,
             'message' => 'Đã xếp lịch xóa snapshot đã chọn.',
         ]);
@@ -1184,6 +1206,7 @@ class AdminBackupController extends Controller
         if ($includeTechnical) {
             $payload['error_message'] = $rawError !== '' ? $rawError : null;
             $payload['technical_message'] = $rawError !== '' ? $rawError : null;
+            $payload['launcher_log_relative_path'] = $run['launcher_log_relative_path'] ?? null;
             if (is_array($run['logs'] ?? null)) {
                 $payload['logs'] = $run['logs'];
             }
@@ -1212,6 +1235,22 @@ class AdminBackupController extends Controller
         return [
             'user_message' => $this->buildUserMessage($operation, $status, $errorCode, $raw),
             'error_code' => $errorCode,
+        ];
+    }
+
+    private function primaryReadinessIssue(array $readiness): ?array
+    {
+        $issues = is_array($readiness['blocking_issues'] ?? null)
+            ? array_values(array_filter($readiness['blocking_issues'], static fn ($item): bool => is_array($item)))
+            : [];
+
+        if ($issues === []) {
+            return null;
+        }
+
+        return [
+            'code' => $issues[0]['code'] ?? null,
+            'message' => $issues[0]['message'] ?? null,
         ];
     }
 
@@ -1288,6 +1327,18 @@ class AdminBackupController extends Controller
                 return 'Remote Google Drive spnc_gdrive không hợp lệ hoặc không tồn tại trong tệp rclone.conf dùng chung.';
             }
 
+            if ($errorCode === 'BACKUP_CONFIG_INVALID') {
+                return 'Cau hinh backup chua day du. Hay kiem tra repository va mat khau backup truoc khi thao tac.';
+            }
+
+            if ($errorCode === 'RESTIC_BINARY_INVALID') {
+                return 'Khong tim thay restic trong runtime hien tai. Hay kiem tra SPNC_BACKUP_RESTIC_BINARY hoac image deploy.';
+            }
+
+            if ($errorCode === 'EXPORT_TARGET_INVALID') {
+                return 'Khong suy ra duoc dich exports tu cau hinh repository hien tai. Hay kiem tra SPNC_BACKUP_REPOSITORY va SPNC_BACKUP_EXPORT_TARGET.';
+            }
+
             if ($errorCode === 'RUN_TIMEOUT') {
                 if ($fallbackMessage !== '' && ! $this->isTechnicalMessage($fallbackMessage)) {
                     return $fallbackMessage;
@@ -1343,6 +1394,18 @@ class AdminBackupController extends Controller
 
         if ($this->containsTimeoutHint($combined)) {
             return 'RUN_TIMEOUT';
+        }
+
+        if ($this->containsBackupConfigHint($combined)) {
+            return 'BACKUP_CONFIG_INVALID';
+        }
+
+        if ($this->containsResticBinaryHint($combined)) {
+            return 'RESTIC_BINARY_INVALID';
+        }
+
+        if ($this->containsExportTargetHint($combined)) {
+            return 'EXPORT_TARGET_INVALID';
         }
 
         if (
@@ -1443,6 +1506,39 @@ class AdminBackupController extends Controller
             'couldn\'t find root directory id',
             'could not find root directory id',
             'unknown backend',
+        ]);
+    }
+
+    private function containsBackupConfigHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'missing spnc_backup_repository',
+            'missing spnc_backup_password',
+            'backup repository is not configured',
+            'backup password is not configured',
+            'thieu spnc_backup_repository',
+            'thieu spnc_backup_password',
+        ]);
+    }
+
+    private function containsResticBinaryHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'khong tim thay restic binary',
+            'không tìm thấy restic binary',
+            'restic binary',
+            'spnc_backup_restic_binary',
+        ]);
+    }
+
+    private function containsExportTargetHint(string $normalized): bool
+    {
+        return Str::contains($normalized, [
+            'khong suy ra duoc dich export',
+            'không suy ra được đích export',
+            'spnc_backup_export_target',
+            'spnc_backup_repository dang o dang rclone nhung khong chua remote hop le',
+            'remote/path',
         ]);
     }
 
@@ -1565,6 +1661,7 @@ class AdminBackupController extends Controller
             'trigger' => $trigger,
             'requested_by_user_id' => $userId > 0 ? $userId : null,
             'requested_at' => now()->toIso8601String(),
+            'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
             'message' => 'Đã xếp lịch làm mới danh sách snapshot.',
         ]);
 
@@ -1596,9 +1693,3 @@ class AdminBackupController extends Controller
         return ['run_id' => $runId];
     }
 }
-
-
-
-
-
-

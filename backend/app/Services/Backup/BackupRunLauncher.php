@@ -2,6 +2,8 @@
 
 namespace App\Services\Backup;
 
+use Illuminate\Support\Facades\File;
+
 class BackupRunLauncher
 {
     public function launch(string $runId, int $initiatedByUserId, string $trigger = 'manual'): void
@@ -110,8 +112,6 @@ class BackupRunLauncher
             throw new BackupRuntimeException('Danh sách snapshot cần xóa không hợp lệ.');
         }
 
-        // Không truyền danh sách snapshot qua CLI khi chạy detached để tránh lỗi parse tham số
-        // trên môi trường Windows; command sẽ đọc lại snapshot_ids từ run-state đã được API ghi sẵn.
         $this->runDetached('spnc:backup:forget', [
             '--run-id' => $runId,
             '--trigger' => $trigger,
@@ -120,11 +120,29 @@ class BackupRunLauncher
         ]);
     }
 
+    public function logRelativePath(string $runId): string
+    {
+        $this->assertSafeRunId($runId);
+
+        $stateDir = trim((string) config('backup.paths.state_dir', 'backup-runs'), "/\\");
+        if ($stateDir === '') {
+            $stateDir = 'backup-runs';
+        }
+
+        return $stateDir . '/launcher-logs/' . $runId . '.log';
+    }
+
     private function runDetached(string $artisanCommand, array $options): void
     {
         if (! preg_match('/^[a-z0-9:\-]+$/', $artisanCommand)) {
             throw new BackupRuntimeException('Lệnh backup nền không hợp lệ.');
         }
+
+        $runId = trim((string) ($options['--run-id'] ?? ''));
+        if ($runId === '') {
+            throw new BackupRuntimeException('Thiếu run ID cho tiến trình backup nền.');
+        }
+        $this->assertSafeRunId($runId);
 
         $php = escapeshellarg(PHP_BINARY);
         $artisan = escapeshellarg(base_path('artisan'));
@@ -165,8 +183,12 @@ class BackupRunLauncher
         }
 
         $argString = implode(' ', $parts);
+        $logPath = $this->ensureLogFile($runId);
+        $logTarget = escapeshellarg($logPath);
+        $this->writeLaunchMarker($logPath, $artisanCommand, $argString);
+
         if (DIRECTORY_SEPARATOR === '\\') {
-            $cmd = 'start "" /B ' . $argString . ' > NUL 2>&1';
+            $cmd = 'start "" /B ' . $argString . ' >> ' . $logTarget . ' 2>&1';
             $handle = @popen('cmd /C ' . $cmd, 'r');
             if ($handle === false) {
                 throw new BackupRuntimeException('Không thể khởi chạy tác vụ backup nền.');
@@ -175,11 +197,39 @@ class BackupRunLauncher
             return;
         }
 
-        $cmd = $argString . ' > /dev/null 2>&1 &';
+        $cmd = $argString . ' >> ' . $logTarget . ' 2>&1 &';
         @exec($cmd, $output, $exitCode);
         if ($exitCode !== 0) {
             throw new BackupRuntimeException('Không thể khởi chạy tác vụ backup nền.');
         }
+    }
+
+    private function ensureLogFile(string $runId): string
+    {
+        $absolutePath = storage_path('app' . DIRECTORY_SEPARATOR . str_replace(
+            ['/', '\\'],
+            DIRECTORY_SEPARATOR,
+            $this->logRelativePath($runId)
+        ));
+
+        File::ensureDirectoryExists(dirname($absolutePath));
+        if (! File::exists($absolutePath)) {
+            File::put($absolutePath, '');
+        }
+
+        return $absolutePath;
+    }
+
+    private function writeLaunchMarker(string $logPath, string $artisanCommand, string $commandLine): void
+    {
+        $lines = [
+            '[' . now()->toIso8601String() . '] launch ' . $artisanCommand,
+            'command: ' . $commandLine,
+            'php_binary: ' . PHP_BINARY,
+            str_repeat('-', 72),
+        ];
+
+        File::append($logPath, implode(PHP_EOL, $lines) . PHP_EOL);
     }
 
     private function assertSafeRunId(string $runId): void

@@ -18,9 +18,12 @@ class AdminLecturerAccountController extends Controller
 {
     private const ASSIGNABLE_ROLE_KEYS = ['LECTURER', 'DEPARTMENT_BOARD'];
 
-    public function __construct(
-        private readonly CreateFacultyLecturerAccountService $createFacultyLecturerAccountService,
-    ) {}
+    private CreateFacultyLecturerAccountService $createFacultyLecturerAccountService;
+
+    public function __construct(CreateFacultyLecturerAccountService $createFacultyLecturerAccountService)
+    {
+        $this->createFacultyLecturerAccountService = $createFacultyLecturerAccountService;
+    }
 
     public function store(Request $request)
     {
