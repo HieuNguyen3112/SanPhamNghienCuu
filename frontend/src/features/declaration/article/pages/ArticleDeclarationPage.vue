@@ -1299,24 +1299,40 @@ function onJournalSelect(option: {
   website?: string | null;
   sourceName?: string | null;
   publisher?: string | null;
-  point?: number | null;
+  point?: number | string | null;
   classification?: string | null;
-  researchHours?: number;
+  researchHours?: number | string | null;
 }) {
+  const normalizedPoint =
+    option.point !== null &&
+    option.point !== undefined &&
+    Number.isFinite(Number(option.point))
+      ? Number(option.point)
+      : null;
+  const normalizedResearchHours =
+    option.researchHours !== null &&
+    option.researchHours !== undefined &&
+    Number.isFinite(Number(option.researchHours))
+      ? Number(option.researchHours)
+      : null;
+
   form.journalId = option.id;
   form.journalName = option.name;
   form.issn = option.issn ?? "";
-  form.journalResearchHours =
-    typeof option.researchHours === "number" ? option.researchHours : null;
+  form.journalResearchHours = normalizedResearchHours;
   form.journalScope = option.address ?? "";
   form.journalWebsite = option.website ?? "";
   form.journalSourceName = option.sourceName ?? "";
   form.journalPublisher = option.publisher ?? "";
-  form.workScore = typeof option.point === "number" ? option.point : null;
+  form.workScore = normalizedPoint;
 
-  selectedJournalClassification.value = option.classification ?? null;
+  selectedJournalClassification.value =
+    option.classification ??
+    deriveJournalCategory(form.issn, normalizedPoint ?? null);
   selectedJournalResearchHours.value =
-    typeof option.researchHours === "number" ? option.researchHours : null;
+    normalizedResearchHours ??
+    hoursFromClassification(selectedJournalClassification.value);
+  form.journalResearchHours = selectedJournalResearchHours.value;
 
   clearFieldError("journalName");
 }
@@ -1889,15 +1905,29 @@ async function searchJournals(q: string) {
   type JournalRow = Awaited<ReturnType<typeof search_journals>>[number];
   type JournalSelectOptionDto = JournalRow & {
     address: string;
-    point: string | number | null;
+    point: number | null;
+    researchHours: number | null;
+    classification: string | null;
   };
 
   const rows = await search_journals(q);
   return rows.map((r) => ({
     ...r,
     address: (r as any).address ?? "",
-    point:
-      (r as any).point ?? (r as any).point_max ?? (r as any).point_min ?? null,
+    point: Number.isFinite(Number((r as any).point))
+      ? Number((r as any).point)
+      : Number.isFinite(Number((r as any).point_max))
+        ? Number((r as any).point_max)
+        : Number.isFinite(Number((r as any).point_min))
+          ? Number((r as any).point_min)
+          : null,
+    classification:
+      typeof (r as any).classification === "string"
+        ? (r as any).classification
+        : null,
+    researchHours: Number.isFinite(Number((r as any).research_hours))
+      ? Number((r as any).research_hours)
+      : null,
   })) as JournalSelectOptionDto[];
 }
 
