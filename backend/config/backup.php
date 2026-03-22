@@ -6,8 +6,9 @@ return [
     | Backup Engine
     |--------------------------------------------------------------------------
     |
-    | SPNC ưu tiên restic + rclone vì có mã hóa phía client, deduplication và
-    | snapshot gia tăng phù hợp cho dữ liệu minh chứng dung lượng lớn.
+    | SPNC uses restic + rclone for encrypted snapshots and Drive-backed
+    | storage. Keep the environment contract explicit so local and production
+    | resolve the same runtime chain.
     |
     */
     'engine' => env('SPNC_BACKUP_ENGINE', 'restic'),
@@ -21,6 +22,14 @@ return [
         'rclone_config_path' => env(
             'SPNC_RCLONE_CONFIG',
             env('SPNC_BACKUP_RCLONE_CONFIG', 'storage/app/rclone/rclone.conf')
+        ),
+        'rclone_service_account_file' => env(
+            'SPNC_RCLONE_SERVICE_ACCOUNT_FILE',
+            env('SPNC_BACKUP_RCLONE_SERVICE_ACCOUNT_FILE', '')
+        ),
+        'rclone_drive_impersonate' => env(
+            'SPNC_RCLONE_DRIVE_IMPERSONATE',
+            env('SPNC_BACKUP_RCLONE_DRIVE_IMPERSONATE', '')
         ),
     ],
 
@@ -36,19 +45,24 @@ return [
         'no_proxy' => env('SPNC_BACKUP_NO_PROXY', ''),
     ],
 
+    'database' => [
+        'connection' => env('SPNC_BACKUP_DB_CONNECTION', env('DB_CONNECTION', 'mysql')),
+    ],
+
     'mysql' => [
         'mysqldump_binary' => env('SPNC_BACKUP_MYSQLDUMP_BINARY', 'mysqldump'),
         'mysql_binary' => env('SPNC_BACKUP_MYSQL_BINARY', 'mysql'),
+    ],
+
+    'pgsql' => [
+        'pg_dump_binary' => env('SPNC_BACKUP_PG_DUMP_BINARY', 'pg_dump'),
+        'psql_binary' => env('SPNC_BACKUP_PSQL_BINARY', 'psql'),
     ],
 
     /*
     |--------------------------------------------------------------------------
     | Backup Scope
     |--------------------------------------------------------------------------
-    |
-    | include: dữ liệu nhạy cảm bắt buộc sao lưu.
-    | exclude: dữ liệu tạm/cache/log không cần đưa lên cloud.
-    |
     */
     'paths' => [
         'include' => array_values(array_filter(array_map(
@@ -71,17 +85,15 @@ return [
         'sync_to_drive' => filter_var(env('SPNC_BACKUP_EXPORT_SYNC_TO_DRIVE', true), FILTER_VALIDATE_BOOL),
         'pdf_enabled' => filter_var(env('SPNC_BACKUP_EXPORT_PDF_ENABLED', true), FILTER_VALIDATE_BOOL),
         'folder_name' => env('SPNC_BACKUP_EXPORT_FOLDER_NAME', 'exports'),
-        // Cho phép override đích export. Ví dụ:
-        // - rclone:drive:spnc-backups/exports
-        // - C:\\mount\\spnc-backups\\exports
-        // Để trống -> tự suy ra từ SPNC_BACKUP_REPOSITORY.
+        // Optional override for the readable export destination.
+        // Leave empty to derive from SPNC_BACKUP_REPOSITORY.
         'target' => env('SPNC_BACKUP_EXPORT_TARGET', ''),
         'local_dir' => env('SPNC_BACKUP_EXPORT_LOCAL_DIR', 'backup-exports/items'),
         'index_file' => env('SPNC_BACKUP_EXPORT_INDEX_FILE', 'backup-exports/index.json'),
     ],
 
     'snapshot_cache' => [
-        // Danh sach snapshot duoc cache de API list khong goi restic moi request.
+        // Cache snapshot metadata so the API does not call restic on every request.
         'max_items' => max(10, (int) env('SPNC_BACKUP_SNAPSHOT_CACHE_MAX_ITEMS', 200)),
         'stale_after_seconds' => max(30, (int) env('SPNC_BACKUP_SNAPSHOT_CACHE_STALE_SECONDS', 900)),
         'refresh_timeout_seconds' => max(60, (int) env('SPNC_BACKUP_SNAPSHOT_REFRESH_TIMEOUT_SECONDS', 900)),
@@ -90,8 +102,7 @@ return [
     ],
 
     'schedule' => [
-        // Carbon dayOfWeek: 0=CN, 1=T2, ... 6=T7.
-        // Mặc định giữ cadence cố định ban đầu: Thứ 2 + Thứ 5.
+        // Carbon dayOfWeek: 0=Sunday, 1=Monday, ... 6=Saturday.
         'days' => array_values(array_filter(array_map(
             static function ($value): int {
                 return (int) trim((string) $value);

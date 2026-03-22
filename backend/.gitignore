@@ -3,6 +3,9 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/app/rclone/*.conf
+/storage/app/rclone/*.json
+/storage/app/rclone/*.token
 /vendor
 .env
 .env.backup

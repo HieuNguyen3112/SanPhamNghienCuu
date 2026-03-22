@@ -665,10 +665,12 @@ class ResticBackupManager
         $resticBinaryOk = (bool) (($backupConfig['restic_binary']['exists'] ?? false) === true);
         $rcloneBinaryOk = ! $requiresRclone || (bool) (($backupConfig['rclone_binary']['exists'] ?? false) === true);
         $rcloneConfigOk = ! $requiresRclone || (bool) (($backupConfig['rclone_config']['readable'] ?? false) === true);
+        $rcloneRemoteOk = ! $requiresRclone || (bool) (($backupConfig['rclone_remote']['defined'] ?? false) === true);
         $repositoryEnvConfigured = $repository !== '' && $passwordSet;
-        $runtimeReady = $resticBinaryOk && $rcloneBinaryOk && $rcloneConfigOk;
+        $runtimeReady = $resticBinaryOk && $rcloneBinaryOk && $rcloneConfigOk && $rcloneRemoteOk;
 
         $blockingIssues = [];
+        $warnings = [];
 
         if ($repository === '') {
             $blockingIssues[] = [
@@ -705,10 +707,24 @@ class ResticBackupManager
             ];
         }
 
+        if ($requiresRclone && ! $rcloneRemoteOk) {
+            $blockingIssues[] = [
+                'code' => 'RCLONE_REMOTE_UNDEFINED',
+                'message' => 'Remote rclone trong SPNC_BACKUP_REPOSITORY chưa được khai báo trong rclone config hiện tại.',
+            ];
+        }
+
         if (! ($destination['valid'] ?? false)) {
             $blockingIssues[] = [
                 'code' => (string) ($destination['error_code'] ?? 'EXPORT_TARGET_INVALID'),
                 'message' => (string) ($destination['error_message'] ?? 'Không suy ra được đích export từ cấu hình backup hiện tại.'),
+            ];
+        }
+
+        if ($requiresRclone && (string) ($backupConfig['rclone_remote']['auth_mode'] ?? '') === 'oauth_token') {
+            $warnings[] = [
+                'code' => 'RCLONE_OAUTH_INTERACTIVE',
+                'message' => 'Backup đang phụ thuộc user OAuth token trong rclone.conf. Production nên dùng service account để tránh phải re-auth thủ công khi token bị revoke hoặc invalid.',
             ];
         }
 
@@ -726,6 +742,8 @@ class ResticBackupManager
                 'rclone_binary' => $backupConfig['rclone_binary'] ?? null,
                 'rclone_config' => $backupConfig['rclone_config'] ?? null,
                 'rclone_program' => $backupConfig['rclone_program'] ?? null,
+                'rclone_remote' => $backupConfig['rclone_remote'] ?? null,
+                'database' => $backupConfig['database'] ?? null,
             ],
             'export_destination' => [
                 'valid' => (bool) ($destination['valid'] ?? false),
@@ -736,6 +754,7 @@ class ResticBackupManager
                 'error_message' => $destination['error_message'] ?? null,
             ],
             'blocking_issues' => $blockingIssues,
+            'warnings' => $warnings,
         ];
     }
 
@@ -828,41 +847,23 @@ class ResticBackupManager
 
     private function dumpDatabase(string $outputAbsolutePath): void
     {
-        $mysql = config('database.connections.mysql');
-        if (! is_array($mysql)) {
-            throw new BackupRuntimeException('Không tìm thấy cấu hình database mysql.');
+        $databaseConfig = $this->resolveBackupDatabaseConnection();
+        $driver = $databaseConfig['driver'];
+        $connection = $databaseConfig['config'];
+
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            $this->dumpMySqlDatabase($connection, $outputAbsolutePath);
+            return;
         }
 
-        $database = (string) ($mysql['database'] ?? '');
-        $username = (string) ($mysql['username'] ?? '');
-        if ($database === '' || $username === '') {
-            throw new BackupRuntimeException('Thiếu cấu hình database để tạo dump backup.');
+        if (in_array($driver, ['pgsql', 'postgres', 'postgresql'], true)) {
+            $this->dumpPgSqlDatabase($connection, $outputAbsolutePath);
+            return;
         }
 
-        $command = [
-            (string) config('backup.mysql.mysqldump_binary', 'mysqldump'),
-            '--single-transaction',
-            '--quick',
-            '--routines',
-            '--triggers',
-            '--default-character-set=utf8mb4',
-            '--host=' . (string) ($mysql['host'] ?? '127.0.0.1'),
-            '--port=' . (string) ($mysql['port'] ?? 3306),
-            '--user=' . $username,
-            '--result-file=' . $outputAbsolutePath,
-            $database,
-        ];
-
-        $env = [];
-        $password = (string) ($mysql['password'] ?? '');
-        if ($password !== '') {
-            $env['MYSQL_PWD'] = $password;
-        }
-
-        $result = $this->runProcess($command, $env, false, 1800);
-        if (! $result['successful']) {
-            throw new BackupRuntimeException('Tạo DB dump thất bại: ' . trim((string) $result['stderr']));
-        }
+        throw new BackupRuntimeException(
+            'Backup database hiện chỉ hỗ trợ mysql/mariadb và pgsql. Driver hiện tại: ' . $driver
+        );
     }
 
     private function importDatabaseDump(string $dumpAbsolutePath): void
@@ -871,49 +872,23 @@ class ResticBackupManager
             throw new BackupRuntimeException('Không tìm thấy tệp DB dump để khôi phục.');
         }
 
-        $mysql = config('database.connections.mysql');
-        if (! is_array($mysql)) {
-            throw new BackupRuntimeException('Không tìm thấy cấu hình mysql để khôi phục dữ liệu.');
+        $databaseConfig = $this->resolveBackupDatabaseConnection();
+        $driver = $databaseConfig['driver'];
+        $connection = $databaseConfig['config'];
+
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            $this->importMySqlDatabaseDump($connection, $dumpAbsolutePath);
+            return;
         }
 
-        $database = (string) ($mysql['database'] ?? '');
-        $username = (string) ($mysql['username'] ?? '');
-        if ($database === '' || $username === '') {
-            throw new BackupRuntimeException('Thiếu cấu hình database để import bản sao lưu.');
+        if (in_array($driver, ['pgsql', 'postgres', 'postgresql'], true)) {
+            $this->importPgSqlDatabaseDump($connection, $dumpAbsolutePath);
+            return;
         }
 
-        $blockedDatabases = ['mysql', 'information_schema', 'performance_schema', 'sys'];
-        if (in_array(Str::lower($database), $blockedDatabases, true)) {
-            throw new BackupRuntimeException('Từ chối import vào database hệ thống không an toàn.');
-        }
-
-        $command = [
-            (string) config('backup.mysql.mysql_binary', 'mysql'),
-            '--default-character-set=utf8mb4',
-            '--host=' . (string) ($mysql['host'] ?? '127.0.0.1'),
-            '--port=' . (string) ($mysql['port'] ?? 3306),
-            '--user=' . $username,
-            $database,
-        ];
-
-        $env = [];
-        $password = (string) ($mysql['password'] ?? '');
-        if ($password !== '') {
-            $env['MYSQL_PWD'] = $password;
-        }
-
-        $process = new Process($command, base_path(), $this->mergeProcessEnvironment($env), null, 3600);
-        $stream = fopen($dumpAbsolutePath, 'rb');
-        if ($stream === false) {
-            throw new BackupRuntimeException('Không thể đọc tệp DB dump để import.');
-        }
-        $process->setInput($stream);
-        $process->run();
-        fclose($stream);
-
-        if (! $process->isSuccessful()) {
-            throw new BackupRuntimeException('Khôi phục database thất bại: ' . trim((string) $process->getErrorOutput()));
-        }
+        throw new BackupRuntimeException(
+            'Khôi phục database hiện chỉ hỗ trợ mysql/mariadb và pgsql. Driver hiện tại: ' . $driver
+        );
     }
 
     private function findLatestSnapshotForRunId(string $runId): ?array
@@ -3241,6 +3216,8 @@ class ResticBackupManager
         $rcloneBinary = trim((string) config('backup.restic.rclone_binary', 'rclone'));
         $repository = trim((string) config('backup.restic.repository', ''));
         $rcloneConfig = trim((string) config('backup.restic.rclone_config_path', ''));
+        $serviceAccountFile = trim((string) config('backup.restic.rclone_service_account_file', ''));
+        $driveImpersonate = trim((string) config('backup.restic.rclone_drive_impersonate', ''));
 
         $proxyKeys = ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy'];
         $envPreview = [];
@@ -3262,8 +3239,18 @@ class ResticBackupManager
             'rclone_binary' => $this->inspectBinaryConfig($rcloneBinary, $this->resolveRcloneCandidateDirectories()),
             'rclone_program' => $this->resolveRcloneProgram(),
             'rclone_config' => $this->inspectOptionalPath($rcloneConfig),
+            'rclone_service_account_file' => $this->inspectOptionalPath($serviceAccountFile),
+            'rclone_drive_impersonate' => $driveImpersonate !== '' ? $driveImpersonate : null,
+            'rclone_remote' => $this->inspectConfiguredRcloneRemote($repository, $rcloneConfig, $serviceAccountFile),
+            'database' => $this->inspectBackupDatabaseConfig(),
             'process_env' => [
                 'RCLONE_CONFIG' => $this->inspectOptionalPath((string) ($resticEnv['RCLONE_CONFIG'] ?? '')),
+                'RCLONE_DRIVE_SERVICE_ACCOUNT_FILE' => $this->inspectOptionalPath(
+                    (string) ($resticEnv['RCLONE_DRIVE_SERVICE_ACCOUNT_FILE'] ?? '')
+                ),
+                'RCLONE_DRIVE_IMPERSONATE' => trim((string) ($resticEnv['RCLONE_DRIVE_IMPERSONATE'] ?? '')) !== ''
+                    ? (string) $resticEnv['RCLONE_DRIVE_IMPERSONATE']
+                    : null,
                 'PATH_overridden' => isset($resticEnv['PATH']) || isset($resticEnv['Path']),
                 'proxy_overrides' => $envPreview,
             ],
@@ -3497,6 +3484,16 @@ class ResticBackupManager
             $env['RCLONE_CONFIG'] = $this->resolveAbsolutePath($rcloneConfig);
         }
 
+        $serviceAccountFile = trim((string) config('backup.restic.rclone_service_account_file', ''));
+        if ($serviceAccountFile !== '') {
+            $env['RCLONE_DRIVE_SERVICE_ACCOUNT_FILE'] = $this->resolveAbsolutePath($serviceAccountFile);
+        }
+
+        $driveImpersonate = trim((string) config('backup.restic.rclone_drive_impersonate', ''));
+        if ($driveImpersonate !== '') {
+            $env['RCLONE_DRIVE_IMPERSONATE'] = $driveImpersonate;
+        }
+
         $httpProxy = trim((string) config('backup.network.http_proxy', ''));
         $httpsProxy = trim((string) config('backup.network.https_proxy', ''));
         $noProxy = trim((string) config('backup.network.no_proxy', ''));
@@ -3545,6 +3542,270 @@ class ResticBackupManager
         }
 
         return $env;
+    }
+
+    private function inspectBackupDatabaseConfig(): array
+    {
+        $configuredConnection = trim((string) config('backup.database.connection', config('database.default', 'mysql')));
+        $selected = $configuredConnection !== '' ? $configuredConnection : (string) config('database.default', 'mysql');
+        $connection = config("database.connections.{$selected}");
+        $driver = is_array($connection) ? Str::lower((string) ($connection['driver'] ?? $selected)) : null;
+
+        return [
+            'connection' => $selected !== '' ? $selected : null,
+            'driver' => $driver,
+            'mysql_dump_binary' => $this->inspectBinaryConfig((string) config('backup.mysql.mysqldump_binary', 'mysqldump')),
+            'mysql_restore_binary' => $this->inspectBinaryConfig((string) config('backup.mysql.mysql_binary', 'mysql')),
+            'pgsql_dump_binary' => $this->inspectBinaryConfig((string) config('backup.pgsql.pg_dump_binary', 'pg_dump')),
+            'pgsql_restore_binary' => $this->inspectBinaryConfig((string) config('backup.pgsql.psql_binary', 'psql')),
+        ];
+    }
+
+    private function resolveBackupDatabaseConnection(): array
+    {
+        $configuredConnection = trim((string) config('backup.database.connection', config('database.default', 'mysql')));
+        $connectionName = $configuredConnection !== '' ? $configuredConnection : (string) config('database.default', 'mysql');
+        $connection = config("database.connections.{$connectionName}");
+        if (! is_array($connection)) {
+            throw new BackupRuntimeException('Không tìm thấy cấu hình database cho backup: ' . $connectionName);
+        }
+
+        return [
+            'name' => $connectionName,
+            'driver' => Str::lower((string) ($connection['driver'] ?? $connectionName)),
+            'config' => $connection,
+        ];
+    }
+
+    private function dumpMySqlDatabase(array $mysql, string $outputAbsolutePath): void
+    {
+        $database = (string) ($mysql['database'] ?? '');
+        $username = (string) ($mysql['username'] ?? '');
+        if ($database === '' || $username === '') {
+            throw new BackupRuntimeException('Thiếu cấu hình database để tạo dump backup.');
+        }
+
+        $command = [
+            (string) config('backup.mysql.mysqldump_binary', 'mysqldump'),
+            '--single-transaction',
+            '--quick',
+            '--routines',
+            '--triggers',
+            '--default-character-set=utf8mb4',
+            '--host=' . (string) ($mysql['host'] ?? '127.0.0.1'),
+            '--port=' . (string) ($mysql['port'] ?? 3306),
+            '--user=' . $username,
+            '--result-file=' . $outputAbsolutePath,
+            $database,
+        ];
+
+        $env = [];
+        $password = (string) ($mysql['password'] ?? '');
+        if ($password !== '') {
+            $env['MYSQL_PWD'] = $password;
+        }
+
+        $result = $this->runProcess($command, $env, false, 1800);
+        if (! $result['successful']) {
+            throw new BackupRuntimeException('Tạo DB dump thất bại: ' . trim((string) $result['stderr']));
+        }
+    }
+
+    private function dumpPgSqlDatabase(array $pgsql, string $outputAbsolutePath): void
+    {
+        $database = (string) ($pgsql['database'] ?? '');
+        $username = (string) ($pgsql['username'] ?? '');
+        if ($database === '' || $username === '') {
+            throw new BackupRuntimeException('Thiếu cấu hình PostgreSQL để tạo dump backup.');
+        }
+
+        $command = [
+            (string) config('backup.pgsql.pg_dump_binary', 'pg_dump'),
+            '--format=plain',
+            '--no-owner',
+            '--no-privileges',
+            '--encoding=UTF8',
+            '--file=' . $outputAbsolutePath,
+            '--host=' . (string) ($pgsql['host'] ?? '127.0.0.1'),
+            '--port=' . (string) ($pgsql['port'] ?? 5432),
+            '--username=' . $username,
+            $database,
+        ];
+
+        $env = [];
+        $password = (string) ($pgsql['password'] ?? '');
+        if ($password !== '') {
+            $env['PGPASSWORD'] = $password;
+        }
+
+        $sslMode = trim((string) ($pgsql['sslmode'] ?? ''));
+        if ($sslMode !== '') {
+            $env['PGSSLMODE'] = $sslMode;
+        }
+
+        $result = $this->runProcess($command, $env, false, 1800);
+        if (! $result['successful']) {
+            throw new BackupRuntimeException('Tạo PostgreSQL dump thất bại: ' . trim((string) $result['stderr']));
+        }
+    }
+
+    private function importMySqlDatabaseDump(array $mysql, string $dumpAbsolutePath): void
+    {
+        $database = (string) ($mysql['database'] ?? '');
+        $username = (string) ($mysql['username'] ?? '');
+        if ($database === '' || $username === '') {
+            throw new BackupRuntimeException('Thiếu cấu hình database để import bản sao lưu.');
+        }
+
+        $blockedDatabases = ['mysql', 'information_schema', 'performance_schema', 'sys'];
+        if (in_array(Str::lower($database), $blockedDatabases, true)) {
+            throw new BackupRuntimeException('Từ chối import vào database hệ thống không an toàn.');
+        }
+
+        $command = [
+            (string) config('backup.mysql.mysql_binary', 'mysql'),
+            '--default-character-set=utf8mb4',
+            '--host=' . (string) ($mysql['host'] ?? '127.0.0.1'),
+            '--port=' . (string) ($mysql['port'] ?? 3306),
+            '--user=' . $username,
+            $database,
+        ];
+
+        $env = [];
+        $password = (string) ($mysql['password'] ?? '');
+        if ($password !== '') {
+            $env['MYSQL_PWD'] = $password;
+        }
+
+        $process = new Process($command, base_path(), $this->mergeProcessEnvironment($env), null, 3600);
+        $stream = fopen($dumpAbsolutePath, 'rb');
+        if ($stream === false) {
+            throw new BackupRuntimeException('Không thể đọc tệp DB dump để import.');
+        }
+        $process->setInput($stream);
+        $process->run();
+        fclose($stream);
+
+        if (! $process->isSuccessful()) {
+            throw new BackupRuntimeException('Khôi phục database thất bại: ' . trim((string) $process->getErrorOutput()));
+        }
+    }
+
+    private function importPgSqlDatabaseDump(array $pgsql, string $dumpAbsolutePath): void
+    {
+        $database = (string) ($pgsql['database'] ?? '');
+        $username = (string) ($pgsql['username'] ?? '');
+        if ($database === '' || $username === '') {
+            throw new BackupRuntimeException('Thiếu cấu hình PostgreSQL để import bản sao lưu.');
+        }
+
+        $blockedDatabases = ['postgres', 'template0', 'template1'];
+        if (in_array(Str::lower($database), $blockedDatabases, true)) {
+            throw new BackupRuntimeException('Từ chối import vào PostgreSQL system database không an toàn.');
+        }
+
+        $command = [
+            (string) config('backup.pgsql.psql_binary', 'psql'),
+            '--host=' . (string) ($pgsql['host'] ?? '127.0.0.1'),
+            '--port=' . (string) ($pgsql['port'] ?? 5432),
+            '--username=' . $username,
+            '--dbname=' . $database,
+            '--set',
+            'ON_ERROR_STOP=1',
+            '--file=' . $dumpAbsolutePath,
+        ];
+
+        $env = [];
+        $password = (string) ($pgsql['password'] ?? '');
+        if ($password !== '') {
+            $env['PGPASSWORD'] = $password;
+        }
+
+        $sslMode = trim((string) ($pgsql['sslmode'] ?? ''));
+        if ($sslMode !== '') {
+            $env['PGSSLMODE'] = $sslMode;
+        }
+
+        $result = $this->runProcess($command, $env, false, 3600);
+        if (! $result['successful']) {
+            throw new BackupRuntimeException('Khôi phục PostgreSQL thất bại: ' . trim((string) $result['stderr']));
+        }
+    }
+
+    private function inspectConfiguredRcloneRemote(string $repository, string $rcloneConfigPath, string $serviceAccountFile): array
+    {
+        $remoteName = $this->extractRcloneRemoteName($repository);
+        $inspection = [
+            'name' => $remoteName,
+            'defined' => false,
+            'type' => null,
+            'auth_mode' => null,
+            'refresh_token_present' => null,
+            'uses_service_account_env' => trim($serviceAccountFile) !== '',
+        ];
+
+        if ($remoteName === null) {
+            return $inspection;
+        }
+
+        $resolvedConfigPath = trim($rcloneConfigPath) !== '' ? $this->resolveAbsolutePath($rcloneConfigPath) : '';
+        if ($resolvedConfigPath === '' || ! is_file($resolvedConfigPath) || ! is_readable($resolvedConfigPath)) {
+            return $inspection;
+        }
+
+        try {
+            $parsed = parse_ini_file($resolvedConfigPath, true, INI_SCANNER_RAW);
+        } catch (\Throwable) {
+            return $inspection;
+        }
+
+        if (! is_array($parsed) || ! isset($parsed[$remoteName]) || ! is_array($parsed[$remoteName])) {
+            return $inspection;
+        }
+
+        $section = $parsed[$remoteName];
+        $tokenRaw = trim((string) ($section['token'] ?? ''));
+        $sectionServiceAccount = trim((string) ($section['service_account_file'] ?? ''));
+        $authMode = null;
+        $refreshTokenPresent = null;
+
+        if (trim($serviceAccountFile) !== '' || $sectionServiceAccount !== '') {
+            $authMode = 'service_account';
+        } elseif ($tokenRaw !== '') {
+            $authMode = 'oauth_token';
+            $decoded = json_decode($tokenRaw, true);
+            if (is_array($decoded)) {
+                $refreshTokenPresent = array_key_exists('refresh_token', $decoded)
+                    && trim((string) ($decoded['refresh_token'] ?? '')) !== '';
+            }
+        }
+
+        return [
+            'name' => $remoteName,
+            'defined' => true,
+            'type' => trim((string) ($section['type'] ?? '')) !== '' ? trim((string) $section['type']) : null,
+            'auth_mode' => $authMode,
+            'refresh_token_present' => $refreshTokenPresent,
+            'uses_service_account_env' => trim($serviceAccountFile) !== '',
+        ];
+    }
+
+    private function extractRcloneRemoteName(string $repository): ?string
+    {
+        $repository = trim($repository);
+        if (! str_starts_with(Str::lower($repository), 'rclone:')) {
+            return null;
+        }
+
+        $withoutPrefix = trim((string) Str::after($repository, 'rclone:'));
+        if ($withoutPrefix === '') {
+            return null;
+        }
+
+        $parts = explode(':', $withoutPrefix, 2);
+        $remoteName = trim((string) ($parts[0] ?? ''));
+
+        return $remoteName !== '' ? $remoteName : null;
     }
 
     private function resolveRcloneProgram(): ?string
@@ -3627,7 +3888,7 @@ class ResticBackupManager
             $resolved = $this->resolveAbsolutePath($configured);
         } else {
             $finder = new ExecutableFinder();
-            $found = $finder->find($configured, null, $searchDirs ?: null);
+            $found = $finder->find($configured, null, $searchDirs ?: []);
             if (is_string($found) && trim($found) !== '') {
                 $resolved = $this->resolveAbsolutePath($found);
             }

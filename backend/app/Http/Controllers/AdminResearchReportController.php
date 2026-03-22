@@ -6,11 +6,16 @@ use App\Exports\AdminResearchReportExport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as BaseResponse;
 
 class AdminResearchReportController extends Controller
 {
+    private const REPORT_SIGNATURE = 'admin-research-report:2026-03-23.1';
+
     private const CATEGORY_ORDER = ['ISI', 'SCOPUS', 'CONFERENCE', 'PROJECT', 'BOOK'];
 
     private const CATEGORY_LABELS = [
@@ -29,6 +34,10 @@ class AdminResearchReportController extends Controller
         'department' => 'department_name',
         'year' => 'activity_year',
     ];
+
+    private array $schemaColumnCache = [];
+
+    private ?array $reportDiagnosticsCache = null;
 
     public function filters()
     {
@@ -77,7 +86,7 @@ class AdminResearchReportController extends Controller
             ];
         }, self::CATEGORY_ORDER);
 
-        return response()->json([
+        return $this->withReportDiagnostics(response()->json([
             'success' => true,
             'message' => 'ok',
             'data' => [
@@ -86,14 +95,14 @@ class AdminResearchReportController extends Controller
                 'research_types' => $researchTypes,
                 'lecturers' => $lecturers,
             ],
-        ], Response::HTTP_OK);
+        ], Response::HTTP_OK));
     }
 
     public function index(Request $request)
     {
         $result = $this->reportData($request, true);
 
-        return response()->json([
+        return $this->withReportDiagnostics(response()->json([
             'success' => true,
             'message' => 'ok',
             'data' => [
@@ -102,7 +111,7 @@ class AdminResearchReportController extends Controller
                 'table' => $result['table'],
                 'applied_filters' => $result['filters'],
             ],
-        ], Response::HTTP_OK);
+        ], Response::HTTP_OK));
     }
 
     public function exportExcel(Request $request)
@@ -318,7 +327,7 @@ class AdminResearchReportController extends Controller
                 'ra.title',
                 DB::raw("{$categoryExpr} as category_key"),
                 DB::raw($yearExpr . ' as activity_year'),
-                DB::raw("COALESCE(pd.journal_name, cd.conference_name, bd.publisher, prd.project_code, '') as venue_label"),
+                DB::raw($this->venueLabelExpression() . ' as venue_label'),
                 DB::raw("COALESCE(mag.lecturer_names, {$primaryLecturerNameExpr}) as lecturer_names"),
                 DB::raw($primaryLecturerNameExpr . ' as primary_lecturer_name'),
                 'd.name as department_name',
@@ -329,7 +338,7 @@ class AdminResearchReportController extends Controller
         } elseif ($sortField === 'activity_year') {
             $query->orderByRaw($yearExpr . ' ' . $sortDir);
         } elseif ($sortField === 'venue_label') {
-            $query->orderByRaw("COALESCE(pd.journal_name, cd.conference_name, bd.publisher, prd.project_code, '') " . $sortDir);
+            $query->orderByRaw($this->venueLabelExpression() . ' ' . $sortDir);
         } else {
             $query->orderBy($sortField, $sortDir);
         }
@@ -492,16 +501,48 @@ class AdminResearchReportController extends Controller
     private function activityYearExpression(): string
     {
         $driver = DB::connection()->getDriverName();
+        $parts = [];
+
+        if ($this->hasColumn('paper_details', 'year')) {
+            $parts[] = 'pd.year';
+        }
+
+        if ($this->hasColumn('book_details', 'year')) {
+            $parts[] = 'bd.year';
+        }
+
+        if ($this->hasColumn('project_details', 'start_month')) {
+            if ($driver === 'pgsql') {
+                $parts[] = 'CAST(EXTRACT(YEAR FROM prd.start_month) AS INTEGER)';
+            } elseif ($driver === 'sqlite') {
+                $parts[] = "CAST(strftime('%Y', prd.start_month) AS INTEGER)";
+            } else {
+                $parts[] = 'YEAR(prd.start_month)';
+            }
+        }
+
+        if ($this->hasColumn('conference_details', 'held_on')) {
+            if ($driver === 'pgsql') {
+                $parts[] = 'CAST(EXTRACT(YEAR FROM cd.held_on) AS INTEGER)';
+            } elseif ($driver === 'sqlite') {
+                $parts[] = "CAST(strftime('%Y', cd.held_on) AS INTEGER)";
+            } else {
+                $parts[] = 'YEAR(cd.held_on)';
+            }
+        }
 
         if ($driver === 'pgsql') {
-            return 'COALESCE(pd.year, bd.year, CAST(EXTRACT(YEAR FROM prd.start_month) AS INTEGER), CAST(EXTRACT(YEAR FROM cd.held_on) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.start_date) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.created_at) AS INTEGER))';
+            $parts[] = 'CAST(EXTRACT(YEAR FROM ra.start_date) AS INTEGER)';
+            $parts[] = 'CAST(EXTRACT(YEAR FROM ra.created_at) AS INTEGER)';
+        } elseif ($driver === 'sqlite') {
+            $parts[] = "CAST(strftime('%Y', ra.start_date) AS INTEGER)";
+            $parts[] = "CAST(strftime('%Y', ra.created_at) AS INTEGER)";
+        } else {
+            $parts[] = 'YEAR(ra.start_date)';
+            $parts[] = 'YEAR(ra.created_at)';
         }
 
-        if ($driver === 'sqlite') {
-            return "COALESCE(pd.year, bd.year, CAST(strftime('%Y', prd.start_month) AS INTEGER), CAST(strftime('%Y', cd.held_on) AS INTEGER), CAST(strftime('%Y', ra.start_date) AS INTEGER), CAST(strftime('%Y', ra.created_at) AS INTEGER))";
-        }
-
-        return 'COALESCE(pd.year, bd.year, YEAR(prd.start_month), YEAR(cd.held_on), YEAR(ra.start_date), YEAR(ra.created_at))';
+        return 'COALESCE(' . implode(', ', $parts) . ')';
     }
 
     private function lecturerNamesAggregateExpression(): string
@@ -589,5 +630,92 @@ class AdminResearchReportController extends Controller
             'lecturer' => $lecturerLabel ?: $allLabel,
             'keyword' => $filters['q'] ?: $allLabel,
         ];
+    }
+
+    private function venueLabelExpression(): string
+    {
+        $parts = [];
+
+        if ($this->hasColumn('paper_details', 'journal_name')) {
+            $parts[] = 'pd.journal_name';
+        }
+
+        if ($this->hasColumn('conference_details', 'conference_name')) {
+            $parts[] = 'cd.conference_name';
+        }
+
+        if ($this->hasColumn('book_details', 'publisher')) {
+            $parts[] = 'bd.publisher';
+        }
+
+        if ($this->hasColumn('project_details', 'project_code')) {
+            $parts[] = 'prd.project_code';
+        }
+
+        $parts[] = "''";
+
+        return 'COALESCE(' . implode(', ', $parts) . ')';
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        $cacheKey = $table . '.' . $column;
+
+        if (! array_key_exists($cacheKey, $this->schemaColumnCache)) {
+            $this->schemaColumnCache[$cacheKey] = Schema::hasTable($table)
+                && Schema::hasColumn($table, $column);
+        }
+
+        return $this->schemaColumnCache[$cacheKey];
+    }
+
+    private function reportDiagnostics(): array
+    {
+        if ($this->reportDiagnosticsCache !== null) {
+            return $this->reportDiagnosticsCache;
+        }
+
+        $missingColumns = [];
+        foreach ([
+            'paper_details.year',
+            'book_details.year',
+            'project_details.start_month',
+            'conference_details.held_on',
+            'paper_details.journal_name',
+            'conference_details.conference_name',
+            'book_details.publisher',
+            'project_details.project_code',
+        ] as $reference) {
+            [$table, $column] = explode('.', $reference, 2);
+            if (! $this->hasColumn($table, $column)) {
+                $missingColumns[] = $reference;
+            }
+        }
+
+        return $this->reportDiagnosticsCache = [
+            'signature' => self::REPORT_SIGNATURE,
+            'driver' => DB::connection()->getDriverName(),
+            'schema_status' => empty($missingColumns) ? 'ok' : 'mismatch',
+            'missing_columns' => $missingColumns,
+        ];
+    }
+
+    private function withReportDiagnostics(BaseResponse $response): BaseResponse
+    {
+        $diagnostics = $this->reportDiagnostics();
+
+        if ($diagnostics['schema_status'] !== 'ok') {
+            Log::warning('Admin research report schema mismatch detected.', $diagnostics);
+        }
+
+        $response->headers->set('X-SPNC-Research-Report-Signature', $diagnostics['signature']);
+        $response->headers->set('X-SPNC-Research-Report-Driver', $diagnostics['driver']);
+        $response->headers->set('X-SPNC-Research-Report-Schema-Status', $diagnostics['schema_status']);
+        $response->headers->set(
+            'X-SPNC-Research-Report-Missing-Columns',
+            empty($diagnostics['missing_columns']) ? 'none' : implode(',', $diagnostics['missing_columns'])
+        );
+
+        return $response;
     }
 }
