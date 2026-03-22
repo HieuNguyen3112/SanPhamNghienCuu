@@ -43,8 +43,24 @@ export interface DraftDeclarationItem {
  */
 export type DeclarationDraftRow = DraftDeclarationItem;
 
+function normalizeDraftTypeLabel(dto: DeclarationDraftRowDTO): string {
+  const label = String(dto.type_label ?? "").trim();
+  const lower = label.toLowerCase();
+  const route = String(dto.to ?? "").toLowerCase();
+
+  // Legacy backend labels may append hour classes (e.g. ISSN/ISBN 300h).
+  // In draft list we only need declaration kind for quick recognition.
+  if (lower.startsWith("bài báo khoa học -")) return "Bài báo khoa học";
+  if (lower.startsWith("báo cáo khoa học -")) return "Báo cáo khoa học";
+
+  if (route.includes("/declaration/article")) return "Bài báo khoa học";
+  if (route.includes("/declaration/conference")) return "Báo cáo hội thảo";
+
+  return label || "—";
+}
+
 export function declarationTypeCardFromDto(
-  dto: DeclarationTypeCardDTO
+  dto: DeclarationTypeCardDTO,
 ): DeclarationTypeCard {
   return {
     typeKey: dto.type_key,
@@ -55,12 +71,12 @@ export function declarationTypeCardFromDto(
 }
 
 export function draftDeclarationItemFromDto(
-  dto: DeclarationDraftRowDTO
+  dto: DeclarationDraftRowDTO,
 ): DraftDeclarationItem {
   return {
     id: dto.id,
     title: dto.title,
-    typeLabel: dto.type_label,
+    typeLabel: normalizeDraftTypeLabel(dto),
     updatedAt: dto.updated_at,
     to: dto.to,
   };
