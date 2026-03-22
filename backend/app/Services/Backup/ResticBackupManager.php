@@ -789,6 +789,7 @@ class ResticBackupManager
 
     private function ensureRepositoryReady(): void
     {
+        $repository = trim((string) config('backup.restic.repository', ''));
         $probe = $this->runRestic([
             'snapshots',
             '--json',
@@ -807,7 +808,8 @@ class ResticBackupManager
 
         if (! $repositoryMissing) {
             throw new BackupRuntimeException(
-                'Không thể truy cập repository backup: ' . trim((string) $probe['stderr'])
+                'Không thể truy cập repository backup: '
+                . $this->buildRepositoryAccessFailureMessage($repository, $probe)
             );
         }
 
@@ -3311,7 +3313,7 @@ class ResticBackupManager
     {
         $rcloneBinary = trim((string) config('backup.restic.rclone_binary', 'rclone'));
         $repository = trim((string) config('backup.restic.repository', ''));
-        $rcloneRemoteRoot = $this->parseRcloneRemoteRoot($repository);
+        $rcloneProbeTarget = $this->buildRcloneRepositoryProbeTarget($repository);
         $rcloneProgram = $this->resolveRcloneProgram();
 
         $tests = [
@@ -3330,9 +3332,9 @@ class ResticBackupManager
             ),
         ];
 
-        if ($rcloneRemoteRoot !== null) {
+        if ($rcloneProbeTarget !== null) {
             $tests['rclone_lsd'] = $this->doctorRunCommand(
-                [$rcloneBinary, 'lsd', $rcloneRemoteRoot],
+                [$rcloneBinary, 'lsd', $rcloneProbeTarget],
                 $this->resticEnv(),
                 30
             );
@@ -3345,6 +3347,41 @@ class ResticBackupManager
         }
 
         return $tests;
+    }
+
+    private function buildRepositoryAccessFailureMessage(string $repository, array $resticProbe): string
+    {
+        $resticMessage = trim((string) ($resticProbe['stderr'] ?? ''));
+        if ($resticMessage === '') {
+            $resticMessage = trim((string) ($resticProbe['stdout'] ?? ''));
+        }
+
+        if (
+            ! str_starts_with(Str::lower($repository), 'rclone:')
+            || ! Str::contains(Str::lower($resticMessage), [
+                'error talking http to rclone',
+                'unable to open repository at rclone:',
+            ])
+        ) {
+            return $resticMessage !== '' ? $resticMessage : 'Không xác định được chi tiết lỗi repository.';
+        }
+
+        $probeTarget = $this->buildRcloneRepositoryProbeTarget($repository);
+        if ($probeTarget === null) {
+            return $resticMessage !== '' ? $resticMessage : 'Không xác định được remote rclone.';
+        }
+
+        $rcloneProbe = $this->runRclone(['lsd', $probeTarget], true, 30);
+        if ((bool) ($rcloneProbe['successful'] ?? false)) {
+            return $resticMessage !== '' ? $resticMessage : 'Restic không đọc được repository qua rclone.';
+        }
+
+        $rcloneMessage = trim((string) ($rcloneProbe['stderr'] ?? ''));
+        if ($rcloneMessage === '') {
+            $rcloneMessage = trim((string) ($rcloneProbe['stdout'] ?? ''));
+        }
+
+        return $rcloneMessage !== '' ? $rcloneMessage : ($resticMessage !== '' ? $resticMessage : 'Không xác định được lỗi rclone.');
     }
 
     private function doctorRunCommand(array $command, array $env = [], int $timeout = 60): array
@@ -3445,6 +3482,14 @@ class ResticBackupManager
         $env = [
             'RESTIC_REPOSITORY' => (string) config('backup.restic.repository', ''),
             'RESTIC_PASSWORD' => (string) config('backup.restic.password', ''),
+            'HTTP_PROXY' => '',
+            'http_proxy' => '',
+            'HTTPS_PROXY' => '',
+            'https_proxy' => '',
+            'ALL_PROXY' => '',
+            'all_proxy' => '',
+            'NO_PROXY' => '',
+            'no_proxy' => '',
         ];
 
         $rcloneConfig = trim((string) config('backup.restic.rclone_config_path', ''));
@@ -3667,6 +3712,44 @@ class ResticBackupManager
         }
 
         return $remoteName . ':';
+    }
+
+    private function buildRcloneRepositoryProbeTarget(string $repository): ?string
+    {
+        $repository = trim($repository);
+        if (! str_starts_with(Str::lower($repository), 'rclone:')) {
+            return null;
+        }
+
+        $raw = trim((string) Str::after($repository, 'rclone:'));
+        if ($raw === '') {
+            return null;
+        }
+
+        $parts = explode(':', $raw, 2);
+        $remoteName = trim((string) ($parts[0] ?? ''));
+        $path = trim((string) ($parts[1] ?? ''), "/\\");
+        if ($remoteName === '') {
+            return null;
+        }
+
+        if ($path === '') {
+            return $remoteName . ':';
+        }
+
+        $segments = preg_split('/[\/\\\\]+/', $path) ?: [];
+        $segments = array_values(array_filter(array_map(
+            static fn ($segment): string => trim((string) $segment),
+            $segments
+        )));
+
+        if (count($segments) <= 1) {
+            return $remoteName . ':';
+        }
+
+        array_pop($segments);
+
+        return $remoteName . ':' . implode('/', $segments);
     }
 
     private function normalizeNoProxy(string $value): ?string
@@ -3911,5 +3994,4 @@ class ResticBackupManager
         return rtrim($restoredRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $relative;
     }
 }
-
 

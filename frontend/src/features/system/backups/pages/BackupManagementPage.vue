@@ -1284,8 +1284,8 @@ async function triggerBackupNow() {
         message: "Hệ thống đang tạo tiến trình sao lưu...",
       },
       success: {
-        title: "Thành công",
-        message: "Hệ thống đã sao lưu an toàn.",
+        title: "Đã khởi tạo",
+        message: "Yêu cầu sao lưu đã được tiếp nhận. Hệ thống sẽ cập nhật kết quả khi tiến trình hoàn tất.",
       },
       error: {
         title: "Có lỗi xảy ra",
@@ -1293,7 +1293,17 @@ async function triggerBackupNow() {
       },
     });
 
-    if (result?.run_id) startPolling(result.run_id);
+    if (result?.run_id) {
+      currentRunState.value = {
+        run_id: result.run_id,
+        operation: result.operation || "backup",
+        status: result.status || "queued",
+        message: result.user_message || "Đã tiếp nhận yêu cầu sao lưu. Hệ thống đang chạy tác vụ nền.",
+        user_message: result.user_message || "Đã tiếp nhận yêu cầu sao lưu. Hệ thống đang chạy tác vụ nền.",
+        error_code: result.error_code || null,
+      };
+      startPolling(result.run_id);
+    }
   } finally {
     isTriggeringBackup.value = false;
   }

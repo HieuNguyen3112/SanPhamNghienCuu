@@ -246,7 +246,7 @@ class FacultyResearchReportController extends Controller
             ->selectRaw($yearExpr . ' as activity_year')
             ->whereRaw($yearExpr . ' is not null')
             ->distinct()
-            ->orderByDesc('activity_year')
+            ->orderByRaw($yearExpr . ' desc')
             ->pluck('activity_year')
             ->map(fn ($year) => (string) $year)
             ->values()
@@ -303,8 +303,8 @@ class FacultyResearchReportController extends Controller
             ->selectRaw($yearExpr . ' as activity_year')
             ->selectRaw('COUNT(DISTINCT ra.id) as total_count')
             ->whereRaw($yearExpr . ' is not null')
-            ->groupBy('activity_year')
-            ->orderBy('activity_year');
+            ->groupByRaw($yearExpr)
+            ->orderByRaw($yearExpr);
 
         $yearRows = $yearQuery->get();
 
@@ -350,7 +350,7 @@ class FacultyResearchReportController extends Controller
             ->join('lecturers as lm', 'ram.lecturer_id', '=', 'lm.id')
             ->select([
                 'ram.activity_id',
-                DB::raw("GROUP_CONCAT(lm.full_name ORDER BY ram.id SEPARATOR ', ') as lecturer_names"),
+                DB::raw($this->lecturerNamesAggregateExpression() . ' as lecturer_names'),
             ])
             ->groupBy('ram.activity_id');
 
@@ -538,7 +538,32 @@ class FacultyResearchReportController extends Controller
 
     private function activityYearExpression(): string
     {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            return 'COALESCE(pd.year, bd.year, CAST(EXTRACT(YEAR FROM prd.start_month) AS INTEGER), CAST(EXTRACT(YEAR FROM cd.held_on) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.start_date) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.created_at) AS INTEGER))';
+        }
+
+        if ($driver === 'sqlite') {
+            return "COALESCE(pd.year, bd.year, CAST(strftime('%Y', prd.start_month) AS INTEGER), CAST(strftime('%Y', cd.held_on) AS INTEGER), CAST(strftime('%Y', ra.start_date) AS INTEGER), CAST(strftime('%Y', ra.created_at) AS INTEGER))";
+        }
+
         return 'COALESCE(pd.year, bd.year, YEAR(prd.start_month), YEAR(cd.held_on), YEAR(ra.start_date), YEAR(ra.created_at))';
+    }
+
+    private function lecturerNamesAggregateExpression(): string
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            return "STRING_AGG(lm.full_name, ', ' ORDER BY ram.id)";
+        }
+
+        if ($driver === 'sqlite') {
+            return "GROUP_CONCAT(lm.full_name, ', ')";
+        }
+
+        return "GROUP_CONCAT(lm.full_name ORDER BY ram.id SEPARATOR ', ')";
     }
 
     private function categoryKeyExpression(): string
