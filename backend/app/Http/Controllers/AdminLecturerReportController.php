@@ -300,11 +300,11 @@ class AdminLecturerReportController extends Controller
                 'ar.id as academic_rank_id',
                 'ar.code as academic_rank_code',
                 'ar.name as academic_rank_name',
-                DB::raw('TIMESTAMPDIFF(YEAR, COALESCE(lwh.first_start_date, DATE(l.created_at)), CURDATE()) as seniority_years'),
-            ]);
+            ])
+            ->addSelect(DB::raw($this->seniorityYearsExpression().' as seniority_years'));
 
         if ($sortField === 'seniority_years') {
-            $query->orderByRaw('seniority_years ' . $sortDir);
+            $query->orderByRaw($this->seniorityYearsExpression().' '.$sortDir);
         } else {
             $query->orderBy($sortField, $sortDir);
         }
@@ -372,6 +372,20 @@ class AdminLecturerReportController extends Controller
         return [$resolvedField, $dir];
     }
 
+    private function seniorityYearsExpression(): string
+    {
+        $driver = DB::connection()->getDriverName();
+        $startDateExpression = $driver === 'sqlite'
+            ? "COALESCE(lwh.first_start_date, date(l.created_at))"
+            : "COALESCE(lwh.first_start_date, CAST(l.created_at AS DATE))";
+
+        return match ($driver) {
+            'pgsql' => "CAST(EXTRACT(YEAR FROM age(CURRENT_DATE, {$startDateExpression})) AS INTEGER)",
+            'sqlite' => "CAST((julianday('now') - julianday({$startDateExpression})) / 365.2425 AS INTEGER)",
+            default => "TIMESTAMPDIFF(YEAR, {$startDateExpression}, CURDATE())",
+        };
+    }
+
     private function formatGenderLabel(?string $gender): string
     {
         $raw = trim((string) $gender);
@@ -416,3 +430,4 @@ class AdminLecturerReportController extends Controller
         ];
     }
 }
+
