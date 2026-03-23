@@ -23,9 +23,17 @@ return [
             'SPNC_RCLONE_CONFIG',
             env('SPNC_BACKUP_RCLONE_CONFIG', 'storage/app/rclone/rclone.conf')
         ),
+        'rclone_config_base64' => env(
+            'SPNC_RCLONE_CONFIG_BASE64',
+            env('SPNC_BACKUP_RCLONE_CONFIG_BASE64', '')
+        ),
         'rclone_service_account_file' => env(
             'SPNC_RCLONE_SERVICE_ACCOUNT_FILE',
             env('SPNC_BACKUP_RCLONE_SERVICE_ACCOUNT_FILE', '')
+        ),
+        'rclone_service_account_json_base64' => env(
+            'SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64',
+            env('SPNC_BACKUP_RCLONE_SERVICE_ACCOUNT_JSON_BASE64', '')
         ),
         'rclone_drive_impersonate' => env(
             'SPNC_RCLONE_DRIVE_IMPERSONATE',

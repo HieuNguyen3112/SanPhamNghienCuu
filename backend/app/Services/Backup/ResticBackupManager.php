@@ -703,7 +703,8 @@ class ResticBackupManager
         if ($requiresRclone && ! $rcloneConfigOk) {
             $blockingIssues[] = [
                 'code' => 'RCLONE_CONFIG_INVALID',
-                'message' => 'Không đọc được tệp rclone.conf dùng cho backup.',
+                'message' => (string) (($backupConfig['rclone_config']['error'] ?? null)
+                    ?: 'Không đọc được tệp rclone.conf dùng cho backup.'),
             ];
         }
 
@@ -711,6 +712,13 @@ class ResticBackupManager
             $blockingIssues[] = [
                 'code' => 'RCLONE_REMOTE_UNDEFINED',
                 'message' => 'Remote rclone trong SPNC_BACKUP_REPOSITORY chưa được khai báo trong rclone config hiện tại.',
+            ];
+        }
+
+        if (! empty($backupConfig['rclone_service_account_file']['error'])) {
+            $warnings[] = [
+                'code' => 'RCLONE_SERVICE_ACCOUNT_INVALID',
+                'message' => (string) $backupConfig['rclone_service_account_file']['error'],
             ];
         }
 
@@ -3215,8 +3223,8 @@ class ResticBackupManager
         $resticBinary = trim((string) config('backup.restic.binary', 'restic'));
         $rcloneBinary = trim((string) config('backup.restic.rclone_binary', 'rclone'));
         $repository = trim((string) config('backup.restic.repository', ''));
-        $rcloneConfig = trim((string) config('backup.restic.rclone_config_path', ''));
-        $serviceAccountFile = trim((string) config('backup.restic.rclone_service_account_file', ''));
+        $rcloneConfig = $this->resolveRuntimeRcloneConfigInfo();
+        $serviceAccountFile = $this->resolveRuntimeRcloneServiceAccountInfo();
         $driveImpersonate = trim((string) config('backup.restic.rclone_drive_impersonate', ''));
 
         $proxyKeys = ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy'];
@@ -3238,10 +3246,14 @@ class ResticBackupManager
             'restic_binary' => $this->inspectBinaryConfig($resticBinary),
             'rclone_binary' => $this->inspectBinaryConfig($rcloneBinary, $this->resolveRcloneCandidateDirectories()),
             'rclone_program' => $this->resolveRcloneProgram(),
-            'rclone_config' => $this->inspectOptionalPath($rcloneConfig),
-            'rclone_service_account_file' => $this->inspectOptionalPath($serviceAccountFile),
+            'rclone_config' => $rcloneConfig,
+            'rclone_service_account_file' => $serviceAccountFile,
             'rclone_drive_impersonate' => $driveImpersonate !== '' ? $driveImpersonate : null,
-            'rclone_remote' => $this->inspectConfiguredRcloneRemote($repository, $rcloneConfig, $serviceAccountFile),
+            'rclone_remote' => $this->inspectConfiguredRcloneRemote(
+                $repository,
+                (string) ($rcloneConfig['resolved'] ?? ''),
+                (string) ($serviceAccountFile['resolved'] ?? '')
+            ),
             'database' => $this->inspectBackupDatabaseConfig(),
             'process_env' => [
                 'RCLONE_CONFIG' => $this->inspectOptionalPath((string) ($resticEnv['RCLONE_CONFIG'] ?? '')),
@@ -3466,6 +3478,8 @@ class ResticBackupManager
 
     private function resticEnv(): array
     {
+        $runtimeRcloneConfig = $this->resolveRuntimeRcloneConfigInfo();
+        $runtimeServiceAccountFile = $this->resolveRuntimeRcloneServiceAccountInfo();
         $env = [
             'RESTIC_REPOSITORY' => (string) config('backup.restic.repository', ''),
             'RESTIC_PASSWORD' => (string) config('backup.restic.password', ''),
@@ -3479,14 +3493,14 @@ class ResticBackupManager
             'no_proxy' => '',
         ];
 
-        $rcloneConfig = trim((string) config('backup.restic.rclone_config_path', ''));
+        $rcloneConfig = trim((string) ($runtimeRcloneConfig['resolved'] ?? ''));
         if ($rcloneConfig !== '') {
-            $env['RCLONE_CONFIG'] = $this->resolveAbsolutePath($rcloneConfig);
+            $env['RCLONE_CONFIG'] = $rcloneConfig;
         }
 
-        $serviceAccountFile = trim((string) config('backup.restic.rclone_service_account_file', ''));
+        $serviceAccountFile = trim((string) ($runtimeServiceAccountFile['resolved'] ?? ''));
         if ($serviceAccountFile !== '') {
-            $env['RCLONE_DRIVE_SERVICE_ACCOUNT_FILE'] = $this->resolveAbsolutePath($serviceAccountFile);
+            $env['RCLONE_DRIVE_SERVICE_ACCOUNT_FILE'] = $serviceAccountFile;
         }
 
         $driveImpersonate = trim((string) config('backup.restic.rclone_drive_impersonate', ''));
@@ -3924,6 +3938,106 @@ class ResticBackupManager
             'resolved' => $resolved,
             'exists' => is_file($resolved),
             'readable' => is_readable($resolved),
+        ];
+    }
+
+    private function resolveRuntimeRcloneConfigInfo(): array
+    {
+        return $this->resolveRuntimeConfigAsset(
+            (string) config('backup.restic.rclone_config_path', ''),
+            (string) config('backup.restic.rclone_config_base64', ''),
+            'storage/app/runtime-config/backup/rclone.conf',
+            'rclone.conf'
+        );
+    }
+
+    private function resolveRuntimeRcloneServiceAccountInfo(): array
+    {
+        return $this->resolveRuntimeConfigAsset(
+            (string) config('backup.restic.rclone_service_account_file', ''),
+            (string) config('backup.restic.rclone_service_account_json_base64', ''),
+            'storage/app/runtime-config/backup/google-service-account.json',
+            'Google service account JSON'
+        );
+    }
+
+    private function resolveRuntimeConfigAsset(
+        string $configuredPath,
+        string $inlineBase64,
+        string $materializedRelativePath,
+        string $label
+    ): array {
+        $configured = trim($configuredPath);
+        $resolved = null;
+        $source = null;
+        $error = null;
+
+        if ($configured !== '') {
+            $resolved = $this->resolveAbsolutePath($configured);
+            $source = 'path';
+            if (is_file($resolved) && is_readable($resolved)) {
+                return [
+                    'configured' => $configured,
+                    'resolved' => $resolved,
+                    'exists' => true,
+                    'readable' => true,
+                    'source' => $source,
+                    'materialized' => false,
+                    'error' => null,
+                ];
+            }
+        }
+
+        $inlineBase64 = trim($inlineBase64);
+        if ($inlineBase64 !== '') {
+            $materialized = $this->materializeRuntimeConfigAsset($inlineBase64, $materializedRelativePath, $label);
+            if ($materialized['resolved'] !== null) {
+                return [
+                    'configured' => $configured !== '' ? $configured : null,
+                    'resolved' => $materialized['resolved'],
+                    'exists' => true,
+                    'readable' => true,
+                    'source' => 'base64',
+                    'materialized' => true,
+                    'error' => null,
+                ];
+            }
+
+            $error = $materialized['error'];
+            $source = 'base64';
+        } elseif ($configured !== '') {
+            $error = "{$label} không tồn tại hoặc không đọc được tại đường dẫn runtime hiện tại.";
+        }
+
+        return [
+            'configured' => $configured !== '' ? $configured : null,
+            'resolved' => $resolved,
+            'exists' => $resolved !== null ? is_file($resolved) : false,
+            'readable' => $resolved !== null ? is_readable($resolved) : false,
+            'source' => $source,
+            'materialized' => false,
+            'error' => $error,
+        ];
+    }
+
+    private function materializeRuntimeConfigAsset(string $inlineBase64, string $relativePath, string $label): array
+    {
+        $decoded = base64_decode(trim($inlineBase64), true);
+        if ($decoded === false || $decoded === '') {
+            return [
+                'resolved' => null,
+                'error' => "{$label} base64 không hợp lệ hoặc rỗng.",
+            ];
+        }
+
+        $absolute = $this->resolveAbsolutePath($relativePath);
+        $directory = dirname($absolute);
+        File::ensureDirectoryExists($directory);
+        File::put($absolute, $decoded);
+
+        return [
+            'resolved' => $absolute,
+            'error' => null,
         ];
     }
 
