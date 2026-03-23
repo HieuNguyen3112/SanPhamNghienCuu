@@ -9,6 +9,7 @@ import {
 } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
+import type { UserRole } from "@/app/stores/userStore";
 import { useLayoutStore } from "@/app/stores/layoutStore";
 import Sidebar from "@/shared/components/layout/Sidebar.vue";
 import Navbar from "@/shared/components/layout/Navbar.vue";
@@ -65,6 +66,26 @@ const handleLogout = async () => {
 
 const handleGoHome = async () => {
   await router.push("/");
+};
+
+const handleChangeRole = async (role: UserRole) => {
+  try {
+    userStore.setRole(role);
+
+    const requiredRoles = route.matched
+      .map((record) => record.meta.roles as string[] | undefined)
+      .find((roles) => Array.isArray(roles) && roles.length);
+
+    if (requiredRoles && !requiredRoles.includes(role)) {
+      if (router.hasRoute("profile.scientific")) {
+        await router.push({ name: "profile.scientific" });
+      } else {
+        await router.push("/profile");
+      }
+    }
+  } catch (error) {
+    console.error(error);
+  }
 };
 
 const syncDesktopState = (matchesDesktop: boolean) => {
@@ -171,11 +192,14 @@ onBeforeUnmount(() => {
       <Navbar
         :user-name="userName"
         :user-code="userCode"
+        :current-role="userStore.role"
+        :available-roles="userStore.currentUser?.roles ?? []"
         :is-desktop="isDesktop"
         :is-sidebar-drawer-open="isMobileDrawerOpen"
         @toggle-sidebar="toggleSidebar"
         @open-profile="handleOpenProfile"
         @change-password="isChangePasswordOpen = true"
+        @change-role="handleChangeRole"
         @logout="handleLogout"
         @go-home="handleGoHome"
       />

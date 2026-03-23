@@ -201,13 +201,12 @@ const roleLabelMap: Record<string, string> = {
 };
 
 const roleName = computed(() => {
-  const roles = userStore.currentUser?.roles ?? [];
-  if (!roles.length) return "Không xác định";
-  return roles.map((role) => roleLabelMap[role] ?? role).join(" / ");
+  const roleUser = userStore.role;
+  return roleUser ? roleLabelMap[roleUser] : "Không xác định";
 });
 
 const menuItems = computed(
-  () => buildMenuForRole(userStore.currentUser?.roles ?? []) as MenuItem[],
+  () => buildMenuForRole(userStore.role) as MenuItem[],
 );
 const { menuGroups, groupOpen, toggleGroup } = useSidebarGroups(
   menuItems,

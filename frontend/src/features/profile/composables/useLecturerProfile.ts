@@ -14,6 +14,7 @@ import {
   type LookupItemDTO,
   type ResearchAreaDTO,
   type ResearchWorkItemDTO,
+  type UpdateLanguagesPayload,
   type SyncTrainingHistoriesPayload,
   type ScientificProfilePayload,
 } from "../services/lecturerProfileService";
@@ -388,17 +389,22 @@ function buildResearchAreaItems(profile: LecturerAcademicProfile): string[] {
   return Array.from(new Set(items));
 }
 
-function buildLanguagePayload(rows: LanguageRow[]): LanguageDTO[] {
+function buildLanguagePayload(
+  rows: LanguageRow[],
+): UpdateLanguagesPayload["items"] {
   return rows
     .map((row) => {
+      const language = row.language.trim().slice(0, 100);
+      const level = row.level.trim().slice(0, 100);
       const idNum = Number(row.id);
+
       return {
-        id: Number.isFinite(idNum) ? idNum : 0,
-        language: row.language,
-        level: row.level,
-      } as LanguageDTO;
+        id: Number.isInteger(idNum) && idNum > 0 ? idNum : undefined,
+        language,
+        level,
+      };
     })
-    .filter((row) => row.language && row.level);
+    .filter((row) => row.language.length > 0 && row.level.length > 0);
 }
 
 function resolveErrorMessage(error: unknown, fallback: string): string {
@@ -598,13 +604,7 @@ export function useLecturerProfile() {
       const researchItems = buildResearchAreaItems(next);
       const payload = await updateResearchAreas({ items: researchItems });
       const languagePayload = buildLanguagePayload(next.languages);
-      const languages = await updateLanguages({
-        items: languagePayload.map((row) => ({
-          id: row.id || undefined,
-          language: row.language,
-          level: row.level ?? "",
-        })),
-      });
+      const languages = await updateLanguages({ items: languagePayload });
 
       applyProfilePayload(
         payload,

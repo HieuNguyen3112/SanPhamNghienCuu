@@ -25,6 +25,33 @@
           </p>
         </div>
 
+        <div
+          v-if="availableRoles.length > 1"
+          class="border-b border-slate-200 px-4 py-3"
+        >
+          <p
+            class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Chọn vai trò
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="role in availableRoles"
+              :key="role"
+              type="button"
+              class="rounded-full border px-2.5 py-1 text-xs font-medium transition"
+              :class="
+                role === currentRole
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              "
+              @click="$emit('change-role', role)"
+            >
+              {{ roleLabel(role) }}
+            </button>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div class="py-2">
           <button
@@ -80,6 +107,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import type { UserRole } from "@/app/stores/userStore";
 
 const props = withDefaults(
   defineProps<{
@@ -87,11 +115,15 @@ const props = withDefaults(
     anchorEl: HTMLElement | null; // nút avatar
     userName?: string;
     userCode?: string;
+    currentRole?: UserRole | null;
+    availableRoles?: UserRole[];
     offsetY?: number; // khoảng cách dưới avatar
   }>(),
   {
     userName: "",
     userCode: "",
+    currentRole: null,
+    availableRoles: () => [],
     offsetY: 8,
   },
 );
@@ -101,7 +133,18 @@ const emit = defineEmits<{
   (e: "open-profile"): void;
   (e: "change-password"): void;
   (e: "logout"): void;
+  (e: "change-role", role: UserRole): void;
 }>();
+
+const roleLabelMap: Record<UserRole, string> = {
+  LECTURER: "Giảng viên",
+  DEPARTMENT_BOARD: "Ban chủ nhiệm khoa",
+  SCIENCE_OFFICE: "Phòng quản lý khoa học",
+};
+
+function roleLabel(role: UserRole): string {
+  return roleLabelMap[role] ?? role;
+}
 
 const menuRef = ref<HTMLElement | null>(null);
 

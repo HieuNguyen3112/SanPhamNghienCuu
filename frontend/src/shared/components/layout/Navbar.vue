@@ -119,7 +119,7 @@
               <ul v-else class="divide-y divide-slate-100">
                 <li
                   v-for="entry in notificationsWithVisual"
-                  :key="`${entry.item.source_role}:${entry.item.id}`"
+                  :key="entry.item.id"
                   class="px-3 py-2"
                 >
                   <div
@@ -170,7 +170,7 @@
                         type="button"
                         class="mt-0.5 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="markingReadId === entry.item.id"
-                        @click.stop="markAsReadOnly(entry.item)"
+                        @click.stop="markAsReadOnly(entry.item.id)"
                       >
                         Đã đọc
                       </button>
@@ -188,7 +188,7 @@
                           type="button"
                           class="mt-0.5 rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                           :disabled="deletingId === entry.item.id"
-                          @click.stop="deleteNotification(entry.item)"
+                          @click.stop="deleteNotification(entry.item.id)"
                         >
                           <span class="sr-only">Xóa thông báo</span>
                           <Trash2 class="h-3.5 w-3.5" />
@@ -228,10 +228,13 @@
           :anchor-el="avatarBtnRef"
           :user-name="userName"
           :user-code="userCode"
+          :current-role="currentRole"
+          :available-roles="availableRoles"
           @close="closeUserMenu"
           @open-profile="handleOpenProfile"
           @change-password="handleChangePassword"
           @logout="handleLogout"
+          @change-role="handleChangeRole"
         />
       </div>
     </div>
@@ -242,7 +245,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, toRefs, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Bell, Trash2 } from "lucide-vue-next";
-import { useUserStore } from "@/app/stores/userStore";
+import { useUserStore, type UserRole } from "@/app/stores/userStore";
 import UserDropdown from "@/shared/components/layout/UserDropdown.vue";
 import { getNotificationVisual } from "@/shared/notifications/notificationVisual";
 import {
@@ -261,6 +264,7 @@ const emit = defineEmits<{
   (e: "change-password"): void;
   (e: "logout"): void;
   (e: "go-home"): void;
+  (e: "change-role", role: UserRole): void;
 }>();
 
 const props = withDefaults(
@@ -269,6 +273,8 @@ const props = withDefaults(
     notificationCount?: number;
     userName?: string;
     userCode?: string;
+    currentRole?: UserRole | null;
+    availableRoles?: UserRole[];
     isDesktop?: boolean;
     isSidebarDrawerOpen?: boolean;
   }>(),
@@ -277,6 +283,8 @@ const props = withDefaults(
     notificationCount: 0,
     userName: "",
     userCode: "",
+    currentRole: null,
+    availableRoles: () => [],
     isDesktop: false,
     isSidebarDrawerOpen: false,
   },
@@ -285,26 +293,21 @@ const props = withDefaults(
 const router = useRouter();
 const userStore = useUserStore();
 
-const notificationRoles = computed<NotificationRole[]>(() => {
-  const roles = userStore.currentUser?.roles ?? [];
-  const supportedRoles: NotificationRole[] = [];
-  if (roles.includes("LECTURER")) supportedRoles.push("LECTURER");
-  if (roles.includes("DEPARTMENT_BOARD"))
-    supportedRoles.push("DEPARTMENT_BOARD");
-  return supportedRoles;
+const notificationRole = computed<NotificationRole | null>(() => {
+  const role = (userStore.role ?? null) as UserRole | null;
+  if (role === "LECTURER" || role === "DEPARTMENT_BOARD") {
+    return role;
+  }
+  return null;
 });
-const canUseNotifications = computed(() => notificationRoles.value.length > 0);
+const canUseNotifications = computed(() => notificationRole.value !== null);
 
 const isUserMenuOpen = ref(false);
 const avatarBtnRef = ref<HTMLElement | null>(null);
 
 const isNotificationOpen = ref(false);
 const notificationRootRef = ref<HTMLElement | null>(null);
-type NotificationListEntry = AppNotificationItem & {
-  source_role: NotificationRole;
-};
-
-const notifications = ref<NotificationListEntry[]>([]);
+const notifications = ref<AppNotificationItem[]>([]);
 const unreadCount = ref(0);
 const loadingNotifications = ref(false);
 const markingReadId = ref<string | null>(null);
@@ -360,6 +363,11 @@ function handleLogout() {
   closeUserMenu();
 }
 
+function handleChangeRole(role: UserRole) {
+  emit("change-role", role);
+  closeUserMenu();
+}
+
 function formatRelativeTime(value: string | null) {
   if (!value) return "Vừa xong";
 
@@ -391,8 +399,8 @@ function formatRelativeTime(value: string | null) {
 }
 
 async function fetchNotifications(options?: { silent?: boolean }) {
-  const roles = notificationRoles.value;
-  if (roles.length === 0) {
+  const role = notificationRole.value;
+  if (!role) {
     notifications.value = [];
     unreadCount.value = 0;
     return;
@@ -404,38 +412,12 @@ async function fetchNotifications(options?: { silent?: boolean }) {
   }
 
   try {
-    const results = await Promise.allSettled(
-      roles.map((role) =>
-        listNotificationsByRole(role, {
-          page: 1,
-          per_page: 12,
-        }).then((response) => ({ role, response })),
-      ),
-    );
-
-    const mergedItems: NotificationListEntry[] = [];
-    let mergedUnreadCount = 0;
-
-    for (const result of results) {
-      if (result.status !== "fulfilled") continue;
-      const { role, response } = result.value;
-      mergedUnreadCount += Number(response.unread_count ?? 0);
-      mergedItems.push(
-        ...response.items.map((item) => ({
-          ...item,
-          source_role: role,
-        })),
-      );
-    }
-
-    mergedItems.sort((a, b) => {
-      const left = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const right = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return right - left;
+    const response = await listNotificationsByRole(role, {
+      page: 1,
+      per_page: 12,
     });
-
-    notifications.value = mergedItems.slice(0, 12);
-    unreadCount.value = mergedUnreadCount;
+    notifications.value = response.items;
+    unreadCount.value = response.unread_count;
   } catch (error) {
     console.error(error);
   } finally {
@@ -445,21 +427,22 @@ async function fetchNotifications(options?: { silent?: boolean }) {
   }
 }
 
-async function markAsReadOnly(item: NotificationListEntry) {
-  const role = item.source_role;
+async function markAsReadOnly(notificationId: string) {
+  const role = notificationRole.value;
+  if (!role) return;
   if (markingReadId.value) return;
 
-  markingReadId.value = item.id;
+  markingReadId.value = notificationId;
   try {
-    await markNotificationAsReadByRole(role, item.id);
-    notifications.value = notifications.value.map((entry) =>
-      entry.id === item.id && entry.source_role === role
+    await markNotificationAsReadByRole(role, notificationId);
+    notifications.value = notifications.value.map((item) =>
+      item.id === notificationId
         ? {
-            ...entry,
+            ...item,
             is_unread: false,
-            read_at: entry.read_at ?? new Date().toISOString(),
+            read_at: item.read_at ?? new Date().toISOString(),
           }
-        : entry,
+        : item,
     );
     unreadCount.value = Math.max(0, unreadCount.value - 1);
   } catch (error) {
@@ -469,11 +452,12 @@ async function markAsReadOnly(item: NotificationListEntry) {
   }
 }
 
-async function openNotification(item: NotificationListEntry) {
-  const role = item.source_role;
+async function openNotification(item: AppNotificationItem) {
+  const role = notificationRole.value;
+  if (!role) return;
 
   if (item.is_unread) {
-    await markAsReadOnly(item);
+    await markAsReadOnly(item.id);
   }
 
   isNotificationOpen.value = false;
@@ -484,15 +468,13 @@ async function openNotification(item: NotificationListEntry) {
 }
 
 async function markAllAsRead() {
-  const roles = notificationRoles.value;
-  if (roles.length === 0) return;
+  const role = notificationRole.value;
+  if (!role) return;
   if (markingAllRead.value || displayNotificationCount.value === 0) return;
 
   markingAllRead.value = true;
   try {
-    await Promise.all(
-      roles.map((role) => markAllNotificationsAsReadByRole(role)),
-    );
+    await markAllNotificationsAsReadByRole(role);
     notifications.value = notifications.value.map((item) => ({
       ...item,
       is_unread: false,
@@ -506,18 +488,18 @@ async function markAllAsRead() {
   }
 }
 
-async function deleteNotification(item: NotificationListEntry) {
-  const role = item.source_role;
-  if (deletingId.value) return;
+async function deleteNotification(notificationId: string) {
+  const role = notificationRole.value;
+  if (!role || deletingId.value) return;
 
-  deletingId.value = item.id;
+  deletingId.value = notificationId;
   try {
-    await deleteNotificationByRole(role, item.id);
+    await deleteNotificationByRole(role, notificationId);
     const removed = notifications.value.find(
-      (entry) => entry.id === item.id && entry.source_role === role,
+      (item) => item.id === notificationId,
     );
     notifications.value = notifications.value.filter(
-      (entry) => !(entry.id === item.id && entry.source_role === role),
+      (item) => item.id !== notificationId,
     );
 
     if (removed?.is_unread) {
@@ -531,17 +513,12 @@ async function deleteNotification(item: NotificationListEntry) {
 }
 
 async function deleteReadNotifications() {
-  const roles = notificationRoles.value;
-  if (
-    roles.length === 0 ||
-    deletingRead.value ||
-    readNotificationCount.value === 0
-  )
-    return;
+  const role = notificationRole.value;
+  if (!role || deletingRead.value || readNotificationCount.value === 0) return;
 
   deletingRead.value = true;
   try {
-    await Promise.all(roles.map((role) => deleteReadNotificationsByRole(role)));
+    await deleteReadNotificationsByRole(role);
     notifications.value = notifications.value.filter((item) => item.is_unread);
   } catch (error) {
     console.error(error);
@@ -587,7 +564,7 @@ function handleEsc(event: KeyboardEvent) {
   closeUserMenu();
 }
 
-watch(notificationRoles, () => {
+watch(notificationRole, () => {
   notifications.value = [];
   unreadCount.value = 0;
   void fetchNotifications({ silent: true });
@@ -604,6 +581,13 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", handleEsc);
 });
 
-const { userName, userCode, title, isDesktop, isSidebarDrawerOpen } =
-  toRefs(props);
+const {
+  userName,
+  userCode,
+  currentRole,
+  availableRoles,
+  title,
+  isDesktop,
+  isSidebarDrawerOpen,
+} = toRefs(props);
 </script>
