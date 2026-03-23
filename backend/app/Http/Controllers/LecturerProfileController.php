@@ -87,6 +87,8 @@ class LecturerProfileController extends Controller
             'emergency_contact_relation',
             'current_position',
             'current_unit',
+            'staff_type',
+            'work_status',
             'research_area',
             'teaching_specialization',
             'orcid_id',
@@ -134,6 +136,8 @@ class LecturerProfileController extends Controller
             'emergency_contact_relation' => ['nullable', 'string', 'max:100'],
             'current_position' => ['nullable', 'string', 'max:255'],
             'current_unit' => ['nullable', 'string', 'max:255'],
+            'staff_type' => ['nullable', 'string', 'max:100'],
+            'work_status' => ['nullable', 'string', 'max:100'],
             'research_area' => ['nullable', 'string', 'max:255'],
             'teaching_specialization' => ['nullable', 'string', 'max:255'],
             'orcid_id' => ['nullable', 'string', 'max:50'],
@@ -850,8 +854,8 @@ class LecturerProfileController extends Controller
         array $languagePayload,
         array $researchAreasPayload
     ): array {
-        $staffType = $latestWorkPayload['employment_type'] ?? null;
-        $workStatus = $lecturer->active ? 'active' : 'inactive';
+        $staffType = $profile?->staff_type ?? ($latestWorkPayload['employment_type'] ?? null);
+        $workStatus = $profile?->work_status ?? ($lecturer->active ? 'active' : 'inactive');
 
         return [
             'personal_info' => [
@@ -906,23 +910,23 @@ class LecturerProfileController extends Controller
     private function buildApprovedResearchWorks(Lecturer $lecturer): array
     {
         $itemsByKind = [
-    'paper' => [],
-    'book' => [],        // tổng sách + giáo trình (legacy)
-    'book_only' => [],   // ✅ chỉ sách
-    'textbook' => [],    // ✅ chỉ giáo trình
-    'project' => [],
-    'conference' => [],
-];
+            'paper' => [],
+            'book' => [],        // tổng sách + giáo trình (legacy)
+            'book_only' => [],   // ✅ chỉ sách
+            'textbook' => [],    // ✅ chỉ giáo trình
+            'project' => [],
+            'conference' => [],
+        ];
 
-$countsByKind = [
-    'paper' => 0,
-    'book' => 0,         // tổng sách + giáo trình (legacy)
-    'book_only' => 0,    // ✅ chỉ sách
-    'textbook' => 0,     // ✅ chỉ giáo trình
-    'project' => 0,
-    'conference' => 0,
-    'total' => 0,
-];
+        $countsByKind = [
+            'paper' => 0,
+            'book' => 0,         // tổng sách + giáo trình (legacy)
+            'book_only' => 0,    // ✅ chỉ sách
+            'textbook' => 0,     // ✅ chỉ giáo trình
+            'project' => 0,
+            'conference' => 0,
+            'total' => 0,
+        ];
 
         $rows = DB::table('research_activities as ra')
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
@@ -987,31 +991,31 @@ $countsByKind = [
 
         foreach ($rows as $row) {
             $item = $this->formatResearchWorkRow($row);
-$kindCode = $row->kind_code ?? 'other';
-$typeCode = strtolower((string) ($row->type_code ?? ''));
+            $kindCode = $row->kind_code ?? 'other';
+            $typeCode = strtolower((string) ($row->type_code ?? ''));
 
-$items[] = $item;
+            $items[] = $item;
 
-// đảm bảo key tồn tại
-if (! array_key_exists($kindCode, $itemsByKind)) {
-    $itemsByKind[$kindCode] = [];
-    $countsByKind[$kindCode] = 0;
-}
+            // đảm bảo key tồn tại
+            if (! array_key_exists($kindCode, $itemsByKind)) {
+                $itemsByKind[$kindCode] = [];
+                $countsByKind[$kindCode] = 0;
+            }
 
-// luôn push theo kind (legacy)
-$itemsByKind[$kindCode][] = $item;
-$countsByKind[$kindCode] = count($itemsByKind[$kindCode]);
+            // luôn push theo kind (legacy)
+            $itemsByKind[$kindCode][] = $item;
+            $countsByKind[$kindCode] = count($itemsByKind[$kindCode]);
 
-// ✅ tách riêng nếu kind = book
-if ($kindCode === 'book') {
-    if ($typeCode === 'textbook') {
-        $itemsByKind['textbook'][] = $item;
-        $countsByKind['textbook'] = count($itemsByKind['textbook']);
-    } else {
-        $itemsByKind['book_only'][] = $item;
-        $countsByKind['book_only'] = count($itemsByKind['book_only']);
-    }
-}
+            // ✅ tách riêng nếu kind = book
+            if ($kindCode === 'book') {
+                if ($typeCode === 'textbook') {
+                    $itemsByKind['textbook'][] = $item;
+                    $countsByKind['textbook'] = count($itemsByKind['textbook']);
+                } else {
+                    $itemsByKind['book_only'][] = $item;
+                    $countsByKind['book_only'] = count($itemsByKind['book_only']);
+                }
+            }
         }
 
         $countsByKind['total'] = count($items);

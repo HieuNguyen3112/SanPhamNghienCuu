@@ -45,11 +45,17 @@ const allMenuItems: MenuItem[] = [
   ...searchMenuItems,
 ];
 
-export function buildMenuForRole(role?: UserRole | null): MenuItem[] {
-  if (!role) return allMenuItems;
+export function buildMenuForRole(
+  roles?: UserRole[] | UserRole | null,
+): MenuItem[] {
+  const normalizedRoles = Array.isArray(roles) ? roles : roles ? [roles] : [];
+
+  if (normalizedRoles.length === 0) return allMenuItems;
+
+  const roleSet = new Set(normalizedRoles);
   return allMenuItems.filter((item) => {
     if (!item.roles) return true; // không set roles => ai cũng thấy
-    return item.roles.includes(role);
+    return item.roles.some((role) => roleSet.has(role));
   });
 }
 

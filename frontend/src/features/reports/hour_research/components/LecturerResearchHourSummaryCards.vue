@@ -42,6 +42,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+
 const componentProperties = defineProps<{
   totalLecturerCount: number;
   totalResearchHourCount: number;
@@ -55,11 +57,11 @@ function formatIntegerValue(value: number): string {
 
 function formatDecimalValue(value: number): string {
   return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(
-    value
+    value,
   );
 }
 
-const summaryCardDescriptors = [
+const summaryCardDescriptors = computed(() => [
   {
     title: "Tổng số giảng viên",
     subtitle: "Quy mô nhân lực",
@@ -71,7 +73,7 @@ const summaryCardDescriptors = [
     title: "Tổng giờ NCKH",
     subtitle: "Khối lượng nghiên cứu",
     formattedValue: formatIntegerValue(
-      componentProperties.totalResearchHourCount
+      componentProperties.totalResearchHourCount,
     ),
     iconPath:
       "M9 12h6M9 16h6M7 3h7l3 3v15a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
@@ -80,7 +82,7 @@ const summaryCardDescriptors = [
     title: "Giờ NCKH trung bình / giảng viên",
     subtitle: "Mức độ bình quân",
     formattedValue: formatDecimalValue(
-      componentProperties.averageResearchHoursPerLecturer
+      componentProperties.averageResearchHoursPerLecturer,
     ),
     iconPath: "M4 19V5M8 17V9M12 19v-6M16 17v-8M20 19V7",
   },
@@ -88,9 +90,9 @@ const summaryCardDescriptors = [
     title: "Tỉ lệ giảng viên đạt chuẩn (%)",
     subtitle: "Mức độ đáp ứng chuẩn",
     formattedValue: `${formatDecimalValue(
-      componentProperties.lecturerMeetingResearchHourStandardPercentage
+      componentProperties.lecturerMeetingResearchHourStandardPercentage,
     )}%`,
     iconPath: "M20 6L9 17l-5-5",
   },
-];
+]);
 </script>

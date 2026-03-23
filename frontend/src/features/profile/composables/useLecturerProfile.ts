@@ -151,7 +151,7 @@ function normalizeEmploymentType(value?: string | null): EmploymentType {
 
 function normalizeWorkStatus(
   value?: string | null,
-  active?: boolean | null
+  active?: boolean | null,
 ): WorkStatus {
   const raw = (value ?? "").toLowerCase();
   if (raw.includes("on_leave")) return "on_leave";
@@ -211,7 +211,7 @@ function parseResearchAreaString(value?: string | null): string[] {
 
 function mapResearchFields(
   fields: ResearchAreaDTO[] | undefined,
-  fallback: string | null | undefined
+  fallback: string | null | undefined,
 ) {
   const items = (fields ?? [])
     .map((f) => ({ name: f.name?.trim(), type: f.type }))
@@ -300,7 +300,7 @@ function applyProfilePayload(
   personalInfoRef: { value: LecturerPersonalInfo },
   contactInfoRef: { value: LecturerContactInfo },
   academicProfileRef: { value: LecturerAcademicProfile },
-  worksRef: { value: ResearchWorkItem[] }
+  worksRef: { value: ResearchWorkItem[] },
 ) {
   const summary = payload.scientific_profile;
   const personal = summary?.personal_info ?? {};
@@ -308,28 +308,30 @@ function applyProfilePayload(
   const academic = summary?.academic_info ?? {};
   const latestEducation =
     summary?.latest_education ?? payload.latest_education ?? null;
-  const latestWork = summary?.latest_work_history ?? payload.latest_work_history;
+  const latestWork =
+    summary?.latest_work_history ?? payload.latest_work_history;
 
-  const degreeName = academic.degree_name ?? payload.lecturer?.degree_name ?? "";
+  const degreeName =
+    academic.degree_name ?? payload.lecturer?.degree_name ?? "";
   const rankName =
     academic.academic_rank_name ?? payload.lecturer?.academic_rank_name ?? "";
 
   const { primary, secondary, keywords } = mapResearchFields(
     summary?.research_fields ?? payload.research_areas,
-    academic.research_area ?? payload.profile?.research_area
+    academic.research_area ?? payload.profile?.research_area,
   );
 
   personalInfoRef.value = {
-    lecturerCode:
-      personal.lecturer_code ?? payload.lecturer?.code ?? "",
+    lecturerCode: personal.lecturer_code ?? payload.lecturer?.code ?? "",
     fullName: personal.full_name ?? payload.lecturer?.full_name ?? "",
     birthDate: personal.date_of_birth ?? payload.profile?.date_of_birth ?? null,
     gender: normalizeGender(personal.gender ?? payload.profile?.gender),
     departmentName:
       personal.department_name ?? payload.lecturer?.department_name ?? "",
-    jobTitle: personal.current_position ?? payload.profile?.current_position ?? "",
+    jobTitle:
+      personal.current_position ?? payload.profile?.current_position ?? "",
     employmentType: normalizeEmploymentType(
-      personal.staff_type ?? latestWork?.employment_type
+      personal.staff_type ?? latestWork?.employment_type,
     ),
     workStatus: normalizeWorkStatus(personal.work_status, personal.active),
     avatarUrl: null,
@@ -341,10 +343,12 @@ function applyProfilePayload(
       payload.lecturer?.email ??
       payload.user?.email ??
       "",
-    personalEmail: contact.personal_email ?? payload.profile?.personal_email ?? "",
+    personalEmail:
+      contact.personal_email ?? payload.profile?.personal_email ?? "",
     phone: contact.phone ?? payload.lecturer?.phone ?? "",
     address: contact.address ?? payload.profile?.address ?? "",
-    website: contact.personal_website ?? payload.profile?.personal_website ?? "",
+    website:
+      contact.personal_website ?? payload.profile?.personal_website ?? "",
     googleScholar:
       contact.google_scholar_profile ??
       payload.profile?.google_scholar_profile ??
@@ -360,7 +364,9 @@ function applyProfilePayload(
     major: latestEducation?.major ?? "",
     academicDegree: degreeName,
     academicRank: rankName,
-    degreeYear: parseYear(latestEducation?.end_date ?? latestEducation?.start_date),
+    degreeYear: parseYear(
+      latestEducation?.end_date ?? latestEducation?.start_date,
+    ),
     rankYear: null,
     primaryArea: primary,
     secondaryArea: secondary,
@@ -397,7 +403,9 @@ function buildLanguagePayload(rows: LanguageRow[]): LanguageDTO[] {
 
 function resolveErrorMessage(error: unknown, fallback: string): string {
   const anyError = error as { response?: { data?: { message?: string } } };
-  return anyError?.response?.data?.message || (error as Error)?.message || fallback;
+  return (
+    anyError?.response?.data?.message || (error as Error)?.message || fallback
+  );
 }
 
 export function useLecturerProfile() {
@@ -415,11 +423,11 @@ export function useLecturerProfile() {
   async function syncLatestEducation(
     next: LecturerAcademicProfile,
     degreeIdToPersist?: number | null,
-    fallbackDegreeId?: number | null
+    fallbackDegreeId?: number | null,
   ) {
     const histories = await fetchTrainingHistories();
     const items: SyncTrainingHistoriesPayload["items"] = histories.map((item) =>
-      toTrainingHistorySyncItem(item)
+      toTrainingHistorySyncItem(item),
     );
     for (const item of items) {
       if (!item.institution || !item.institution.trim()) {
@@ -465,7 +473,13 @@ export function useLecturerProfile() {
       ]);
       degreeOptions.value = degrees;
       rankOptions.value = ranks;
-      applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+      applyProfilePayload(
+        payload,
+        personalInfo,
+        contactInfo,
+        academicProfile,
+        works,
+      );
     } catch (error) {
       throw new Error(resolveErrorMessage(error, "Unable to load profile"));
     } finally {
@@ -481,10 +495,20 @@ export function useLecturerProfile() {
         date_of_birth: next.birthDate,
         gender: normalizeGenderToBackend(next.gender),
         current_position: next.jobTitle,
+        staff_type: next.employmentType,
+        work_status: next.workStatus,
       });
-      applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+      applyProfilePayload(
+        payload,
+        personalInfo,
+        contactInfo,
+        academicProfile,
+        works,
+      );
     } catch (error) {
-      throw new Error(resolveErrorMessage(error, "Unable to update personal info"));
+      throw new Error(
+        resolveErrorMessage(error, "Unable to update personal info"),
+      );
     } finally {
       loading.value = false;
     }
@@ -501,9 +525,17 @@ export function useLecturerProfile() {
         google_scholar_profile: next.googleScholar || null,
         orcid_id: next.orcid || null,
       });
-      applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+      applyProfilePayload(
+        payload,
+        personalInfo,
+        contactInfo,
+        academicProfile,
+        works,
+      );
     } catch (error) {
-      throw new Error(resolveErrorMessage(error, "Unable to update contact info"));
+      throw new Error(
+        resolveErrorMessage(error, "Unable to update contact info"),
+      );
     } finally {
       loading.value = false;
     }
@@ -518,14 +550,18 @@ export function useLecturerProfile() {
       const degreeChanged = degreeInput !== prev.academicDegree.trim();
       const rankChanged = rankInput !== prev.academicRank.trim();
       const [degrees, ranks] = await Promise.all([
-        degreeOptions.value.length > 0 ? Promise.resolve(degreeOptions.value) : fetchDegrees(),
+        degreeOptions.value.length > 0
+          ? Promise.resolve(degreeOptions.value)
+          : fetchDegrees(),
         rankOptions.value.length > 0
           ? Promise.resolve(rankOptions.value)
           : fetchAcademicRanks(),
       ]);
       degreeOptions.value = degrees;
       rankOptions.value = ranks;
-      const matchedDegreeId = degreeInput ? matchLookupId(degreeInput, degrees) : null;
+      const matchedDegreeId = degreeInput
+        ? matchLookupId(degreeInput, degrees)
+        : null;
       const matchedRankId = rankInput ? matchLookupId(rankInput, ranks) : null;
 
       if (degreeChanged && degreeInput && !matchedDegreeId) {
@@ -544,13 +580,19 @@ export function useLecturerProfile() {
             },
           ],
         });
-        applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+        applyProfilePayload(
+          payload,
+          personalInfo,
+          contactInfo,
+          academicProfile,
+          works,
+        );
       }
 
       await syncLatestEducation(
         next,
         degreeChanged ? (matchedDegreeId ?? null) : undefined,
-        matchedDegreeId
+        matchedDegreeId,
       );
 
       const researchItems = buildResearchAreaItems(next);
@@ -564,13 +606,21 @@ export function useLecturerProfile() {
         })),
       });
 
-      applyProfilePayload(payload, personalInfo, contactInfo, academicProfile, works);
+      applyProfilePayload(
+        payload,
+        personalInfo,
+        contactInfo,
+        academicProfile,
+        works,
+      );
       academicProfile.value = {
         ...academicProfile.value,
         languages: mapLanguageRows(languages),
       };
     } catch (error) {
-      throw new Error(resolveErrorMessage(error, "Unable to update academic profile"));
+      throw new Error(
+        resolveErrorMessage(error, "Unable to update academic profile"),
+      );
     } finally {
       loading.value = false;
     }

@@ -27,6 +27,8 @@ class LecturerProfile extends Model
         'emergency_contact_relation',
         'current_position',
         'current_unit',
+        'staff_type',
+        'work_status',
         'research_area',
         'teaching_specialization',
         'orcid_id',

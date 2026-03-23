@@ -16,8 +16,7 @@ class AdminResearchWorkSearchController extends Controller
 {
     public function __construct(
         private ResearchEvidenceStorageService $evidenceStorageService
-    ) {
-    }
+    ) {}
 
     public function lookups(Request $request)
     {

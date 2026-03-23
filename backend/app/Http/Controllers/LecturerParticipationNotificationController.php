@@ -11,6 +11,7 @@ use App\Support\AuditLogger;
 use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 class LecturerParticipationNotificationController extends Controller
@@ -58,7 +59,7 @@ class LecturerParticipationNotificationController extends Controller
             ->paginate($perPage, ['*'], 'page', $page);
 
         $items = collect($paginator->items())
-            ->map(fn ($row) => $this->mapListRow($row))
+            ->map(fn($row) => $this->mapListRow($row))
             ->all();
 
         return response()->json([
@@ -666,6 +667,7 @@ class LecturerParticipationNotificationController extends Controller
     private function baseQuery(int $lecturerId)
     {
         $yearExpr = $this->activityYearExpression();
+        $paperArticleUrlExpr = $this->paperArticleUrlSelectExpression();
 
         return DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
@@ -697,7 +699,7 @@ class LecturerParticipationNotificationController extends Controller
                 'pd.journal_name',
                 'pd.issn',
                 'pd.doi',
-                'pd.article_url',
+                DB::raw($paperArticleUrlExpr . ' as article_url'),
                 'pd.year as paper_year',
                 'bd.publisher',
                 'bd.isbn',
@@ -712,15 +714,18 @@ class LecturerParticipationNotificationController extends Controller
             ]);
     }
 
+    private function paperArticleUrlSelectExpression(): string
+    {
+        return Schema::hasColumn('paper_details', 'article_url') ? 'pd.article_url' : 'NULL';
+    }
+
     private function activityYearExpression(): string
     {
-        $driver = DB::connection()->getDriverName();
-
-        if ($driver === 'sqlite') {
-            return "COALESCE(pd.year, bd.year, CAST(strftime('%Y', prd.start_month) AS INTEGER), CAST(strftime('%Y', cd.held_on) AS INTEGER), CAST(strftime('%Y', ra.start_date) AS INTEGER), CAST(strftime('%Y', ra.created_at) AS INTEGER))";
-        }
-
-        return 'COALESCE(pd.year, bd.year, YEAR(prd.start_month), YEAR(cd.held_on), YEAR(ra.start_date), YEAR(ra.created_at))';
+        return match (DB::connection()->getDriverName()) {
+            'sqlite' => "COALESCE(pd.year, bd.year, CAST(strftime('%Y', prd.start_month) AS INTEGER), CAST(strftime('%Y', cd.held_on) AS INTEGER), CAST(strftime('%Y', ra.start_date) AS INTEGER), CAST(strftime('%Y', ra.created_at) AS INTEGER))",
+            'pgsql' => 'COALESCE(pd.year, bd.year, CAST(EXTRACT(YEAR FROM prd.start_month) AS INTEGER), CAST(EXTRACT(YEAR FROM cd.held_on) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.start_date) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.created_at) AS INTEGER))',
+            default => 'COALESCE(pd.year, bd.year, YEAR(prd.start_month), YEAR(cd.held_on), YEAR(ra.start_date), YEAR(ra.created_at))',
+        };
     }
 
     private function buildShortInfo(object $row): string

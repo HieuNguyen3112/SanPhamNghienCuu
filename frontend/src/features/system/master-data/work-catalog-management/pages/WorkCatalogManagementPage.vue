@@ -229,14 +229,7 @@
 
 <script setup lang="ts">
 import { onMounted } from "vue";
-import {
-  Layers,
-  Flag,
-  BookOpen,
-  Building2,
-  Users,
-  Brain,
-} from "lucide-vue-next";
+import { BookOpen, Building2, Users, Brain } from "lucide-vue-next";
 
 import CatalogTabs from "../components/CatalogTabs.vue";
 import WorkTypeCatalogSection from "../components/WorkTypeCatalogSection.vue";
@@ -257,8 +250,6 @@ import { usePageLoadFeedback } from "@/shared/composables/usePageLoadFeedback";
 import PageHeader from "@/shared/components/layout/PageHeader.vue";
 
 const tabs: Array<{ key: WorkCatalogTabKey; label: string; icon: any }> = [
-  { key: "work_type", label: "Loại công trình", icon: Layers },
-  { key: "work_level", label: "Cấp công trình", icon: Flag },
   { key: "journal", label: "Tạp chí khoa học", icon: BookOpen },
   { key: "publisher", label: "Nhà xuất bản", icon: Building2 },
   { key: "conference", label: "Hội nghị khoa học", icon: Users },

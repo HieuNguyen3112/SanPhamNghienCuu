@@ -176,8 +176,11 @@ router.beforeEach(async (to) => {
   }
 
   if (requiredRoles) {
-    const currentRole = userStore.role;
-    if (!currentRole || !requiredRoles.includes(currentRole)) {
+    const assignedRoles = userStore.currentUser?.roles ?? [];
+    const hasAllowedRole = assignedRoles.some((role) =>
+      requiredRoles.includes(role),
+    );
+    if (!hasAllowedRole) {
       return { path: "/403", replace: true };
     }
   }

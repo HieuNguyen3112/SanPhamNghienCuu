@@ -96,6 +96,7 @@ import { computed } from "vue";
 import { Save, Send } from "lucide-vue-next";
 import DeclarationStatusBadge from "./DeclarationStatusBadge.vue";
 import type { DeclarationStatusUi } from "../contracts/declarationSharedContract";
+import { formatBackendDateTimeVi } from "@/shared/utils/backendDateTime";
 
 const props = defineProps<{
   title: string;
@@ -144,7 +145,6 @@ const statusText = computed(() => {
 });
 
 function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString();
+  return formatBackendDateTimeVi(iso);
 }
 </script>
