@@ -191,10 +191,11 @@ class LecturerPersonalHoursController extends Controller
             WHEN SUM(CASE WHEN aa.status = 'rejected' THEN 1 ELSE 0 END) > 0 THEN 'rejected'
             ELSE 'approved'
         END";
+        $batchIdExpr = $this->approvalBatchIdExpression('aa.created_at');
 
         $batchQuery = $this->hoursApprovalQuery((int) $lecturer->id, $scopeAcademicYearId, $hoursStageId)
             ->select([
-                DB::raw('UNIX_TIMESTAMP(aa.created_at) as batch_id'),
+                DB::raw($batchIdExpr . ' as batch_id'),
                 'ay.id as academic_year_id',
                 'ay.code as academic_year_code',
                 DB::raw('MAX(aa.created_at) as submitted_at'),
@@ -202,7 +203,7 @@ class LecturerPersonalHoursController extends Controller
                 DB::raw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as total_hours'),
                 DB::raw($statusCase . ' as status_code'),
             ])
-            ->groupBy(DB::raw('UNIX_TIMESTAMP(aa.created_at)'), 'ay.id', 'ay.code');
+            ->groupBy(DB::raw($batchIdExpr), 'ay.id', 'ay.code');
 
         $paginator = $batchQuery
             ->orderByDesc(DB::raw('MAX(aa.created_at)'))
@@ -254,9 +255,10 @@ class LecturerPersonalHoursController extends Controller
         }
 
         $this->backfillComputedHoursForLecturer((int) $lecturer->id, null);
+        $batchIdExpr = $this->approvalBatchIdExpression('aa.created_at');
 
         $items = $this->hoursApprovalQuery($lecturer->id, null, $hoursStageId)
-            ->whereRaw('UNIX_TIMESTAMP(aa.created_at) = ?', [$batchId])
+            ->whereRaw($batchIdExpr . ' = ?', [$batchId])
             ->select([
                 'ra.id as activity_id',
                 'ra.title as activity_title',
@@ -632,5 +634,14 @@ class LecturerPersonalHoursController extends Controller
         };
 
         return $mapped ?? $fallback ?? $code;
+    }
+
+    private function approvalBatchIdExpression(string $column): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "CAST(EXTRACT(EPOCH FROM {$column}) AS BIGINT)",
+            'sqlite' => "CAST(strftime('%s', {$column}) AS INTEGER)",
+            default => "UNIX_TIMESTAMP({$column})",
+        };
     }
 }
