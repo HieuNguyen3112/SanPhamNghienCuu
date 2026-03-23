@@ -77,7 +77,7 @@ const handleGoHome = async () => {
   await router.push("/");
 };
 
-const resolveRoleLandingTarget = (role: UserRole) => {
+const resolveRoleLandingTarget = (role: UserRole | null) => {
   if (role === "LECTURER") {
     if (router.hasRoute("declarations.gateway")) {
       return { name: "declarations.gateway" };
