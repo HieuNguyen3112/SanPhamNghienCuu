@@ -226,6 +226,8 @@ export interface UpdateContactPayload {
   emergency_contact_relation?: string | null;
   current_position?: string | null;
   current_unit?: string | null;
+  staff_type?: string | null;
+  work_status?: string | null;
   research_area?: string | null;
   teaching_specialization?: string | null;
   orcid_id?: string | null;
@@ -286,14 +288,14 @@ export interface SyncTrainingHistoriesPayload {
 
 export async function fetchDegrees(): Promise<LookupItemDTO[]> {
   const { data } = await http.get<{ data: LookupItemDTO[] }>(
-    "/api/lookups/degrees"
+    "/api/lookups/degrees",
   );
   return data.data;
 }
 
 export async function fetchAcademicRanks(): Promise<LookupItemDTO[]> {
   const { data } = await http.get<{ data: LookupItemDTO[] }>(
-    "/api/lookups/academic-ranks"
+    "/api/lookups/academic-ranks",
   );
   return data.data;
 }
@@ -304,61 +306,63 @@ export async function fetchScientificProfile(): Promise<ScientificProfilePayload
 }
 
 export async function fetchTrainingHistories(): Promise<EducationDTO[]> {
-  const { data } = await http.get<{ data: EducationDTO[] }>("/api/profile/educations");
+  const { data } = await http.get<{ data: EducationDTO[] }>(
+    "/api/profile/educations",
+  );
   return data.data;
 }
 
 export async function updateAcademicTitles(
-  payload: UpdateAcademicTitlesPayload
+  payload: UpdateAcademicTitlesPayload,
 ): Promise<ScientificProfilePayload> {
   await ensureCsrfCookie();
   const { data } = await http.put<{ data: ScientificProfilePayload }>(
     "/api/profile/academic-titles",
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function updateProfileContact(
-  payload: UpdateContactPayload
+  payload: UpdateContactPayload,
 ): Promise<ScientificProfilePayload> {
   await ensureCsrfCookie();
   const { data } = await http.put<{ data: ScientificProfilePayload }>(
     "/api/profile/contact",
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function updateResearchAreas(
-  payload: UpdateResearchAreasPayload
+  payload: UpdateResearchAreasPayload,
 ): Promise<ScientificProfilePayload> {
   await ensureCsrfCookie();
   const { data } = await http.put<{ data: ScientificProfilePayload }>(
     "/api/profile/research-areas",
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function updateLanguages(
-  payload: UpdateLanguagesPayload
+  payload: UpdateLanguagesPayload,
 ): Promise<LanguageDTO[]> {
   await ensureCsrfCookie();
   const { data } = await http.put<{ data: LanguageDTO[] }>(
     "/api/profile/languages",
-    payload
+    payload,
   );
   return data.data;
 }
 
 export async function syncTrainingHistories(
-  payload: SyncTrainingHistoriesPayload
+  payload: SyncTrainingHistoriesPayload,
 ): Promise<EducationDTO[]> {
   await ensureCsrfCookie();
   const { data } = await http.put<{ data: EducationDTO[] }>(
     "/api/profile/educations",
-    payload
+    payload,
   );
   return data.data;
 }

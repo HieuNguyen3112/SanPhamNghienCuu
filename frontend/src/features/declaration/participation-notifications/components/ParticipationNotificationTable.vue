@@ -133,6 +133,7 @@ src/features/declaration/participation-notifications/components/ParticipationNot
 import { computed, watch } from "vue";
 import { Eye } from "lucide-vue-next";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
+import { formatBackendDateTimeVi } from "@/shared/utils/backendDateTime";
 
 type WorkType = "ARTICLE" | "PROJECT" | "BOOK" | "CONFERENCE";
 type NotificationStatus = "PENDING" | "ACCEPTED" | "REJECTED";
@@ -204,12 +205,6 @@ function statusBadgeClass(s: NotificationStatus) {
 }
 
 function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  return formatBackendDateTimeVi(iso);
 }
 </script>

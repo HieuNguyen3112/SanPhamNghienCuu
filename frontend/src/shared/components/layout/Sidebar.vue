@@ -47,7 +47,9 @@
       >
         <div
           class="flex items-center justify-center rounded-full bg-slate-300 font-semibold text-slate-700"
-          :class="isCollapsedDesktop ? 'h-12 w-12 text-base' : 'h-14 w-14 text-lg'"
+          :class="
+            isCollapsedDesktop ? 'h-12 w-12 text-base' : 'h-14 w-14 text-lg'
+          "
         >
           <span>{{ teacherInitials }}</span>
         </div>
@@ -93,7 +95,9 @@
             @click="toggleGroup(group.header.id)"
           >
             <span>{{ group.header.label }}</span>
-            <span class="text-xs">{{ groupOpen[group.header.id] ? "▾" : "▸" }}</span>
+            <span class="text-xs">{{
+              groupOpen[group.header.id] ? "▾" : "▸"
+            }}</span>
           </button>
 
           <transition name="collapse">
@@ -115,12 +119,16 @@
                 :title="isCollapsedDesktop ? item.label : undefined"
                 @click="handleItemClick"
               >
-                <span class="flex h-8 w-8 items-center justify-center rounded-md bg-transparent">
+                <span
+                  class="flex h-8 w-8 items-center justify-center rounded-md bg-transparent"
+                >
                   <component v-if="item.icon" :is="item.icon" class="h-5 w-5" />
                   <span v-else class="text-[10px]">•</span>
                 </span>
 
-                <span v-if="!isCollapsedDesktop" class="truncate">{{ item.label }}</span>
+                <span v-if="!isCollapsedDesktop" class="truncate">{{
+                  item.label
+                }}</span>
 
                 <div
                   v-if="isCollapsedDesktop"
@@ -184,9 +192,7 @@ const teacher = computed(
     },
 );
 
-const isCollapsedDesktop = computed(
-  () => props.isDesktop && props.isCollapsed,
-);
+const isCollapsedDesktop = computed(() => props.isDesktop && props.isCollapsed);
 
 const roleLabelMap: Record<string, string> = {
   LECTURER: "Giảng viên",
@@ -195,12 +201,18 @@ const roleLabelMap: Record<string, string> = {
 };
 
 const roleName = computed(() => {
-  const roleUser = userStore.role;
-  return roleUser ? roleLabelMap[roleUser] : "Không xác định";
+  const roles = userStore.currentUser?.roles ?? [];
+  if (!roles.length) return "Không xác định";
+  return roles.map((role) => roleLabelMap[role] ?? role).join(" / ");
 });
 
-const menuItems = computed(() => buildMenuForRole(userStore.role) as MenuItem[]);
-const { menuGroups, groupOpen, toggleGroup } = useSidebarGroups(menuItems, route);
+const menuItems = computed(
+  () => buildMenuForRole(userStore.currentUser?.roles ?? []) as MenuItem[],
+);
+const { menuGroups, groupOpen, toggleGroup } = useSidebarGroups(
+  menuItems,
+  route,
+);
 
 const isActive = (routeName: string) => route.name === routeName;
 

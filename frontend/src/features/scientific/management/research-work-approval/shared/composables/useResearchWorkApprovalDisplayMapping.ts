@@ -155,6 +155,8 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Ho_Chi_Minh",
     }).format(dateValue);
   }
 

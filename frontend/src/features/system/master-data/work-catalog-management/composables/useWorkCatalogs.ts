@@ -9,7 +9,7 @@ import { useConferenceCatalog } from "./useConferenceCatalog";
 import { useResearchFieldCatalog } from "./useResearchFieldCatalog";
 
 export function useWorkCatalogs() {
-  const activeTab = ref<WorkCatalogTabKey>("work_type");
+  const activeTab = ref<WorkCatalogTabKey>("journal");
   const loading = ref(false);
   const errorMessage = ref<string | null>(null);
 

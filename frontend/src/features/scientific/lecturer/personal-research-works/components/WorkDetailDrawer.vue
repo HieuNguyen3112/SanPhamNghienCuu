@@ -385,6 +385,7 @@ import InfoRow from "@/features/scientific/lecturer/personal-research-works/comp
 import TimelineItem from "@/features/scientific/lecturer/personal-research-works/components/TimelineItem.vue";
 import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
 import { usePdfPreview } from "@/shared/composables/usePdfPreview";
+import { formatBackendDateTimeVi } from "@/shared/utils/backendDateTime";
 
 const props = defineProps<{
   open: boolean;
@@ -499,9 +500,8 @@ function editActionLabel(work: PersonalWorkDetail): string {
 
 function formatDateTime(value: string | null): string {
   if (!value) return "—";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
+  const formatted = formatBackendDateTimeVi(value);
+  return formatted || value;
 }
 
 function formatBytes(bytes: number): string {

@@ -62,7 +62,9 @@
             role="menu"
             aria-label="Danh sách thông báo"
           >
-            <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+            <div
+              class="flex items-center justify-between border-b border-slate-200 px-4 py-3"
+            >
               <div class="text-sm font-semibold text-slate-900">Thông báo</div>
               <div class="flex items-center gap-3">
                 <button
@@ -81,7 +83,9 @@
                   type="button"
                   class="text-xs font-medium text-slate-500 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                   :disabled="
-                    !canUseNotifications || deletingRead || readNotificationCount === 0
+                    !canUseNotifications ||
+                    deletingRead ||
+                    readNotificationCount === 0
                   "
                   @click="deleteReadNotifications"
                 >
@@ -115,7 +119,7 @@
               <ul v-else class="divide-y divide-slate-100">
                 <li
                   v-for="entry in notificationsWithVisual"
-                  :key="entry.item.id"
+                  :key="`${entry.item.source_role}:${entry.item.id}`"
                   class="px-3 py-2"
                 >
                   <div
@@ -138,7 +142,11 @@
                         />
                       </div>
 
-                      <button type="button" class="flex-1 text-left" @click="openNotification(entry.item)">
+                      <button
+                        type="button"
+                        class="flex-1 text-left"
+                        @click="openNotification(entry.item)"
+                      >
                         <p
                           class="line-clamp-1 text-sm"
                           :class="
@@ -162,7 +170,7 @@
                         type="button"
                         class="mt-0.5 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="markingReadId === entry.item.id"
-                        @click.stop="markAsReadOnly(entry.item.id)"
+                        @click.stop="markAsReadOnly(entry.item)"
                       >
                         Đã đọc
                       </button>
@@ -171,14 +179,16 @@
                         <span
                           class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-slate-400"
                         >
-                          <span class="inline-block h-1.5 w-1.5 rounded-full bg-slate-300"></span>
+                          <span
+                            class="inline-block h-1.5 w-1.5 rounded-full bg-slate-300"
+                          ></span>
                           Đã đọc
                         </span>
                         <button
                           type="button"
                           class="mt-0.5 rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                           :disabled="deletingId === entry.item.id"
-                          @click.stop="deleteNotification(entry.item.id)"
+                          @click.stop="deleteNotification(entry.item)"
                         >
                           <span class="sr-only">Xóa thông báo</span>
                           <Trash2 class="h-3.5 w-3.5" />
@@ -232,7 +242,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, toRefs, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Bell, Trash2 } from "lucide-vue-next";
-import { useUserStore, type UserRole } from "@/app/stores/userStore";
+import { useUserStore } from "@/app/stores/userStore";
 import UserDropdown from "@/shared/components/layout/UserDropdown.vue";
 import { getNotificationVisual } from "@/shared/notifications/notificationVisual";
 import {
@@ -275,21 +285,26 @@ const props = withDefaults(
 const router = useRouter();
 const userStore = useUserStore();
 
-const notificationRole = computed<NotificationRole | null>(() => {
-  const role = (userStore.role ?? null) as UserRole | null;
-  if (role === "LECTURER" || role === "DEPARTMENT_BOARD") {
-    return role;
-  }
-  return null;
+const notificationRoles = computed<NotificationRole[]>(() => {
+  const roles = userStore.currentUser?.roles ?? [];
+  const supportedRoles: NotificationRole[] = [];
+  if (roles.includes("LECTURER")) supportedRoles.push("LECTURER");
+  if (roles.includes("DEPARTMENT_BOARD"))
+    supportedRoles.push("DEPARTMENT_BOARD");
+  return supportedRoles;
 });
-const canUseNotifications = computed(() => notificationRole.value !== null);
+const canUseNotifications = computed(() => notificationRoles.value.length > 0);
 
 const isUserMenuOpen = ref(false);
 const avatarBtnRef = ref<HTMLElement | null>(null);
 
 const isNotificationOpen = ref(false);
 const notificationRootRef = ref<HTMLElement | null>(null);
-const notifications = ref<AppNotificationItem[]>([]);
+type NotificationListEntry = AppNotificationItem & {
+  source_role: NotificationRole;
+};
+
+const notifications = ref<NotificationListEntry[]>([]);
 const unreadCount = ref(0);
 const loadingNotifications = ref(false);
 const markingReadId = ref<string | null>(null);
@@ -376,8 +391,8 @@ function formatRelativeTime(value: string | null) {
 }
 
 async function fetchNotifications(options?: { silent?: boolean }) {
-  const role = notificationRole.value;
-  if (!role) {
+  const roles = notificationRoles.value;
+  if (roles.length === 0) {
     notifications.value = [];
     unreadCount.value = 0;
     return;
@@ -389,9 +404,38 @@ async function fetchNotifications(options?: { silent?: boolean }) {
   }
 
   try {
-    const response = await listNotificationsByRole(role, { page: 1, per_page: 12 });
-    notifications.value = response.items;
-    unreadCount.value = response.unread_count;
+    const results = await Promise.allSettled(
+      roles.map((role) =>
+        listNotificationsByRole(role, {
+          page: 1,
+          per_page: 12,
+        }).then((response) => ({ role, response })),
+      ),
+    );
+
+    const mergedItems: NotificationListEntry[] = [];
+    let mergedUnreadCount = 0;
+
+    for (const result of results) {
+      if (result.status !== "fulfilled") continue;
+      const { role, response } = result.value;
+      mergedUnreadCount += Number(response.unread_count ?? 0);
+      mergedItems.push(
+        ...response.items.map((item) => ({
+          ...item,
+          source_role: role,
+        })),
+      );
+    }
+
+    mergedItems.sort((a, b) => {
+      const left = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const right = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return right - left;
+    });
+
+    notifications.value = mergedItems.slice(0, 12);
+    unreadCount.value = mergedUnreadCount;
   } catch (error) {
     console.error(error);
   } finally {
@@ -401,22 +445,21 @@ async function fetchNotifications(options?: { silent?: boolean }) {
   }
 }
 
-async function markAsReadOnly(notificationId: string) {
-  const role = notificationRole.value;
-  if (!role) return;
+async function markAsReadOnly(item: NotificationListEntry) {
+  const role = item.source_role;
   if (markingReadId.value) return;
 
-  markingReadId.value = notificationId;
+  markingReadId.value = item.id;
   try {
-    await markNotificationAsReadByRole(role, notificationId);
-    notifications.value = notifications.value.map((item) =>
-      item.id === notificationId
+    await markNotificationAsReadByRole(role, item.id);
+    notifications.value = notifications.value.map((entry) =>
+      entry.id === item.id && entry.source_role === role
         ? {
-            ...item,
+            ...entry,
             is_unread: false,
-            read_at: item.read_at ?? new Date().toISOString(),
+            read_at: entry.read_at ?? new Date().toISOString(),
           }
-        : item,
+        : entry,
     );
     unreadCount.value = Math.max(0, unreadCount.value - 1);
   } catch (error) {
@@ -426,12 +469,11 @@ async function markAsReadOnly(notificationId: string) {
   }
 }
 
-async function openNotification(item: AppNotificationItem) {
-  const role = notificationRole.value;
-  if (!role) return;
+async function openNotification(item: NotificationListEntry) {
+  const role = item.source_role;
 
   if (item.is_unread) {
-    await markAsReadOnly(item.id);
+    await markAsReadOnly(item);
   }
 
   isNotificationOpen.value = false;
@@ -442,13 +484,15 @@ async function openNotification(item: AppNotificationItem) {
 }
 
 async function markAllAsRead() {
-  const role = notificationRole.value;
-  if (!role) return;
+  const roles = notificationRoles.value;
+  if (roles.length === 0) return;
   if (markingAllRead.value || displayNotificationCount.value === 0) return;
 
   markingAllRead.value = true;
   try {
-    await markAllNotificationsAsReadByRole(role);
+    await Promise.all(
+      roles.map((role) => markAllNotificationsAsReadByRole(role)),
+    );
     notifications.value = notifications.value.map((item) => ({
       ...item,
       is_unread: false,
@@ -462,16 +506,18 @@ async function markAllAsRead() {
   }
 }
 
-async function deleteNotification(notificationId: string) {
-  const role = notificationRole.value;
-  if (!role || deletingId.value) return;
+async function deleteNotification(item: NotificationListEntry) {
+  const role = item.source_role;
+  if (deletingId.value) return;
 
-  deletingId.value = notificationId;
+  deletingId.value = item.id;
   try {
-    await deleteNotificationByRole(role, notificationId);
-    const removed = notifications.value.find((item) => item.id === notificationId);
+    await deleteNotificationByRole(role, item.id);
+    const removed = notifications.value.find(
+      (entry) => entry.id === item.id && entry.source_role === role,
+    );
     notifications.value = notifications.value.filter(
-      (item) => item.id !== notificationId,
+      (entry) => !(entry.id === item.id && entry.source_role === role),
     );
 
     if (removed?.is_unread) {
@@ -485,12 +531,17 @@ async function deleteNotification(notificationId: string) {
 }
 
 async function deleteReadNotifications() {
-  const role = notificationRole.value;
-  if (!role || deletingRead.value || readNotificationCount.value === 0) return;
+  const roles = notificationRoles.value;
+  if (
+    roles.length === 0 ||
+    deletingRead.value ||
+    readNotificationCount.value === 0
+  )
+    return;
 
   deletingRead.value = true;
   try {
-    await deleteReadNotificationsByRole(role);
+    await Promise.all(roles.map((role) => deleteReadNotificationsByRole(role)));
     notifications.value = notifications.value.filter((item) => item.is_unread);
   } catch (error) {
     console.error(error);
@@ -515,7 +566,10 @@ function handleClickOutside(event: MouseEvent) {
   const target = event.target as Node | null;
 
   if (isNotificationOpen.value) {
-    if (notificationRootRef.value && !notificationRootRef.value.contains(target)) {
+    if (
+      notificationRootRef.value &&
+      !notificationRootRef.value.contains(target)
+    ) {
       closeNotificationMenu();
     }
   }
@@ -533,7 +587,7 @@ function handleEsc(event: KeyboardEvent) {
   closeUserMenu();
 }
 
-watch(notificationRole, () => {
+watch(notificationRoles, () => {
   notifications.value = [];
   unreadCount.value = 0;
   void fetchNotifications({ silent: true });
