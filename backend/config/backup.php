@@ -92,6 +92,7 @@ return [
         'enabled' => filter_var(env('SPNC_BACKUP_EXPORT_ENABLED', true), FILTER_VALIDATE_BOOL),
         'sync_to_drive' => filter_var(env('SPNC_BACKUP_EXPORT_SYNC_TO_DRIVE', true), FILTER_VALIDATE_BOOL),
         'pdf_enabled' => filter_var(env('SPNC_BACKUP_EXPORT_PDF_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'inline_postprocess' => filter_var(env('SPNC_BACKUP_EXPORT_INLINE_POSTPROCESS', true), FILTER_VALIDATE_BOOL),
         'folder_name' => env('SPNC_BACKUP_EXPORT_FOLDER_NAME', 'exports'),
         // Optional override for the readable export destination.
         // Leave empty to derive from SPNC_BACKUP_REPOSITORY.

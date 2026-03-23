@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Backup\BackupRunStateStore;
 use App\Services\Backup\BackupRunLauncher;
+use App\Services\Backup\BackupRunStateStore;
 use App\Services\Backup\BackupSnapshotStore;
 use App\Services\Backup\ResticBackupManager;
 use Illuminate\Console\Command;
@@ -14,11 +14,11 @@ use Illuminate\Support\Facades\Log;
 class SpncBackupRun extends Command
 {
     protected $signature = 'spnc:backup:run
-        {--run-id= : Mã run để theo dõi trạng thái}
-        {--trigger=manual : Nguồn kích hoạt backup (manual/schedule)}
-        {--initiated-by= : user_id kích hoạt}';
+        {--run-id= : MÃ£ run Ä‘á»ƒ theo dÃµi tráº¡ng thÃ¡i}
+        {--trigger=manual : Nguá»“n kÃ­ch hoáº¡t backup (manual/schedule)}
+        {--initiated-by= : user_id kÃ­ch hoáº¡t}';
 
-    protected $description = 'Chạy backup SPNC (DB + tệp nhạy cảm) bằng restic.';
+    protected $description = 'Cháº¡y backup SPNC (DB + tá»‡p nháº¡y cáº£m) báº±ng restic.';
 
     private ResticBackupManager $backupManager;
     private BackupRunStateStore $stateStore;
@@ -72,11 +72,11 @@ class SpncBackupRun extends Command
                 'requested_by_user_id' => $initiatedBy ?? ($existing['requested_by_user_id'] ?? null),
             ]);
         }
-        $this->stateStore->appendLog($runId, 'Bắt đầu tiến trình backup. trigger=' . $trigger);
+        $this->stateStore->appendLog($runId, 'Báº¯t Ä‘áº§u tiáº¿n trÃ¬nh backup. trigger=' . $trigger);
 
         $lock = Cache::lock('spnc:backup:run', 21600);
         if (! $lock->get()) {
-            $message = 'Đang có một bản sao lưu đang chạy. Vui lòng đợi hoàn tất.';
+            $message = 'Äang cÃ³ má»™t báº£n sao lÆ°u Ä‘ang cháº¡y. Vui lÃ²ng Ä‘á»£i hoÃ n táº¥t.';
             $this->stateStore->update($runId, [
                 'status' => 'failed',
                 'operation' => 'backup',
@@ -91,7 +91,7 @@ class SpncBackupRun extends Command
 
         try {
             if (strtolower($trigger) === 'schedule' && $this->shouldSkipScheduleRun($runId)) {
-                $message = 'Bỏ qua backup lịch vì lần chạy gần nhất chưa đạt khoảng cách theo cấu hình.';
+                $message = 'Bá» qua backup lá»‹ch vÃ¬ láº§n cháº¡y gáº§n nháº¥t chÆ°a Ä‘áº¡t khoáº£ng cÃ¡ch theo cáº¥u hÃ¬nh.';
                 $this->stateStore->update($runId, [
                     'status' => 'success',
                     'operation' => 'backup',
@@ -117,17 +117,17 @@ class SpncBackupRun extends Command
                 'operation' => 'backup',
                 'started_at' => now()->toIso8601String(),
                 'step' => 'running_backup',
-                'message' => 'Đang tạo snapshot backup...',
+                'message' => 'Äang táº¡o snapshot backup...',
             ]);
-            $this->stateStore->appendLog($runId, 'Đang chạy restic backup...');
+            $this->stateStore->appendLog($runId, 'Äang cháº¡y restic backup...');
 
             $result = $this->backupManager->runBackup($runId, $trigger, $initiatedBy);
-            $this->stateStore->appendLog($runId, 'Tạo snapshot hoàn tất.');
+            $this->stateStore->appendLog($runId, 'Táº¡o snapshot hoÃ n táº¥t.');
             $summary = $result['summary'] ?? null;
             if (is_array($summary)) {
                 $this->stateStore->appendLog(
                     $runId,
-                    'Tóm tắt backup: ' . json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                    'TÃ³m táº¯t backup: ' . json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
                 );
             }
             $snapshot = is_array($result['snapshot'] ?? null) ? $result['snapshot'] : null;
@@ -138,13 +138,14 @@ class SpncBackupRun extends Command
                     array_merge($snapshot, $this->buildSnapshotCachePatch($result, $runningState)),
                     $runId
                 );
-                $this->stateStore->appendLog($runId, 'Đã ghi thẳng snapshot mới vào cache cục bộ, không cần quét lại toàn bộ repository.');
+                $this->stateStore->appendLog($runId, 'ÄÃ£ ghi tháº³ng snapshot má»›i vÃ o cache cá»¥c bá»™, khÃ´ng cáº§n quÃ©t láº¡i toÃ n bá»™ repository.');
             }
 
             $postProcess = [
                 'scheduled' => false,
                 'status' => 'disabled',
                 'run_id' => null,
+                'inline' => false,
             ];
             if ((bool) config('backup.exports.enabled', true) && $snapshotId !== '') {
                 $postProcessRunId = $this->stateStore->generateRunId();
@@ -157,49 +158,95 @@ class SpncBackupRun extends Command
                     'launcher_log_relative_path' => $this->launcher->logRelativePath($postProcessRunId),
                     'parent_run_id' => $runId,
                     'snapshot_id' => $snapshotId,
-                    'message' => 'Đã xếp lịch hoàn thiện export sao lưu.',
+                    'message' => 'ÄÃ£ xáº¿p lá»‹ch hoÃ n thiá»‡n export sao lÆ°u.',
                 ]);
 
-                try {
-                    $this->launcher->launchBackupPostProcess($postProcessRunId, (int) ($initiatedBy ?? 0), $snapshotId, $trigger);
+                if ((bool) config('backup.exports.inline_postprocess', true)) {
+                    $this->stateStore->appendLog(
+                        $runId,
+                        'Dang chay inline readable export va dong bo Drive trong cung tien trinh backup.'
+                    );
+
+                    $exitCode = $this->call('spnc:backup:post-process', [
+                        '--run-id' => $postProcessRunId,
+                        '--snapshot-id' => $snapshotId,
+                        '--trigger' => $trigger,
+                        '--initiated-by' => $initiatedBy,
+                    ]);
+
+                    $postProcessState = $this->stateStore->get($postProcessRunId);
+                    $postProcessStatus = strtolower(trim((string) ($postProcessState['status'] ?? '')));
                     $postProcess = [
                         'scheduled' => true,
-                        'status' => 'queued',
+                        'status' => $postProcessStatus !== '' ? $postProcessStatus : ($exitCode === self::SUCCESS ? 'success' : 'failed'),
                         'run_id' => $postProcessRunId,
                         'operation' => 'backup_postprocess',
                         'status_url' => '/api/admin/backups/runs/' . $postProcessRunId,
+                        'inline' => true,
                     ];
-                    $this->stateStore->appendLog(
-                        $runId,
-                        'Đã chuyển bước export readable và đồng bộ Drive sang child run ' . $postProcessRunId . '.'
-                    );
-                } catch (\Throwable $exception) {
-                    $this->stateStore->update($postProcessRunId, [
-                        'status' => 'failed',
-                        'operation' => 'backup_postprocess',
-                        'step' => 'failed',
-                        'finished_at' => now()->toIso8601String(),
-                        'message' => 'Không thể khởi chạy hoàn thiện export sao lưu.',
-                        'error_message' => $exception->getMessage(),
-                    ]);
-                    $this->stateStore->appendLog(
-                        $runId,
-                        'Không thể khởi chạy hậu xử lý export: ' . $exception->getMessage(),
-                        'warning'
-                    );
-                    Log::warning('backup.postprocess_launch_failed', [
-                        'run_id' => $runId,
-                        'postprocess_run_id' => $postProcessRunId,
-                        'snapshot_id' => $snapshotId,
-                        'message' => $exception->getMessage(),
-                    ]);
-                    $postProcess = [
-                        'scheduled' => false,
-                        'status' => 'failed_to_launch',
-                        'run_id' => $postProcessRunId,
-                        'operation' => 'backup_postprocess',
-                        'error_message' => $exception->getMessage(),
-                    ];
+
+                    if ($exitCode === self::SUCCESS) {
+                        $this->stateStore->appendLog(
+                            $runId,
+                            'Da hoan tat inline readable export trong child run ' . $postProcessRunId . '.'
+                        );
+                    } else {
+                        $postProcess['error_message'] = trim((string) ($postProcessState['error_message'] ?? ''));
+                        $this->stateStore->appendLog(
+                            $runId,
+                            'Inline hau xu ly export khong thanh cong cho child run ' . $postProcessRunId . '.',
+                            'warning'
+                        );
+                    }
+                } else {
+                    try {
+                        $this->launcher->launchBackupPostProcess(
+                            $postProcessRunId,
+                            (int) ($initiatedBy ?? 0),
+                            $snapshotId,
+                            $trigger
+                        );
+                        $postProcess = [
+                            'scheduled' => true,
+                            'status' => 'queued',
+                            'run_id' => $postProcessRunId,
+                            'operation' => 'backup_postprocess',
+                            'status_url' => '/api/admin/backups/runs/' . $postProcessRunId,
+                            'inline' => false,
+                        ];
+                        $this->stateStore->appendLog(
+                            $runId,
+                            'ÄÃ£ chuyá»ƒn bÆ°á»›c export readable vÃ  Ä‘á»“ng bá»™ Drive sang child run ' . $postProcessRunId . '.'
+                        );
+                    } catch (\Throwable $exception) {
+                        $this->stateStore->update($postProcessRunId, [
+                            'status' => 'failed',
+                            'operation' => 'backup_postprocess',
+                            'step' => 'failed',
+                            'finished_at' => now()->toIso8601String(),
+                            'message' => 'KhÃ´ng thá»ƒ khá»Ÿi cháº¡y hoÃ n thiá»‡n export sao lÆ°u.',
+                            'error_message' => $exception->getMessage(),
+                        ]);
+                        $this->stateStore->appendLog(
+                            $runId,
+                            'KhÃ´ng thá»ƒ khá»Ÿi cháº¡y háº­u xá»­ lÃ½ export: ' . $exception->getMessage(),
+                            'warning'
+                        );
+                        Log::warning('backup.postprocess_launch_failed', [
+                            'run_id' => $runId,
+                            'postprocess_run_id' => $postProcessRunId,
+                            'snapshot_id' => $snapshotId,
+                            'message' => $exception->getMessage(),
+                        ]);
+                        $postProcess = [
+                            'scheduled' => false,
+                            'status' => 'failed_to_launch',
+                            'run_id' => $postProcessRunId,
+                            'operation' => 'backup_postprocess',
+                            'error_message' => $exception->getMessage(),
+                            'inline' => false,
+                        ];
+                    }
                 }
             }
 
@@ -208,9 +255,11 @@ class SpncBackupRun extends Command
                 'operation' => 'backup',
                 'step' => 'completed',
                 'snapshot_id' => $snapshotId !== '' ? $snapshotId : null,
-                'message' => $postProcess['scheduled']
-                    ? 'Backup an toàn đã hoàn tất. Export readable đang tiếp tục ở nền.'
-                    : 'Backup hoàn tất.',
+                'message' => ($postProcess['status'] ?? null) === 'success'
+                    ? 'Backup va readable export da hoan tat.'
+                    : ($postProcess['scheduled']
+                        ? 'Backup an toÃ n Ä‘Ã£ hoÃ n táº¥t. Export readable Ä‘ang tiáº¿p tá»¥c á»Ÿ ná»n.'
+                        : 'Backup hoÃ n táº¥t.'),
                 'finished_at' => now()->toIso8601String(),
                 'result' => [
                     'snapshot' => $result['snapshot'] ?? null,
@@ -236,7 +285,7 @@ class SpncBackupRun extends Command
                 );
             }
 
-            $this->info('Backup hoàn tất. run_id=' . $runId);
+            $this->info('Backup hoÃ n táº¥t. run_id=' . $runId);
             return self::SUCCESS;
         } catch (\Throwable $exception) {
             Log::error('backup.run_failed', [
@@ -249,13 +298,13 @@ class SpncBackupRun extends Command
                 'status' => 'failed',
                 'operation' => 'backup',
                 'step' => 'failed',
-                'message' => 'Backup thất bại.',
+                'message' => 'Backup tháº¥t báº¡i.',
                 'finished_at' => now()->toIso8601String(),
                 'error_message' => $exception->getMessage(),
             ]);
-            $this->stateStore->appendLog($runId, 'Backup thất bại: ' . $exception->getMessage(), 'error');
+            $this->stateStore->appendLog($runId, 'Backup tháº¥t báº¡i: ' . $exception->getMessage(), 'error');
 
-            $this->error('Backup thất bại: ' . $exception->getMessage());
+            $this->error('Backup tháº¥t báº¡i: ' . $exception->getMessage());
             return self::FAILURE;
         } finally {
             optional($lock)->release();
