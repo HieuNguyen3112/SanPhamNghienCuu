@@ -74,18 +74,18 @@
 
               <div>
                 <label class="text-xs font-medium text-slate-600"
-                  >Phân loại báo cáo khoa học / báo cáo khoa học</label
+                  >Phân loại bài báo khoa học / báo cáo khoa học</label
                 >
                 <select
-                  v-model="form.typeId"
+                  v-model="selectedArticleMode"
                   :disabled="readOnly"
                   :class="selectClass(formErrors.typeId)"
                 >
-                  <option :value="null">-- Chọn loại --</option>
+                  <option value="">-- Chọn loại --</option>
                   <option
                     v-for="t in articleTypeOptions"
-                    :key="t.id"
-                    :value="t.id"
+                    :key="t.mode"
+                    :value="t.mode"
                   >
                     {{ t.name }}
                   </option>
@@ -443,7 +443,10 @@
                   lĩnh vực, đơn vị tổ chức, ISBN và điểm quy đổi.
                 </p>
               </div>
-              <div v-if="form.typeId" class="mt-2 text-xs text-slate-600">
+              <div
+                v-if="selectedArticleMode"
+                class="mt-2 text-xs text-slate-600"
+              >
                 Giờ NCKH lấy theo loại công trình trong cấu hình quy đổi:
                 <span class="font-semibold text-slate-900">{{
                   baseHoursText
@@ -742,6 +745,7 @@ const selectedConferenceClassification = ref<string | null>(null);
 const selectedConferenceResearchHours = ref<number | null>(null);
 const showManualJournalForm = ref(false);
 const showManualConferenceForm = ref(false);
+const selectedArticleMode = ref<"" | "journal" | "conference">("");
 
 // Keywords (UI + persist)
 const keywords = ref("");
@@ -845,6 +849,9 @@ const deletingEvidenceFileId = ref<number | null>(null);
 const typeCodeById = computed(() =>
   Object.fromEntries(types.value.map((t) => [t.id, t.code])),
 );
+const typeIdByCode = computed(() =>
+  Object.fromEntries(types.value.map((t) => [t.code, t.id])),
+);
 const typeHoursById = computed(() =>
   Object.fromEntries(
     types.value.map((t) => [
@@ -855,53 +862,24 @@ const typeHoursById = computed(() =>
 );
 
 type ArticleTypeOption = {
-  id: number;
-  code: string;
   name: string;
   mode: "journal" | "conference";
 };
 
 const articleTypeOptions = computed(() => {
-  const first = types.value[0];
-  if (!first) return [] as ArticleTypeOption[];
-
-  const journalSource =
-    types.value.find((t) =>
-      ["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"].includes(t.code),
-    ) ?? first;
-
-  const conferenceSource =
-    types.value.find(
-      (t) =>
-        !["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"].includes(t.code) &&
-        t.id !== journalSource.id,
-    ) ??
-    types.value.find((t) => t.id !== journalSource.id) ??
-    null;
-
-  const rows: ArticleTypeOption[] = [
+  return [
     {
-      id: journalSource.id,
-      code: journalSource.code,
       name: "Bài báo khoa học",
       mode: "journal",
     },
-  ];
-  if (conferenceSource) {
-    rows.push({
-      id: conferenceSource.id,
-      code: conferenceSource.code,
+    {
       name: "Báo cáo khoa học",
       mode: "conference",
-    });
-  }
-  return rows;
+    },
+  ] as ArticleTypeOption[];
 });
-const selectedArticleTypeOption = computed(
-  () => articleTypeOptions.value.find((opt) => opt.id === form.typeId) ?? null,
-);
 const isConferenceType = computed(
-  () => selectedArticleTypeOption.value?.mode === "conference",
+  () => selectedArticleMode.value === "conference",
 );
 const lecturerNameById = computed(() =>
   Object.fromEntries(lecturers.value.map((l) => [l.id, l.full_name])),
@@ -1015,6 +993,62 @@ function hoursFromClassification(
   return null;
 }
 
+function mapCategoryToJournalTypeCode(
+  category: "POINT_GE_2" | "POINT_GE_1" | "ISSN_ISBN" | "OTHER",
+): "hdgsnn_900" | "hdgsnn_600" | "hdgsnn_300" | null {
+  if (category === "POINT_GE_2") return "hdgsnn_900";
+  if (category === "POINT_GE_1") return "hdgsnn_600";
+  if (category === "ISSN_ISBN") return "hdgsnn_300";
+  return null;
+}
+
+function normalizeJournalCategory(
+  value: string | null | undefined,
+): "POINT_GE_2" | "POINT_GE_1" | "ISSN_ISBN" | "OTHER" | null {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (normalized === "POINT_GE_2" || normalized === "HDGSNN_GE_2") {
+    return "POINT_GE_2";
+  }
+  if (normalized === "POINT_GE_1" || normalized === "HDGSNN_GE_1") {
+    return "POINT_GE_1";
+  }
+  if (normalized === "ISSN_ISBN") return "ISSN_ISBN";
+  if (normalized === "OTHER") return "OTHER";
+  return null;
+}
+
+function inferArticleModeFromTypeId(
+  typeId: number | null,
+): "journal" | "conference" | "" {
+  if (typeof typeId !== "number") return "";
+  const code = String(typeCodeById.value[typeId] ?? "").toLowerCase();
+  if (["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"].includes(code)) {
+    return "journal";
+  }
+  if (code) return "conference";
+  return "";
+}
+
+const journalFallbackTypeId = computed(() => {
+  const by300 = typeIdByCode.value.hdgsnn_300;
+  if (typeof by300 === "number") return by300;
+  const by600 = typeIdByCode.value.hdgsnn_600;
+  if (typeof by600 === "number") return by600;
+  const by900 = typeIdByCode.value.hdgsnn_900;
+  if (typeof by900 === "number") return by900;
+  return null;
+});
+
+const conferenceFallbackTypeId = computed(() => {
+  const firstConference = types.value.find(
+    (t) => !["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"].includes(t.code),
+  );
+  return firstConference?.id ?? null;
+});
+
 const journalDrivenHours = computed(() => {
   if (
     typeof selectedJournalResearchHours.value === "number" &&
@@ -1061,6 +1095,31 @@ const venueDrivenHours = computed(() =>
     : journalDrivenHours.value,
 );
 
+const persistedTypeId = computed(() => {
+  if (selectedArticleMode.value === "conference") {
+    if (typeof conferenceFallbackTypeId.value === "number") {
+      return conferenceFallbackTypeId.value;
+    }
+    return form.typeId;
+  }
+
+  if (selectedArticleMode.value !== "journal") {
+    return form.typeId;
+  }
+
+  const category =
+    normalizeJournalCategory(selectedJournalClassification.value) ??
+    deriveJournalCategory(form.issn, form.workScore ?? null);
+  const targetCode = mapCategoryToJournalTypeCode(category);
+  const mappedId = targetCode ? typeIdByCode.value[targetCode] : undefined;
+
+  if (typeof mappedId === "number") return mappedId;
+  if (typeof journalFallbackTypeId.value === "number") {
+    return journalFallbackTypeId.value;
+  }
+  return form.typeId;
+});
+
 const hoursNote = computed(() => {
   if (isConferenceType.value) {
     if (!form.conferenceName.trim()) {
@@ -1076,7 +1135,7 @@ const hoursNote = computed(() => {
 
 const canSubmit = computed(() => {
   if (!form.academicYearId) return false;
-  if (!form.typeId) return false;
+  if (!selectedArticleMode.value) return false;
   if (!form.title.trim()) return false;
 
   const validMembers = form.members.filter((m) => {
@@ -1220,6 +1279,7 @@ async function loadDraftFromQuery() {
     form.academicYearId = activity.academic_year_id ?? null;
     form.kindId = activity.kind_id ?? form.kindId;
     form.typeId = activity.type_id ?? null;
+    selectedArticleMode.value = inferArticleModeFromTypeId(form.typeId);
     form.title = activity.title ?? "";
     form.abstract = activity.abstract ?? "";
     form.notes = activity.notes ?? "";
@@ -1571,7 +1631,7 @@ function collectMissingFields(mode: "draft" | "submit") {
   }
 
   if (mode === "submit") {
-    if (!form.typeId) {
+    if (!selectedArticleMode.value) {
       missing.push("Loại bài báo");
       formErrors.typeId = "Vui lòng chọn loại bài báo.";
     }
@@ -1657,7 +1717,7 @@ const shell = useDeclarationFormShell({
       const saved = await upsert_activity_base({
         id: form.activityId ?? undefined,
         kind_id: form.kindId,
-        type_id: form.typeId,
+        type_id: persistedTypeId.value,
         academic_year_id: form.academicYearId ?? undefined,
         title: form.title,
         abstract: form.abstract || null,
@@ -1668,6 +1728,7 @@ const shell = useDeclarationFormShell({
       });
 
       form.activityId = saved.id;
+      form.typeId = persistedTypeId.value ?? null;
 
       if (saved.id) {
         await router.replace({
@@ -1811,7 +1872,7 @@ watch(
   () => clearFieldError("academicYearId"),
 );
 watch(
-  () => form.typeId,
+  () => selectedArticleMode.value,
   () => {
     clearFieldError("typeId");
     clearFieldError("journalName");
