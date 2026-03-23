@@ -33,6 +33,11 @@ export const logout = async () => {
   return http.post("/logout");
 };
 
+export const switchActiveRole = async (role: string) => {
+  await fetchCsrfCookie();
+  return http.post("/api/auth/active-role", { role });
+};
+
 export const changePassword = async (payload: {
   current_password: string;
   password: string;

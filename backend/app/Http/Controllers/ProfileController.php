@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Hash;
+use App\Support\ActiveRoleContext;
 use Symfony\Component\HttpFoundation\Response;
 
 class ProfileController extends Controller
@@ -22,6 +23,7 @@ class ProfileController extends Controller
             'must_change_password' => (bool) $u->must_change_password,
             'roles' => \App\Support\RoleMapper::backendListToCanonical($u->getRoleNames()->all()),
             'backend_roles' => $u->getRoleNames(),
+            'active_role' => ActiveRoleContext::get($request),
         ]);
     }
 

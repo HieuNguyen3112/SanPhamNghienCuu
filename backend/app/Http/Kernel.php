@@ -46,6 +46,7 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
             \App\Http\Middleware\EnsurePasswordChanged::class,
+            \App\Http\Middleware\EnsureActiveRole::class,
         ],
     ];
 
@@ -73,5 +74,6 @@ class Kernel extends HttpKernel
         'force.json' => \App\Http\Middleware\ForceJsonResponse::class,
         'audit.export' => \App\Http\Middleware\AuditExportAction::class,
         'must.change.password' => \App\Http\Middleware\EnsurePasswordChanged::class,
+        'active.role' => \App\Http\Middleware\EnsureActiveRole::class,
     ];
 }

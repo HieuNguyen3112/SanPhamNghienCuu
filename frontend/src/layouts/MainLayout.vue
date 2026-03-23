@@ -13,6 +13,7 @@ import type { UserRole } from "@/app/stores/userStore";
 import { useLayoutStore } from "@/app/stores/layoutStore";
 import Sidebar from "@/shared/components/layout/Sidebar.vue";
 import Navbar from "@/shared/components/layout/Navbar.vue";
+import RoleSwitchConfirmModal from "@/shared/components/layout/RoleSwitchConfirmModal.vue";
 import ChangePasswordModal from "@/features/auth/components/ChangePasswordModal.vue";
 import { useLogoutFeedback } from "@/features/auth/composables/useLogoutFeedback";
 
@@ -29,6 +30,9 @@ const desktopMediaQuery = ref<MediaQueryList | null>(null);
 const isDesktop = ref(false);
 const isMobileSidebarOpen = ref(false);
 const isChangePasswordOpen = ref(false);
+const isRoleSwitchDialogOpen = ref(false);
+const roleSwitchPending = ref<UserRole | null>(null);
+const switchingRole = ref(false);
 
 const userName = computed(() => userStore.currentUser?.name ?? "");
 const userCode = computed(
@@ -68,23 +72,81 @@ const handleGoHome = async () => {
   await router.push("/");
 };
 
-const handleChangeRole = async (role: UserRole) => {
-  try {
-    userStore.setRole(role);
-
-    const requiredRoles = route.matched
-      .map((record) => record.meta.roles as string[] | undefined)
-      .find((roles) => Array.isArray(roles) && roles.length);
-
-    if (requiredRoles && !requiredRoles.includes(role)) {
-      if (router.hasRoute("profile.scientific")) {
-        await router.push({ name: "profile.scientific" });
-      } else {
-        await router.push("/profile");
-      }
+const resolveRoleLandingTarget = (role: UserRole) => {
+  if (role === "LECTURER") {
+    if (router.hasRoute("declarations.gateway")) {
+      return { name: "declarations.gateway" };
     }
+    if (router.hasRoute("profile.scientific")) {
+      return { name: "profile.scientific" };
+    }
+    return { path: "/profile" };
+  }
+
+  if (role === "DEPARTMENT_BOARD") {
+    if (router.hasRoute("works.facapprovals")) {
+      return { name: "works.facapprovals" };
+    }
+    if (router.hasRoute("user.manager")) {
+      return { name: "user.manager" };
+    }
+    return { path: "/profile" };
+  }
+
+  if (role === "SCIENCE_OFFICE") {
+    if (router.hasRoute("works.uniapprovals")) {
+      return { name: "works.uniapprovals" };
+    }
+    if (router.hasRoute("user.manager")) {
+      return { name: "user.manager" };
+    }
+    return { path: "/profile" };
+  }
+
+  return { path: "/profile" };
+};
+
+const handleChangeRole = async (role: UserRole) => {
+  if (!userStore.currentUser) {
+    return;
+  }
+
+  if (userStore.role === role) {
+    return;
+  }
+
+  roleSwitchPending.value = role;
+  isRoleSwitchDialogOpen.value = true;
+};
+
+const cancelRoleSwitch = () => {
+  if (switchingRole.value) return;
+  isRoleSwitchDialogOpen.value = false;
+  roleSwitchPending.value = null;
+};
+
+const confirmRoleSwitch = async () => {
+  if (switchingRole.value) return;
+
+  const nextRole = roleSwitchPending.value;
+  if (!nextRole) {
+    cancelRoleSwitch();
+    return;
+  }
+
+  switchingRole.value = true;
+  try {
+    await userStore.switchRole(nextRole);
+
+    // Always reset to role landing page to avoid staying in stale/over-scoped screens.
+    await router.replace(resolveRoleLandingTarget(nextRole));
+
+    isRoleSwitchDialogOpen.value = false;
+    roleSwitchPending.value = null;
   } catch (error) {
     console.error(error);
+  } finally {
+    switchingRole.value = false;
   }
 };
 
@@ -212,5 +274,13 @@ onBeforeUnmount(() => {
     </div>
 
     <ChangePasswordModal v-model="isChangePasswordOpen" />
+    <RoleSwitchConfirmModal
+      :open="isRoleSwitchDialogOpen"
+      :loading="switchingRole"
+      :current-role="userStore.role"
+      :next-role="roleSwitchPending"
+      @cancel="cancelRoleSwitch"
+      @confirm="confirmRoleSwitch"
+    />
   </div>
 </template>

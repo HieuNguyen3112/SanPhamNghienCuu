@@ -61,8 +61,6 @@ const handleSubmit = async () => {
           password: password.value,
           role: role.value,
         });
-
-        userStore.setRole(role.value);
         await router.replace(resolveRedirectTarget());
       },
       {

@@ -49,6 +49,7 @@ Route::prefix('auth')->group(function () {
     // ME: uses Sanctum session auth, no token rotation.
     Route::middleware(['auth:sanctum', 'force.json'])->group(function () {
         Route::get('/me', [AuthMeController::class, 'show']);
+        Route::post('/active-role', [AuthMeController::class, 'switchRole']);
     });
 
     // Token endpoints: SCIENCE_OFFICE only, with rotation.

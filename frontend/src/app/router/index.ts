@@ -4,6 +4,7 @@ import {
   type RouteRecordRaw,
 } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
+import type { UserRole } from "@/app/stores/userStore";
 
 // Layouts
 import MainLayout from "@/layouts/MainLayout.vue";
@@ -178,6 +179,20 @@ router.beforeEach(async (to) => {
   if (requiredRoles) {
     const currentRole = userStore.role;
     if (!currentRole || !requiredRoles.includes(currentRole)) {
+      const availableRoles = userStore.currentUser?.roles ?? [];
+      const switchableRole = (requiredRoles as UserRole[]).find((role) =>
+        availableRoles.includes(role),
+      );
+
+      if (switchableRole) {
+        try {
+          await userStore.switchRole(switchableRole);
+          return true;
+        } catch {
+          return { path: "/403", replace: true };
+        }
+      }
+
       return { path: "/403", replace: true };
     }
   }

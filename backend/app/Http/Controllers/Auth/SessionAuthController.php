@@ -13,6 +13,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Validation\Rule;
 use App\Support\RoleMapper;
+use App\Support\ActiveRoleContext;
 use App\Support\AuditLogger;
 use Spatie\Permission\Models\Role;
 
@@ -37,6 +38,7 @@ class SessionAuthController extends Controller
                 'success' => true,
                 'message' => 'Ban da dang nhap roi',
                 'token'   => null,
+                'active_role' => $user ? ActiveRoleContext::get($request) : null,
                 'user'    => $user ? [
                     'id'    => $user->id,
                     'name'  => $user->name,
@@ -44,6 +46,7 @@ class SessionAuthController extends Controller
                     'must_change_password' => (bool) $user->must_change_password,
                     'roles' => $user->getRoleNames()->values()->all(),
                     'backend_roles' => $user->getRoleNames()->values()->all(),
+                    'active_role' => ActiveRoleContext::get($request),
                 ] : null,
             ], Response::HTTP_OK);
         }
@@ -165,6 +168,15 @@ class SessionAuthController extends Controller
 
         $request->session()->regenerate();
 
+        $activeRole = $requestedRole;
+        if (! $activeRole) {
+            $canonicalRoles = ActiveRoleContext::canonicalUserRoles($user);
+            $activeRole = $canonicalRoles[0] ?? null;
+        }
+        if ($activeRole) {
+            ActiveRoleContext::set($request, $activeRole);
+        }
+
         Log::info('login.success', [
             'user_id' => $user->id,
             'ip' => $request->ip(),
@@ -187,6 +199,7 @@ class SessionAuthController extends Controller
             'success' => true,
             'message' => 'Dang nhap thanh cong',
             'token'   => null,
+            'active_role' => ActiveRoleContext::get($request),
             'user'    => [
                 'id'    => $user->id,
                 'name'  => $user->name,
@@ -194,6 +207,7 @@ class SessionAuthController extends Controller
                 'must_change_password' => (bool) $user->must_change_password,
                 'roles' => $user->getRoleNames()->values()->all(),
                 'backend_roles' => $user->getRoleNames()->values()->all(),
+                'active_role' => ActiveRoleContext::get($request),
             ],
         ], Response::HTTP_OK);
     }
@@ -225,6 +239,8 @@ class SessionAuthController extends Controller
         if (! empty($tokenIds)) {
             PersonalAccessToken::whereIn('id', $tokenIds)->delete();
         }
+
+        ActiveRoleContext::clear($request);
 
         Auth::guard('web')->logout();
         $request->session()->invalidate();

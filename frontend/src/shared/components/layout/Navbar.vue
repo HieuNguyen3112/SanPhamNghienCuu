@@ -25,6 +25,13 @@
         >
           {{ title }}
         </span>
+        <span
+          v-if="currentRoleLabel"
+          class="hidden rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide sm:inline-flex"
+          :class="currentRoleBadgeClass"
+        >
+          {{ currentRoleLabel }}
+        </span>
       </div>
     </div>
 
@@ -58,7 +65,7 @@
         >
           <div
             v-if="isNotificationOpen"
-            class="absolute right-0 top-11 z-[70] w-[380px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-xl"
+            class="absolute right-0 top-11 z-70 w-[380px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-xl"
             role="menu"
             aria-label="Danh sách thông báo"
           >
@@ -339,6 +346,34 @@ const defaultTargetByRole: Record<NotificationRole, string> = {
   LECTURER: "/declarations/gateway",
   DEPARTMENT_BOARD: "/works/facapprovals",
 };
+
+const currentRoleLabel = computed(() => {
+  if (!props.currentRole) return "";
+
+  switch (props.currentRole) {
+    case "LECTURER":
+      return "Giảng viên";
+    case "DEPARTMENT_BOARD":
+      return "Ban chủ nhiệm khoa";
+    case "SCIENCE_OFFICE":
+      return "Phòng quản lý khoa học";
+    default:
+      return props.currentRole;
+  }
+});
+
+const currentRoleBadgeClass = computed(() => {
+  switch (props.currentRole) {
+    case "LECTURER":
+      return "bg-cyan-200/95 text-cyan-900";
+    case "DEPARTMENT_BOARD":
+      return "bg-emerald-200/95 text-emerald-900";
+    case "SCIENCE_OFFICE":
+      return "bg-amber-200/95 text-amber-900";
+    default:
+      return "bg-slate-200 text-slate-800";
+  }
+});
 
 function toggleUserMenu() {
   isUserMenuOpen.value = !isUserMenuOpen.value;

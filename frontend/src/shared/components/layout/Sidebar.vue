@@ -61,9 +61,6 @@
           <span class="block truncate text-xs text-slate-500">
             {{ teacher.code }}
           </span>
-          <span class="block truncate text-xs text-slate-500">
-            {{ roleName }}
-          </span>
         </div>
       </div>
     </div>

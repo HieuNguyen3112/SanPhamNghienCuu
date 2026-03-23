@@ -4,6 +4,7 @@ import {
   logout as apiLogout,
   fetchCurrentUser as apiFetchCurrentUser,
   getCsrfCookie as apiGetCsrfCookie,
+  switchActiveRole as apiSwitchActiveRole,
 } from "@/features/auth/api";
 
 export type UserRole = "LECTURER" | "DEPARTMENT_BOARD" | "SCIENCE_OFFICE";
@@ -52,6 +53,25 @@ const mapBackendRoles = (roles: string[] = []): UserRole[] => {
     .map((r) => mapBackendRole(r))
     .filter((r): r is UserRole => Boolean(r));
   return Array.from(new Set(mapped));
+};
+
+const pickPreferredRole = (params: {
+  mappedRoles: UserRole[];
+  activeRoleRaw?: string | null;
+  fallbackRole?: UserRole | null;
+}): UserRole | null => {
+  const { mappedRoles, activeRoleRaw, fallbackRole } = params;
+
+  const activeRole = mapBackendRole(activeRoleRaw ?? "");
+  if (activeRole && mappedRoles.includes(activeRole)) {
+    return activeRole;
+  }
+
+  if (fallbackRole && mappedRoles.includes(fallbackRole)) {
+    return fallbackRole;
+  }
+
+  return mappedRoles[0] ?? null;
 };
 
 const readAuthSessionHint = (): boolean => {
@@ -143,12 +163,11 @@ export const useUserStore = defineStore("user", {
             avatar: data.avatar,
           };
 
-          if (
-            !this.currentRole ||
-            !this.currentUser.roles.includes(this.currentRole)
-          ) {
-            this.currentRole = mappedRoles[0] ?? null;
-          }
+          this.currentRole = pickPreferredRole({
+            mappedRoles,
+            activeRoleRaw: data?.active_role,
+            fallbackRole: this.currentRole,
+          });
 
           this.setSessionHint(true);
 
@@ -225,7 +244,11 @@ export const useUserStore = defineStore("user", {
         avatar: data.avatar,
       };
 
-      this.currentRole = mappedRoles[0] ?? null;
+      this.currentRole = pickPreferredRole({
+        mappedRoles,
+        activeRoleRaw: data?.active_role,
+        fallbackRole: payload.role,
+      });
       this.isInitialized = true;
       this._initPromise = null;
       this.authErrorCode = null;
@@ -241,6 +264,17 @@ export const useUserStore = defineStore("user", {
         throw new Error("ROLE_KHONG_HOP_LE");
       }
       this.currentRole = role;
+    },
+
+    async switchRole(role: UserRole) {
+      if (!this.currentUser) throw new Error("CHUA_DANG_NHAP");
+      if (!this.currentUser.roles.includes(role)) {
+        throw new Error("ROLE_KHONG_HOP_LE");
+      }
+
+      await apiSwitchActiveRole(role);
+      this.currentRole = role;
+      return role;
     },
 
     async logout() {
