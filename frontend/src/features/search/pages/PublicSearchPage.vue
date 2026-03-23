@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-100">
+  <div class="min-h-screen overflow-x-hidden bg-slate-100">
     <PublicHomeTopHeader />
 
     <PublicHomeNavBar
@@ -10,7 +10,7 @@
       @logout="handleLogout"
     />
 
-    <main class="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
       <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div class="text-2xl font-extrabold text-slate-900">{{ pageTitle }}</div>
@@ -214,7 +214,6 @@ watch(
   }
 );
 
-// Chỉ reload khi user thao tác pagination sau khi page đã được set
 watch(
   () => [filterState.page, filterState.pageSize],
   ([nextPage, nextPageSize], [prevPage, prevPageSize]) => {

@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-white">
+  <div class="min-h-screen overflow-x-hidden bg-white">
     <PublicHomeTopHeader />
 
     <PublicHomeNavBar
@@ -24,9 +24,9 @@
     />
 
     <section v-if="isAuthenticated && countsByKind" class="bg-slate-50">
-      <div class="mx-auto max-w-6xl px-4 py-8 md:px-6">
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div class="flex items-start justify-between gap-3">
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div class="text-xl font-extrabold text-slate-900">
                 Công trình khoa học của tôi
@@ -42,7 +42,7 @@
             </div>
           </div>
 
-          <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
             <div class="rounded-2xl bg-slate-50 p-4">
               <div class="text-3xl font-extrabold text-[#e11d48]">
                 {{ myCounts.paper }}
@@ -73,7 +73,7 @@
               </div>
             </div>
 
-            <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="col-span-2 rounded-2xl bg-slate-50 p-4 lg:col-span-1">
               <div class="text-3xl font-extrabold text-[#e11d48]">
                 {{ myCounts.conference }}
               </div>
@@ -149,12 +149,11 @@ const myCounts = computed(() => {
     paper: Number(c.paper ?? 0),
     project: Number(c.project ?? 0),
     conference: Number(c.conference ?? 0),
-    book: Number(c.book_only ?? 0), 
-    textbook: Number(c.textbook ?? 0), 
+    book: Number(c.book_only ?? 0),
+    textbook: Number(c.textbook ?? 0),
     total: Number(c.total ?? 0),
   };
 });
-
 
 const {
   filterState,
