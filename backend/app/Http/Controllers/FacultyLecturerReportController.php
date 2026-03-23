@@ -45,14 +45,14 @@ class FacultyLecturerReportController extends Controller
             ->where('id', $facultyId)
             ->select(['id', 'name'])
             ->get()
-            ->map(fn ($row) => ['id' => (int) $row->id, 'name' => $row->name])
+            ->map(fn($row) => ['id' => (int) $row->id, 'name' => $row->name])
             ->all();
 
         $degrees = DB::table('degrees')
             ->select(['id', 'code', 'name'])
             ->orderBy('name')
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->id,
                 'code' => $row->code,
                 'name' => $row->name,
@@ -63,7 +63,7 @@ class FacultyLecturerReportController extends Controller
             ->select(['id', 'code', 'name'])
             ->orderBy('name')
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->id,
                 'code' => $row->code,
                 'name' => $row->name,
@@ -295,20 +295,20 @@ class FacultyLecturerReportController extends Controller
 
         return [
             'by_faculty' => [
-                'labels' => $facultyRows->map(fn ($row) => $row->name ?? 'Chưa rõ')->values()->all(),
-                'values' => $facultyRows->map(fn ($row) => (int) $row->total)->values()->all(),
+                'labels' => $facultyRows->map(fn($row) => $row->name ?? 'Chưa rõ')->values()->all(),
+                'values' => $facultyRows->map(fn($row) => (int) $row->total)->values()->all(),
             ],
             'by_degree' => [
-                'labels' => $degreeRows->map(fn ($row) => $row->name ?? 'Chưa rõ')->values()->all(),
-                'values' => $degreeRows->map(fn ($row) => (int) $row->total)->values()->all(),
+                'labels' => $degreeRows->map(fn($row) => $row->name ?? 'Chưa rõ')->values()->all(),
+                'values' => $degreeRows->map(fn($row) => (int) $row->total)->values()->all(),
             ],
             'by_academic_rank' => [
-                'labels' => $rankRows->map(fn ($row) => $row->name ?? 'Chưa rõ')->values()->all(),
-                'values' => $rankRows->map(fn ($row) => (int) $row->total)->values()->all(),
+                'labels' => $rankRows->map(fn($row) => $row->name ?? 'Chưa rõ')->values()->all(),
+                'values' => $rankRows->map(fn($row) => (int) $row->total)->values()->all(),
             ],
             'by_gender' => [
-                'labels' => $genderRows->map(fn ($row) => $this->formatGenderLabel($row->gender))->values()->all(),
-                'values' => $genderRows->map(fn ($row) => (int) $row->total)->values()->all(),
+                'labels' => $genderRows->map(fn($row) => $this->formatGenderLabel($row->gender))->values()->all(),
+                'values' => $genderRows->map(fn($row) => (int) $row->total)->values()->all(),
             ],
         ];
     }
@@ -316,6 +316,7 @@ class FacultyLecturerReportController extends Controller
     private function buildTable(array $filters, array $validated, bool $paginate): array
     {
         [$sortField, $sortDir] = $this->parseSort($filters['sort'] ?? null);
+        $seniorityExpr = $this->seniorityYearsExpression();
 
         $senioritySub = DB::table('lecturer_work_histories')
             ->select('lecturer_id', DB::raw('MIN(start_date) as first_start_date'))
@@ -335,7 +336,7 @@ class FacultyLecturerReportController extends Controller
                 'ar.id as academic_rank_id',
                 'ar.code as academic_rank_code',
                 'ar.name as academic_rank_name',
-                DB::raw('TIMESTAMPDIFF(YEAR, COALESCE(lwh.first_start_date, DATE(l.created_at)), CURDATE()) as seniority_years'),
+                DB::raw($seniorityExpr . ' as seniority_years'),
             ]);
 
         if ($sortField === 'seniority_years') {
@@ -405,6 +406,15 @@ class FacultyLecturerReportController extends Controller
         $resolvedField = self::SORT_FIELDS[$field] ?? self::SORT_FIELDS['full_name'];
 
         return [$resolvedField, $dir];
+    }
+
+    private function seniorityYearsExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "GREATEST(0, CAST(EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(lwh.first_start_date, CAST(l.created_at AS DATE)))) AS INTEGER))",
+            'sqlite' => "MAX(0, CAST((julianday('now') - julianday(COALESCE(lwh.first_start_date, date(l.created_at)))) / 365.25 AS INTEGER))",
+            default => 'GREATEST(0, TIMESTAMPDIFF(YEAR, COALESCE(lwh.first_start_date, DATE(l.created_at)), CURDATE()))',
+        };
     }
 
     private function formatGenderLabel(?string $gender): string
