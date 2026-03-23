@@ -76,7 +76,13 @@ class SubmitResearchActivityRequest extends FormRequest
                     ->first();
 
                 $typeCode = Str::lower((string) ($activity->type_code ?? ''));
-                $isConferenceReport = in_array($typeCode, ['report', 'conference_report', 'bao_cao', 'scientific_report'], true);
+                $isConferenceReport = Str::contains($typeCode, [
+                    'conference',
+                    'report',
+                    'bao_cao',
+                    'hoi_nghi',
+                    'proceeding',
+                ]);
 
                 if ($isConferenceReport) {
                     if (! $detail || ! trim((string) ($detail->conference_name ?? ''))) {
