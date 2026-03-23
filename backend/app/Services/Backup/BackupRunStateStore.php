@@ -355,6 +355,7 @@ class BackupRunStateStore
         $secrets = [
             (string) config('backup.restic.password', ''),
             (string) config('database.connections.mysql.password', ''),
+            (string) config('database.connections.pgsql.password', ''),
         ];
 
         foreach ($secrets as $secret) {
@@ -365,7 +366,7 @@ class BackupRunStateStore
             $output = str_replace($secret, '***', $output);
         }
 
-        $output = preg_replace('/(RESTIC_PASSWORD|MYSQL_PWD)=([^\\s]+)/i', '$1=***', $output) ?: $output;
+        $output = preg_replace('/(RESTIC_PASSWORD|MYSQL_PWD|PGPASSWORD)=([^\\s]+)/i', '$1=***', $output) ?: $output;
 
         $maxChars = max(80, (int) config('backup.runs.log_max_chars', 500));
         if (strlen($output) > $maxChars) {
