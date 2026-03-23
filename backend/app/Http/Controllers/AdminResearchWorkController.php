@@ -11,6 +11,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdminResearchWorkController extends Controller
 {
+    private const MANAGEMENT_VISIBLE_STATUS_CODES = [
+        'submitted',
+        'pending_faculty_review',
+        'approved',
+        'rejected',
+        'member_rejected',
+    ];
+
     public function lecturerSummary(Request $request)
     {
         $result = $this->summaryData($request);
@@ -56,7 +64,7 @@ class AdminResearchWorkController extends Controller
 
         $academicYearId = $validated['academic_year_id'] ?? null;
         $status = $validated['status'] ?? 'approved';
-        $pendingStatusCodes = ['pending_faculty_review'];
+        $pendingStatusCodes = ['pending_faculty_review', 'submitted'];
         $rejectedStatusCodes = ['rejected', 'member_rejected'];
 
         $rows = DB::table('research_activities as ra')
@@ -72,6 +80,7 @@ class AdminResearchWorkController extends Controller
                 $query->where('ra.owner_lecturer_id', '=', $lecturer)
                     ->orWhereNotNull('ram.lecturer_id');
             })
+            ->whereIn('ast.code', self::MANAGEMENT_VISIBLE_STATUS_CODES)
             ->when($status !== 'all', function ($query) use ($status, $pendingStatusCodes, $rejectedStatusCodes) {
                 if ($status === 'pending' || $status === 'submitted') {
                     $query->whereIn('ast.code', $pendingStatusCodes);
@@ -288,6 +297,7 @@ class AdminResearchWorkController extends Controller
             ->fromSub($activityLecturers, 'al')
             ->join('research_activities as ra', 'al.activity_id', '=', 'ra.id')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
+            ->whereIn('ast.code', self::MANAGEMENT_VISIBLE_STATUS_CODES)
             ->when($academicYearId, function ($query, $academicYearId) {
                 $query->where('ra.academic_year_id', $academicYearId);
             })
@@ -296,7 +306,7 @@ class AdminResearchWorkController extends Controller
                 'al.lecturer_id as lecturer_id',
                 DB::raw('COUNT(*) as total_declared_research_work_count'),
                 DB::raw("SUM(CASE WHEN ast.code = 'approved' THEN 1 ELSE 0 END) as approved_research_work_count"),
-                DB::raw("SUM(CASE WHEN ast.code IN ('pending_faculty_review') THEN 1 ELSE 0 END) as pending_research_work_count"),
+                DB::raw("SUM(CASE WHEN ast.code IN ('submitted','pending_faculty_review') THEN 1 ELSE 0 END) as pending_research_work_count"),
                 DB::raw("SUM(CASE WHEN ast.code IN ('rejected','member_rejected') THEN 1 ELSE 0 END) as rejected_research_work_count"),
             ]);
 

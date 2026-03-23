@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Lecturer\ParticipationNotificationIndexRequest;
 use App\Http\Requests\Lecturer\ParticipationNotificationRejectRequest;
 use App\Models\User;
+use App\Notifications\ParticipationInvitationNotification;
 use App\Notifications\ParticipationInvitationAcceptedNotification;
 use App\Notifications\ParticipationInvitationRejectedNotification;
 use App\Support\AuditLogger;
@@ -39,7 +40,7 @@ class LecturerParticipationNotificationController extends Controller
         $query = $this->baseQuery($lecturer->id);
 
         if (! empty($filters['status']) && $filters['status'] !== 'ALL') {
-            $query->where('ram.confirmation_status', $this->mapStatusToDb($filters['status']));
+            $query->whereRaw('LOWER(ram.confirmation_status) = ?', [$this->mapStatusToDb($filters['status'])]);
         }
 
         if (! empty($filters['q'])) {
@@ -121,7 +122,8 @@ class LecturerParticipationNotificationController extends Controller
                 return ['error' => 'request not found', 'status' => Response::HTTP_NOT_FOUND];
             }
 
-            if ($member->confirmation_status !== self::STATUS_PENDING) {
+            $currentStatus = $this->normalizeStatus($member->confirmation_status ?? null);
+            if ($currentStatus !== self::STATUS_PENDING) {
                 return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
             }
 
@@ -141,6 +143,8 @@ class LecturerParticipationNotificationController extends Controller
                     'confirmation_note' => null,
                     'updated_at' => $now,
                 ]);
+
+            $this->markInvitationNotificationAsRead($request, $requestId);
 
             try {
                 $this->notifyOwnerOnAccept((int) $member->activity_id, (string) ($lecturer->full_name ?? ''), (int) $requestId);
@@ -237,7 +241,8 @@ class LecturerParticipationNotificationController extends Controller
                 return ['error' => 'request not found', 'status' => Response::HTTP_NOT_FOUND];
             }
 
-            if ($member->confirmation_status !== self::STATUS_PENDING) {
+            $currentStatus = $this->normalizeStatus($member->confirmation_status ?? null);
+            if ($currentStatus !== self::STATUS_PENDING) {
                 return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
             }
 
@@ -257,6 +262,8 @@ class LecturerParticipationNotificationController extends Controller
                     'confirmation_note' => $reason,
                     'updated_at' => $now,
                 ]);
+
+            $this->markInvitationNotificationAsRead($request, $requestId);
 
             $this->markActivityMemberRejected(
                 (int) $member->activity_id,
@@ -326,14 +333,14 @@ class LecturerParticipationNotificationController extends Controller
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->where('ram.activity_id', $activityId)
             ->whereColumn('ram.lecturer_id', '<>', 'ra.owner_lecturer_id')
-            ->where('ram.confirmation_status', self::STATUS_PENDING)
+            ->whereRaw('LOWER(ram.confirmation_status) = ?', [self::STATUS_PENDING])
             ->exists();
 
         $hasRejected = DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->where('ram.activity_id', $activityId)
             ->whereColumn('ram.lecturer_id', '<>', 'ra.owner_lecturer_id')
-            ->where('ram.confirmation_status', self::STATUS_REJECTED)
+            ->whereRaw('LOWER(ram.confirmation_status) = ?', [self::STATUS_REJECTED])
             ->exists();
 
         if ($hasRejected) {
@@ -470,11 +477,38 @@ class LecturerParticipationNotificationController extends Controller
 
     private function mapStatusToUi(?string $status): string
     {
-        return match ($status) {
+        return match ($this->normalizeStatus($status)) {
             self::STATUS_ACCEPTED => 'ACCEPTED',
             self::STATUS_REJECTED => 'REJECTED',
             default => 'PENDING',
         };
+    }
+
+    private function normalizeStatus(?string $status): string
+    {
+        return strtolower(trim((string) ($status ?? '')));
+    }
+
+    private function markInvitationNotificationAsRead(Request $request, int $requestId): void
+    {
+        $user = $request->user();
+        if (! $user) {
+            return;
+        }
+
+        $notification = $user->unreadNotifications()
+            ->where('type', ParticipationInvitationNotification::class)
+            ->get()
+            ->first(function ($item) use ($requestId) {
+                $data = is_array($item->data) ? $item->data : [];
+
+                return ($data['event_key'] ?? null) === 'participation_invitation'
+                    && (int) ($data['invitation_id'] ?? 0) === $requestId;
+            });
+
+        if ($notification && $notification->read_at === null) {
+            $notification->markAsRead();
+        }
     }
 
     private function mapWorkType(?string $kindCode): string

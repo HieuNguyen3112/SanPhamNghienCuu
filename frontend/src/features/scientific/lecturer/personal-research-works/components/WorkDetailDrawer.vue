@@ -433,7 +433,9 @@ const submitterName = computed<string | null>(() => {
   if (!currentWork) return null;
 
   const submittedHistory = currentWork.statusHistories.find(
-    (history) => history.toStatusCode === "submitted" || history.toStatusCode === "pending_faculty_review"
+    (history) =>
+      history.toStatusCode === "submitted" ||
+      history.toStatusCode === "pending_faculty_review",
   );
   return submittedHistory?.actedByUserName ?? null;
 });
@@ -442,7 +444,11 @@ const approvalActorName = computed<string | null>(() => {
   const currentWork = props.work;
   if (!currentWork) return null;
 
-  for (let index = currentWork.statusHistories.length - 1; index >= 0; index -= 1) {
+  for (
+    let index = currentWork.statusHistories.length - 1;
+    index >= 0;
+    index -= 1
+  ) {
     const history = currentWork.statusHistories[index];
     if (history?.toStatusCode === "approved") return history.actedByUserName;
   }
@@ -460,7 +466,11 @@ const rejectedActorName = computed<string | null>(() => {
   const currentWork = props.work;
   if (!currentWork) return null;
 
-  for (let index = currentWork.statusHistories.length - 1; index >= 0; index -= 1) {
+  for (
+    let index = currentWork.statusHistories.length - 1;
+    index >= 0;
+    index -= 1
+  ) {
     const history = currentWork.statusHistories[index];
     if (history?.toStatusCode === "rejected") return history.actedByUserName;
   }

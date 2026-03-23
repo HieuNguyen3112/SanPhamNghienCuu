@@ -1,6 +1,8 @@
 <template>
   <div class="space-y-4">
-    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+    <div
+      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
+    >
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
@@ -40,12 +42,16 @@
       v-if="status === 'MEMBER_REJECTED'"
       class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
     >
-      Có thành viên đã từ chối. Bạn cần xóa/thay thế hoặc gửi lại yêu cầu xác nhận
-      trước khi gửi lên khoa.
+      Có thành viên đã từ chối. Bạn cần xóa/thay thế hoặc gửi lại yêu cầu xác
+      nhận trước khi gửi lên khoa.
     </div>
 
-    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
-      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div
+      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6"
+    >
+      <div
+        class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+      >
         <div class="text-sm text-slate-600">
           <span class="font-medium text-slate-900">Trạng thái:</span>
           <span class="ml-1">{{ statusText }}</span>
@@ -84,7 +90,8 @@
         v-if="readOnly"
         class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600"
       >
-        Bản kê khai đang ở trạng thái <span class="font-semibold">{{ statusText }}</span>
+        Bản kê khai đang ở trạng thái
+        <span class="font-semibold">{{ statusText }}</span>
         nên đang ở chế độ chỉ xem.
       </div>
     </div>
@@ -119,7 +126,9 @@ defineEmits<{
 }>();
 
 function isEditableStatus(status: DeclarationStatusUi): boolean {
-  return status === "DRAFT" || status === "MEMBER_REJECTED" || status === "REJECTED";
+  return (
+    status === "DRAFT" || status === "MEMBER_REJECTED" || status === "REJECTED"
+  );
 }
 
 const readOnly = computed(() => !isEditableStatus(props.status));

@@ -182,7 +182,7 @@ watch(
     if (props.currentPageNumber < 1) {
       emit("update:currentPageNumber", 1);
     }
-  }
+  },
 );
 
 function workTypeLabel(t: WorkType) {

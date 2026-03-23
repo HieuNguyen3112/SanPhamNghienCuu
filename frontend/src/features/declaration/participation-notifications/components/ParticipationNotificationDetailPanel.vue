@@ -308,7 +308,9 @@
                     @click="confirmReject"
                   >
                     <XCircle class="h-4 w-4" />
-                    {{ props.processing ? "Đang xử lý..." : "Xác nhận từ chối" }}
+                    {{
+                      props.processing ? "Đang xử lý..." : "Xác nhận từ chối"
+                    }}
                   </button>
                 </div>
               </div>
@@ -516,7 +518,7 @@ watch(
       rejectReason.value = "";
       rejectError.value = null;
     }
-  }
+  },
 );
 
 watch(
@@ -525,7 +527,7 @@ watch(
     isRejecting.value = false;
     rejectReason.value = "";
     rejectError.value = null;
-  }
+  },
 );
 
 const notification = computed(() => props.notification);
@@ -570,7 +572,8 @@ watch(
       cacheKey: `participation-evidence:${firstFile.id}`,
       previewUrl: previewRawUrl,
       downloadUrl: downloadRawUrl,
-      fallbackFileName: firstFile.label.trim() || `minh-chung-${firstFile.id}.pdf`,
+      fallbackFileName:
+        firstFile.label.trim() || `minh-chung-${firstFile.id}.pdf`,
     });
   },
   { immediate: true, deep: true },

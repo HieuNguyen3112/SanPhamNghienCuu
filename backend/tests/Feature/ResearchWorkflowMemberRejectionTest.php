@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Notifications\WorkflowDatabaseNotification;
+use App\Notifications\ParticipationInvitationNotification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -294,6 +295,56 @@ class ResearchWorkflowMemberRejectionTest extends TestCase
             ->assertJsonValidationErrors(['to']);
     }
 
+    public function test_member_confirm_updates_status_and_marks_invitation_notification_read(): void
+    {
+        [$activityId, $memberRowId] = $this->createActivityWithMember('pending_member_confirm', 'pending');
+
+        DB::table('research_activity_members')
+            ->where('id', $memberRowId)
+            ->update([
+                'confirmation_status' => 'PENDING',
+                'responded_at' => null,
+                'confirmation_note' => null,
+                'updated_at' => now(),
+            ]);
+
+        $this->memberUser->notify(new ParticipationInvitationNotification([
+            'event_key' => 'participation_invitation',
+            'title' => 'Yeu cau xac nhan tham gia cong trinh',
+            'message' => 'Vui long xac nhan tham gia cong trinh.',
+            'activity_id' => $activityId,
+            'invitation_id' => $memberRowId,
+            'action_route' => '/declarations/participatier',
+        ]));
+
+        Sanctum::actingAs($this->memberUser);
+
+        $response = $this->postJson("/api/lecturer/participation-requests/{$memberRowId}/confirm")
+            ->assertOk();
+
+        $this->assertSame('ACCEPTED', $response->json('data.status'));
+
+        $this->assertDatabaseHas('research_activity_members', [
+            'id' => $memberRowId,
+            'confirmation_status' => 'accepted',
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $this->memberUser->id,
+            'type' => ParticipationInvitationNotification::class,
+        ]);
+
+        $unreadCount = DB::table('notifications')
+            ->where('notifiable_type', User::class)
+            ->where('notifiable_id', $this->memberUser->id)
+            ->where('type', ParticipationInvitationNotification::class)
+            ->whereNull('read_at')
+            ->count();
+
+        $this->assertSame(0, $unreadCount);
+    }
+
     public function test_accepted_member_can_rework_faculty_rejected_activity_and_see_same_reason(): void
     {
         [$activityId] = $this->createActivityWithMember('pending_faculty_review', 'accepted');
@@ -364,14 +415,16 @@ class ResearchWorkflowMemberRejectionTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        foreach ([
-            'draft' => 'Draft',
-            'pending_member_confirm' => 'Cho thanh vien xac nhan',
-            'member_rejected' => 'Thanh vien tu choi',
-            'pending_faculty_review' => 'Cho khoa duyet',
-            'approved' => 'Da duyet',
-            'rejected' => 'Bi tu choi',
-        ] as $code => $name) {
+        foreach (
+            [
+                'draft' => 'Draft',
+                'pending_member_confirm' => 'Cho thanh vien xac nhan',
+                'member_rejected' => 'Thanh vien tu choi',
+                'pending_faculty_review' => 'Cho khoa duyet',
+                'approved' => 'Da duyet',
+                'rejected' => 'Bi tu choi',
+            ] as $code => $name
+        ) {
             DB::table('activity_statuses')->insert([
                 'code' => $code,
                 'name' => $name,
