@@ -11,6 +11,7 @@ use App\Support\AuditLogger;
 use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 class LecturerParticipationNotificationController extends Controller
@@ -666,6 +667,7 @@ class LecturerParticipationNotificationController extends Controller
     private function baseQuery(int $lecturerId)
     {
         $yearExpr = $this->activityYearExpression();
+        $paperArticleUrlExpr = $this->paperArticleUrlSelectExpression();
 
         return DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
@@ -697,7 +699,7 @@ class LecturerParticipationNotificationController extends Controller
                 'pd.journal_name',
                 'pd.issn',
                 'pd.doi',
-                'pd.article_url',
+                DB::raw($paperArticleUrlExpr . ' as article_url'),
                 'pd.year as paper_year',
                 'bd.publisher',
                 'bd.isbn',
@@ -710,6 +712,11 @@ class LecturerParticipationNotificationController extends Controller
                 'cd.held_on',
                 DB::raw($yearExpr . ' as activity_year'),
             ]);
+    }
+
+    private function paperArticleUrlSelectExpression(): string
+    {
+        return Schema::hasColumn('paper_details', 'article_url') ? 'pd.article_url' : 'NULL';
     }
 
     private function activityYearExpression(): string
