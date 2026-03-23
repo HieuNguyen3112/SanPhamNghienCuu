@@ -31,7 +31,7 @@ export function useParticipationNotifications() {
   const rows = ref<ParticipationNotification[]>([]);
 
   const filters = ref<NotificationFilters>({
-    status: "ALL",
+    status: "PENDING",
     q: "",
     from: "",
     to: "",
@@ -73,10 +73,27 @@ export function useParticipationNotifications() {
     };
   }
 
+  function getHttpStatusCode(error: unknown): number | null {
+    if (!error || typeof error !== "object") return null;
+    const maybeResponse = (error as { response?: { status?: unknown } })
+      .response;
+    if (!maybeResponse) return null;
+    const status = maybeResponse.status;
+    return typeof status === "number" ? status : null;
+  }
+
+  async function refreshSelectionState(): Promise<void> {
+    await loadList({ withFeedback: false });
+    if (selectedId.value != null && detailOpen.value) {
+      await loadDetail(selectedId.value);
+    }
+  }
+
   async function loadListInternal() {
     loading.value = true;
     try {
-      const response = await list_participation_notifications(buildListParams());
+      const response =
+        await list_participation_notifications(buildListParams());
       rows.value = response.items.map(mapParticipationNotificationDtoToModel);
       totalItems.value = response.pagination.total;
       totalPages.value = response.pagination.last_page;
@@ -87,7 +104,9 @@ export function useParticipationNotifications() {
       rows.value = [];
       totalItems.value = 0;
       totalPages.value = 1;
-      setNotification("Không thể tải danh sách yêu cầu xác nhận. Vui lòng thử lại.");
+      setNotification(
+        "Không thể tải danh sách yêu cầu xác nhận. Vui lòng thử lại.",
+      );
     } finally {
       loading.value = false;
     }
@@ -111,7 +130,8 @@ export function useParticipationNotifications() {
     await runPageLoad(loadListInternal, {
       loading: {
         title: "Đang khởi tạo thông báo xác nhận",
-        message: "Hệ thống đang chuẩn bị danh sách lời mời tham gia công trình...",
+        message:
+          "Hệ thống đang chuẩn bị danh sách lời mời tham gia công trình...",
       },
     });
   }
@@ -131,7 +151,7 @@ export function useParticipationNotifications() {
   }
 
   function resetFilters() {
-    filters.value = { status: "ALL", q: "", from: "", to: "" };
+    filters.value = { status: "PENDING", q: "", from: "", to: "" };
     currentPageNumber.value = 1;
     void loadList();
   }
@@ -150,8 +170,19 @@ export function useParticipationNotifications() {
   }
 
   async function acceptSelected() {
-    if (!selected.value) return;
-    if (selected.value.status !== "PENDING") return;
+    if (!selected.value) {
+      setNotification(
+        "Không tìm thấy yêu cầu cần xác nhận. Vui lòng chọn lại từ danh sách.",
+      );
+      return;
+    }
+    if (selected.value.status !== "PENDING") {
+      setNotification(
+        "Yêu cầu này đã được xử lý trước đó. Hệ thống đang làm mới dữ liệu.",
+      );
+      await refreshSelectionState();
+      return;
+    }
     if (processingDecision.value) return;
 
     processingDecision.value = true;
@@ -163,7 +194,9 @@ export function useParticipationNotifications() {
           );
           const updated = mapParticipationNotificationDtoToModel(updatedDto);
           selected.value = updated;
-          rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
+          rows.value = rows.value.map((x) =>
+            x.id === updated.id ? updated : x,
+          );
           closeDetail();
           await loadList({ withFeedback: false });
         },
@@ -188,14 +221,32 @@ export function useParticipationNotifications() {
       );
     } catch (error) {
       console.error(error);
+      const httpStatus = getHttpStatusCode(error);
+      if (httpStatus === 404 || httpStatus === 409 || httpStatus === 422) {
+        setNotification(
+          "Yêu cầu không còn ở trạng thái chờ xác nhận. Dữ liệu đã được làm mới.",
+        );
+        await refreshSelectionState();
+      }
     } finally {
       processingDecision.value = false;
     }
   }
 
   async function rejectSelected(reason: string) {
-    if (!selected.value) return;
-    if (selected.value.status !== "PENDING") return;
+    if (!selected.value) {
+      setNotification(
+        "Không tìm thấy yêu cầu cần từ chối. Vui lòng chọn lại từ danh sách.",
+      );
+      return;
+    }
+    if (selected.value.status !== "PENDING") {
+      setNotification(
+        "Yêu cầu này đã được xử lý trước đó. Hệ thống đang làm mới dữ liệu.",
+      );
+      await refreshSelectionState();
+      return;
+    }
     if (processingDecision.value) return;
 
     processingDecision.value = true;
@@ -208,7 +259,9 @@ export function useParticipationNotifications() {
           );
           const updated = mapParticipationNotificationDtoToModel(updatedDto);
           selected.value = updated;
-          rows.value = rows.value.map((x) => (x.id === updated.id ? updated : x));
+          rows.value = rows.value.map((x) =>
+            x.id === updated.id ? updated : x,
+          );
           closeDetail();
           await loadList({ withFeedback: false });
         },
@@ -233,6 +286,13 @@ export function useParticipationNotifications() {
       );
     } catch (error) {
       console.error(error);
+      const httpStatus = getHttpStatusCode(error);
+      if (httpStatus === 404 || httpStatus === 409 || httpStatus === 422) {
+        setNotification(
+          "Yêu cầu không còn ở trạng thái chờ xác nhận. Dữ liệu đã được làm mới.",
+        );
+        await refreshSelectionState();
+      }
     } finally {
       processingDecision.value = false;
     }
