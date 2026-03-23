@@ -1,21 +1,39 @@
 <template>
   <div class="sticky top-0 z-40 bg-[#234a74] shadow-sm">
-    <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2 md:px-6">
-      <!-- Left menu (no scrollbar) -->
-      <nav class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden text-[12px] font-normal md:gap-2">
-        <RouterLink :to="{ path: '/' }" :class="navClass(isActiveExact('/'))">Trang chủ</RouterLink>
+    <div
+      class="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-2 md:flex-row md:items-center md:justify-between md:gap-3 md:px-6"
+    >
+      <nav
+        class="-mb-1 flex min-w-0 w-full items-center gap-1 overflow-x-auto pb-1 text-[12px] font-normal no-scrollbar md:mb-0 md:w-auto md:flex-1 md:gap-2 md:overflow-visible md:pb-0"
+      >
+        <RouterLink :to="{ path: '/' }" :class="navClass(isActiveExact('/'))"
+          >Trang chủ</RouterLink
+        >
 
-        <RouterLink :to="{ path: '/lecturers' }" :class="navClass(isActivePrefix('/lecturers'))">Giảng viên</RouterLink>
+        <RouterLink
+          :to="{ path: '/lecturers' }"
+          :class="navClass(isActivePrefix('/lecturers'))"
+          >Giảng viên</RouterLink
+        >
 
-        <RouterLink :to="{ path: '/research-articles' }" :class="navClass(isActivePrefix('/research-articles'))">
+        <RouterLink
+          :to="{ path: '/research-articles' }"
+          :class="navClass(isActivePrefix('/research-articles'))"
+        >
           Bài báo khoa học
         </RouterLink>
 
-        <RouterLink :to="{ path: '/research-projects' }" :class="navClass(isActivePrefix('/research-projects'))">
+        <RouterLink
+          :to="{ path: '/research-projects' }"
+          :class="navClass(isActivePrefix('/research-projects'))"
+        >
           Đề tài nghiên cứu
         </RouterLink>
 
-        <RouterLink :to="{ path: '/textbooks' }" :class="navClass(isActivePrefix('/textbooks'))">
+        <RouterLink
+          :to="{ path: '/textbooks' }"
+          :class="navClass(isActivePrefix('/textbooks'))"
+        >
           Sách - Giáo trình
         </RouterLink>
 
@@ -27,14 +45,18 @@
           <span class="lg:hidden">Hội thảo - Báo cáo</span>
         </RouterLink>
 
-        <RouterLink :to="{ path: '/user-guide' }" :class="navClass(isActivePrefix('/user-guide'))">
+        <RouterLink
+          :to="{ path: '/user-guide' }"
+          :class="navClass(isActivePrefix('/user-guide'))"
+        >
           <span class="hidden lg:inline">Hướng dẫn sử dụng</span>
           <span class="lg:hidden">Hướng dẫn</span>
         </RouterLink>
       </nav>
 
-      <!-- Right auth (always on the far right) -->
-      <div class="flex shrink-0 items-center gap-2 whitespace-nowrap">
+      <div
+        class="flex w-full shrink-0 items-center justify-end gap-2 whitespace-nowrap md:w-auto"
+      >
         <RouterLink
           v-if="!isAuthenticated"
           to="/login"
@@ -55,7 +77,9 @@
             >
               {{ initials || "U" }}
             </span>
-            <span class="max-w-[180px] truncate">{{ lecturerName || "Tài khoản" }}</span>
+            <span class="max-w-[130px] truncate md:max-w-[180px]">{{
+              lecturerName || "Tài khoản"
+            }}</span>
           </RouterLink>
 
           <button
@@ -100,3 +124,14 @@ function navClass(active: boolean) {
   ].join(" ");
 }
 </script>
+
+<style scoped>
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+</style>
