@@ -61,6 +61,27 @@ class ResearchHoursCatalogSeeder extends Seeder
                 'hours_total_per_activity' => 300,
             ],
             [
+                'kind' => 'paper',
+                'type' => 'scientific_report',
+                'type_aliases' => ['scientific_report', 'paper_report', 'bao_cao_khoa_hoc'],
+                'distribution_strategy' => 'equal_all_members',
+                'hours_total_per_activity' => 300,
+            ],
+            [
+                'kind' => 'paper',
+                'type' => 'scientific_report_600',
+                'type_aliases' => ['scientific_report_600', 'paper_report_600', 'bao_cao_khoa_hoc_600'],
+                'distribution_strategy' => 'equal_all_members',
+                'hours_total_per_activity' => 600,
+            ],
+            [
+                'kind' => 'paper',
+                'type' => 'scientific_report_900',
+                'type_aliases' => ['scientific_report_900', 'paper_report_900', 'bao_cao_khoa_hoc_900'],
+                'distribution_strategy' => 'equal_all_members',
+                'hours_total_per_activity' => 900,
+            ],
+            [
                 'kind' => 'book',
                 'type' => 'textbook',
                 'type_aliases' => ['textbook', 'giao_trinh', 'book_textbook'],

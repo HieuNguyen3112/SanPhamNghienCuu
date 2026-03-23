@@ -28,7 +28,7 @@ class ResearchLookupSeeder extends Seeder
         }
 
         $kinds = [
-            ['code' => 'paper', 'name' => 'Bài báo khoa học'],
+            ['code' => 'paper', 'name' => 'Bài báo / Báo cáo khoa học'],
             ['code' => 'book', 'name' => 'Sách, giáo trình'],
             ['code' => 'project', 'name' => 'Đề tài KH&CN'],
             ['code' => 'conference', 'name' => 'Hội nghị, hội thảo'],
@@ -50,6 +50,9 @@ class ResearchLookupSeeder extends Seeder
             ['code' => 'hdgsnn_900', 'name' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)', 'kind_code' => 'paper'],
             ['code' => 'hdgsnn_600', 'name' => 'Bài báo HDGSNN <= 1 điểm (600 giờ)', 'kind_code' => 'paper'],
             ['code' => 'hdgsnn_300', 'name' => 'Bài báo có ISSN/ISBN (300 giờ)', 'kind_code' => 'paper'],
+            ['code' => 'scientific_report_900', 'name' => 'Báo cáo khoa học (900 giờ)', 'kind_code' => 'paper'],
+            ['code' => 'scientific_report_600', 'name' => 'Báo cáo khoa học (600 giờ)', 'kind_code' => 'paper'],
+            ['code' => 'scientific_report', 'name' => 'Báo cáo khoa học (300 giờ)', 'kind_code' => 'paper'],
             ['code' => 'textbook', 'name' => 'Giáo trình', 'kind_code' => 'book'],
             ['code' => 'reference', 'name' => 'Tài liệu tham khảo', 'kind_code' => 'book'],
             ['code' => 'bo', 'name' => 'Đề tài cấp Bộ (2 năm)', 'kind_code' => 'project'],

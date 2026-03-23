@@ -401,7 +401,7 @@ class LecturerPersonalHoursController extends Controller
             $allAcademicYearIds = DB::table('academic_years')
                 ->orderByDesc('start_date')
                 ->pluck('id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn($id) => (int) $id)
                 ->all();
 
             if ($allAcademicYearIds === []) {
@@ -461,8 +461,8 @@ class LecturerPersonalHoursController extends Controller
     private function requiredHoursForAcademicYears(array $academicYearIds): float
     {
         $academicYearIds = array_values(array_unique(array_map(
-            static fn ($id) => (int) $id,
-            array_filter($academicYearIds, static fn ($id) => (int) $id > 0)
+            static fn($id) => (int) $id,
+            array_filter($academicYearIds, static fn($id) => (int) $id > 0)
         )));
 
         if ($academicYearIds === []) {
@@ -615,12 +615,16 @@ class LecturerPersonalHoursController extends Controller
 
     private function mapKindName(?string $code, ?string $fallback): ?string
     {
+        if ($fallback !== null && trim($fallback) !== '') {
+            return $fallback;
+        }
+
         if (! $code) {
             return $fallback;
         }
 
         $mapped = match (strtolower($code)) {
-            'paper' => 'Bài báo',
+            'paper' => 'Bài báo / Báo cáo khoa học',
             'book' => 'Sách/Giáo trình',
             'project' => 'Đề tài KH&CN',
             'conference' => 'Hội nghị/Hội thảo',

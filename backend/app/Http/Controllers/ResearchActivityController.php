@@ -1073,7 +1073,15 @@ class ResearchActivityController extends Controller
             return null;
         }
 
-        if ($this->isConferenceReportTypeCode($activity->type_code ?? null)) {
+        $hasConferenceData = trim((string) ($detail->conference_name ?? '')) !== ''
+            || trim((string) ($detail->conference_level ?? '')) !== ''
+            || trim((string) ($detail->conference_research_field ?? '')) !== ''
+            || trim((string) ($detail->conference_organization ?? '')) !== ''
+            || trim((string) ($detail->conference_isbn ?? '')) !== ''
+            || (bool) ($detail->conference_has_isbn ?? false)
+            || $detail->conference_point !== null;
+
+        if ($this->isConferenceReportTypeCode($activity->type_code ?? null) || $hasConferenceData) {
             return $this->upsertConferenceSuggestion($activityId, $lecturerId, $userId, $detail);
         }
 
@@ -1139,7 +1147,13 @@ class ResearchActivityController extends Controller
     private function isConferenceReportTypeCode(?string $typeCode): bool
     {
         $normalized = Str::lower(trim((string) $typeCode));
-        return in_array($normalized, ['report', 'conference_report', 'bao_cao', 'scientific_report'], true);
+        return Str::contains($normalized, [
+            'conference',
+            'report',
+            'bao_cao',
+            'hoi_nghi',
+            'proceeding',
+        ]);
     }
 
     private function upsertJournalSuggestion(int $activityId, int $lecturerId, ?int $userId, object $detail): ?array

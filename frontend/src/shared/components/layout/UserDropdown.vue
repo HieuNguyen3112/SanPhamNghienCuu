@@ -93,10 +93,10 @@ const props = withDefaults(
     userName: "",
     userCode: "",
     offsetY: 8,
-  }
+  },
 );
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "close"): void;
   (e: "open-profile"): void;
   (e: "change-password"): void;
@@ -128,6 +128,7 @@ const handleClickOutside = (event: MouseEvent) => {
   if (!props.open) return;
 
   const target = event.target as Node | null;
+  if (!target) return;
 
   // click ngoài menu và ngoài anchor => close
   if (
@@ -136,21 +137,16 @@ const handleClickOutside = (event: MouseEvent) => {
     props.anchorEl &&
     !props.anchorEl.contains(target)
   ) {
-    // emit close
-    // @ts-ignore
-    (getCurrentInstance()?.emit as any)("close");
+    emit("close");
   }
 };
 
 const handleEsc = (event: KeyboardEvent) => {
   if (!props.open) return;
   if (event.key === "Escape") {
-    // @ts-ignore
-    (getCurrentInstance()?.emit as any)("close");
+    emit("close");
   }
 };
-
-import { getCurrentInstance } from "vue";
 
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);

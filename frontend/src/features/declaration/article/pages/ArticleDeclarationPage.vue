@@ -966,19 +966,17 @@ const manualConferenceDerivedHours = computed(() => {
 });
 
 const manualDerivedCategoryLabel = computed(() => {
-  if (manualDerivedCategory.value === "POINT_GE_2") return "HDGSNN 1-2 điểm";
-  if (manualDerivedCategory.value === "POINT_GE_1") return "HDGSNN <= 1 điểm";
-  if (manualDerivedCategory.value === "ISSN_ISBN") return "Có ISSN/ISBN";
-  return "Khác";
+  if (manualDerivedHours.value > 0) {
+    return `Bài báo (${manualDerivedHours.value} giờ)`;
+  }
+  return "Bài báo (chưa xác định giờ)";
 });
 
 const manualConferenceDerivedCategoryLabel = computed(() => {
-  if (manualConferenceDerivedCategory.value === "POINT_GE_2")
-    return "HDGSNN 1-2 điểm";
-  if (manualConferenceDerivedCategory.value === "POINT_GE_1")
-    return "HDGSNN <= 1 điểm";
-  if (manualConferenceDerivedCategory.value === "ISSN_ISBN") return "Có ISBN";
-  return "Khác";
+  if (manualConferenceDerivedHours.value > 0) {
+    return `Báo cáo (${manualConferenceDerivedHours.value} giờ)`;
+  }
+  return "Báo cáo (chưa xác định giờ)";
 });
 
 function hoursFromClassification(
@@ -999,6 +997,19 @@ function mapCategoryToJournalTypeCode(
   if (category === "POINT_GE_2") return "hdgsnn_900";
   if (category === "POINT_GE_1") return "hdgsnn_600";
   if (category === "ISSN_ISBN") return "hdgsnn_300";
+  return null;
+}
+
+function mapHoursToConferenceTypeCode(
+  hours: number,
+):
+  | "scientific_report_900"
+  | "scientific_report_600"
+  | "scientific_report"
+  | null {
+  if (hours >= 900) return "scientific_report_900";
+  if (hours >= 600) return "scientific_report_600";
+  if (hours >= 300) return "scientific_report";
   return null;
 }
 
@@ -1043,10 +1054,31 @@ const journalFallbackTypeId = computed(() => {
 });
 
 const conferenceFallbackTypeId = computed(() => {
-  const firstConference = types.value.find(
+  const reportType = types.value.find((t) => {
+    const code = String(t.code ?? "").toLowerCase();
+    return (
+      code === "scientific_report_900" ||
+      code === "scientific_report_600" ||
+      code === "scientific_report" ||
+      code === "paper_report" ||
+      code === "report" ||
+      code.includes("conference") ||
+      code.includes("bao_cao") ||
+      code.includes("hoi_nghi") ||
+      code.includes("proceeding")
+    );
+  });
+  if (reportType) return reportType.id;
+
+  const firstNonJournal = types.value.find(
     (t) => !["hdgsnn_900", "hdgsnn_600", "hdgsnn_300"].includes(t.code),
   );
-  return firstConference?.id ?? null;
+  if (firstNonJournal) return firstNonJournal.id;
+
+  const firstJournal = types.value.find((t) => t.code === "hdgsnn_300");
+  if (firstJournal) return firstJournal.id;
+
+  return null;
 });
 
 const journalDrivenHours = computed(() => {
@@ -1097,6 +1129,12 @@ const venueDrivenHours = computed(() =>
 
 const persistedTypeId = computed(() => {
   if (selectedArticleMode.value === "conference") {
+    const targetCode = mapHoursToConferenceTypeCode(
+      conferenceDrivenHours.value,
+    );
+    const mappedId = targetCode ? typeIdByCode.value[targetCode] : undefined;
+    if (typeof mappedId === "number") return mappedId;
+
     if (typeof conferenceFallbackTypeId.value === "number") {
       return conferenceFallbackTypeId.value;
     }

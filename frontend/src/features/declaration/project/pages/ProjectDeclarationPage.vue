@@ -1333,9 +1333,8 @@ const shell = useDeclarationFormShell({
   },
   on_submit: async () => {
     try {
-      if (!form.activityId) {
-        await shell.save_draft({ silent_success: true });
-      }
+      // Always persist the latest edits (especially members) before submit.
+      await shell.save_draft({ silent_success: true });
       if (!form.activityId) return;
       const submitResult = await submit_activity(form.activityId);
       const nextStatusCode =
