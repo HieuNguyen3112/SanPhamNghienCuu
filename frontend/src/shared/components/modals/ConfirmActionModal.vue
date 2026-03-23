@@ -10,7 +10,7 @@
     >
       <div
         v-if="open"
-        class="fixed inset-0 z-[85] bg-slate-950/45 backdrop-blur-[1.5px]"
+        class="fixed inset-0 z-85 bg-slate-950/45 backdrop-blur-[1.5px]"
         aria-hidden="true"
         @click="requestCancel"
       />
@@ -26,7 +26,7 @@
     >
       <div
         v-if="open"
-        class="fixed inset-0 z-[90] flex items-center justify-center p-4"
+        class="fixed inset-0 z-90 flex items-center justify-center p-4"
         role="dialog"
         aria-modal="true"
         :aria-label="resolvedTitle"
@@ -48,7 +48,7 @@
           </header>
 
           <section class="px-6 py-6">
-            <p class="whitespace-pre-line break-words text-[15px] leading-6 text-slate-700">
+            <p class="whitespace-pre-line wrap-break-word text-[15px] leading-6 text-slate-700">
               {{ message }}
             </p>
           </section>

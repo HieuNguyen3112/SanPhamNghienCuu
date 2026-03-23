@@ -91,7 +91,7 @@ function resolveForgotPasswordErrorMessage(error: unknown): string {
   }
 
   if (status === 422) {
-    return "Vui lòng nhập đúng địa chỉ email để nhận liên kết đặt lại mật khẩu.";
+    return "Vui lòng nhập đúng địa chỉ email @hcmue.edu.vn để nhận liên kết đặt lại mật khẩu.";
   }
 
   if (status !== null && status >= 500) {
@@ -114,9 +114,9 @@ function validate(): boolean {
     return false;
   }
 
-  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailPattern = /^[a-zA-Z0-9._%+-]+@hcmue\.edu\.vn$/i;
   if (!emailPattern.test(normalizedEmail)) {
-    emailError.value = "Vui lòng nhập đúng định dạng email.";
+    emailError.value = "Vui lòng sử dụng email có đuôi @hcmue.edu.vn.";
     return false;
   }
 
