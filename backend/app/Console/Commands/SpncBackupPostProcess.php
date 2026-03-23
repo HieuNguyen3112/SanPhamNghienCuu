@@ -17,7 +17,7 @@ class SpncBackupPostProcess extends Command
         {--trigger=manual : Nguồn kích hoạt}
         {--initiated-by= : user_id kích hoạt}';
 
-    protected $description = 'Hoàn thiện export readable và đồng bộ Drive sau khi snapshot backup đã an toàn.';
+    protected $description = 'Hoàn thiện readable export và đồng bộ Drive sau khi snapshot backup đã an toàn.';
 
     public function __construct(
         private ResticBackupManager $backupManager,
