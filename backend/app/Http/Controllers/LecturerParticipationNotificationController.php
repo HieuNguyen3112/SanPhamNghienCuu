@@ -131,18 +131,23 @@ class LecturerParticipationNotificationController extends Controller
                 ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
                 ->where('ra.id', $member->activity_id)
                 ->value('ast.code');
-            if ($activityStatus !== self::ACT_PENDING_MEMBER_CONFIRM) {
+            if ($this->normalizeStatus($activityStatus) !== self::ACT_PENDING_MEMBER_CONFIRM) {
                 return ['error' => 'activity is not waiting member confirmations', 'status' => Response::HTTP_CONFLICT];
             }
 
-            DB::table('research_activity_members')
+            $updated = DB::table('research_activity_members')
                 ->where('id', $requestId)
+                ->whereRaw('LOWER(confirmation_status) = ?', [self::STATUS_PENDING])
                 ->update([
                     'confirmation_status' => self::STATUS_ACCEPTED,
                     'responded_at' => $now,
                     'confirmation_note' => null,
                     'updated_at' => $now,
                 ]);
+
+            if ($updated < 1) {
+                return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
+            }
 
             $this->markInvitationNotificationAsRead($request, $requestId);
 
@@ -250,18 +255,23 @@ class LecturerParticipationNotificationController extends Controller
                 ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
                 ->where('ra.id', $member->activity_id)
                 ->value('ast.code');
-            if ($activityStatus !== self::ACT_PENDING_MEMBER_CONFIRM) {
+            if ($this->normalizeStatus($activityStatus) !== self::ACT_PENDING_MEMBER_CONFIRM) {
                 return ['error' => 'activity is not waiting member confirmations', 'status' => Response::HTTP_CONFLICT];
             }
 
-            DB::table('research_activity_members')
+            $updated = DB::table('research_activity_members')
                 ->where('id', $requestId)
+                ->whereRaw('LOWER(confirmation_status) = ?', [self::STATUS_PENDING])
                 ->update([
                     'confirmation_status' => self::STATUS_REJECTED,
                     'responded_at' => $now,
                     'confirmation_note' => $reason,
                     'updated_at' => $now,
                 ]);
+
+            if ($updated < 1) {
+                return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
+            }
 
             $this->markInvitationNotificationAsRead($request, $requestId);
 
@@ -325,7 +335,7 @@ class LecturerParticipationNotificationController extends Controller
             return null;
         }
 
-        if ($activity->status_code !== self::ACT_PENDING_MEMBER_CONFIRM) {
+        if ($this->normalizeStatus($activity->status_code ?? null) !== self::ACT_PENDING_MEMBER_CONFIRM) {
             return null;
         }
 
@@ -399,7 +409,7 @@ class LecturerParticipationNotificationController extends Controller
             ->select(['ra.id', 'ra.status_id', 'ast.code as status_code'])
             ->first();
 
-        if (! $activity || $activity->status_code === self::ACT_MEMBER_REJECTED) {
+        if (! $activity || $this->normalizeStatus($activity->status_code ?? null) === self::ACT_MEMBER_REJECTED) {
             return;
         }
 
@@ -444,7 +454,9 @@ class LecturerParticipationNotificationController extends Controller
 
     private function getStatusId(string $code): ?int
     {
-        $id = DB::table('activity_statuses')->where('code', $code)->value('id');
+        $id = DB::table('activity_statuses')
+            ->whereRaw('LOWER(code) = ?', [$this->normalizeStatus($code)])
+            ->value('id');
         return $id ? (int) $id : null;
     }
 
@@ -491,23 +503,30 @@ class LecturerParticipationNotificationController extends Controller
 
     private function markInvitationNotificationAsRead(Request $request, int $requestId): void
     {
-        $user = $request->user();
-        if (! $user) {
-            return;
-        }
+        try {
+            $user = $request->user();
+            if (! $user || ! Schema::hasTable('notifications')) {
+                return;
+            }
 
-        $notification = $user->unreadNotifications()
-            ->where('type', ParticipationInvitationNotification::class)
-            ->get()
-            ->first(function ($item) use ($requestId) {
-                $data = is_array($item->data) ? $item->data : [];
+            $notification = $user->unreadNotifications()
+                ->where('type', ParticipationInvitationNotification::class)
+                ->get()
+                ->first(function ($item) use ($requestId) {
+                    $data = is_array($item->data) ? $item->data : [];
 
-                return ($data['event_key'] ?? null) === 'participation_invitation'
-                    && (int) ($data['invitation_id'] ?? 0) === $requestId;
-            });
+                    return ($data['event_key'] ?? null) === 'participation_invitation'
+                        && (int) ($data['invitation_id'] ?? 0) === $requestId;
+                });
 
-        if ($notification && $notification->read_at === null) {
-            $notification->markAsRead();
+            if ($notification && $notification->read_at === null) {
+                $notification->markAsRead();
+            }
+        } catch (\Throwable $e) {
+            Log::warning('participation.mark_invitation_notification_read_failed', [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -733,6 +752,7 @@ class LecturerParticipationNotificationController extends Controller
         $paperArticleUrlExpr = $this->paperArticleUrlSelectExpression();
 
         return DB::table('research_activity_members as ram')
+            ->useWritePdo()
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
