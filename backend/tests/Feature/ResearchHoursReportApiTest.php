@@ -72,16 +72,16 @@ class ResearchHoursReportApiTest extends TestCase
         $response = $this->getJson('/api/admin/reports/hour-research?academic_year_id=' . $this->academicYearId)
             ->assertOk();
 
-        $response->assertJsonPath('data.kpis.lecturer_count', 2);
+        $response->assertJsonPath('data.kpis.lecturer_count', 3);
         $response->assertJsonPath('data.kpis.total_hours', 80);
 
         $rows = collect($response->json('data.table.items'));
-        $this->assertCount(2, $rows);
+        $this->assertCount(3, $rows);
         $this->assertSame(80.0, (float) $rows->sum('total_hours'));
 
         $facultyFiltered = $this->getJson('/api/admin/reports/hour-research?academic_year_id=' . $this->academicYearId . '&faculty_id=' . $this->facultyOneId)
             ->assertOk();
-        $facultyFiltered->assertJsonPath('data.kpis.lecturer_count', 1);
+        $facultyFiltered->assertJsonPath('data.kpis.lecturer_count', 2);
         $facultyFiltered->assertJsonPath('data.kpis.total_hours', 30);
     }
 
@@ -103,7 +103,7 @@ class ResearchHoursReportApiTest extends TestCase
         $response = $this->getJson('/api/faculty/reports/hour-research?academic_year_id=' . $this->academicYearId)
             ->assertOk();
 
-        $response->assertJsonPath('data.kpis.lecturer_count', 1);
+        $response->assertJsonPath('data.kpis.lecturer_count', 2);
         $response->assertJsonPath('data.kpis.total_hours', 28);
         $response->assertJsonPath('data.applied_filters.faculty_id', $this->facultyOneId);
 

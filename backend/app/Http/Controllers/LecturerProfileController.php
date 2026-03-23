@@ -726,6 +726,7 @@ class LecturerProfileController extends Controller
             : null;
         $languagePayload = LecturerLanguageResource::collection($languageProficiencies)->resolve();
         $researchAreasPayload = $this->serializeResearchAreas($profile?->research_area);
+        $isScienceOffice = $this->hasScienceOfficeRole($backendRoles);
         $partyPayload = $partyMembership ? [
             'is_member' => $partyMembership->is_member,
             'membership_no' => $partyMembership->membership_no,
@@ -746,7 +747,8 @@ class LecturerProfileController extends Controller
             $workPayload,
             $latestWorkPayload,
             $languagePayload,
-            $researchAreasPayload
+            $researchAreasPayload,
+            $isScienceOffice
         );
         $researchWorks = $this->buildApprovedResearchWorks($lecturer);
 
@@ -764,8 +766,8 @@ class LecturerProfileController extends Controller
                 'full_name' => $lecturer->full_name,
                 'email' => $lecturer->email,
                 'phone' => $lecturer->phone,
-                'department_id' => $lecturer->department_id,
-                'department_name' => $lecturer->department->name ?? null,
+                'department_id' => $isScienceOffice ? null : $lecturer->department_id,
+                'department_name' => $isScienceOffice ? null : ($lecturer->department->name ?? null),
                 'degree_id' => $lecturer->degree_id,
                 'degree_name' => $lecturer->degree->name ?? null,
                 'academic_rank_id' => $lecturer->academic_rank_id,
@@ -821,6 +823,12 @@ class LecturerProfileController extends Controller
             return $lecturer;
         }
 
+        $backendRoles = $user->getRoleNames()->values()->all();
+        if ($this->hasScienceOfficeRole($backendRoles)) {
+            // School-level accounts are not attached to any faculty/department lecturer profile.
+            return null;
+        }
+
         $department = Department::query()->orderBy('id')->first();
         if (! $department) {
             return null;
@@ -852,7 +860,8 @@ class LecturerProfileController extends Controller
         array $workPayload,
         ?array $latestWorkPayload,
         array $languagePayload,
-        array $researchAreasPayload
+        array $researchAreasPayload,
+        bool $isScienceOffice = false
     ): array {
         $staffType = $profile?->staff_type ?? ($latestWorkPayload['employment_type'] ?? null);
         $workStatus = $profile?->work_status ?? ($lecturer->active ? 'active' : 'inactive');
@@ -869,8 +878,8 @@ class LecturerProfileController extends Controller
                 'hometown' => $profile?->hometown,
                 'current_position' => $profile?->current_position,
                 'current_unit' => $profile?->current_unit,
-                'department_id' => $lecturer->department_id,
-                'department_name' => $lecturer->department->name ?? null,
+                'department_id' => $isScienceOffice ? null : $lecturer->department_id,
+                'department_name' => $isScienceOffice ? null : ($lecturer->department->name ?? null),
                 'staff_type' => $staffType,
                 'work_status' => $workStatus,
                 'active' => $lecturer->active,
@@ -905,6 +914,13 @@ class LecturerProfileController extends Controller
             'latest_education' => $latestEducationPayload,
             'party_membership' => $partyPayload,
         ];
+    }
+
+    private function hasScienceOfficeRole(array $backendRoles): bool
+    {
+        return in_array('SCIENCE_OFFICE', $backendRoles, true)
+            || in_array('QL', $backendRoles, true)
+            || in_array('ADMIN', $backendRoles, true);
     }
 
     private function buildApprovedResearchWorks(Lecturer $lecturer): array

@@ -1,9 +1,6 @@
 import type { HoursComputationResult } from "../shared/contracts/declarationSharedContract";
 import type { ParticipantRowModel } from "../shared/components/ParticipantsTable.vue";
-import {
-  normalizeParticipantsForHours,
-  round2,
-} from "../shared/contracts/participantHours.util";
+import { round2 } from "../shared/contracts/participantHours.util";
 export type BookDeclarationFormModel = {
   activityId: number | null;
 
@@ -56,34 +53,79 @@ export function computeBookHours(
     : 0;
   const baseHours = byTypeConfig > 0 ? byTypeConfig : byTypeFallback;
 
-  const participants = normalizeParticipantsForHours(model.members);
+  const allParticipants = model.members.flatMap((row) => {
+    const memberRoleId = row.member_role_id;
+    if (typeof memberRoleId !== "number" || !Number.isFinite(memberRoleId)) {
+      return [] as Array<{
+        kind: "internal" | "external";
+        lecturer_id?: number;
+        member_role_id: number;
+        role_code: string;
+        chief_editor_is_coauthor: boolean;
+      }>;
+    }
 
-  // map role_code cho cả internal + external (để external chief_editor vẫn “ăn” 1/5 nhưng không phân bổ lại)
-  const allWithRole = participants.all.map((p) => ({
-    ...p,
-    role_code: ctx.memberRoleCodeById[p.member_role_id] ?? "",
-  }));
-  const internalWithRole = participants.internal.map((p) => ({
-    ...p,
-    role_code: ctx.memberRoleCodeById[p.member_role_id] ?? "",
-  }));
+    const roleCode = (ctx.memberRoleCodeById[memberRoleId] ?? "").toLowerCase();
+    const chiefEditorIsCoauthor = row.chief_editor_is_coauthor !== false;
 
-  const totalMembers = allWithRole.length;
+    if (row.is_external === true) {
+      const externalName = String(row.external_full_name ?? "").trim();
+      if (!externalName) return [];
+      return [
+        {
+          kind: "external" as const,
+          member_role_id: memberRoleId,
+          role_code: roleCode,
+          chief_editor_is_coauthor: chiefEditorIsCoauthor,
+        },
+      ];
+    }
 
-  // Rule giữ nguyên, chỉ đổi mẫu số
-  const sharedPerMember =
-    totalMembers > 0 ? (baseHours * 4) / 5 / totalMembers : 0;
+    const lecturerId = row.lecturer_id;
+    if (typeof lecturerId !== "number" || !Number.isFinite(lecturerId)) {
+      return [];
+    }
 
-  const chiefEditorsCount = allWithRole.filter(
+    return [
+      {
+        kind: "internal" as const,
+        lecturer_id: lecturerId,
+        member_role_id: memberRoleId,
+        role_code: roleCode,
+        chief_editor_is_coauthor: chiefEditorIsCoauthor,
+      },
+    ];
+  });
+
+  const internalParticipants = allParticipants.filter(
+    (
+      p,
+    ): p is (typeof allParticipants)[number] & {
+      kind: "internal";
+      lecturer_id: number;
+    } => p.kind === "internal" && typeof p.lecturer_id === "number",
+  );
+
+  const chiefEditorsCount = allParticipants.filter(
     (p) => p.role_code === "chief_editor",
   ).length;
-
   const chiefExtra =
     chiefEditorsCount > 0 ? baseHours / 5 / chiefEditorsCount : 0;
 
-  const distribution = internalWithRole.map((p) => {
+  const writingParticipantsCount = allParticipants.filter((p) => {
+    if (p.role_code !== "chief_editor") return true;
+    return p.chief_editor_is_coauthor;
+  }).length;
+  const sharedPerMember =
+    writingParticipantsCount > 0
+      ? (baseHours * 4) / 5 / writingParticipantsCount
+      : 0;
+
+  const distribution = internalParticipants.map((p) => {
     const isChief = p.role_code === "chief_editor";
-    const hours = sharedPerMember + (isChief ? chiefExtra : 0);
+    const joinWritingPool = !isChief || p.chief_editor_is_coauthor;
+    const hours =
+      (joinWritingPool ? sharedPerMember : 0) + (isChief ? chiefExtra : 0);
 
     return {
       lecturer_id: p.lecturer_id,

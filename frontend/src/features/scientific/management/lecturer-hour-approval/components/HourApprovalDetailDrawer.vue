@@ -79,22 +79,48 @@
           </div>
 
           <div class="flex-1 overflow-auto px-4 py-4 lg:px-5">
-            <div v-if="loadingDetail" class="text-sm text-slate-700">Đang tải chi tiết...</div>
+            <div v-if="loadingDetail" class="text-sm text-slate-700">
+              Đang tải chi tiết...
+            </div>
 
             <div
               v-else-if="errorDetail"
               class="rounded-xl border border-rose-200 bg-rose-50 p-4"
             >
-              <div class="text-sm font-medium text-rose-700">Không tải được chi tiết</div>
+              <div class="text-sm font-medium text-rose-700">
+                Không tải được chi tiết
+              </div>
               <div class="mt-1 whitespace-pre-wrap text-xs text-rose-700">
                 {{ errorDetail }}
               </div>
             </div>
 
             <template v-else-if="detail">
-              <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div class="text-sm font-semibold text-slate-900">Danh sách công trình trong yêu cầu</div>
-                <span class="text-xs text-slate-500">Theo dõi giờ quy đổi và minh chứng</span>
+              <div
+                class="mb-3 flex flex-wrap items-center justify-between gap-2"
+              >
+                <div class="text-sm font-semibold text-slate-900">
+                  Danh sách công trình trong yêu cầu
+                </div>
+                <div class="flex items-center gap-3">
+                  <label
+                    v-if="hasHandledItems"
+                    class="inline-flex items-center gap-2 text-xs text-slate-700"
+                  >
+                    <input
+                      v-model="showHandledItems"
+                      type="checkbox"
+                      class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                    />
+                    <span>Hiện cả mục đã xử lý</span>
+                  </label>
+                  <span class="text-xs text-slate-500">
+                    Hiển thị {{ displayedItems.length }}/{{
+                      detail.items.length
+                    }}
+                    mục
+                  </span>
+                </div>
               </div>
 
               <div
@@ -102,36 +128,49 @@
                 class="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
               >
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <label class="inline-flex items-center gap-2 text-xs text-slate-700">
+                  <label
+                    class="inline-flex items-center gap-2 text-xs text-slate-700"
+                  >
                     <input
                       type="checkbox"
                       class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
                       :checked="isAllPendingSelected"
                       @change="toggleSelectAll"
                     />
-                    <span class="font-medium text-slate-800">Chọn tất cả mục chờ duyệt</span>
+                    <span class="font-medium text-slate-800"
+                      >Chọn tất cả mục chờ duyệt</span
+                    >
                   </label>
 
                   <div class="text-xs text-slate-600">
-                    Đã chọn: <span class="font-semibold text-slate-900">{{ selectedPendingCount }}</span>
+                    Đã chọn:
+                    <span class="font-semibold text-slate-900">{{
+                      selectedPendingCount
+                    }}</span>
                     / {{ pendingItems.length }} công trình
                     <span class="mx-1 text-slate-400">•</span>
                     Tổng giờ mục đã chọn:
-                    <span class="font-semibold text-slate-900">{{ formatHours(selectedPendingTotalHours) }} giờ</span>
+                    <span class="font-semibold text-slate-900"
+                      >{{ formatHours(selectedPendingTotalHours) }} giờ</span
+                    >
                   </div>
                 </div>
               </div>
 
               <div class="space-y-3">
                 <article
-                  v-for="item in detail.items"
+                  v-for="item in displayedItems"
                   :key="item.activityId"
                   class="rounded-xl border border-slate-200 p-3"
                 >
                   <div class="flex items-start gap-3">
                     <label
                       class="mt-0.5 inline-flex items-center"
-                      :class="item.approvalStatus === 'pending' ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
+                      :class="
+                        item.approvalStatus === 'pending'
+                          ? 'cursor-pointer'
+                          : 'cursor-not-allowed opacity-60'
+                      "
                     >
                       <input
                         type="checkbox"
@@ -143,18 +182,30 @@
                     </label>
 
                     <div class="min-w-0 flex-1">
-                      <div class="flex flex-wrap items-start justify-between gap-2">
+                      <div
+                        class="flex flex-wrap items-start justify-between gap-2"
+                      >
                         <div class="min-w-0">
-                          <div class="font-medium text-slate-900">{{ item.activityTitle }}</div>
+                          <div class="font-medium text-slate-900">
+                            {{ item.activityTitle }}
+                          </div>
                           <div class="mt-0.5 text-xs text-slate-500">
-                            #{{ item.activityId }} • {{ item.activityKindName }} • {{ item.memberRoleName }}
+                            #{{ item.activityId }} •
+                            {{ item.activityKindName }} •
+                            {{ item.memberRoleName }}
                           </div>
                         </div>
 
                         <div class="text-right text-xs">
                           <div class="text-slate-500">Giờ dùng để duyệt</div>
                           <div class="text-sm font-semibold text-slate-900">
-                            {{ formatHours(item.effectiveHoursDisplay ?? item.hoursConverted) }} giờ
+                            {{
+                              formatHours(
+                                item.effectiveHoursDisplay ??
+                                  item.hoursConverted,
+                              )
+                            }}
+                            giờ
                           </div>
                           <div class="mt-1">
                             <span
@@ -167,7 +218,10 @@
                         </div>
                       </div>
 
-                      <div v-if="item.ruleSummary" class="mt-1 text-xs text-slate-600">
+                      <div
+                        v-if="item.ruleSummary"
+                        class="mt-1 text-xs text-slate-600"
+                      >
                         {{ item.ruleSummary }}
                       </div>
                       <div
@@ -180,31 +234,56 @@
                         <div class="mt-1">
                           Tổng giờ công trình:
                           <span class="font-semibold text-slate-900">
-                            {{ formatHours(item.totalHoursActivity ?? item.formulaExplanation.totalHoursActivity) }} giờ
+                            {{
+                              formatHours(
+                                item.totalHoursActivity ??
+                                  item.formulaExplanation.totalHoursActivity,
+                              )
+                            }}
+                            giờ
                           </span>
                         </div>
                         <div>
                           Giờ của giảng viên:
                           <span class="font-semibold text-slate-900">
-                            {{ formatHours(item.memberHours ?? item.formulaExplanation.memberHours ?? item.effectiveHoursDisplay) }} giờ
+                            {{
+                              formatHours(
+                                item.memberHours ??
+                                  item.formulaExplanation.memberHours ??
+                                  item.effectiveHoursDisplay,
+                              )
+                            }}
+                            giờ
                           </span>
                           <span
-                            v-if="item.formulaExplanation.memberSharePercent != null"
+                            v-if="
+                              item.formulaExplanation.memberSharePercent != null
+                            "
                             class="ml-1 text-slate-500"
                           >
                             ({{ item.formulaExplanation.memberSharePercent }}%)
                           </span>
                         </div>
                       </div>
-                      <div v-if="item.rejectionReason" class="mt-1 text-xs text-rose-700">
+                      <div
+                        v-if="item.rejectionReason"
+                        class="mt-1 text-xs text-rose-700"
+                      >
                         Lý do từ chối: {{ item.rejectionReason }}
                       </div>
                     </div>
                   </div>
 
-                  <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                    <div class="mb-1 text-xs font-medium text-slate-700">Minh chứng</div>
-                    <div v-if="item.evidenceFiles.length === 0" class="text-xs text-slate-500">
+                  <div
+                    class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5"
+                  >
+                    <div class="mb-1 text-xs font-medium text-slate-700">
+                      Minh chứng
+                    </div>
+                    <div
+                      v-if="item.evidenceFiles.length === 0"
+                      class="text-xs text-slate-500"
+                    >
                       Chưa có minh chứng.
                     </div>
                     <ul v-else class="space-y-1.5">
@@ -214,9 +293,14 @@
                         class="flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-1.5"
                       >
                         <div class="min-w-0">
-                          <div class="truncate text-xs text-slate-800">{{ file.originalName }}</div>
+                          <div class="truncate text-xs text-slate-800">
+                            {{ file.originalName }}
+                          </div>
                           <div class="text-[11px] text-slate-500">
-                            {{ file.fileTypeName ?? `Loại #${file.fileTypeId}` }} •
+                            {{
+                              file.fileTypeName ?? `Loại #${file.fileTypeId}`
+                            }}
+                            •
                             {{ formatBytes(file.sizeBytes) }}
                           </div>
                         </div>
@@ -236,17 +320,33 @@
                 </article>
               </div>
 
-              <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div
+                class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
+              >
                 <div class="flex items-start gap-2">
                   <Info class="mt-0.5 h-4 w-4 text-slate-500" />
                   <div class="min-w-0">
                     <div class="text-sm font-semibold text-slate-900">
                       Tổng giờ hợp lệ: {{ formatHours(detail.totalHours) }} giờ
                     </div>
-                    <div v-if="detail.noteFromFaculty" class="mt-1 text-xs text-rose-700">
+                    <div class="mt-1 text-xs text-slate-600">
+                      Đang xét duyệt theo đợt yêu cầu #{{ detail.requestId }}.
+                      {{
+                        showHandledItems
+                          ? "Đang hiển thị cả mục đã xử lý."
+                          : "Đang ẩn các mục đã xử lý để tập trung vào mục cần duyệt."
+                      }}
+                    </div>
+                    <div
+                      v-if="detail.noteFromFaculty"
+                      class="mt-1 text-xs text-rose-700"
+                    >
                       Ghi chú từ khoa: {{ detail.noteFromFaculty }}
                     </div>
-                    <div v-if="detail.noteFromLecturer" class="mt-1 text-xs text-slate-600">
+                    <div
+                      v-if="detail.noteFromLecturer"
+                      class="mt-1 text-xs text-slate-600"
+                    >
                       Ghi chú từ giảng viên: {{ detail.noteFromLecturer }}
                     </div>
                   </div>
@@ -259,7 +359,10 @@
             <div class="flex items-center justify-between gap-2">
               <div v-if="detail" class="text-xs text-slate-600">
                 Trạng thái:
-                <span class="font-semibold" :class="statusTextClass(detail.status)">
+                <span
+                  class="font-semibold"
+                  :class="statusTextClass(detail.status)"
+                >
                   {{ statusLabel(detail.status) }}
                 </span>
               </div>
@@ -268,7 +371,12 @@
                 <button
                   type="button"
                   class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                  :disabled="!canAct || selectedPendingCount === 0 || loadingApprove || loadingReject"
+                  :disabled="
+                    !canAct ||
+                    selectedPendingCount === 0 ||
+                    loadingApprove ||
+                    loadingReject
+                  "
                   @click="onApproveSelected"
                 >
                   <Check class="h-4 w-4" />
@@ -278,7 +386,12 @@
                 <button
                   type="button"
                   class="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
-                  :disabled="!canAct || selectedPendingCount === 0 || loadingApprove || loadingReject"
+                  :disabled="
+                    !canAct ||
+                    selectedPendingCount === 0 ||
+                    loadingApprove ||
+                    loadingReject
+                  "
                   @click="rejectModalOpen = true"
                 >
                   <X class="h-4 w-4" />
@@ -287,8 +400,12 @@
               </div>
             </div>
 
-            <div v-if="errorApprove" class="mt-2 text-xs text-rose-700">{{ errorApprove }}</div>
-            <div v-if="errorReject" class="mt-2 text-xs text-rose-700">{{ errorReject }}</div>
+            <div v-if="errorApprove" class="mt-2 text-xs text-rose-700">
+              {{ errorApprove }}
+            </div>
+            <div v-if="errorReject" class="mt-2 text-xs text-rose-700">
+              {{ errorReject }}
+            </div>
           </div>
         </div>
 
@@ -346,13 +463,25 @@ const emit = defineEmits<{
 
 const rejectModalOpen = ref(false);
 const selectedActivityIds = ref<number[]>([]);
+const showHandledItems = ref(false);
 
 watch(
   () => [props.open, props.detail?.requestId],
   ([isOpen]) => {
     if (!isOpen) rejectModalOpen.value = false;
     selectedActivityIds.value = [];
-  }
+    showHandledItems.value = false;
+  },
+);
+
+watch(
+  () => props.detail?.status,
+  (status) => {
+    if (!status) return;
+    // Với yêu cầu đã xử lý xong, mặc định hiển thị toàn bộ để tiện đối soát lịch sử.
+    showHandledItems.value = status !== "pending";
+  },
+  { immediate: true },
 );
 
 const pendingItems = computed(() => {
@@ -360,8 +489,23 @@ const pendingItems = computed(() => {
   return props.detail.items.filter((item) => item.approvalStatus === "pending");
 });
 
+const hasHandledItems = computed(() => {
+  if (!props.detail) return false;
+  return props.detail.items.some((item) => item.approvalStatus !== "pending");
+});
+
+const displayedItems = computed(() => {
+  if (!props.detail) return [] as HourApprovalRequestItem[];
+  if (showHandledItems.value) return props.detail.items;
+  return props.detail.items.filter((item) => item.approvalStatus === "pending");
+});
+
 const canAct = computed(() => {
-  return Boolean(props.detail && props.detail.status === "pending" && pendingItems.value.length > 0);
+  return Boolean(
+    props.detail &&
+    props.detail.status === "pending" &&
+    pendingItems.value.length > 0,
+  );
 });
 
 const selectedPendingCount = computed(() => selectedActivityIds.value.length);
@@ -371,7 +515,11 @@ const selectedPendingTotalHours = computed(() => {
   const selected = new Set(selectedActivityIds.value);
   return props.detail.items
     .filter((item) => selected.has(item.activityId))
-    .reduce((sum, item) => sum + Number(item.effectiveHoursDisplay ?? item.hoursConverted ?? 0), 0);
+    .reduce(
+      (sum, item) =>
+        sum + Number(item.effectiveHoursDisplay ?? item.hoursConverted ?? 0),
+      0,
+    );
 });
 
 const isAllPendingSelected = computed(() => {
@@ -406,8 +554,11 @@ function itemStatusLabel(status: HourApprovalRequestItem["approvalStatus"]) {
   return "Chờ duyệt";
 }
 
-function itemStatusPillClass(status: HourApprovalRequestItem["approvalStatus"]) {
-  if (status === "approved") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+function itemStatusPillClass(
+  status: HourApprovalRequestItem["approvalStatus"],
+) {
+  if (status === "approved")
+    return "bg-emerald-50 text-emerald-700 ring-emerald-200";
   if (status === "rejected") return "bg-rose-50 text-rose-700 ring-rose-200";
   return "bg-amber-50 text-amber-700 ring-amber-200";
 }
@@ -417,10 +568,13 @@ function isActivitySelected(activityId: number): boolean {
 }
 
 function toggleActivity(activityId: number) {
-  if (!pendingItems.value.some((item) => item.activityId === activityId)) return;
+  if (!pendingItems.value.some((item) => item.activityId === activityId))
+    return;
 
   if (isActivitySelected(activityId)) {
-    selectedActivityIds.value = selectedActivityIds.value.filter((id) => id !== activityId);
+    selectedActivityIds.value = selectedActivityIds.value.filter(
+      (id) => id !== activityId,
+    );
     return;
   }
 

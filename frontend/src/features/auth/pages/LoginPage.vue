@@ -33,9 +33,24 @@ function resolveRedirectTarget() {
     !redirect.startsWith("//") &&
     !redirect.includes("://");
 
-  return isSafeRedirect && redirect && redirect !== "/login"
-    ? redirect
-    : "/profile";
+  if (isSafeRedirect && redirect && redirect !== "/login") {
+    return redirect;
+  }
+
+  const nextRole = userStore.role ?? role.value;
+  if (nextRole === "LECTURER") {
+    return "/declarations/gateway";
+  }
+
+  if (nextRole === "DEPARTMENT_BOARD") {
+    return "/works/facapprovals";
+  }
+
+  if (nextRole === "SCIENCE_OFFICE") {
+    return "/works/uniapprovals";
+  }
+
+  return "/";
 }
 
 const handleSubmit = async () => {

@@ -56,12 +56,17 @@ const toggleSidebar = () => {
 };
 
 const handleOpenProfile = async () => {
+  if (userStore.role !== "LECTURER") {
+    await router.push(resolveRoleLandingTarget(userStore.role ?? null));
+    return;
+  }
+
   if (router.hasRoute("profile.scientific")) {
     await router.push({ name: "profile.scientific" });
     return;
   }
 
-  await router.push("/profile");
+  await router.push("/declarations/gateway");
 };
 
 const handleLogout = async () => {
@@ -90,7 +95,7 @@ const resolveRoleLandingTarget = (role: UserRole) => {
     if (router.hasRoute("user.manager")) {
       return { name: "user.manager" };
     }
-    return { path: "/profile" };
+    return { path: "/works/facapprovals" };
   }
 
   if (role === "SCIENCE_OFFICE") {
@@ -100,10 +105,10 @@ const resolveRoleLandingTarget = (role: UserRole) => {
     if (router.hasRoute("user.manager")) {
       return { name: "user.manager" };
     }
-    return { path: "/profile" };
+    return { path: "/works/uniapprovals" };
   }
 
-  return { path: "/profile" };
+  return { path: "/" };
 };
 
 const handleChangeRole = async (role: UserRole) => {

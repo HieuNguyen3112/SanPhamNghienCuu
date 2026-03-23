@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\AdminResearchHoursReportExport;
+use App\Models\User;
 use App\Http\Requests\Faculty\FacultyResearchHoursReportRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class FacultyResearchHoursReportController extends Controller
             ->where('id', $facultyId)
             ->select(['id', 'name'])
             ->get()
-            ->map(fn ($row) => ['id' => (int) $row->id, 'name' => $row->name])
+            ->map(fn($row) => ['id' => (int) $row->id, 'name' => $row->name])
             ->all();
 
         return response()->json([
@@ -160,25 +161,62 @@ class FacultyResearchHoursReportController extends Controller
     private function baseQuery(array $filters)
     {
         $hoursSource = $this->resolveHoursSourceQuery($filters);
+        $selectedAcademicYearId = $filters['academic_year_id'] ?? null;
 
-        $query = DB::query()
-            ->fromSub($hoursSource, 'lyh')
-            ->join('lecturers as l', 'lyh.lecturer_id', '=', 'l.id')
+        $query = DB::table('lecturers as l')
+            ->leftJoinSub($hoursSource, 'lyh', function ($join) use ($selectedAcademicYearId) {
+                $join->on('lyh.lecturer_id', '=', 'l.id');
+
+                if (! empty($selectedAcademicYearId)) {
+                    $join->where('lyh.academic_year_id', '=', $selectedAcademicYearId);
+                }
+            })
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
-            ->leftJoin('academic_years as ay', 'lyh.academic_year_id', '=', 'ay.id')
-            ->leftJoin('workload_quotas as wq', 'wq.academic_year_id', '=', 'lyh.academic_year_id')
+            ->leftJoin('academic_years as ay', function ($join) use ($selectedAcademicYearId) {
+                if (! empty($selectedAcademicYearId)) {
+                    $join->where('ay.id', '=', $selectedAcademicYearId);
+                    return;
+                }
+
+                $join->on('ay.id', '=', 'lyh.academic_year_id');
+            })
+            ->leftJoin('workload_quotas as wq', function ($join) use ($selectedAcademicYearId) {
+                if (! empty($selectedAcademicYearId)) {
+                    $join->where('wq.academic_year_id', '=', $selectedAcademicYearId);
+                    return;
+                }
+
+                $join->on('wq.academic_year_id', '=', 'lyh.academic_year_id');
+            })
             ->where('f.id', $filters['faculty_id']);
 
-        if (! empty($filters['academic_year_id'])) {
-            $query->where('lyh.academic_year_id', $filters['academic_year_id']);
-        }
+        $this->applyLecturerRoleScope($query);
 
         if (! empty($filters['status']) && $filters['status'] !== 'all') {
             $this->applyStatusFilter($query, $filters['status']);
         }
 
         return $query;
+    }
+
+    private function applyLecturerRoleScope($query): void
+    {
+        $userMorphType = (new User())->getMorphClass();
+
+        $query->where(function ($scopeQuery) use ($userMorphType) {
+            $scopeQuery
+                ->whereNull('l.user_id')
+                ->orWhereExists(function ($roleQuery) use ($userMorphType) {
+                    $roleQuery
+                        ->selectRaw('1')
+                        ->from('model_has_roles as mhr')
+                        ->join('roles as r', 'mhr.role_id', '=', 'r.id')
+                        ->where('mhr.model_type', $userMorphType)
+                        ->whereColumn('mhr.model_id', 'l.user_id')
+                        ->whereIn('r.name', ['LECTURER', 'DEPARTMENT_BOARD']);
+                });
+        });
     }
 
     private function buildKpis($baseQuery): array
@@ -229,8 +267,8 @@ class FacultyResearchHoursReportController extends Controller
 
         return [
             'hours_by_faculty' => [
-                'labels' => $facultyRows->map(fn ($row) => $row->name ?? 'Chưa rõ')->values()->all(),
-                'values' => $facultyRows->map(fn ($row) => (float) $row->total_hours)->values()->all(),
+                'labels' => $facultyRows->map(fn($row) => $row->name ?? 'Chưa rõ')->values()->all(),
+                'values' => $facultyRows->map(fn($row) => (float) $row->total_hours)->values()->all(),
             ],
             'status_distribution' => [
                 'labels' => ['Đạt chuẩn', 'Chưa đạt'],
@@ -240,8 +278,8 @@ class FacultyResearchHoursReportController extends Controller
                 ],
             ],
             'hours_by_year' => [
-                'labels' => $yearRows->map(fn ($row) => (string) $row->code)->values()->all(),
-                'values' => $yearRows->map(fn ($row) => (float) $row->total_hours)->values()->all(),
+                'labels' => $yearRows->map(fn($row) => (string) $row->code)->values()->all(),
+                'values' => $yearRows->map(fn($row) => (float) $row->total_hours)->values()->all(),
             ],
         ];
     }
@@ -431,7 +469,7 @@ class FacultyResearchHoursReportController extends Controller
             ->orderByDesc('is_active')
             ->orderByDesc('id')
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->id,
                 'code' => $row->code,
                 'is_active' => (bool) $row->is_active,

@@ -3,7 +3,7 @@
     <div class="mx-auto w-full space-y-4 p-4 md:p-6">
       <DeclarationFormShell
         title="Kê khai Giáo trình / Tài liệu tham khảo"
-        description="Giờ tính theo loại tài liệu; Chủ biên nhận 1/5, 4/5 chia đều cho tất cả người tham gia."
+        description="Giờ tính theo loại tài liệu; Chủ biên nhận 1/5, phần tác giả viết (4/5) chia theo nhóm tham gia biên soạn."
         :icon="BookOpen"
         :status="shell.status.value"
         :canSubmit="canSubmit"
@@ -21,9 +21,11 @@
           >
             <div class="font-semibold text-slate-900">Rule phân bổ</div>
             <div class="mt-1 text-slate-600">
-              Chủ biên nhận <span class="font-semibold">1/5</span> tổng giờ;
-              phần còn lại <span class="font-semibold">4/5</span> chia đều cho
-              toàn bộ người tham gia (kể cả chủ biên).
+              Chủ biên nhận <span class="font-semibold">1/5</span> tổng giờ
+              (chia đều giữa các chủ biên). Phần
+              <span class="font-semibold">4/5</span> chia đều cho các thành viên
+              tham gia biên soạn; chủ biên chỉ nhận phần này khi bật
+              <span class="font-semibold">Chủ biên đồng tác giả</span>.
             </div>
           </div>
         </template>
@@ -299,6 +301,7 @@
               :lecturers="lecturers"
               :memberRoles="filteredMemberRoles"
               :readOnly="readOnly"
+              :showChiefEditorCoauthorToggle="true"
               :currentLecturerId="currentLecturerId"
               :ownerFacultyId="ownerFacultyId"
               :hoursByLecturerId="hoursByLecturerId"
@@ -549,7 +552,8 @@ const canSubmit = computed(() => {
   if (!form.typeId) return false;
   if (!form.title.trim()) return false;
   if (!form.publisher.trim()) return false; // book_details.publisher required
-  if (!showManualPublisherForm.value && !selectedPublisherId.value) return false;
+  if (!showManualPublisherForm.value && !selectedPublisherId.value)
+    return false;
   if (showManualPublisherForm.value) {
     if (!form.publisherAddress.trim()) return false;
     if (!form.publisherPhone.trim()) return false;
@@ -576,15 +580,21 @@ const canSubmit = computed(() => {
 });
 
 async function loadCatalogs() {
-  const [currentLecturerOption, lecturerOptions, years, kinds, roles, fileTypes] =
-    await Promise.all([
-      fetch_current_lecturer_option(),
-      search_lecturer_options(""),
-      fetch_academic_years(),
-      fetch_activity_kinds(),
-      fetch_member_roles(),
-      fetch_evidence_file_types("book"),
-    ]);
+  const [
+    currentLecturerOption,
+    lecturerOptions,
+    years,
+    kinds,
+    roles,
+    fileTypes,
+  ] = await Promise.all([
+    fetch_current_lecturer_option(),
+    search_lecturer_options(""),
+    fetch_academic_years(),
+    fetch_activity_kinds(),
+    fetch_member_roles(),
+    fetch_evidence_file_types("book"),
+  ]);
   currentLecturerId.value = currentLecturerOption?.id ?? 0;
   lecturers.value = currentLecturerOption
     ? [
@@ -609,6 +619,7 @@ async function loadCatalogs() {
       lecturer_id: currentLecturerId.value,
       member_role_id: chiefRole?.id ?? null,
       member_role_code: chiefRole?.code ?? null,
+      chief_editor_is_coauthor: true,
     });
   }
 }
@@ -839,10 +850,10 @@ async function loadDraftFromQuery() {
         !selectedPublisherId.value &&
         Boolean(
           publisherName ||
-            form.publisherAddress.trim() ||
-            form.publisherPhone.trim() ||
-            form.publisherEmail.trim() ||
-            form.publisherWebsite.trim(),
+          form.publisherAddress.trim() ||
+          form.publisherPhone.trim() ||
+          form.publisherEmail.trim() ||
+          form.publisherWebsite.trim(),
         );
       form.approvalDecisionNo = detail.approval_decision_no ?? "";
       form.approvalDecisionDate = detail.approval_decision_date ?? null;
@@ -858,6 +869,14 @@ async function loadDraftFromQuery() {
       is_external: !!member.is_external,
       external_full_name: member.external_full_name ?? null,
       external_department_name: member.external_department_name ?? null,
+      chief_editor_is_coauthor:
+        (member.member_role_code ??
+          (typeof member.member_role_id === "number"
+            ? memberRoleCodeById.value[member.member_role_id]
+            : "") ??
+          "") === "chief_editor"
+          ? member.contribution_share !== 0
+          : null,
     }));
     lecturers.value = mergeLecturerOptionsFromMembers(
       lecturers.value,
@@ -932,18 +951,30 @@ const shell = useDeclarationFormShell({
           if (m.is_external) return Boolean(m.external_full_name?.trim());
           return typeof m.lecturer_id === "number";
         })
-        .map((m) => ({
-          lecturer_id: m.is_external ? null : (m.lecturer_id as number),
-          member_role_id: m.member_role_id as number,
-          is_external: !!m.is_external,
-          external_full_name: m.is_external
-            ? (m.external_full_name?.trim() ?? null)
-            : null,
-          external_department_name: m.is_external
-            ? (m.external_department_name?.trim() ?? null)
-            : null,
-          contribution_share: null,
-        }));
+        .map((m) => {
+          const roleId = m.member_role_id as number;
+          const roleCode = (
+            memberRoleCodeById.value[roleId] ?? ""
+          ).toLowerCase();
+          const isChiefEditor = roleCode === "chief_editor";
+
+          return {
+            lecturer_id: m.is_external ? null : (m.lecturer_id as number),
+            member_role_id: roleId,
+            is_external: !!m.is_external,
+            external_full_name: m.is_external
+              ? (m.external_full_name?.trim() ?? null)
+              : null,
+            external_department_name: m.is_external
+              ? (m.external_department_name?.trim() ?? null)
+              : null,
+            contribution_share: isChiefEditor
+              ? m.chief_editor_is_coauthor === false
+                ? 0
+                : 1
+              : null,
+          };
+        });
       await upsert_members(saved.id, upsertList);
 
       await persistEvidenceDraft(saved.id);

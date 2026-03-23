@@ -29,7 +29,7 @@ export function useUniversityResearchWorkApprovalProvider() {
       "Xét duyệt cuối cùng và chốt giờ nghiên cứu khoa học cho giảng viên",
     summaryStripText:
       "Các công trình đã được khoa duyệt, chờ xác nhận chính thức",
-    isDepartmentFilterVisible: true,
+    isDepartmentFilterVisible: false,
     isOfficialResearchHoursEditable: true,
     tableActionButtonLabel: "Xem & chốt giờ",
     drawerTitle: "Hồ sơ công trình – Cấp trường",
@@ -46,7 +46,7 @@ export function useUniversityResearchWorkApprovalProvider() {
   const filtering = useResearchWorkApprovalFiltering({
     approvalScopeIdentifier: "UNIVERSITY_SCOPE",
     researchWorkApprovalListRef: researchWorkApprovalList,
-    isDepartmentFilterVisible: true,
+    isDepartmentFilterVisible: false,
     forcedDepartmentIdentifier: null,
   });
 
@@ -324,8 +324,7 @@ export function useUniversityResearchWorkApprovalProvider() {
             journalScope: detail.activity.journal.journal_scope ?? null,
             journalSourceName:
               detail.activity.journal.journal_source_name ?? null,
-            journalPublisher:
-              detail.activity.journal.journal_publisher ?? null,
+            journalPublisher: detail.activity.journal.journal_publisher ?? null,
             journalWebsite: detail.activity.journal.journal_website ?? null,
             workScore: detail.activity.journal.work_score ?? null,
           }

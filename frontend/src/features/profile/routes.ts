@@ -7,7 +7,7 @@ export const profileRoutes: RouteRecordRaw[] = [
     path: "profile",
     name: "profile.scientific",
     component: LecturerProfilePage,
-    meta: { roles: ["LECTURER", "DEPARTMENT_BOARD", "SCIENCE_OFFICE"] },
+    meta: { roles: ["LECTURER"] },
   },
   // {
   //   path: "profile/contact",

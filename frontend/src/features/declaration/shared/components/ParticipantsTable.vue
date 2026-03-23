@@ -234,6 +234,24 @@
                       {{ r.name }}
                     </option>
                   </select>
+                  <label
+                    v-if="isChiefEditorRow(row)"
+                    class="mt-2 inline-flex items-center gap-2 text-xs text-slate-600"
+                  >
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/15 disabled:cursor-not-allowed disabled:opacity-60"
+                      :disabled="readOnly"
+                      :checked="isChiefEditorCoauthorChecked(row)"
+                      @change="
+                        onChiefEditorCoauthorToggle(
+                          idx,
+                          ($event.target as HTMLInputElement).checked,
+                        )
+                      "
+                    />
+                    <span>Chủ biên đồng tác giả</span>
+                  </label>
                 </td>
 
                 <!-- Giờ -->
@@ -526,6 +544,24 @@
                     {{ r.name }}
                   </option>
                 </select>
+                <label
+                  v-if="isChiefEditorRow(row)"
+                  class="mt-2 inline-flex items-center gap-2 text-xs text-slate-600"
+                >
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/15 disabled:cursor-not-allowed disabled:opacity-60"
+                    :disabled="readOnly"
+                    :checked="isChiefEditorCoauthorChecked(row)"
+                    @change="
+                      onChiefEditorCoauthorToggle(
+                        idx,
+                        ($event.target as HTMLInputElement).checked,
+                      )
+                    "
+                  />
+                  <span>Chủ biên đồng tác giả</span>
+                </label>
               </div>
 
               <div>
@@ -666,7 +702,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { AlertTriangle, Plus, Trash2, X } from "lucide-vue-next";
 import type {
   LecturerOptionDto,
@@ -684,6 +720,9 @@ export type ParticipantRowModel = {
   is_external?: boolean;
   external_full_name?: string | null;
   external_department_name?: string | null;
+
+  // UI-only: với vai trò chief_editor, có tính vào nhóm đồng tác giả (4/5) hay không
+  chief_editor_is_coauthor?: boolean | null;
 };
 
 const props = defineProps<{
@@ -694,6 +733,8 @@ const props = defineProps<{
   currentLecturerId: number | null;
   hoursByLecturerId: Record<number, number>;
   ownerFacultyId?: number | null;
+  showChiefEditorCoauthorToggle?: boolean;
+  chiefEditorRoleCode?: string;
 }>();
 
 const emit = defineEmits<{
@@ -705,6 +746,7 @@ const rowSearchQueries = ref<Record<number, string>>({});
 const activeLecturerRow = ref<number | null>(null);
 const isLecturerPanelOpen = ref(false);
 const desktopInputRefs = ref<Record<number, HTMLInputElement | null>>({});
+const cachedLecturersById = ref<Record<number, LecturerOptionDto>>({});
 const isDesktopViewport = ref(false);
 const desktopDropdownStyle = ref<Record<string, string>>({});
 const panelPosition = ref({ x: 0, y: 96 });
@@ -784,6 +826,26 @@ const principalRoleId = computed(() => {
   );
 });
 
+const chiefEditorRoleId = computed(() => {
+  const roleCode = (props.chiefEditorRoleCode ?? "chief_editor").toLowerCase();
+  return (
+    props.memberRoles.find((role) => role.code?.toLowerCase() === roleCode)
+      ?.id ?? null
+  );
+});
+
+watch(
+  () => props.lecturers,
+  (nextLecturers) => {
+    const nextCache = { ...cachedLecturersById.value };
+    for (const lecturer of nextLecturers) {
+      nextCache[lecturer.id] = lecturer;
+    }
+    cachedLecturersById.value = nextCache;
+  },
+  { immediate: true },
+);
+
 function addRow() {
   const next = [
     ...props.modelValue,
@@ -823,13 +885,14 @@ function lecturerInputValue(
   idx: number,
   lecturerId: number | null | undefined,
 ): string {
-  const typed = rowSearchQueries.value[idx];
-  if (typeof typed === "string" && typed !== "") {
-    return typed;
+  if (Object.prototype.hasOwnProperty.call(rowSearchQueries.value, idx)) {
+    return rowSearchQueries.value[idx] ?? "";
   }
 
   if (typeof lecturerId === "number") {
-    const selected = props.lecturers.find((l) => l.id === lecturerId);
+    const selected =
+      props.lecturers.find((l) => l.id === lecturerId) ??
+      cachedLecturersById.value[lecturerId];
     if (selected) return `${selected.full_name} (${selected.code})`;
   }
 
@@ -977,7 +1040,37 @@ function onMemberRoleChange(idx: number, e: Event) {
     return;
   }
 
-  updateRow(idx, { member_role_id: nextRoleId });
+  const shouldHandleChiefCoauthor =
+    props.showChiefEditorCoauthorToggle === true;
+  const isChiefEditorRole =
+    shouldHandleChiefCoauthor &&
+    chiefEditorRoleId.value !== null &&
+    nextRoleId === chiefEditorRoleId.value;
+
+  updateRow(idx, {
+    member_role_id: nextRoleId,
+    chief_editor_is_coauthor: shouldHandleChiefCoauthor
+      ? isChiefEditorRole
+        ? (props.modelValue[idx]?.chief_editor_is_coauthor ?? true)
+        : null
+      : (props.modelValue[idx]?.chief_editor_is_coauthor ?? null),
+  });
+}
+
+function isChiefEditorRow(row: ParticipantRowModel): boolean {
+  return (
+    props.showChiefEditorCoauthorToggle === true &&
+    chiefEditorRoleId.value !== null &&
+    row.member_role_id === chiefEditorRoleId.value
+  );
+}
+
+function isChiefEditorCoauthorChecked(row: ParticipantRowModel): boolean {
+  return row.chief_editor_is_coauthor !== false;
+}
+
+function onChiefEditorCoauthorToggle(idx: number, checked: boolean) {
+  updateRow(idx, { chief_editor_is_coauthor: checked });
 }
 
 function filteredLecturersForRow(idx: number): LecturerOptionDto[] {
@@ -1042,10 +1135,6 @@ function onLecturerInput(idx: number, value: string) {
   activeLecturerRow.value = idx;
   emit("request-search", value);
   updateDesktopDropdownPosition(idx);
-
-  if (value.trim() === "") {
-    updateRow(idx, { lecturer_id: null });
-  }
 }
 
 function toggleExternal(idx: number, checked: boolean) {
@@ -1079,13 +1168,19 @@ function toNumber(e: Event): number | null {
 function lecturerDepartmentName(lecturer_id: number | null) {
   if (!lecturer_id) return null;
   return (
-    props.lecturers.find((l) => l.id === lecturer_id)?.department_name ?? null
+    props.lecturers.find((l) => l.id === lecturer_id)?.department_name ??
+    cachedLecturersById.value[lecturer_id]?.department_name ??
+    null
   );
 }
 
 function lecturerFacultyId(lecturer_id: number | null) {
   if (!lecturer_id) return null;
-  return props.lecturers.find((l) => l.id === lecturer_id)?.faculty_id ?? null;
+  return (
+    props.lecturers.find((l) => l.id === lecturer_id)?.faculty_id ??
+    cachedLecturersById.value[lecturer_id]?.faculty_id ??
+    null
+  );
 }
 
 function isOutsideFaculty(row: ParticipantRowModel): boolean {

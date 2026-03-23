@@ -108,7 +108,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
     children: [
       // Optional: /me -> /profile
-      { path: "me", redirect: "/profile" },
+      { path: "me", redirect: "/" },
 
       // Routes modules
       ...profileRoutes,
@@ -165,7 +165,19 @@ router.beforeEach(async (to) => {
 
   // ✅ Luồng bạn muốn: bấm /login nếu đã login -> chuyển thẳng /profile
   if (isGuestOnly && isAuthenticated) {
-    return { path: "/profile", replace: true };
+    if (userStore.role === "LECTURER") {
+      return { path: "/declarations/gateway", replace: true };
+    }
+
+    if (userStore.role === "DEPARTMENT_BOARD") {
+      return { path: "/works/facapprovals", replace: true };
+    }
+
+    if (userStore.role === "SCIENCE_OFFICE") {
+      return { path: "/works/uniapprovals", replace: true };
+    }
+
+    return { path: "/", replace: true };
   }
 
   if (requiresAuth && !isAuthenticated) {

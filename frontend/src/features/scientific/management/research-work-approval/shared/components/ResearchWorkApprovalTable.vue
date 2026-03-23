@@ -146,7 +146,10 @@
                   </span>
                 </div>
 
-                <div class="min-w-0 truncate">
+                <div
+                  v-if="approvalScopeIdentifier !== 'UNIVERSITY_SCOPE'"
+                  class="min-w-0 truncate"
+                >
                   <span class="text-slate-500">Khoa:</span>
                   <span class="ml-1 font-medium text-slate-800">
                     {{ researchWorkApprovalEntry.facultyDisplayName }}
