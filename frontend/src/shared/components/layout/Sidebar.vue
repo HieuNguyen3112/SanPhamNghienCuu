@@ -191,16 +191,9 @@ const teacher = computed(
 
 const isCollapsedDesktop = computed(() => props.isDesktop && props.isCollapsed);
 
-const roleLabelMap: Record<string, string> = {
-  LECTURER: "Giảng viên",
-  DEPARTMENT_BOARD: "Ban chủ nhiệm khoa",
-  SCIENCE_OFFICE: "Phòng quản lý khoa học",
-};
 
-const roleName = computed(() => {
-  const roleUser = userStore.role;
-  return roleUser ? roleLabelMap[roleUser] : "Không xác định";
-});
+
+
 
 const menuItems = computed(
   () => buildMenuForRole(userStore.role) as MenuItem[],
