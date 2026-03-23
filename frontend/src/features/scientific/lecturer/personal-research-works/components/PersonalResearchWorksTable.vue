@@ -11,7 +11,10 @@
       Không có công trình nào trong trạng thái này.
     </div>
 
-    <div v-else class="max-h-[560px] overflow-auto">
+    <div
+      v-else
+      class="personal-research-works-table-scroll max-h-[min(70vh,560px)] overflow-x-auto overflow-y-scroll overscroll-contain"
+    >
       <table class="w-full min-w-[980px] text-left text-sm">
         <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-600">
           <tr>
@@ -202,3 +205,31 @@ function statusBadgeClass(statusCode: PersonalWorkStatusCode): string {
   }
 }
 </script>
+
+<style scoped>
+.personal-research-works-table-scroll {
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #e2e8f0;
+}
+
+.personal-research-works-table-scroll::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.personal-research-works-table-scroll::-webkit-scrollbar-track {
+  background: #e2e8f0;
+  border-radius: 9999px;
+}
+
+.personal-research-works-table-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border: 2px solid #e2e8f0;
+  border-radius: 9999px;
+}
+
+.personal-research-works-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+</style>
