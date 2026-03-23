@@ -779,8 +779,22 @@ class AdminResearchWorkSearchController extends Controller
     protected function activityYearExpression(): string
     {
         return match (DB::connection()->getDriverName()) {
-            'sqlite' => "COALESCE(pd.year, bd.year, CAST(strftime('%Y', prd.start_month) AS INTEGER), CAST(strftime('%Y', cd.held_on) AS INTEGER), CAST(strftime('%Y', ra.start_date) AS INTEGER), CAST(strftime('%Y', ra.created_at) AS INTEGER))",
-            'pgsql' => 'COALESCE(pd.year, bd.year, CAST(EXTRACT(YEAR FROM prd.start_month) AS INTEGER), CAST(EXTRACT(YEAR FROM cd.held_on) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.start_date) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.created_at) AS INTEGER))',
+            'pgsql' => 'COALESCE(
+                pd.year,
+                bd.year,
+                CAST(EXTRACT(YEAR FROM prd.start_month) AS INTEGER),
+                CAST(EXTRACT(YEAR FROM cd.held_on) AS INTEGER),
+                CAST(EXTRACT(YEAR FROM ra.start_date) AS INTEGER),
+                CAST(EXTRACT(YEAR FROM ra.created_at) AS INTEGER)
+            )',
+            'sqlite' => "COALESCE(
+                pd.year,
+                bd.year,
+                CAST(strftime('%Y', prd.start_month) AS INTEGER),
+                CAST(strftime('%Y', cd.held_on) AS INTEGER),
+                CAST(strftime('%Y', ra.start_date) AS INTEGER),
+                CAST(strftime('%Y', ra.created_at) AS INTEGER)
+            )",
             default => 'COALESCE(pd.year, bd.year, YEAR(prd.start_month), YEAR(cd.held_on), YEAR(ra.start_date), YEAR(ra.created_at))',
         };
     }
