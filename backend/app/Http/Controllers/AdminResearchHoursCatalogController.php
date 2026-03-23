@@ -889,23 +889,31 @@ class AdminResearchHoursCatalogController extends Controller
 
     private function mapKindDisplayName(?string $code, ?string $fallback): ?string
     {
+        if ($fallback !== null && trim($fallback) !== '') {
+            return $fallback;
+        }
+
         if (! $code) {
             return $fallback;
         }
 
         $mapped = match (strtolower($code)) {
-            'paper' => 'Bài báo khoa học',
+            'paper' => 'Bài báo / Báo cáo khoa học',
             'book' => 'Sách, giáo trình',
             'project' => 'Đề tài KH&CN',
             'conference' => 'Hội nghị, hội thảo',
             default => null,
         };
 
-        return $mapped ?? $fallback ?? $code;
+        return $mapped ?? $code;
     }
 
     private function mapTypeDisplayName(?string $code, ?string $fallback): ?string
     {
+        if ($fallback !== null && trim($fallback) !== '') {
+            return $fallback;
+        }
+
         if (! $code) {
             return $fallback;
         }
@@ -914,6 +922,9 @@ class AdminResearchHoursCatalogController extends Controller
             'hdgsnn_900' => 'Bài báo HDGSNN 1-2 điểm (900 giờ)',
             'hdgsnn_600' => 'Bài báo HDGSNN <= 1 điểm (600 giờ)',
             'hdgsnn_300' => 'Bài báo có ISSN/ISBN (300 giờ)',
+            'scientific_report_900' => 'Báo cáo khoa học (900 giờ)',
+            'scientific_report_600' => 'Báo cáo khoa học (600 giờ)',
+            'scientific_report' => 'Báo cáo khoa học (300 giờ)',
             'textbook' => 'Giáo trình',
             'reference' => 'Tài liệu tham khảo',
             'bo', 'ministry' => 'Đề tài cấp Bộ (2 năm)',
@@ -923,6 +934,6 @@ class AdminResearchHoursCatalogController extends Controller
             default => null,
         };
 
-        return $mapped ?? $fallback ?? $code;
+        return $mapped ?? $code;
     }
 }

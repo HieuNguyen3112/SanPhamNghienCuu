@@ -66,23 +66,34 @@ class SubmitResearchActivityRequest extends FormRequest
                 $validator->errors()->add('title', 'Vui lòng nhập tên bài báo.');
             }
 
-            if ($activity->kind_code === 'paper' && ! $activity->type_id) {
-                $validator->errors()->add('type_id', 'Vui lòng chọn loại bài báo.');
-            }
-
             if ($activity->kind_code === 'paper') {
                 $detail = DB::table('paper_details')
                     ->where('activity_id', $activityId)
                     ->first();
 
                 $typeCode = Str::lower((string) ($activity->type_code ?? ''));
-                $isConferenceReport = Str::contains($typeCode, [
+                $isConferenceTypeByCode = Str::contains($typeCode, [
                     'conference',
                     'report',
                     'bao_cao',
                     'hoi_nghi',
                     'proceeding',
                 ]);
+                $hasConferenceData = $detail
+                    && (
+                        trim((string) ($detail->conference_name ?? '')) !== ''
+                        || trim((string) ($detail->conference_level ?? '')) !== ''
+                        || trim((string) ($detail->conference_research_field ?? '')) !== ''
+                        || trim((string) ($detail->conference_organization ?? '')) !== ''
+                        || trim((string) ($detail->conference_isbn ?? '')) !== ''
+                        || (bool) ($detail->conference_has_isbn ?? false)
+                        || $detail->conference_point !== null
+                    );
+                $isConferenceReport = $isConferenceTypeByCode || $hasConferenceData;
+
+                if (! $activity->type_id && ! $isConferenceReport) {
+                    $validator->errors()->add('type_id', 'Vui lòng chọn loại bài báo.');
+                }
 
                 if ($isConferenceReport) {
                     if (! $detail || ! trim((string) ($detail->conference_name ?? ''))) {

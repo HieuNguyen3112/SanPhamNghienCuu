@@ -89,7 +89,7 @@ class LecturerHoursCalculateController extends Controller
         $query->orderByDesc('ra.updated_at');
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
-        $items = collect($paginator->items())->map(fn ($row) => $this->mapListItem($row))->all();
+        $items = collect($paginator->items())->map(fn($row) => $this->mapListItem($row))->all();
         $approvedCount = $this->approvedCount((int) $lecturer->id, $approvedStatusId, $selectedAcademicYearId);
         $responseAcademicYear = $selectedAcademicYear ?: AcademicYearResolver::current();
 
@@ -954,12 +954,12 @@ class LecturerHoursCalculateController extends Controller
         $items = $query
             ->orderByDesc('ra.updated_at')
             ->get()
-            ->map(fn ($row) => $this->mapListItem($row));
+            ->map(fn($row) => $this->mapListItem($row));
 
         return [
             'missing_evidence_count' => $items->count(),
             'missing_evidence_hours_total' => round(
-                (float) $items->sum(fn (array $item) => (float) ($item['effective_hours_display'] ?? 0)),
+                (float) $items->sum(fn(array $item) => (float) ($item['effective_hours_display'] ?? 0)),
                 2
             ),
         ];
@@ -1028,7 +1028,7 @@ class LecturerHoursCalculateController extends Controller
             ->whereIn('ra.id', $activityIds)
             ->distinct()
             ->pluck('ra.id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
     }
 
@@ -1228,12 +1228,16 @@ class LecturerHoursCalculateController extends Controller
 
     private function mapKindName(?string $code, ?string $fallback): ?string
     {
+        if ($fallback !== null && trim($fallback) !== '') {
+            return $fallback;
+        }
+
         if (! $code) {
             return $fallback;
         }
 
         $mapped = match (strtolower($code)) {
-            'paper' => 'Bài báo',
+            'paper' => 'Bài báo / Báo cáo khoa học',
             'book' => 'Sách/Giáo trình',
             'project' => 'Đề tài KH&CN',
             'conference' => 'Hội nghị/Hội thảo',
@@ -1280,8 +1284,7 @@ class LecturerHoursCalculateController extends Controller
         ?string $typeCode = null,
         ?string $typeName = null,
         ?string $academicYearCode = null
-    ): array
-    {
+    ): array {
         $resolvedTypeId = $this->resolveRuleTypeId(
             $kindId,
             $typeId,
@@ -1454,7 +1457,7 @@ class LecturerHoursCalculateController extends Controller
     private function lookupTypeIdByAliases(int $kindId, array $aliases): ?int
     {
         $normalizedAliases = array_values(array_unique(array_filter(array_map(
-            fn ($alias) => $this->normalizeToken((string) $alias),
+            fn($alias) => $this->normalizeToken((string) $alias),
             $aliases
         ))));
 
@@ -1773,7 +1776,7 @@ class LecturerHoursCalculateController extends Controller
             ])
             ->orderByDesc('ef.uploaded_at')
             ->get()
-            ->map(fn ($row) => $this->mapEvidenceRow($row))
+            ->map(fn($row) => $this->mapEvidenceRow($row))
             ->all();
     }
 
