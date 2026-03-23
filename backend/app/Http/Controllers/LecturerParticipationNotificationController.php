@@ -11,6 +11,7 @@ use App\Support\AuditLogger;
 use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -107,7 +108,9 @@ class LecturerParticipationNotificationController extends Controller
         }
 
         $now = now();
-        $result = DB::transaction(function () use ($request, $requestId, $now, $lecturer) {
+        $actorUserId = (int) ($request->user()?->id ?? 0);
+
+        $result = DB::transaction(function () use ($request, $requestId, $now, $lecturer, $actorUserId) {
             $member = DB::table('research_activity_members')
                 ->where('id', $requestId)
                 ->where('lecturer_id', $lecturer->id)
@@ -139,8 +142,26 @@ class LecturerParticipationNotificationController extends Controller
                     'updated_at' => $now,
                 ]);
 
-            $this->notifyOwnerOnAccept((int) $member->activity_id, (string) ($lecturer->full_name ?? ''), (int) $requestId);
-            $facultyNotification = $this->tryAutoSendToFaculty((int) $member->activity_id, $now, (int) $request->user()->id);
+            try {
+                $this->notifyOwnerOnAccept((int) $member->activity_id, (string) ($lecturer->full_name ?? ''), (int) $requestId);
+            } catch (\Throwable $e) {
+                Log::warning('participation.confirm.owner_notify_failed', [
+                    'request_id' => $requestId,
+                    'activity_id' => (int) $member->activity_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            $facultyNotification = null;
+            try {
+                $facultyNotification = $this->tryAutoSendToFaculty((int) $member->activity_id, $now, $actorUserId);
+            } catch (\Throwable $e) {
+                Log::warning('participation.confirm.auto_send_faculty_failed', [
+                    'request_id' => $requestId,
+                    'activity_id' => (int) $member->activity_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             AuditLogger::log($request, [
                 'action_group' => 'approval',
@@ -169,20 +190,28 @@ class LecturerParticipationNotificationController extends Controller
 
         $facultyNotification = $result['faculty_notification'] ?? null;
         if (is_array($facultyNotification) && isset($facultyNotification['activity_id'])) {
-            WorkflowNotification::notifyFacultyBoardByActivityId(
-                (int) $facultyNotification['activity_id'],
-                WorkflowNotification::makePayload(
-                    'work_submitted_to_faculty',
-                    'Có hồ sơ công trình mới cần duyệt',
-                    (string) ($facultyNotification['message'] ?? 'Có công trình mới đang chờ khoa duyệt.'),
-                    '/works/facapprovals?activity_id=' . (int) $facultyNotification['activity_id'],
-                    [
-                        'activity_id' => (int) $facultyNotification['activity_id'],
-                        'lecturer_id' => (int) ($facultyNotification['owner_lecturer_id'] ?? 0),
-                    ]
-                ),
-                (int) ($request->user()?->id ?? 0)
-            );
+            try {
+                WorkflowNotification::notifyFacultyBoardByActivityId(
+                    (int) $facultyNotification['activity_id'],
+                    WorkflowNotification::makePayload(
+                        'work_submitted_to_faculty',
+                        'Có hồ sơ công trình mới cần duyệt',
+                        (string) ($facultyNotification['message'] ?? 'Có công trình mới đang chờ khoa duyệt.'),
+                        '/works/facapprovals?activity_id=' . (int) $facultyNotification['activity_id'],
+                        [
+                            'activity_id' => (int) $facultyNotification['activity_id'],
+                            'lecturer_id' => (int) ($facultyNotification['owner_lecturer_id'] ?? 0),
+                        ]
+                    ),
+                    (int) ($request->user()?->id ?? 0)
+                );
+            } catch (\Throwable $e) {
+                Log::warning('participation.confirm.faculty_notify_failed', [
+                    'request_id' => $requestId,
+                    'activity_id' => (int) $facultyNotification['activity_id'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return $this->show($request, $requestId);

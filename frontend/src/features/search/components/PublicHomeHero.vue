@@ -5,26 +5,26 @@
       aria-hidden="true"
     />
 
-    <div class="relative mx-auto max-w-6xl px-4 py-10 md:px-6 md:py-14">
-      <div class="grid gap-8 lg:grid-cols-12 lg:items-start">
+    <div class="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:py-14">
+      <div class="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-10">
         <!-- LEFT -->
         <div class="lg:col-span-7">
           <div
-            class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90"
+            class="inline-flex max-w-full items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90"
           >
-            <span class="inline-flex h-2 w-2 rounded-full bg-rose-400" />
-            Hệ thống tra cứu công trình NCKH
+            <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-rose-400" />
+            <span class="truncate">Hệ thống tra cứu công trình NCKH</span>
           </div>
 
           <h1
-            class="mt-4 text-3xl font-extrabold leading-tight tracking-tight text-white md:text-4xl"
+            class="mt-4 max-w-3xl text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl"
           >
             Cơ sở dữ liệu
             <span class="text-rose-300">Khoa học &amp; Công nghệ</span>
           </h1>
 
           <p
-            class="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 md:text-base"
+            class="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base"
           >
             Tra cứu nhanh các công trình đã được khoa và trường phê duyệt.
           </p>
@@ -32,15 +32,15 @@
           <!-- Tổng giảng viên -->
           <div class="mt-6">
             <div
-              class="flex items-center justify-between rounded-2xl bg-white/12 px-5 py-4 ring-1 ring-white/10 backdrop-blur-sm"
+              class="rounded-2xl bg-white/12 px-4 py-4 ring-1 ring-white/10 backdrop-blur-sm sm:px-5"
             >
               <div class="flex items-center gap-3">
                 <span
-                  class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/20 text-xl text-white"
+                  class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-500/20 text-xl text-white"
                 >
                   👨‍🏫
                 </span>
-                <div>
+                <div class="min-w-0">
                   <div class="text-sm font-semibold text-white/80">
                     Tổng số giảng viên
                   </div>
@@ -53,7 +53,7 @@
           </div>
 
           <!-- 4 nhóm dữ liệu -->
-          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
               class="rounded-2xl bg-white/10 p-4 text-left ring-1 ring-white/10 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
@@ -61,7 +61,7 @@
             >
               <div class="flex items-start gap-3">
                 <span
-                  class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/20 text-white"
+                  class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/20 text-white"
                 >
                   📄
                 </span>
@@ -86,7 +86,7 @@
             >
               <div class="flex items-start gap-3">
                 <span
-                  class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white"
+                  class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white"
                 >
                   💡
                 </span>
@@ -109,7 +109,7 @@
             >
               <div class="flex items-start gap-3">
                 <span
-                  class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white"
+                  class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white"
                 >
                   📚
                 </span>
@@ -134,7 +134,7 @@
             >
               <div class="flex items-start gap-3">
                 <span
-                  class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white"
+                  class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white"
                 >
                   🎤
                 </span>
@@ -156,37 +156,39 @@
 
         <!-- RIGHT: search card -->
         <div class="lg:col-span-5">
-          <div class="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-black/5">
+          <div
+            class="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-black/5 sm:p-6 lg:sticky lg:top-24"
+          >
             <div class="flex items-center justify-between gap-3">
               <div>
-                <div class="text-sm font-extrabold text-slate-900">
+                <div class="text-xl font-extrabold text-slate-900 sm:text-2xl">
                   Tìm kiếm dữ liệu
                 </div>
               </div>
             </div>
 
-            <form class="mt-4 space-y-3" @submit.prevent="emit('search')">
+            <form class="mt-5 space-y-4" @submit.prevent="emit('search')">
               <div>
-                <label class="text-xs font-semibold text-slate-600">
+                <label class="text-sm font-semibold text-slate-600">
                   Giảng viên (tên/mã)
                 </label>
                 <input
                   :value="filterState.lecturerQuery"
                   @input="onLecturerQueryInput"
                   type="text"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
+                  class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
                   placeholder="Nguyễn Văn An / GV-001"
                 />
               </div>
 
               <div>
-                <label class="text-xs font-semibold text-slate-600">
+                <label class="text-sm font-semibold text-slate-600">
                   Nhóm dữ liệu
                 </label>
                 <select
                   :value="category"
                   @change="onCategoryChange"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
+                  class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
                 >
                   <option
                     v-for="it in categoryItems"
@@ -199,11 +201,11 @@
               </div>
 
               <div>
-                <label class="text-xs font-semibold text-slate-600">Khoa</label>
+                <label class="text-sm font-semibold text-slate-600">Khoa</label>
                 <select
                   :value="selectedFacultyValue"
                   @change="onFacultyChange"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
+                  class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
                 >
                   <option
                     v-for="opt in normalizedFacultyOptions"
@@ -216,13 +218,13 @@
               </div>
 
               <div>
-                <label class="text-xs font-semibold text-slate-600">
+                <label class="text-sm font-semibold text-slate-600">
                   Năm học
                 </label>
                 <select
                   :value="selectedAcademicYearValue"
                   @change="onAcademicYearChange"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
+                  class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-[#234a74]/20"
                 >
                   <option
                     v-for="opt in normalizedAcademicYearOptions"
@@ -236,14 +238,14 @@
 
               <button
                 type="submit"
-                class="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#e11d48] px-4 text-sm font-extrabold text-white shadow-sm hover:brightness-110 active:scale-[0.99]"
+                class="mt-2 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#e11d48] px-4 text-base font-extrabold text-white shadow-sm hover:brightness-110 active:scale-[0.99]"
               >
                 Tìm kiếm
               </button>
 
               <button
                 type="button"
-                class="w-full text-center text-xs font-semibold text-slate-500 hover:text-slate-700"
+                class="w-full text-center text-sm font-semibold text-slate-500 hover:text-slate-700"
                 @click="emit('reset')"
               >
                 Đặt lại bộ lọc
