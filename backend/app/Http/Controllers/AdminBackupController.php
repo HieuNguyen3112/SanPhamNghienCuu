@@ -1234,6 +1234,43 @@ class AdminBackupController extends Controller
         ];
     }
 
+    private function primaryReadinessIssue(array $readiness): ?array
+    {
+        $blockingIssues = array_values(array_filter(
+            (array) ($readiness['blocking_issues'] ?? []),
+            static fn ($issue): bool => is_array($issue)
+                && (trim((string) ($issue['code'] ?? '')) !== ''
+                    || trim((string) ($issue['message'] ?? '')) !== '')
+        ));
+
+        if ($blockingIssues !== []) {
+            $issue = $blockingIssues[0];
+
+            return [
+                'code' => trim((string) ($issue['code'] ?? '')) ?: null,
+                'message' => trim((string) ($issue['message'] ?? '')) ?: null,
+            ];
+        }
+
+        $warnings = array_values(array_filter(
+            (array) ($readiness['warnings'] ?? []),
+            static fn ($issue): bool => is_array($issue)
+                && (trim((string) ($issue['code'] ?? '')) !== ''
+                    || trim((string) ($issue['message'] ?? '')) !== '')
+        ));
+
+        if ($warnings === []) {
+            return null;
+        }
+
+        $issue = $warnings[0];
+
+        return [
+            'code' => trim((string) ($issue['code'] ?? '')) ?: null,
+            'message' => trim((string) ($issue['message'] ?? '')) ?: null,
+        ];
+    }
+
     private function buildUserMessage(
         string $operation,
         string $status,
