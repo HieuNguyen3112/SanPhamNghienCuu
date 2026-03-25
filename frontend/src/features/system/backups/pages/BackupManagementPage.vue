@@ -76,7 +76,7 @@
         class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 shadow-sm"
       >
         <p class="font-semibold">{{ mapOperationLabel(activeRunState.operation) }} • {{ mapStatusLabel(activeRunState.status) }}</p>
-        <p class="mt-1 text-xs text-indigo-700">{{ activeRunState.user_message || activeRunState.message || "Đang xử lý..." }}</p>
+        <p class="mt-1 text-xs text-indigo-700">{{ activeRunDescription }}</p>
       </section>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
@@ -339,8 +339,8 @@
                 {{ mapExportStateLabel(detailResponse?.export.state) }}
               </span>
             </p>
-            <p v-if="detailResponse?.export.message" class="mt-1 text-xs" :class="exportStateTextClass(detailResponse?.export.state)">
-              {{ detailResponse.export.message }}
+            <p v-if="detailExportMessage" class="mt-1 text-xs" :class="exportStateTextClass(detailResponse?.export.state)">
+              {{ detailExportMessage }}
             </p>
             <p v-if="detailResponse?.export.artifacts?.length" class="mt-1 text-xs text-slate-600">
               Tệp: {{ detailResponse.export.artifacts.join(", ") }}
@@ -556,24 +556,54 @@ function isTechnicalMessage(value: string | null | undefined) {
   );
 }
 
+function looksLikeMojibake(value: string | null | undefined) {
+  const normalized = (value || "").trim();
+  if (!normalized) return false;
+  return [
+    "\u00C3",
+    "\u00C2",
+    "\u00C6",
+    "\u00E2\u20AC",
+    "\uFFFD",
+  ].some((marker) => normalized.includes(marker));
+}
+
+function readableBackupMessage(value: string | null | undefined, fallback = "") {
+  const normalized = (value || "").trim();
+  if (!normalized) return fallback;
+  return looksLikeMojibake(normalized) ? fallback : normalized;
+}
+
+function fallbackExportStateMessage(state: string | null | undefined) {
+  const normalized = (state || "").toLowerCase();
+  if (normalized === "ready") return "Readable export \u0111\u00e3 s\u1eb5n s\u00e0ng \u0111\u1ec3 t\u1ea3i.";
+  if (normalized === "running") return "Readable export \u0111ang \u0111\u01b0\u1ee3c t\u1ea1o v\u00e0 \u0111\u1ed3ng b\u1ed9 l\u00ean Drive.";
+  if (normalized === "queued" || normalized === "pending") return "Readable export \u0111ang ch\u1edd x\u1eed l\u00fd \u1edf n\u1ec1n.";
+  if (normalized === "finalizing") return "Readable export \u0111\u00e3 x\u1eed l\u00fd xong, \u0111ang ch\u1edd c\u00f4ng b\u1ed1 ho\u00e0n t\u1ea5t.";
+  if (normalized === "failed") return "Snapshot an to\u00e0n \u0111\u00e3 xong nh\u01b0ng readable export ch\u01b0a ho\u00e0n thi\u1ec7n.";
+  if (normalized === "disabled") return "Readable export \u0111ang t\u1eaft theo c\u1ea5u h\u00ecnh.";
+  return "Readable export ch\u01b0a s\u1eb5n s\u00e0ng.";
+}
+
 function toFriendlySyncMessage(rawMessage: string | null | undefined) {
   const normalized = (rawMessage || "").trim();
   const normalizedLower = normalized.toLowerCase();
   if (
     normalizedLower.includes("timed out")
     || normalizedLower.includes("timeout")
-    || normalizedLower.includes("quá thời gian")
+    || normalizedLower.includes("qu\u00e1 th\u1eddi gian")
     || normalizedLower.includes("exceeded the timeout")
   ) {
-    return "Đồng bộ danh sách bị quá thời gian. Vui lòng thử lại.";
+    return "\u0110\u1ed3ng b\u1ed9 danh s\u00e1ch b\u1ecb qu\u00e1 th\u1eddi gian. Vui l\u00f2ng th\u1eed l\u1ea1i.";
   }
 
-  if (normalized !== "" && !isTechnicalMessage(normalized)) {
+  if (normalized !== "" && !looksLikeMojibake(normalized) && !isTechnicalMessage(normalized)) {
     return normalized;
   }
 
-  return "Đồng bộ danh sách thất bại. Bạn có thể thử lại.";
+  return "\u0110\u1ed3ng b\u1ed9 danh s\u00e1ch th\u1ea5t b\u1ea1i. B\u1ea1n c\u00f3 th\u1ec3 th\u1eed l\u1ea1i.";
 }
+
 function toFriendlyBackgroundRunFailureMessage(
   userMessage: string | null | undefined,
   errorCode: string | null | undefined,
@@ -584,20 +614,25 @@ function toFriendlyBackgroundRunFailureMessage(
   const primary = (userMessage || "").trim();
   if (code === "BACKUP_LOCKED") {
     if (normalizedOperation === "forget") {
-      return "Không thể xóa snapshot lúc này vì hệ thống sao lưu đang bận. Nếu snapshot vừa sao lưu xong, hãy đợi readable export hoàn tất rồi thử lại.";
+      return "Kh\u00f4ng th\u1ec3 x\u00f3a snapshot l\u00fac n\u00e0y v\u00ec h\u1ec7 th\u1ed1ng sao l\u01b0u \u0111ang b\u1eadn. N\u1ebfu snapshot v\u1eeba sao l\u01b0u xong, h\u00e3y \u0111\u1ee3i readable export ho\u00e0n t\u1ea5t r\u1ed3i th\u1eed l\u1ea1i.";
     }
-    return "Bản sao lưu đang bị khóa bởi tiến trình khác. Nếu không còn tác vụ nào chạy, bạn có thể dùng nút “Gỡ khóa treo”.";
+    return "B\u1ea3n sao l\u01b0u \u0111ang b\u1ecb kh\u00f3a b\u1edfi ti\u1ebfn tr\u00ecnh kh\u00e1c. N\u1ebfu kh\u00f4ng c\u00f2n t\u00e1c v\u1ee5 n\u00e0o ch\u1ea1y, b\u1ea1n c\u00f3 th\u1ec3 d\u00f9ng n\u00fat \u201cG\u1ee1 kh\u00f3a treo\u201d.";
   }
   if (code === "RUN_TIMEOUT") {
-    return "Tiến trình nền bị quá thời gian. Bạn có thể thử lại.";
+    return "Ti\u1ebfn tr\u00ecnh n\u1ec1n b\u1ecb qu\u00e1 th\u1eddi gian. B\u1ea1n c\u00f3 th\u1ec3 th\u1eed l\u1ea1i.";
   }
 
-  if (primary !== "" && !isTechnicalMessage(primary)) {
+  if (primary !== "" && !looksLikeMojibake(primary) && !isTechnicalMessage(primary)) {
     return primary;
   }
 
-  return "Không thể xử lý tác vụ sao lưu. Vui lòng thử lại.";
+  return "Kh\u00f4ng th\u1ec3 x\u1eed l\u00fd t\u00e1c v\u1ee5 sao l\u01b0u. Vui l\u00f2ng th\u1eed l\u1ea1i.";
 }
+
+const activeRunDescription = computed(() =>
+  readableBackupMessage(activeRunState.value?.user_message || activeRunState.value?.message, "\u0110ang x\u1eed l\u00fd...")
+);
+
 const syncFailedMessage = computed(() => {
   if (activeRunOperation.value === "snapshot_refresh" && activeRunStatus.value === "failed") {
     return toFriendlySyncMessage(activeRunState.value?.user_message || activeRunState.value?.message);
@@ -837,17 +872,7 @@ function exportStateTextClass(state: string | null | undefined) {
 }
 
 function resolveExportStateMessage(snapshot: BackupListItem) {
-  const explicitMessage = (snapshot.export_message || "").trim();
-  if (explicitMessage !== "") return explicitMessage;
-
-  const normalized = (snapshot.export_state || "").toLowerCase();
-  if (normalized === "ready") return "Readable export đã sẵn sàng để tải.";
-  if (normalized === "running") return "Readable export đang được tạo và đồng bộ lên Drive.";
-  if (normalized === "queued" || normalized === "pending") return "Readable export đang chờ xử lý ở nền.";
-  if (normalized === "finalizing") return "Readable export đã xử lý xong, đang chờ công bố hoàn tất.";
-  if (normalized === "failed") return "Snapshot an toàn đã xong nhưng readable export chưa hoàn thiện.";
-  if (normalized === "disabled") return "Readable export đang tắt theo cấu hình.";
-  return "Readable export chưa sẵn sàng.";
+  return readableBackupMessage(snapshot.export_message, fallbackExportStateMessage(snapshot.export_state));
 }
 
 function shouldShowExportStateHint(snapshot: BackupListItem) {
@@ -880,9 +905,15 @@ function buildDetailExportActionLabel() {
 
 function buildDetailExportActionTitle() {
   const snapshot = detailResponse.value?.snapshot || detailSnapshot.value;
-  if (!snapshot) return "Tải export";
+  if (!snapshot) return "T\u1ea3i export";
   return buildExportActionTitle(snapshot);
 }
+
+const detailExportMessage = computed(() => {
+  const exportPayload = detailResponse.value?.export;
+  if (!exportPayload) return "";
+  return readableBackupMessage(exportPayload.message, fallbackExportStateMessage(exportPayload.state));
+});
 
 function mapOperationLabel(operation: string | undefined) {
   const s = (operation || "").toLowerCase();
