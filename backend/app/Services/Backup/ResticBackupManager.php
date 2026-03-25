@@ -76,7 +76,7 @@ class ResticBackupManager
                 $payload['run_state'] = null;
                 $payload['size_bytes'] = null;
             }
-            $payload['status'] = $payload['run_state'] ?? 'unknown';
+            $payload['status'] = $payload['run_state'] ?? 'success';
             $items[] = $payload;
         }
 
@@ -662,12 +662,30 @@ class ResticBackupManager
 
         $repositoryType = (string) ($destination['repository_type'] ?? 'unknown');
         $requiresRclone = $repositoryType === 'rclone' || (($destination['target_type'] ?? null) === 'rclone');
+        $databaseRuntime = is_array($backupConfig['database'] ?? null) ? $backupConfig['database'] : [];
+        $databaseDriver = Str::lower(trim((string) ($databaseRuntime['driver'] ?? '')));
+
         $resticBinaryOk = (bool) (($backupConfig['restic_binary']['exists'] ?? false) === true);
         $rcloneBinaryOk = ! $requiresRclone || (bool) (($backupConfig['rclone_binary']['exists'] ?? false) === true);
         $rcloneConfigOk = ! $requiresRclone || (bool) (($backupConfig['rclone_config']['readable'] ?? false) === true);
         $rcloneRemoteOk = ! $requiresRclone || (bool) (($backupConfig['rclone_remote']['defined'] ?? false) === true);
+        $mysqlDumpBinaryOk = ! in_array($databaseDriver, ['mysql', 'mariadb'], true)
+            || (bool) (($databaseRuntime['mysql_dump_binary']['exists'] ?? false) === true);
+        $mysqlRestoreBinaryOk = ! in_array($databaseDriver, ['mysql', 'mariadb'], true)
+            || (bool) (($databaseRuntime['mysql_restore_binary']['exists'] ?? false) === true);
+        $pgsqlDumpBinaryOk = ! in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true)
+            || (bool) (($databaseRuntime['pgsql_dump_binary']['exists'] ?? false) === true);
+        $pgsqlRestoreBinaryOk = ! in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true)
+            || (bool) (($databaseRuntime['pgsql_restore_binary']['exists'] ?? false) === true);
         $repositoryEnvConfigured = $repository !== '' && $passwordSet;
-        $runtimeReady = $resticBinaryOk && $rcloneBinaryOk && $rcloneConfigOk && $rcloneRemoteOk;
+        $runtimeReady = $resticBinaryOk
+            && $rcloneBinaryOk
+            && $rcloneConfigOk
+            && $rcloneRemoteOk
+            && $mysqlDumpBinaryOk
+            && $mysqlRestoreBinaryOk
+            && $pgsqlDumpBinaryOk
+            && $pgsqlRestoreBinaryOk;
 
         $blockingIssues = [];
         $warnings = [];
@@ -675,28 +693,28 @@ class ResticBackupManager
         if ($repository === '') {
             $blockingIssues[] = [
                 'code' => 'BACKUP_REPOSITORY_MISSING',
-                'message' => 'Thiếu SPNC_BACKUP_REPOSITORY nên hệ thống chưa xác định được repository backup.',
+                'message' => 'Thi?u SPNC_BACKUP_REPOSITORY n�n h? th?ng chua x�c d?nh du?c repository backup.',
             ];
         }
 
         if (! $passwordSet) {
             $blockingIssues[] = [
                 'code' => 'BACKUP_PASSWORD_MISSING',
-                'message' => 'Thiếu SPNC_BACKUP_PASSWORD nên không thể truy cập repository restic.',
+                'message' => 'Thi?u SPNC_BACKUP_PASSWORD n�n kh�ng th? truy c?p repository restic.',
             ];
         }
 
         if (! $resticBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'RESTIC_BINARY_INVALID',
-                'message' => 'Không tìm thấy restic binary trong runtime hiện tại.',
+                'message' => 'Kh�ng t�m th?y restic binary trong runtime hi?n t?i.',
             ];
         }
 
         if ($requiresRclone && ! $rcloneBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'RCLONE_BINARY_INVALID',
-                'message' => 'Không tìm thấy rclone binary trong runtime hiện tại.',
+                'message' => 'Kh�ng t�m th?y rclone binary trong runtime hi?n t?i.',
             ];
         }
 
@@ -704,14 +722,42 @@ class ResticBackupManager
             $blockingIssues[] = [
                 'code' => 'RCLONE_CONFIG_INVALID',
                 'message' => (string) (($backupConfig['rclone_config']['error'] ?? null)
-                    ?: 'Không đọc được tệp rclone.conf dùng cho backup.'),
+                    ?: 'Kh�ng d?c du?c t?p rclone.conf d�ng cho backup.'),
             ];
         }
 
         if ($requiresRclone && ! $rcloneRemoteOk) {
             $blockingIssues[] = [
                 'code' => 'RCLONE_REMOTE_UNDEFINED',
-                'message' => 'Remote rclone trong SPNC_BACKUP_REPOSITORY chưa được khai báo trong rclone config hiện tại.',
+                'message' => 'Remote rclone trong SPNC_BACKUP_REPOSITORY chua du?c khai b�o trong rclone config hi?n t?i.',
+            ];
+        }
+
+        if (in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true) && ! $pgsqlDumpBinaryOk) {
+            $blockingIssues[] = [
+                'code' => 'PG_DUMP_BINARY_INVALID',
+                'message' => 'Kh�ng t�m th?y pg_dump trong runtime hi?n t?i n�n chua th? t?o PostgreSQL dump cho backup.',
+            ];
+        }
+
+        if (in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true) && ! $pgsqlRestoreBinaryOk) {
+            $blockingIssues[] = [
+                'code' => 'PSQL_BINARY_INVALID',
+                'message' => 'Kh�ng t�m th?y psql trong runtime hi?n t?i n�n chua th? ph?c h?i PostgreSQL t? backup.',
+            ];
+        }
+
+        if (in_array($databaseDriver, ['mysql', 'mariadb'], true) && ! $mysqlDumpBinaryOk) {
+            $blockingIssues[] = [
+                'code' => 'MYSQLDUMP_BINARY_INVALID',
+                'message' => 'Kh�ng t�m th?y mysqldump trong runtime hi?n t?i n�n chua th? t?o database dump cho backup.',
+            ];
+        }
+
+        if (in_array($databaseDriver, ['mysql', 'mariadb'], true) && ! $mysqlRestoreBinaryOk) {
+            $blockingIssues[] = [
+                'code' => 'MYSQL_BINARY_INVALID',
+                'message' => 'Kh�ng t�m th?y mysql client trong runtime hi?n t?i n�n chua th? ph?c h?i database t? backup.',
             ];
         }
 
@@ -725,14 +771,14 @@ class ResticBackupManager
         if (! ($destination['valid'] ?? false)) {
             $blockingIssues[] = [
                 'code' => (string) ($destination['error_code'] ?? 'EXPORT_TARGET_INVALID'),
-                'message' => (string) ($destination['error_message'] ?? 'Không suy ra được đích export từ cấu hình backup hiện tại.'),
+                'message' => (string) ($destination['error_message'] ?? 'Kh�ng suy ra du?c d�ch export t? c?u h�nh backup hi?n t?i.'),
             ];
         }
 
         if ($requiresRclone && (string) ($backupConfig['rclone_remote']['auth_mode'] ?? '') === 'oauth_token') {
             $warnings[] = [
                 'code' => 'RCLONE_OAUTH_INTERACTIVE',
-                'message' => 'Backup đang phụ thuộc user OAuth token trong rclone.conf. Production nên dùng service account để tránh phải re-auth thủ công khi token bị revoke hoặc invalid.',
+                'message' => 'Backup dang ph? thu?c user OAuth token trong rclone.conf. Production n�n d�ng service account d? tr�nh ph?i re-auth th? c�ng khi token b? revoke ho?c invalid.',
             ];
         }
 
@@ -765,8 +811,7 @@ class ResticBackupManager
             'warnings' => $warnings,
         ];
     }
-
-    public function buildDoctorReport(int $snapshotLimit = 10): array
+public function buildDoctorReport(int $snapshotLimit = 10): array
     {
         $snapshotLimit = max(1, min(50, $snapshotLimit));
         $resticEnv = $this->resticEnv();
@@ -949,7 +994,7 @@ class ResticBackupManager
                         $state = app(BackupRunStateStore::class)->get($runId);
                         $payload['run_state'] = $state['status'] ?? null;
                         $payload['size_bytes'] = $this->resolveRunSizeBytes($state);
-                        $payload['status'] = $payload['run_state'] ?? 'unknown';
+                        $payload['status'] = $payload['run_state'] ?? 'success';
                         $payload = $this->applyVerificationFromRunState($payload, $state);
                     }
                     return $payload;
@@ -4369,4 +4414,5 @@ class ResticBackupManager
         return rtrim($restoredRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $relative;
     }
 }
+
 

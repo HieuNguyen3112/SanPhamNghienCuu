@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y \
     git \
     unzip \
     curl \
+    postgresql-client \
     restic \
     rclone \
     libpq-dev \

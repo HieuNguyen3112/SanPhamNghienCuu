@@ -1262,27 +1262,27 @@ class AdminBackupController extends Controller
     ): string {
         if ($status === 'queued') {
             return match ($operation) {
-                'backup' => 'Đã tiếp nhận yêu cầu sao lưu.',
-                'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
-                'backup_check' => 'Đã tiếp nhận yêu cầu kiểm tra repository backup.',
-                'prune' => 'Đã tiếp nhận yêu cầu dọn bản sao lưu cũ.',
-                'forget' => 'Đã tiếp nhận yêu cầu xóa bản sao lưu.',
-                'restore' => 'Đã tiếp nhận yêu cầu khôi phục dữ liệu.',
-                'snapshot_refresh' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
-                default => 'Đã tiếp nhận yêu cầu xử lý.',
+                'backup' => '�� ti?p nh?n y�u c?u sao luu.',
+                'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
+                'backup_check' => '�� ti?p nh?n y�u c?u ki?m tra repository backup.',
+                'prune' => '�� ti?p nh?n y�u c?u d?n b?n sao luu cu.',
+                'forget' => '�� ti?p nh?n y�u c?u x�a b?n sao luu.',
+                'restore' => '�� ti?p nh?n y�u c?u kh�i ph?c d? li?u.',
+                'snapshot_refresh' => '�� ti?p nh?n y�u c?u l�m m?i danh s�ch.',
+                default => '�� ti?p nh?n y�u c?u x? l�.',
             };
         }
 
         if ($status === 'running') {
             return match ($operation) {
-                'backup' => 'Đang sao lưu dữ liệu...',
-                'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
-                'backup_check' => 'Đang kiểm tra tính toàn vẹn repository backup...',
-                'prune' => 'Đang dọn bản sao lưu cũ...',
-                'forget' => 'Đang xóa bản sao lưu...',
-                'restore' => 'Đang khôi phục dữ liệu...',
-                'snapshot_refresh' => 'Đang đồng bộ danh sách bản sao lưu...',
-                default => 'Đang xử lý dữ liệu...',
+                'backup' => '�ang sao luu d? li?u...',
+                'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
+                'backup_check' => '�ang ki?m tra t�nh to�n v?n repository backup...',
+                'prune' => '�ang d?n b?n sao luu cu...',
+                'forget' => '�ang x�a b?n sao luu...',
+                'restore' => '�ang kh�i ph?c d? li?u...',
+                'snapshot_refresh' => '�ang d?ng b? danh s�ch b?n sao luu...',
+                default => '�ang x? l� d? li?u...',
             };
         }
 
@@ -1292,51 +1292,63 @@ class AdminBackupController extends Controller
             }
 
             return match ($operation) {
-                'backup' => 'Sao lưu dữ liệu hoàn tất.',
-                'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
-                'backup_check' => 'Kiểm tra repository backup hoàn tất.',
-                'prune' => 'Dọn bản sao lưu cũ hoàn tất.',
-                'forget' => 'Đã xóa bản sao lưu thành công.',
-                'restore' => 'Khôi phục dữ liệu hoàn tất.',
-                'snapshot_refresh' => 'Đồng bộ danh sách bản sao lưu hoàn tất.',
-                default => 'Xử lý hoàn tất.',
+                'backup' => 'Sao luu d? li?u ho�n t?t.',
+                'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
+                'backup_check' => 'Ki?m tra repository backup ho�n t?t.',
+                'prune' => 'D?n b?n sao luu cu ho�n t?t.',
+                'forget' => '�� x�a b?n sao luu th�nh c�ng.',
+                'restore' => 'Kh�i ph?c d? li?u ho�n t?t.',
+                'snapshot_refresh' => '�?ng b? danh s�ch b?n sao luu ho�n t?t.',
+                default => 'X? l� ho�n t?t.',
             };
         }
 
         if ($status === 'failed') {
             if ($errorCode === 'BACKUP_LOCKED') {
                 return match ($operation) {
-                    'forget' => 'Không thể xóa snapshot lúc này vì hệ thống sao lưu đang bận. Nếu snapshot vừa sao lưu xong, hãy đợi readable export hoàn tất rồi thử lại.',
-                    default => 'Hệ thống đang có tiến trình khác giữ khóa sao lưu. Vui lòng đợi rồi thử lại.',
+                    'forget' => 'Kh�ng th? x�a snapshot l�c n�y v� h? th?ng sao luu dang b?n. N?u snapshot v?a sao luu xong, h�y d?i readable export ho�n t?t r?i th? l?i.',
+                    default => 'H? th?ng dang c� ti?n tr�nh kh�c gi? kh�a sao luu. Vui l�ng d?i r?i th? l?i.',
                 };
             }
 
             if ($errorCode === 'DRIVE_AUTH_INVALID') {
-                return 'Không thể xác thực Google Drive cho backup. Hãy cập nhật remote spnc_gdrive trong rclone.conf runtime hoặc secret env tương ứng rồi thử lại.';
+                return 'Kh�ng th? x�c th?c Google Drive cho backup. H�y c?p nh?t remote spnc_gdrive trong rclone.conf runtime ho?c secret env tuong ?ng r?i th? l?i.';
             }
 
             if ($errorCode === 'RCLONE_CONFIG_INVALID') {
-                return 'Không đọc được rclone.conf runtime cho backup. Hãy kiểm tra SPNC_RCLONE_CONFIG hoặc SPNC_RCLONE_CONFIG_BASE64 trên môi trường triển khai.';
+                return 'Kh�ng d?c du?c rclone.conf runtime cho backup. H�y ki?m tra SPNC_RCLONE_CONFIG ho?c SPNC_RCLONE_CONFIG_BASE64 tr�n m�i tru?ng tri?n khai.';
             }
 
             if ($errorCode === 'RCLONE_BINARY_INVALID') {
-                return 'Không thể chạy rclone để truy cập Google Drive. Hãy kiểm tra SPNC_RCLONE_BINARY.';
+                return 'Kh�ng th? ch?y rclone d? truy c?p Google Drive. H�y ki?m tra SPNC_RCLONE_BINARY.';
             }
 
             if ($errorCode === 'RCLONE_REMOTE_INVALID') {
-                return 'Remote Google Drive spnc_gdrive không hợp lệ hoặc không tồn tại trong tệp rclone.conf dùng chung.';
+                return 'Remote Google Drive spnc_gdrive kh�ng h?p l? ho?c kh�ng t?n t?i trong t?p rclone.conf d�ng chung.';
             }
 
             if ($errorCode === 'BACKUP_CONFIG_INVALID') {
-                return 'Cau hinh backup chua day du. Hay kiem tra repository va mat khau backup truoc khi thao tac.';
+                return 'C?u h�nh backup chua d?y d?. H�y ki?m tra repository v� m?t kh?u backup tru?c khi thao t�c.';
             }
 
             if ($errorCode === 'RESTIC_BINARY_INVALID') {
-                return 'Khong tim thay restic trong runtime hien tai. Hay kiem tra SPNC_BACKUP_RESTIC_BINARY hoac image deploy.';
+                return 'Kh�ng t�m th?y restic trong runtime hi?n t?i. H�y ki?m tra SPNC_BACKUP_RESTIC_BINARY ho?c image deploy.';
+            }
+
+            if ($errorCode === 'PG_DUMP_BINARY_INVALID') {
+                return 'Kh�ng t�m th?y pg_dump trong runtime hi?n t?i. Image production c?n c� PostgreSQL client d? t?o database dump.';
+            }
+
+            if ($errorCode === 'PSQL_BINARY_INVALID') {
+                return 'Kh�ng t�m th?y psql trong runtime hi?n t?i. Image production c?n c� PostgreSQL client d? kh�i ph?c d? li?u t? backup.';
+            }
+
+            if ($errorCode === 'POSTGRES_DUMP_FAILED') {
+                return 'T?o PostgreSQL dump th?t b?i. H�y ki?m tra pg_dump, k?t n?i PostgreSQL v� quy?n truy c?p database backup.';
             }
 
             if ($errorCode === 'EXPORT_TARGET_INVALID') {
-                return 'Khong suy ra duoc dich exports tu cau hinh repository hien tai. Hay kiem tra SPNC_BACKUP_REPOSITORY va SPNC_BACKUP_EXPORT_TARGET.';
+                return 'Kh�ng suy ra du?c d�ch exports t? c?u h�nh repository hi?n t?i. H�y ki?m tra SPNC_BACKUP_REPOSITORY v� SPNC_BACKUP_EXPORT_TARGET.';
             }
 
             if ($errorCode === 'RUN_TIMEOUT') {
@@ -1344,18 +1356,18 @@ class AdminBackupController extends Controller
                     return $fallbackMessage;
                 }
                 return match ($operation) {
-                    'snapshot_refresh' => 'Đồng bộ danh sách bị quá thời gian. Vui lòng thử lại.',
-                    'forget' => 'Tiến trình xóa bản sao lưu bị quá thời gian. Vui lòng thử lại.',
-                    'prune' => 'Tiến trình dọn bản sao lưu cũ bị quá thời gian. Vui lòng thử lại.',
-                    'backup' => 'Tiến trình sao lưu bị quá thời gian. Vui lòng thử lại.',
-                    'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
-                    'restore' => 'Tiến trình khôi phục bị quá thời gian. Vui lòng thử lại.',
-                    default => 'Tiến trình xử lý bị quá thời gian. Vui lòng thử lại.',
+                    'snapshot_refresh' => '�?ng b? danh s�ch b? qu� th?i gian. Vui l�ng th? l?i.',
+                    'forget' => 'Ti?n tr�nh x�a b?n sao luu b? qu� th?i gian. Vui l�ng th? l?i.',
+                    'prune' => 'Ti?n tr�nh d?n b?n sao luu cu b? qu� th?i gian. Vui l�ng th? l?i.',
+                    'backup' => 'Ti?n tr�nh sao luu b? qu� th?i gian. Vui l�ng th? l?i.',
+                    'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
+                    'restore' => 'Ti?n tr�nh kh�i ph?c b? qu� th?i gian. Vui l�ng th? l?i.',
+                    default => 'Ti?n tr�nh x? l� b? qu� th?i gian. Vui l�ng th? l?i.',
                 };
             }
 
             if ($errorCode === 'SNAPSHOT_NOT_FOUND') {
-                return 'Không tìm thấy bản sao lưu. Vui lòng tải lại danh sách.';
+                return 'Kh�ng t�m th?y b?n sao luu. Vui l�ng t?i l?i danh s�ch.';
             }
 
             if ($fallbackMessage !== '' && ! $this->isTechnicalMessage($fallbackMessage)) {
@@ -1363,14 +1375,14 @@ class AdminBackupController extends Controller
             }
 
             return match ($operation) {
-                'backup' => 'Không thể sao lưu dữ liệu. Vui lòng thử lại.',
-                'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
-                'backup_check' => 'Không thể kiểm tra repository backup. Vui lòng thử lại.',
-                'prune' => 'Không thể dọn bản sao lưu cũ. Vui lòng thử lại.',
-                'forget' => 'Không thể xóa bản sao lưu. Vui lòng thử lại.',
-                'restore' => 'Không thể khôi phục dữ liệu. Vui lòng thử lại.',
-                'snapshot_refresh' => 'Không thể đồng bộ danh sách bản sao lưu. Vui lòng thử lại.',
-                default => 'Không thể xử lý yêu cầu. Vui lòng thử lại.',
+                'backup' => 'Kh�ng th? sao luu d? li?u. Vui l�ng th? l?i.',
+                'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
+                'backup_check' => 'Kh�ng th? ki?m tra repository backup. Vui l�ng th? l?i.',
+                'prune' => 'Kh�ng th? d?n b?n sao luu cu. Vui l�ng th? l?i.',
+                'forget' => 'Kh�ng th? x�a b?n sao luu. Vui l�ng th? l?i.',
+                'restore' => 'Kh�ng th? kh�i ph?c d? li?u. Vui l�ng th? l?i.',
+                'snapshot_refresh' => 'Kh�ng th? d?ng b? danh s�ch b?n sao luu. Vui l�ng th? l?i.',
+                default => 'Kh�ng th? x? l� y�u c?u. Vui l�ng th? l?i.',
             };
         }
 
@@ -1378,7 +1390,7 @@ class AdminBackupController extends Controller
             return $fallbackMessage;
         }
 
-        return 'Hệ thống đang xử lý...';
+        return 'H? th?ng dang x? l�...';
     }
 
     private function detectErrorCode(string $rawMessage, string $rawError): ?string
@@ -1404,13 +1416,41 @@ class AdminBackupController extends Controller
             return 'RESTIC_BINARY_INVALID';
         }
 
+        if (Str::contains($combined, ['pg_dump', 'postgresql-client', 'postgres client']) && Str::contains($combined, [
+            'command not found',
+            'not recognized as an internal or external command',
+            'failed to start process',
+            'no such file or directory',
+            'executable not found',
+            'kh�ng t�m th?y',
+            'khong tim thay',
+        ])) {
+            return 'PG_DUMP_BINARY_INVALID';
+        }
+
+        if (Str::contains($combined, ['psql']) && Str::contains($combined, [
+            'command not found',
+            'not recognized as an internal or external command',
+            'failed to start process',
+            'no such file or directory',
+            'executable not found',
+            'kh�ng t�m th?y',
+            'khong tim thay',
+        ])) {
+            return 'PSQL_BINARY_INVALID';
+        }
+
+        if (Str::contains($combined, ['tao postgresql dump that bai', 'pg_dump:'])) {
+            return 'POSTGRES_DUMP_FAILED';
+        }
+
         if ($this->containsExportTargetHint($combined)) {
             return 'EXPORT_TARGET_INVALID';
         }
 
         if (
             Str::contains($combined, [
-                'không tìm thấy snapshot',
+                'kh�ng t�m th?y snapshot',
                 'khong tim thay snapshot',
                 'snapshot not found',
             ])
@@ -1436,8 +1476,7 @@ class AdminBackupController extends Controller
 
         return null;
     }
-
-    private function containsLockHint(string $normalized): bool
+private function containsLockHint(string $normalized): bool
     {
         return Str::contains($normalized, [
             'unable to create lock',
@@ -1693,3 +1732,4 @@ class AdminBackupController extends Controller
         return ['run_id' => $runId];
     }
 }
+
