@@ -374,7 +374,6 @@ class LecturerParticipationNotificationController extends Controller
 
         $activity = DB::table('research_activities as ra')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
-            ->leftJoin('lecturers as owner', 'ra.owner_lecturer_id', '=', 'owner.id')
             ->where('ra.id', $activityId)
             ->lockForUpdate()
             ->select([
@@ -382,7 +381,6 @@ class LecturerParticipationNotificationController extends Controller
                 'ra.status_id',
                 'ra.title',
                 'ra.owner_lecturer_id',
-                'owner.full_name as owner_name',
                 'ast.code as status_code',
             ])
             ->first();
@@ -443,7 +441,12 @@ class LecturerParticipationNotificationController extends Controller
             'updated_at' => $now,
         ]);
 
-        $ownerName = trim((string) ($activity->owner_name ?? 'Giảng viên'));
+        $ownerName = trim((string) DB::table('lecturers')
+            ->where('id', $activity->owner_lecturer_id)
+            ->value('full_name'));
+        if ($ownerName === '') {
+            $ownerName = 'Giảng viên';
+        }
         $activityTitle = trim((string) ($activity->title ?? ''));
 
         return [
