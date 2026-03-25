@@ -218,9 +218,9 @@ class AdminBackupController extends Controller
                     'retention' => $retention,
                     'export_overview' => $exportOverview,
                     'friendly_messages' => [
-                        'safe' => 'Hệ thống đã sao lưu an toàn.',
-                        'drive' => 'Bạn có thể mở thư mục Backup trên Google Drive để xem bản sao lưu dễ đọc.',
-                        'restore' => 'Khi cần khôi phục, vui lòng dùng chức năng Khôi phục trong hệ thống.',
+                        'safe' => 'HÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u an toÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n.',
+                        'drive' => 'BÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡n cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸ thÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â° mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c Backup trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªn Google Drive ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ xem bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Âc.',
+                        'restore' => 'Khi cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§n khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c, vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¹ng chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â©c nÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€ Ã¢â‚¬â„¢ng KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c trong hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ng.',
                     ],
                     'last_successful_backup_at' => $lastSuccess['finished_at'] ?? null,
                     'repository_configured' => (bool) ($readiness['ready_for_operations'] ?? false),
@@ -241,7 +241,7 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể tải danh sách backup. Vui lòng thử lại sau.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i danh sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ch backup. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡i sau.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -278,7 +278,7 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể tải thông tin thư mục exports backup.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i thÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tin thÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â° mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c exports backup.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -299,7 +299,7 @@ class AdminBackupController extends Controller
             'requested_by_user_id' => $user ? (int) $user->id : null,
             'requested_at' => now()->toIso8601String(),
             'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
-            'message' => 'Đã xếp lịch chạy backup.',
+            'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ch chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y backup.',
         ]);
 
         try {
@@ -309,11 +309,11 @@ class AdminBackupController extends Controller
                 'status' => 'failed',
                 'operation' => 'backup',
                 'step' => 'failed',
-                'message' => 'Không thể khởi chạy tiến trình backup nền.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿n trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh backup nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân.',
                 'finished_at' => now()->toIso8601String(),
                 'error_message' => $exception->getMessage(),
             ]);
-            $this->stateStore->appendLog($runId, 'Không thể khởi chạy tác vụ nền: ' . $exception->getMessage(), 'error');
+            $this->stateStore->appendLog($runId, 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡c vÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥ nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân: ' . $exception->getMessage(), 'error');
 
             Log::error('backup.launch_failed', [
                 'run_id' => $runId,
@@ -321,14 +321,14 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể khởi chạy backup nền. Vui lòng kiểm tra cấu hình máy chủ.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y backup nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng kiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢m tra cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥u hÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡y chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â§.',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
         AuditLogger::log($request, [
             'action_group' => 'security',
             'action_code' => 'BACKUP_RUN_TRIGGERED',
-            'action_label' => 'Kích hoạt sao lưu hệ thống',
+            'action_label' => 'KÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ch hoÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡t sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ng',
             'target_type' => 'backup_run',
             'target_id' => $runId,
             'target_display' => 'Backup run ' . $runId,
@@ -337,12 +337,12 @@ class AdminBackupController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Đã tiếp nhận yêu cầu sao lưu.',
+            'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u.',
             'data' => [
                 'run_id' => $runId,
                 'operation' => 'backup',
                 'status' => 'queued',
-                'user_message' => 'Đã tiếp nhận yêu cầu sao lưu.',
+                'user_message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u.',
                 'error_code' => null,
                 'status_url' => '/api/admin/backups/runs/' . $runId,
             ],
@@ -360,11 +360,11 @@ class AdminBackupController extends Controller
         if ($run === null) {
             return response()->json([
                 'success' => true,
-                'message' => 'Danh sách bản sao lưu đang được làm mới.',
+                'message' => 'Danh sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ch bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£c lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â m mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºi.',
                 'data' => [
                     'run_id' => $this->snapshotStore->cacheMeta()['refresh_run_id'] ?? null,
                     'status' => 'queued',
-                    'user_message' => 'Danh sách bản sao lưu đang được làm mới.',
+                    'user_message' => 'Danh sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ch bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£c lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â m mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºi.',
                     'error_code' => null,
                     'status_url' => null,
                 ],
@@ -373,12 +373,12 @@ class AdminBackupController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
+            'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â m mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºi danh sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ch.',
             'data' => [
                 'run_id' => $run['run_id'],
                 'operation' => 'snapshot_refresh',
                 'status' => 'queued',
-                'user_message' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
+                'user_message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â m mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºi danh sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ch.',
                 'error_code' => null,
                 'status_url' => '/api/admin/backups/runs/' . $run['run_id'],
             ],
@@ -406,7 +406,7 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể thu thập chẩn đoán backup. Vui lòng kiểm tra log hệ thống.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ thu thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­p chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â©n ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“oÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡n backup. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng kiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢m tra log hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ng.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -422,14 +422,14 @@ class AdminBackupController extends Controller
             $this->stateStore->assertValidRunId($runId);
         } catch (\Throwable $exception) {
             return response()->json([
-                'message' => 'Mã run không hợp lệ.',
+                'message' => 'MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ run khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $state = $this->stateStore->get($runId);
         if (! $state) {
             return response()->json([
-                'message' => 'Không tìm thấy trạng thái backup run.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y trÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡ng thÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡i backup run.',
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -459,7 +459,7 @@ class AdminBackupController extends Controller
             if (
                 $exception instanceof BackupRuntimeException
                 && (
-                    str_contains($normalized, 'không tìm thấy snapshot')
+                    str_contains($normalized, 'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y snapshot')
                     || str_contains($normalized, 'khong tim thay snapshot')
                 )
             ) {
@@ -467,7 +467,7 @@ class AdminBackupController extends Controller
             }
 
             return response()->json([
-                'message' => $exception->getMessage() ?: 'Không thể tải chi tiết bản sao lưu.',
+                'message' => $exception->getMessage() ?: 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i chi tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿t bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u.',
             ], $status);
         }
     }
@@ -488,7 +488,7 @@ class AdminBackupController extends Controller
             'requested_by_user_id' => $user ? (int) $user->id : null,
             'requested_at' => now()->toIso8601String(),
             'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
-            'message' => 'Đã xếp lịch dọn snapshot cũ.',
+            'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ch dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân snapshot cÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â©.',
         ]);
 
         try {
@@ -498,11 +498,11 @@ class AdminBackupController extends Controller
                 'status' => 'failed',
                 'operation' => 'prune',
                 'step' => 'failed',
-                'message' => 'Không thể khởi chạy tiến trình prune nền.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿n trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh prune nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân.',
                 'finished_at' => now()->toIso8601String(),
                 'error_message' => $exception->getMessage(),
             ]);
-            $this->stateStore->appendLog($runId, 'Không thể khởi chạy tác vụ nền: ' . $exception->getMessage(), 'error');
+            $this->stateStore->appendLog($runId, 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡c vÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥ nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân: ' . $exception->getMessage(), 'error');
 
             Log::error('backup.prune_api_launch_failed', [
                 'run_id' => $runId,
@@ -510,14 +510,14 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể khởi chạy dọn snapshot nền. Vui lòng thử lại sau.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân snapshot nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡i sau.',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
         AuditLogger::log($request, [
             'action_group' => 'security',
             'action_code' => 'BACKUP_PRUNE_TRIGGERED',
-            'action_label' => 'Kích hoạt dọn snapshot backup',
+            'action_label' => 'KÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ch hoÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡t dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân snapshot backup',
             'target_type' => 'backup_run',
             'target_id' => $runId,
             'target_display' => 'Prune run ' . $runId,
@@ -526,12 +526,12 @@ class AdminBackupController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Đã kích hoạt dọn snapshot cũ.',
+            'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ kÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ch hoÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡t dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân snapshot cÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â©.',
             'data' => [
                 'run_id' => $runId,
                 'operation' => 'prune',
                 'status' => 'queued',
-                'user_message' => 'Đã tiếp nhận yêu cầu dọn bản sao lưu cũ.',
+                'user_message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u cÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â©.',
                 'error_code' => null,
                 'status_url' => '/api/admin/backups/runs/' . $runId,
             ],
@@ -544,7 +544,7 @@ class AdminBackupController extends Controller
             $this->backupManager->assertValidSnapshotId($snapshotId);
         } catch (\Throwable $exception) {
             return response()->json([
-                'message' => 'Mã snapshot không hợp lệ.',
+                'message' => 'MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ snapshot khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -562,7 +562,7 @@ class AdminBackupController extends Controller
 
         if (! $validated['confirm']) {
             return response()->json([
-                'message' => 'Bạn phải xác nhận thao tác khôi phục dữ liệu.',
+                'message' => 'BÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡n phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡c nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n thao tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡c khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¯ liÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡u.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -571,7 +571,7 @@ class AdminBackupController extends Controller
         $providedPhrase = trim((string) $validated['confirm_phrase']);
         if ($providedPhrase !== $expectedPhrase && $providedPhrase !== $legacyPhrase) {
             return response()->json([
-                'message' => 'Cụm từ xác nhận khôi phục không chính xác.',
+                'message' => 'CÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥m tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â« xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡c nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng chÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­nh xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡c.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -587,7 +587,7 @@ class AdminBackupController extends Controller
             'snapshot_id' => $snapshotId,
             'scope' => (string) $validated['scope'],
             'target' => (string) $validated['target'],
-            'message' => 'Đã xếp lịch khôi phục dữ liệu.',
+            'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ch khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¯ liÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡u.',
         ]);
 
         try {
@@ -604,11 +604,11 @@ class AdminBackupController extends Controller
                 'status' => 'failed',
                 'operation' => 'restore',
                 'step' => 'failed',
-                'message' => 'Không thể khởi chạy tiến trình restore nền.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿n trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh restore nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân.',
                 'finished_at' => now()->toIso8601String(),
                 'error_message' => $exception->getMessage(),
             ]);
-            $this->stateStore->appendLog($runId, 'Không thể khởi chạy tác vụ nền: ' . $exception->getMessage(), 'error');
+            $this->stateStore->appendLog($runId, 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡c vÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥ nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân: ' . $exception->getMessage(), 'error');
 
             Log::error('backup.restore_launch_failed', [
                 'run_id' => $runId,
@@ -617,14 +617,14 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể khởi chạy khôi phục nền. Vui lòng thử lại sau.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡i sau.',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
         AuditLogger::log($request, [
             'action_group' => 'security',
             'action_code' => 'BACKUP_RESTORE_TRIGGERED',
-            'action_label' => 'Kích hoạt khôi phục sao lưu hệ thống',
+            'action_label' => 'KÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ch hoÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡t khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ng',
             'target_type' => 'backup_snapshot',
             'target_id' => $snapshotId,
             'target_display' => 'Snapshot ' . $snapshotId,
@@ -638,12 +638,12 @@ class AdminBackupController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Đã tiếp nhận yêu cầu khôi phục dữ liệu.',
+            'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¯ liÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡u.',
             'data' => [
                 'run_id' => $runId,
                 'operation' => 'restore',
                 'status' => 'queued',
-                'user_message' => 'Đã tiếp nhận yêu cầu khôi phục dữ liệu.',
+                'user_message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¯ liÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡u.',
                 'error_code' => null,
                 'status_url' => '/api/admin/backups/runs/' . $runId,
             ],
@@ -657,13 +657,13 @@ class AdminBackupController extends Controller
             $download = $this->backupManager->extractManifestFromSnapshot($snapshotId);
             $path = (string) ($download['absolute_path'] ?? '');
             if ($path === '') {
-                throw new BackupRuntimeException('Không tìm thấy manifest trong snapshot.');
+                throw new BackupRuntimeException('KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y manifest trong snapshot.');
             }
 
             AuditLogger::log($request, [
                 'action_group' => 'security',
                 'action_code' => 'BACKUP_DOWNLOAD_MANIFEST',
-                'action_label' => 'Tải manifest backup',
+                'action_label' => 'TÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i manifest backup',
                 'target_type' => 'backup_snapshot',
                 'target_id' => $snapshotId,
                 'target_display' => 'Snapshot ' . $snapshotId,
@@ -680,7 +680,7 @@ class AdminBackupController extends Controller
                 'backup.download_manifest_failed',
                 $snapshotId,
                 $exception,
-                'Không thể tải manifest backup.'
+                'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i manifest backup.'
             );
         }
     }
@@ -692,13 +692,13 @@ class AdminBackupController extends Controller
             $download = $this->backupManager->extractDatabaseDumpFromSnapshot($snapshotId);
             $path = (string) ($download['absolute_path'] ?? '');
             if ($path === '') {
-                throw new BackupRuntimeException('Không tìm thấy DB dump trong snapshot.');
+                throw new BackupRuntimeException('KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y DB dump trong snapshot.');
             }
 
             AuditLogger::log($request, [
                 'action_group' => 'security',
                 'action_code' => 'BACKUP_DOWNLOAD_DB_DUMP',
-                'action_label' => 'Tải DB dump backup',
+                'action_label' => 'TÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i DB dump backup',
                 'target_type' => 'backup_snapshot',
                 'target_id' => $snapshotId,
                 'target_display' => 'Snapshot ' . $snapshotId,
@@ -715,7 +715,7 @@ class AdminBackupController extends Controller
                 'backup.download_db_dump_failed',
                 $snapshotId,
                 $exception,
-                'Không thể tải DB dump backup.'
+                'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i DB dump backup.'
             );
         }
     }
@@ -737,9 +737,9 @@ class AdminBackupController extends Controller
             if (
                 $exception instanceof BackupRuntimeException
                 && (
-                    str_contains($normalized, 'không tìm thấy snapshot')
+                    str_contains($normalized, 'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y snapshot')
                     || str_contains($normalized, 'khong tim thay snapshot')
-                    || str_contains($normalized, 'chưa có export')
+                    || str_contains($normalized, 'chÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°a cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ export')
                     || str_contains($normalized, 'chua co export')
                 )
             ) {
@@ -747,7 +747,7 @@ class AdminBackupController extends Controller
             }
 
             return response()->json([
-                'message' => $exception->getMessage() ?: 'Không thể lấy thông tin export backup.',
+                'message' => $exception->getMessage() ?: 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y thÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tin export backup.',
             ], $status);
         }
     }
@@ -759,14 +759,14 @@ class AdminBackupController extends Controller
             $download = $this->backupManager->prepareExportBundleDownload($snapshotId);
             $path = (string) ($download['absolute_path'] ?? '');
             if ($path === '') {
-                throw new BackupRuntimeException('Không tìm thấy tệp export.');
+                throw new BackupRuntimeException('KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡p export.');
             }
 
             $filename = (string) ($download['filename'] ?? ('backup_export_' . $snapshotId . '.zip'));
             AuditLogger::log($request, [
                 'action_group' => 'security',
                 'action_code' => 'BACKUP_DOWNLOAD_EXPORT',
-                'action_label' => 'Tải gói export backup',
+                'action_label' => 'TÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³i export backup',
                 'target_type' => 'backup_snapshot',
                 'target_id' => $snapshotId,
                 'target_display' => 'Snapshot ' . $snapshotId,
@@ -783,7 +783,7 @@ class AdminBackupController extends Controller
                 'backup.download_export_failed',
                 $snapshotId,
                 $exception,
-                'Không thể tải gói export backup.'
+                'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³i export backup.'
             );
         }
     }
@@ -809,13 +809,13 @@ class AdminBackupController extends Controller
 
         if ($pruneAfter) {
             return response()->json([
-                'message' => 'Xóa snapshot chỉ hỗ trợ forget. Việc dọn dung lượng được hệ thống xử lý riêng theo bảo trì.',
+                'message' => 'XÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a snapshot chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â trÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£ forget. ViÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡c dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân dung lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£c hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ng xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â½ riÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªng theo bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£o trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         if ($snapshotIds === []) {
             return response()->json([
-                'message' => 'Danh sách snapshot cần xóa không hợp lệ.',
+                'message' => 'Danh sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ch snapshot cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§n xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -829,7 +829,7 @@ class AdminBackupController extends Controller
             'requested_at' => now()->toIso8601String(),
             'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
             'snapshot_ids' => $snapshotIds,
-            'message' => 'Đã xếp lịch xóa snapshot đã chọn.',
+            'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ch xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a snapshot ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân.',
         ]);
 
         try {
@@ -838,7 +838,7 @@ class AdminBackupController extends Controller
             AuditLogger::log($request, [
                 'action_group' => 'security',
                 'action_code' => 'BACKUP_SNAPSHOT_FORGET',
-                'action_label' => 'Xóa snapshot backup theo lựa chọn',
+                'action_label' => 'XÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a snapshot backup theo lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â±a chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân',
                 'target_type' => 'backup_snapshot',
                 'target_id' => implode(',', $snapshotIds),
                 'target_display' => 'Snapshots ' . implode(', ', $snapshotIds),
@@ -851,13 +851,13 @@ class AdminBackupController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Đã tiếp nhận yêu cầu xóa bản sao lưu.',
+                'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u.',
                 'data' => [
                     'accepted' => true,
                     'run_id' => $runId,
                     'operation' => 'forget',
                     'status' => 'queued',
-                    'user_message' => 'Đã tiếp nhận yêu cầu xóa bản sao lưu.',
+                    'user_message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p nhÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â­n yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u.',
                     'error_code' => null,
                     'status_url' => '/api/admin/backups/runs/' . $runId,
                     'snapshot_ids' => $snapshotIds,
@@ -868,11 +868,11 @@ class AdminBackupController extends Controller
                 'status' => 'failed',
                 'operation' => 'forget',
                 'step' => 'failed',
-                'message' => 'Không thể khởi chạy tiến trình xóa snapshot nền.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿n trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a snapshot nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân.',
                 'finished_at' => now()->toIso8601String(),
                 'error_message' => $exception->getMessage(),
             ]);
-            $this->stateStore->appendLog($runId, 'Không thể khởi chạy tác vụ nền: ' . $exception->getMessage(), 'error');
+            $this->stateStore->appendLog($runId, 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡c vÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥ nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân: ' . $exception->getMessage(), 'error');
 
             Log::error('backup.forget_launch_failed', [
                 'run_id' => $runId,
@@ -881,7 +881,7 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể khởi chạy xóa snapshot nền. Vui lòng thử lại sau.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a snapshot nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡i sau.',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
     }
@@ -900,7 +900,7 @@ class AdminBackupController extends Controller
             AuditLogger::log($request, [
                 'action_group' => 'security',
                 'action_code' => 'BACKUP_UNLOCK_STALE_LOCK',
-                'action_label' => 'Gỡ khóa stale repository backup',
+                'action_label' => 'GÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¡ khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a stale repository backup',
                 'target_type' => 'backup_repository',
                 'target_id' => 'restic',
                 'target_display' => 'Restic repository',
@@ -909,10 +909,10 @@ class AdminBackupController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Đã gửi yêu cầu gỡ khóa sao lưu.',
+                'message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ gÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­i yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u gÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¡ khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u.',
                 'data' => [
                     'unlocked' => true,
-                    'user_message' => 'Đã gửi yêu cầu gỡ khóa sao lưu.',
+                    'user_message' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ gÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­i yÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªu cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§u gÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¡ khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u.',
                 ],
             ], Response::HTTP_OK);
         } catch (\Throwable $exception) {
@@ -921,7 +921,7 @@ class AdminBackupController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Không thể gỡ khóa sao lưu lúc này. Vui lòng thử lại.',
+                'message' => 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ gÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¡ khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºc nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â y. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡i.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
     }
@@ -947,13 +947,13 @@ class AdminBackupController extends Controller
     private function conflictMessageForOperation(string $operation): string
     {
         return match ($operation) {
-            'backup' => 'Đang có một bản sao lưu đang chạy. Vui lòng đợi hoàn tất.',
-            'backup_postprocess' => 'Snapshot đã sao lưu an toàn, nhưng readable export vẫn đang xử lý ở nền. Vui lòng đợi hoàn tất rồi mới xóa snapshot.',
-            'prune' => 'Đang có tiến trình dọn bản sao lưu cũ. Vui lòng đợi hoàn tất.',
-            'forget' => 'Đang có tiến trình xóa snapshot đang chạy. Vui lòng đợi hoàn tất.',
-            'restore' => 'Đang có tiến trình khôi phục dữ liệu đang chạy. Vui lòng đợi hoàn tất.',
+            'backup' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚Âang cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢t bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£i hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥t.',
+            'backup_postprocess' => 'Snapshot ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u an toÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n, nhÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ng readable export vÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â«n ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â½ ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸ nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£i hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥t rÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œi mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âºi xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a snapshot.',
+            'prune' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚Âang cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿n trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£n sao lÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°u cÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â©. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£i hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥t.',
+            'forget' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚Âang cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿n trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh xÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a snapshot ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£i hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥t.',
+            'restore' => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚Âang cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿n trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´i phÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c dÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¯ liÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡u ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£i hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥t.',
             'snapshot_refresh' => 'Đang có tiến trình làm mới danh sách snapshot. Vui lòng đợi hoàn tất.',
-            default => 'Đang có tiến trình nền đang chạy. Vui lòng đợi hoàn tất.',
+            default => 'ÃƒÆ’Ã¢â‚¬Å¾Ãƒâ€šÃ‚Âang cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿n trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y. Vui lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â²ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£i hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥t.',
         };
     }
 
@@ -1083,7 +1083,7 @@ class AdminBackupController extends Controller
         if ($exportAvailable) {
             return [
                 'state' => 'ready',
-                'message' => 'Readable export đã sẵn sàng để tải và mở trên Drive.',
+                'message' => 'Readable export ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ sÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Âµn sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â£i vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  mÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸ trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªn Drive.',
                 'run' => $publicPostProcessRun,
             ];
         }
@@ -1093,7 +1093,7 @@ class AdminBackupController extends Controller
             return [
                 'state' => 'queued',
                 'message' => $publicPostProcessRun['user_message']
-                    ?? 'Snapshot an toàn đã xong. Readable export đang chờ được xử lý.',
+                    ?? 'Snapshot an toÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ xong. Readable export ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£c xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â½.',
                 'run' => $publicPostProcessRun,
             ];
         }
@@ -1102,7 +1102,7 @@ class AdminBackupController extends Controller
             return [
                 'state' => 'running',
                 'message' => $publicPostProcessRun['user_message']
-                    ?? 'Snapshot an toàn đã xong. Readable export đang được tạo ở nền.',
+                    ?? 'Snapshot an toÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ xong. Readable export ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£c tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡o ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸ nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân.',
                 'run' => $publicPostProcessRun,
             ];
         }
@@ -1111,7 +1111,7 @@ class AdminBackupController extends Controller
             return [
                 'state' => 'failed',
                 'message' => $publicPostProcessRun['user_message']
-                    ?? 'Snapshot an toàn đã hoàn tất nhưng readable export chưa thể hoàn thiện.',
+                    ?? 'Snapshot an toÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥t nhÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ng readable export chÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°a thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n thiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡n.',
                 'run' => $publicPostProcessRun,
             ];
         }
@@ -1119,7 +1119,7 @@ class AdminBackupController extends Controller
         if ($postProcessStatus === 'success') {
             return [
                 'state' => 'finalizing',
-                'message' => 'Readable export đã xử lý xong, đang chờ công bố đầy đủ trên giao diện.',
+                'message' => 'Readable export ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â½ xong, ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â§y ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â§ trÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªn giao diÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡n.',
                 'run' => $publicPostProcessRun,
             ];
         }
@@ -1127,7 +1127,7 @@ class AdminBackupController extends Controller
         if ($safeStatus === 'success' && $exportsEnabled) {
             return [
                 'state' => 'pending',
-                'message' => 'Snapshot an toàn đã hoàn tất. Readable export sẽ tiếp tục được xử lý ở nền.',
+                'message' => 'Snapshot an toÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ hoÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â n tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥t. Readable export sÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â½ tiÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¿p tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â¥c ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£c xÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â­ lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â½ ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸ nÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Ân.',
                 'run' => $publicPostProcessRun,
             ];
         }
@@ -1135,14 +1135,14 @@ class AdminBackupController extends Controller
         if (! $exportsEnabled) {
             return [
                 'state' => 'disabled',
-                'message' => 'Readable export đang tắt theo cấu hình hệ thống.',
+                'message' => 'Readable export ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¯t theo cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥u hÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ng.',
                 'run' => $publicPostProcessRun,
             ];
         }
 
         return [
             'state' => 'unavailable',
-            'message' => 'Readable export chưa sẵn sàng.',
+            'message' => 'Readable export chÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°a sÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Âµn sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â ng.',
             'run' => $publicPostProcessRun,
         ];
     }
@@ -1262,27 +1262,27 @@ class AdminBackupController extends Controller
     ): string {
         if ($status === 'queued') {
             return match ($operation) {
-                'backup' => '�� ti?p nh?n y�u c?u sao luu.',
-                'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
-                'backup_check' => '�� ti?p nh?n y�u c?u ki?m tra repository backup.',
-                'prune' => '�� ti?p nh?n y�u c?u d?n b?n sao luu cu.',
-                'forget' => '�� ti?p nh?n y�u c?u x�a b?n sao luu.',
-                'restore' => '�� ti?p nh?n y�u c?u kh�i ph?c d? li?u.',
-                'snapshot_refresh' => '�� ti?p nh?n y�u c?u l�m m?i danh s�ch.',
-                default => '�� ti?p nh?n y�u c?u x? l�.',
+                'backup' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ti?p nh?n yÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½u c?u sao luu.',
+                'backup_postprocess' => 'Snapshot dÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ sao luu an toÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n, nhung readable export v?n dang x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ? n?n. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng d?i hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t r?i m?i xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a snapshot.',
+                'backup_check' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ti?p nh?n yÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½u c?u ki?m tra repository backup.',
+                'prune' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ti?p nh?n yÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½u c?u d?n b?n sao luu cu.',
+                'forget' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ti?p nh?n yÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½u c?u xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a b?n sao luu.',
+                'restore' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ti?p nh?n yÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½u c?u khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½i ph?c d? li?u.',
+                'snapshot_refresh' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
+                default => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ti?p nh?n yÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½u c?u x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½.',
             };
         }
 
         if ($status === 'running') {
             return match ($operation) {
-                'backup' => '�ang sao luu d? li?u...',
-                'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
-                'backup_check' => '�ang ki?m tra t�nh to�n v?n repository backup...',
-                'prune' => '�ang d?n b?n sao luu cu...',
-                'forget' => '�ang x�a b?n sao luu...',
-                'restore' => '�ang kh�i ph?c d? li?u...',
-                'snapshot_refresh' => '�ang d?ng b? danh s�ch b?n sao luu...',
-                default => '�ang x? l� d? li?u...',
+                'backup' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ang sao luu d? li?u...',
+                'backup_postprocess' => 'Snapshot dÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ sao luu an toÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n, nhung readable export v?n dang x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ? n?n. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng d?i hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t r?i m?i xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a snapshot.',
+                'backup_check' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ang ki?m tra tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh toÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n v?n repository backup...',
+                'prune' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ang d?n b?n sao luu cu...',
+                'forget' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ang xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a b?n sao luu...',
+                'restore' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ang khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½i ph?c d? li?u...',
+                'snapshot_refresh' => 'Đang đồng bộ danh sách bản sao lưu...',
+                default => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ang x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ d? li?u...',
             };
         }
 
@@ -1292,63 +1292,63 @@ class AdminBackupController extends Controller
             }
 
             return match ($operation) {
-                'backup' => 'Sao luu d? li?u ho�n t?t.',
-                'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
-                'backup_check' => 'Ki?m tra repository backup ho�n t?t.',
-                'prune' => 'D?n b?n sao luu cu ho�n t?t.',
-                'forget' => '�� x�a b?n sao luu th�nh c�ng.',
-                'restore' => 'Kh�i ph?c d? li?u ho�n t?t.',
-                'snapshot_refresh' => '�?ng b? danh s�ch b?n sao luu ho�n t?t.',
-                default => 'X? l� ho�n t?t.',
+                'backup' => 'Sao luu d? li?u hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t.',
+                'backup_postprocess' => 'Snapshot dÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ sao luu an toÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n, nhung readable export v?n dang x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ? n?n. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng d?i hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t r?i m?i xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a snapshot.',
+                'backup_check' => 'Ki?m tra repository backup hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t.',
+                'prune' => 'D?n b?n sao luu cu hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t.',
+                'forget' => 'ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a b?n sao luu thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh cÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng.',
+                'restore' => 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½i ph?c d? li?u hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t.',
+                'snapshot_refresh' => 'Đồng bộ danh sách bản sao lưu hoàn tất.',
+                default => 'X? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t.',
             };
         }
 
         if ($status === 'failed') {
             if ($errorCode === 'BACKUP_LOCKED') {
                 return match ($operation) {
-                    'forget' => 'Kh�ng th? x�a snapshot l�c n�y v� h? th?ng sao luu dang b?n. N?u snapshot v?a sao luu xong, h�y d?i readable export ho�n t?t r?i th? l?i.',
-                    default => 'H? th?ng dang c� ti?n tr�nh kh�c gi? kh�a sao luu. Vui l�ng d?i r?i th? l?i.',
+                    'forget' => 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a snapshot lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½c nÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y vÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ h? th?ng sao luu dang b?n. N?u snapshot v?a sao luu xong, hÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y d?i readable export hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t r?i th? l?i.',
+                    default => 'H? th?ng dang cÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ti?n trÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½c gi? khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a sao luu. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng d?i r?i th? l?i.',
                 };
             }
 
             if ($errorCode === 'DRIVE_AUTH_INVALID') {
-                return 'Kh�ng th? x�c th?c Google Drive cho backup. H�y c?p nh?t remote spnc_gdrive trong rclone.conf runtime ho?c secret env tuong ?ng r?i th? l?i.';
+                return 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½c th?c Google Drive cho backup. HÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y c?p nh?t remote spnc_gdrive trong rclone.conf runtime ho?c secret env tuong ?ng r?i th? l?i.';
             }
 
             if ($errorCode === 'RCLONE_CONFIG_INVALID') {
-                return 'Kh�ng d?c du?c rclone.conf runtime cho backup. H�y ki?m tra SPNC_RCLONE_CONFIG ho?c SPNC_RCLONE_CONFIG_BASE64 tr�n m�i tru?ng tri?n khai.';
+                return 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng d?c du?c rclone.conf runtime cho backup. HÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y ki?m tra SPNC_RCLONE_CONFIG ho?c SPNC_RCLONE_CONFIG_BASE64 trÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n mÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½i tru?ng tri?n khai.';
             }
 
             if ($errorCode === 'RCLONE_BINARY_INVALID') {
-                return 'Kh�ng th? ch?y rclone d? truy c?p Google Drive. H�y ki?m tra SPNC_RCLONE_BINARY.';
+                return 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? ch?y rclone d? truy c?p Google Drive. HÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y ki?m tra SPNC_RCLONE_BINARY.';
             }
 
             if ($errorCode === 'RCLONE_REMOTE_INVALID') {
-                return 'Remote Google Drive spnc_gdrive kh�ng h?p l? ho?c kh�ng t?n t?i trong t?p rclone.conf d�ng chung.';
+                return 'Remote Google Drive spnc_gdrive khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng h?p l? ho?c khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng t?n t?i trong t?p rclone.conf dÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng chung.';
             }
 
             if ($errorCode === 'BACKUP_CONFIG_INVALID') {
-                return 'C?u h�nh backup chua d?y d?. H�y ki?m tra repository v� m?t kh?u backup tru?c khi thao t�c.';
+                return 'C?u hÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh backup chua d?y d?. HÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y ki?m tra repository vÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ m?t kh?u backup tru?c khi thao tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½c.';
             }
 
             if ($errorCode === 'RESTIC_BINARY_INVALID') {
-                return 'Kh�ng t�m th?y restic trong runtime hi?n t?i. H�y ki?m tra SPNC_BACKUP_RESTIC_BINARY ho?c image deploy.';
+                return 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m th?y restic trong runtime hi?n t?i. HÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y ki?m tra SPNC_BACKUP_RESTIC_BINARY ho?c image deploy.';
             }
 
             if ($errorCode === 'PG_DUMP_BINARY_INVALID') {
-                return 'Kh�ng t�m th?y pg_dump trong runtime hi?n t?i. Image production c?n c� PostgreSQL client d? t?o database dump.';
+                return 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m th?y pg_dump trong runtime hi?n t?i. Image production c?n cÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ PostgreSQL client d? t?o database dump.';
             }
 
             if ($errorCode === 'PSQL_BINARY_INVALID') {
-                return 'Kh�ng t�m th?y psql trong runtime hi?n t?i. Image production c?n c� PostgreSQL client d? kh�i ph?c d? li?u t? backup.';
+                return 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m th?y psql trong runtime hi?n t?i. Image production c?n cÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ PostgreSQL client d? khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½i ph?c d? li?u t? backup.';
             }
 
             if ($errorCode === 'POSTGRES_DUMP_FAILED') {
-                return 'T?o PostgreSQL dump th?t b?i. H�y ki?m tra pg_dump, k?t n?i PostgreSQL v� quy?n truy c?p database backup.';
+                return 'T?o PostgreSQL dump th?t b?i. HÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y ki?m tra pg_dump, k?t n?i PostgreSQL vÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ quy?n truy c?p database backup.';
             }
 
             if ($errorCode === 'EXPORT_TARGET_INVALID') {
-                return 'Kh�ng suy ra du?c d�ch exports t? c?u h�nh repository hi?n t?i. H�y ki?m tra SPNC_BACKUP_REPOSITORY v� SPNC_BACKUP_EXPORT_TARGET.';
+                return 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng suy ra du?c dÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ch exports t? c?u hÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh repository hi?n t?i. HÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y ki?m tra SPNC_BACKUP_REPOSITORY vÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ SPNC_BACKUP_EXPORT_TARGET.';
             }
 
             if ($errorCode === 'RUN_TIMEOUT') {
@@ -1356,18 +1356,18 @@ class AdminBackupController extends Controller
                     return $fallbackMessage;
                 }
                 return match ($operation) {
-                    'snapshot_refresh' => '�?ng b? danh s�ch b? qu� th?i gian. Vui l�ng th? l?i.',
-                    'forget' => 'Ti?n tr�nh x�a b?n sao luu b? qu� th?i gian. Vui l�ng th? l?i.',
-                    'prune' => 'Ti?n tr�nh d?n b?n sao luu cu b? qu� th?i gian. Vui l�ng th? l?i.',
-                    'backup' => 'Ti?n tr�nh sao luu b? qu� th?i gian. Vui l�ng th? l?i.',
-                    'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
-                    'restore' => 'Ti?n tr�nh kh�i ph?c b? qu� th?i gian. Vui l�ng th? l?i.',
-                    default => 'Ti?n tr�nh x? l� b? qu� th?i gian. Vui l�ng th? l?i.',
+                    'snapshot_refresh' => 'Đồng bộ danh sách bị quá thời gian. Vui lòng thử lại.',
+                    'forget' => 'Ti?n trÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a b?n sao luu b? quÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ th?i gian. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                    'prune' => 'Ti?n trÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh d?n b?n sao luu cu b? quÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ th?i gian. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                    'backup' => 'Ti?n trÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh sao luu b? quÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ th?i gian. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                    'backup_postprocess' => 'Snapshot dÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ sao luu an toÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n, nhung readable export v?n dang x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ? n?n. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng d?i hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t r?i m?i xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a snapshot.',
+                    'restore' => 'Ti?n trÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½i ph?c b? quÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ th?i gian. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                    default => 'Ti?n trÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ b? quÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ th?i gian. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
                 };
             }
 
             if ($errorCode === 'SNAPSHOT_NOT_FOUND') {
-                return 'Kh�ng t�m th?y b?n sao luu. Vui l�ng t?i l?i danh s�ch.';
+                return 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m th?y b?n sao luu. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng t?i l?i danh sÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ch.';
             }
 
             if ($fallbackMessage !== '' && ! $this->isTechnicalMessage($fallbackMessage)) {
@@ -1375,14 +1375,14 @@ class AdminBackupController extends Controller
             }
 
             return match ($operation) {
-                'backup' => 'Kh�ng th? sao luu d? li?u. Vui l�ng th? l?i.',
-                'backup_postprocess' => 'Snapshot d� sao luu an to�n, nhung readable export v?n dang x? l� ? n?n. Vui l�ng d?i ho�n t?t r?i m?i x�a snapshot.',
-                'backup_check' => 'Kh�ng th? ki?m tra repository backup. Vui l�ng th? l?i.',
-                'prune' => 'Kh�ng th? d?n b?n sao luu cu. Vui l�ng th? l?i.',
-                'forget' => 'Kh�ng th? x�a b?n sao luu. Vui l�ng th? l?i.',
-                'restore' => 'Kh�ng th? kh�i ph?c d? li?u. Vui l�ng th? l?i.',
-                'snapshot_refresh' => 'Kh�ng th? d?ng b? danh s�ch b?n sao luu. Vui l�ng th? l?i.',
-                default => 'Kh�ng th? x? l� y�u c?u. Vui l�ng th? l?i.',
+                'backup' => 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? sao luu d? li?u. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                'backup_postprocess' => 'Snapshot dÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ sao luu an toÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n, nhung readable export v?n dang x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ? n?n. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng d?i hoÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½n t?t r?i m?i xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a snapshot.',
+                'backup_check' => 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? ki?m tra repository backup. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                'prune' => 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? d?n b?n sao luu cu. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                'forget' => 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? xÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½a b?n sao luu. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                'restore' => 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½i ph?c d? li?u. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
+                'snapshot_refresh' => 'Không thể đồng bộ danh sách bản sao lưu. Vui lòng thử lại.',
+                default => 'KhÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ yÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½u c?u. Vui lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng th? l?i.',
             };
         }
 
@@ -1390,7 +1390,7 @@ class AdminBackupController extends Controller
             return $fallbackMessage;
         }
 
-        return 'H? th?ng dang x? l�...';
+        return 'H? th?ng dang x? lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½...';
     }
 
     private function detectErrorCode(string $rawMessage, string $rawError): ?string
@@ -1422,7 +1422,7 @@ class AdminBackupController extends Controller
             'failed to start process',
             'no such file or directory',
             'executable not found',
-            'kh�ng t�m th?y',
+            'khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m th?y',
             'khong tim thay',
         ])) {
             return 'PG_DUMP_BINARY_INVALID';
@@ -1434,7 +1434,7 @@ class AdminBackupController extends Controller
             'failed to start process',
             'no such file or directory',
             'executable not found',
-            'kh�ng t�m th?y',
+            'khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m th?y',
             'khong tim thay',
         ])) {
             return 'PSQL_BINARY_INVALID';
@@ -1450,7 +1450,7 @@ class AdminBackupController extends Controller
 
         if (
             Str::contains($combined, [
-                'kh�ng t�m th?y snapshot',
+                'khÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ng tÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m th?y snapshot',
                 'khong tim thay snapshot',
                 'snapshot not found',
             ])
@@ -1483,7 +1483,7 @@ private function containsLockHint(string $normalized): bool
             'repository is already locked',
             'already locked by pid',
             'the `unlock` command',
-            'đang bị khóa',
+            'ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ang bÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³a',
             'dang bi khoa',
             'stale lock',
         ]);
@@ -1495,7 +1495,7 @@ private function containsLockHint(string $normalized): bool
             'timed out',
             'timeout',
             'exceeded the timeout',
-            'quá thời gian',
+            'quÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Âi gian',
             'qua thoi gian',
         ]);
     }
@@ -1519,7 +1519,7 @@ private function containsLockHint(string $normalized): bool
             'rclone.conf',
             'config file not found',
             'failed to load config file',
-            'không đọc được tệp cấu hình rclone',
+            'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Âc ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£c tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡p cÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥u hÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬nh rclone',
             'khong doc duoc tep cau hinh rclone',
         ]);
     }
@@ -1531,7 +1531,7 @@ private function containsLockHint(string $normalized): bool
             'the system cannot find the file specified',
             'not recognized as an internal or external command',
             'executable not found',
-            'không thể chạy rclone',
+            'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y rclone',
             'khong the chay rclone',
         ]);
     }
@@ -1564,7 +1564,7 @@ private function containsLockHint(string $normalized): bool
     {
         return Str::contains($normalized, [
             'khong tim thay restic binary',
-            'không tìm thấy restic binary',
+            'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y restic binary',
             'restic binary',
             'spnc_backup_restic_binary',
         ]);
@@ -1574,7 +1574,7 @@ private function containsLockHint(string $normalized): bool
     {
         return Str::contains($normalized, [
             'khong suy ra duoc dich export',
-            'không suy ra được đích export',
+            'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng suy ra ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°ÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£c ÃƒÆ’Ã¢â‚¬Å¾ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ch export',
             'spnc_backup_export_target',
             'spnc_backup_repository dang o dang rclone nhung khong chua remote hop le',
             'remote/path',
@@ -1615,23 +1615,23 @@ private function containsLockHint(string $normalized): bool
 
         if ($exception instanceof BackupRuntimeException) {
             if (
-                str_contains($normalizedMessage, 'mã snapshot không hợp lệ')
+                str_contains($normalizedMessage, 'mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ snapshot khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡')
                 || str_contains($normalizedMessage, 'ma snapshot khong hop le')
             ) {
                 $status = Response::HTTP_UNPROCESSABLE_ENTITY;
-                $message = 'Mã snapshot không hợp lệ.';
+                $message = 'MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£ snapshot khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng hÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€šÃ‚Â£p lÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡.';
             } elseif (
-                str_contains($normalizedMessage, 'không tìm thấy snapshot')
+                str_contains($normalizedMessage, 'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y snapshot')
                 || str_contains($normalizedMessage, 'khong tim thay snapshot')
-                || str_contains($normalizedMessage, 'không tìm thấy manifest')
+                || str_contains($normalizedMessage, 'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y manifest')
                 || str_contains($normalizedMessage, 'khong tim thay manifest')
-                || str_contains($normalizedMessage, 'không tìm thấy db dump')
+                || str_contains($normalizedMessage, 'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y db dump')
                 || str_contains($normalizedMessage, 'khong tim thay db dump')
-                || str_contains($normalizedMessage, 'snapshot chưa có export')
+                || str_contains($normalizedMessage, 'snapshot chÃƒÆ’Ã¢â‚¬Â Ãƒâ€šÃ‚Â°a cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³ export')
                 || str_contains($normalizedMessage, 'snapshot chua co export')
-                || str_contains($normalizedMessage, 'không tìm thấy tệp export')
+                || str_contains($normalizedMessage, 'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡p export')
                 || str_contains($normalizedMessage, 'khong tim thay tep export')
-                || str_contains($normalizedMessage, 'không tìm thấy tệp')
+                || str_contains($normalizedMessage, 'khÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¥y tÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡p')
                 || str_contains($normalizedMessage, 'khong tim thay tep')
             ) {
                 $status = Response::HTTP_NOT_FOUND;
@@ -1719,7 +1719,7 @@ private function containsLockHint(string $normalized): bool
                 'error_message' => $exception->getMessage(),
                 'error_code' => $errorCode,
             ]);
-            $this->stateStore->appendLog($runId, 'Không thể khởi chạy refresh snapshot: ' . $exception->getMessage(), 'error');
+            $this->stateStore->appendLog($runId, 'KhÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´ng thÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€ Ã¢â‚¬â„¢ khÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚Â»Ãƒâ€¦Ã‚Â¸i chÃƒÆ’Ã‚Â¡Ãƒâ€šÃ‚ÂºÃƒâ€šÃ‚Â¡y refresh snapshot: ' . $exception->getMessage(), 'error');
 
             Log::warning('backup.snapshot_refresh_launch_failed', [
                 'run_id' => $runId,
