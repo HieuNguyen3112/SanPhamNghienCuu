@@ -39,6 +39,7 @@ export const declarationRoutes: RouteRecordRaw[] = [
   },
   {
     path: "declarations/participatier",
+    alias: ["declarations/participation"],
     name: "declarations.participatier",
     component: ParticipationNotificationListPage,
     meta: { roles: ["LECTURER"] },

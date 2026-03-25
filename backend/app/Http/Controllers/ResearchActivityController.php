@@ -951,10 +951,21 @@ class ResearchActivityController extends Controller
         foreach ($pendingRows as $row) {
             $inviteeUserId = DB::table('lecturers')->where('id', $row->lecturer_id)->value('user_id');
             if (! $inviteeUserId) {
+                Log::warning('participation.submit.invitation_skipped_missing_lecturer_user', [
+                    'activity_id' => (int) $activity,
+                    'member_id' => (int) $row->id,
+                    'lecturer_id' => (int) $row->lecturer_id,
+                ]);
                 continue;
             }
             $invitee = User::find($inviteeUserId);
             if (! $invitee) {
+                Log::warning('participation.submit.invitation_skipped_user_not_found', [
+                    'activity_id' => (int) $activity,
+                    'member_id' => (int) $row->id,
+                    'lecturer_id' => (int) $row->lecturer_id,
+                    'user_id' => (int) $inviteeUserId,
+                ]);
                 continue;
             }
             $roleName = $roleNames[$row->member_role_id] ?? null;
@@ -966,7 +977,7 @@ class ResearchActivityController extends Controller
                 'activity_id' => (int) $activity,
                 'invitation_id' => (int) $row->id,
                 'role_name' => $roleName,
-                'action_route' => '/declarations/participatier',
+                'action_route' => '/declarations/participation',
             ]));
         }
         if (! $hasPending) {
@@ -2297,12 +2308,12 @@ class ResearchActivityController extends Controller
 
         $invitee->notify(new ParticipationInvitationNotification([
             'event_key' => 'participation_invitation',
-            'title' => 'Loi moi tham gia cong trinh',
-            'message' => trim('Ban duoc moi tham gia cong trinh ' . ($activity->title ?? '') . (($activity->owner_name ?? '') ? (' boi ' . $activity->owner_name) : '') . '.'),
+            'title' => 'Lời mời tham gia công trình',
+            'message' => trim('Bạn được mời tham gia công trình ' . ($activity->title ?? '') . (($activity->owner_name ?? '') ? (' bởi ' . $activity->owner_name) : '') . '.'),
             'activity_id' => $activityId,
             'invitation_id' => isset($member['id']) ? (int) $member['id'] : null,
             'role_name' => $member['member_role_name'] ?? null,
-            'action_route' => '/declarations/participatier',
+            'action_route' => '/declarations/participation',
         ]));
     }
 

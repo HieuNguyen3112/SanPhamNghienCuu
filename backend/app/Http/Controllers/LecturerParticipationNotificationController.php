@@ -25,12 +25,13 @@ class LecturerParticipationNotificationController extends Controller
     private const ACT_PENDING_MEMBER_CONFIRM = 'pending_member_confirm';
     private const ACT_MEMBER_REJECTED = 'member_rejected';
     private const ACT_PENDING_FACULTY_REVIEW = 'pending_faculty_review';
+    private const PARTICIPATION_PAGE_ROUTE = '/declarations/participation';
 
     public function index(ParticipationNotificationIndexRequest $request)
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return $this->lecturerMappingMissingResponse($request);
         }
 
         $filters = $this->normalizeFilters($request->validated());
@@ -83,7 +84,7 @@ class LecturerParticipationNotificationController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return $this->lecturerMappingMissingResponse($request);
         }
 
         $row = $this->baseQuery($lecturer->id)
@@ -91,7 +92,11 @@ class LecturerParticipationNotificationController extends Controller
             ->first();
 
         if (! $row) {
-            return response()->json(['message' => 'request not found'], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse(
+                'Không tìm thấy yêu cầu xác nhận dành cho giảng viên hiện tại.',
+                'PARTICIPATION_REQUEST_NOT_FOUND',
+                Response::HTTP_NOT_FOUND
+            );
         }
 
         return response()->json([
@@ -105,7 +110,7 @@ class LecturerParticipationNotificationController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return $this->lecturerMappingMissingResponse($request);
         }
 
         $now = now();
@@ -119,12 +124,20 @@ class LecturerParticipationNotificationController extends Controller
                 ->first();
 
             if (! $member) {
-                return ['error' => 'request not found', 'status' => Response::HTTP_NOT_FOUND];
+                return $this->errorPayload(
+                    'Không tìm thấy yêu cầu xác nhận dành cho giảng viên hiện tại.',
+                    'PARTICIPATION_REQUEST_NOT_FOUND',
+                    Response::HTTP_NOT_FOUND
+                );
             }
 
             $currentStatus = $this->normalizeStatus($member->confirmation_status ?? null);
             if ($currentStatus !== self::STATUS_PENDING) {
-                return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
+                return $this->errorPayload(
+                    'Yêu cầu này đã được xử lý trước đó và không còn ở trạng thái chờ xác nhận.',
+                    'PARTICIPATION_REQUEST_ALREADY_HANDLED',
+                    Response::HTTP_CONFLICT
+                );
             }
 
             $activityStatus = DB::table('research_activities as ra')
@@ -132,7 +145,11 @@ class LecturerParticipationNotificationController extends Controller
                 ->where('ra.id', $member->activity_id)
                 ->value('ast.code');
             if ($this->normalizeStatus($activityStatus) !== self::ACT_PENDING_MEMBER_CONFIRM) {
-                return ['error' => 'activity is not waiting member confirmations', 'status' => Response::HTTP_CONFLICT];
+                return $this->errorPayload(
+                    'Công trình không còn ở trạng thái chờ thành viên xác nhận nên không thể phản hồi yêu cầu này.',
+                    'ACTIVITY_NOT_WAITING_MEMBER_CONFIRMATIONS',
+                    Response::HTTP_CONFLICT
+                );
             }
 
             $updated = DB::table('research_activity_members')
@@ -146,7 +163,11 @@ class LecturerParticipationNotificationController extends Controller
                 ]);
 
             if ($updated < 1) {
-                return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
+                return $this->errorPayload(
+                    'Yêu cầu này đã được xử lý trước đó và không còn ở trạng thái chờ xác nhận.',
+                    'PARTICIPATION_REQUEST_ALREADY_HANDLED',
+                    Response::HTTP_CONFLICT
+                );
             }
 
             $this->markInvitationNotificationAsRead($request, $requestId);
@@ -164,6 +185,12 @@ class LecturerParticipationNotificationController extends Controller
             $facultyNotification = null;
             try {
                 $facultyNotification = $this->tryAutoSendToFaculty((int) $member->activity_id, $now, $actorUserId);
+            } catch (\RuntimeException $e) {
+                return $this->errorPayload(
+                    $e->getMessage(),
+                    'ACTIVITY_STATUS_NOT_CONFIGURED',
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
             } catch (\Throwable $e) {
                 Log::warning('participation.confirm.auto_send_faculty_failed', [
                     'request_id' => $requestId,
@@ -194,7 +221,11 @@ class LecturerParticipationNotificationController extends Controller
         });
 
         if (isset($result['error'])) {
-            return response()->json(['message' => $result['error']], $result['status']);
+            return $this->errorResponse(
+                $result['error'],
+                $result['error_code'] ?? 'PARTICIPATION_CONFIRM_FAILED',
+                $result['status']
+            );
         }
 
         $facultyNotification = $result['faculty_notification'] ?? null;
@@ -230,7 +261,7 @@ class LecturerParticipationNotificationController extends Controller
     {
         $lecturer = $this->resolveLecturer($request);
         if (! $lecturer) {
-            return response()->json(['message' => 'lecturer not found'], Response::HTTP_NOT_FOUND);
+            return $this->lecturerMappingMissingResponse($request);
         }
 
         $reason = $request->validated()['reason'];
@@ -243,12 +274,20 @@ class LecturerParticipationNotificationController extends Controller
                 ->first();
 
             if (! $member) {
-                return ['error' => 'request not found', 'status' => Response::HTTP_NOT_FOUND];
+                return $this->errorPayload(
+                    'Không tìm thấy yêu cầu xác nhận dành cho giảng viên hiện tại.',
+                    'PARTICIPATION_REQUEST_NOT_FOUND',
+                    Response::HTTP_NOT_FOUND
+                );
             }
 
             $currentStatus = $this->normalizeStatus($member->confirmation_status ?? null);
             if ($currentStatus !== self::STATUS_PENDING) {
-                return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
+                return $this->errorPayload(
+                    'Yêu cầu này đã được xử lý trước đó và không còn ở trạng thái chờ xác nhận.',
+                    'PARTICIPATION_REQUEST_ALREADY_HANDLED',
+                    Response::HTTP_CONFLICT
+                );
             }
 
             $activityStatus = DB::table('research_activities as ra')
@@ -256,7 +295,11 @@ class LecturerParticipationNotificationController extends Controller
                 ->where('ra.id', $member->activity_id)
                 ->value('ast.code');
             if ($this->normalizeStatus($activityStatus) !== self::ACT_PENDING_MEMBER_CONFIRM) {
-                return ['error' => 'activity is not waiting member confirmations', 'status' => Response::HTTP_CONFLICT];
+                return $this->errorPayload(
+                    'Công trình không còn ở trạng thái chờ thành viên xác nhận nên không thể phản hồi yêu cầu này.',
+                    'ACTIVITY_NOT_WAITING_MEMBER_CONFIRMATIONS',
+                    Response::HTTP_CONFLICT
+                );
             }
 
             $updated = DB::table('research_activity_members')
@@ -270,17 +313,29 @@ class LecturerParticipationNotificationController extends Controller
                 ]);
 
             if ($updated < 1) {
-                return ['error' => 'request already handled', 'status' => Response::HTTP_CONFLICT];
+                return $this->errorPayload(
+                    'Yêu cầu này đã được xử lý trước đó và không còn ở trạng thái chờ xác nhận.',
+                    'PARTICIPATION_REQUEST_ALREADY_HANDLED',
+                    Response::HTTP_CONFLICT
+                );
             }
 
             $this->markInvitationNotificationAsRead($request, $requestId);
 
-            $this->markActivityMemberRejected(
-                (int) $member->activity_id,
-                $now,
-                (int) $request->user()->id,
-                'member_rejected_by_invitee'
-            );
+            try {
+                $this->markActivityMemberRejected(
+                    (int) $member->activity_id,
+                    $now,
+                    (int) $request->user()->id,
+                    'member_rejected_by_invitee'
+                );
+            } catch (\RuntimeException $e) {
+                return $this->errorPayload(
+                    $e->getMessage(),
+                    'ACTIVITY_STATUS_NOT_CONFIGURED',
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
+            }
             $this->notifyOwnerOnReject((int) $member->activity_id, (string) ($lecturer->full_name ?? ''), (int) $requestId, $reason);
 
             AuditLogger::log($request, [
@@ -303,7 +358,11 @@ class LecturerParticipationNotificationController extends Controller
         });
 
         if (isset($result['error'])) {
-            return response()->json(['message' => $result['error']], $result['status']);
+            return $this->errorResponse(
+                $result['error'],
+                $result['error_code'] ?? 'PARTICIPATION_REJECT_FAILED',
+                $result['status']
+            );
         }
 
         return $this->show($request, $requestId);
@@ -312,9 +371,6 @@ class LecturerParticipationNotificationController extends Controller
     private function tryAutoSendToFaculty(int $activityId, $now, int $actedByUserId): ?array
     {
         $pendingFacultyId = $this->getStatusId(self::ACT_PENDING_FACULTY_REVIEW);
-        if (! $pendingFacultyId) {
-            return null;
-        }
 
         $activity = DB::table('research_activities as ra')
             ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
@@ -362,6 +418,10 @@ class LecturerParticipationNotificationController extends Controller
             return null;
         }
 
+        if (! $pendingFacultyId) {
+            throw new \RuntimeException('Thiếu trạng thái workflow bắt buộc "pending_faculty_review". Vui lòng kiểm tra dữ liệu activity_statuses.');
+        }
+
         DB::table('research_activities')
             ->where('id', $activityId)
             ->update([
@@ -399,7 +459,7 @@ class LecturerParticipationNotificationController extends Controller
     {
         $memberRejectedId = $this->getStatusId(self::ACT_MEMBER_REJECTED);
         if (! $memberRejectedId) {
-            return;
+            throw new \RuntimeException('Thiếu trạng thái workflow bắt buộc "member_rejected". Vui lòng kiểm tra dữ liệu activity_statuses.');
         }
 
         $activity = DB::table('research_activities as ra')
@@ -464,6 +524,39 @@ class LecturerParticipationNotificationController extends Controller
     {
         $user = $request->user();
         return $user?->lecturer;
+    }
+
+    private function lecturerMappingMissingResponse(Request $request)
+    {
+        $user = $request->user();
+        Log::warning('participation.lecturer_mapping_missing', [
+            'user_id' => $user?->id,
+            'email' => $user?->email,
+        ]);
+
+        return $this->errorResponse(
+            'Tài khoản hiện tại chưa được liên kết với hồ sơ giảng viên. Vui lòng liên hệ quản trị viên để cập nhật lecturers.user_id.',
+            'LECTURER_MAPPING_MISSING',
+            Response::HTTP_NOT_FOUND
+        );
+    }
+
+    private function errorPayload(string $message, string $code, int $status): array
+    {
+        return [
+            'error' => $message,
+            'error_code' => $code,
+            'status' => $status,
+        ];
+    }
+
+    private function errorResponse(string $message, string $code, int $status)
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+            'error_code' => $code,
+        ], $status);
     }
 
     private function normalizeFilters(array $validated): array
@@ -698,12 +791,29 @@ class LecturerParticipationNotificationController extends Controller
             ->select(['ra.title', 'u.id as owner_user_id'])
             ->first();
 
-        if (! $activity || ! $activity->owner_user_id) {
+        if (! $activity) {
+            Log::warning('participation.accept.owner_notification_skipped_missing_activity', [
+                'activity_id' => $activityId,
+                'member_id' => $memberId,
+            ]);
+            return;
+        }
+
+        if (! $activity->owner_user_id) {
+            Log::warning('participation.accept.owner_notification_skipped_missing_owner_user', [
+                'activity_id' => $activityId,
+                'member_id' => $memberId,
+            ]);
             return;
         }
 
         $owner = User::find($activity->owner_user_id);
         if (! $owner) {
+            Log::warning('participation.accept.owner_notification_skipped_owner_user_not_found', [
+                'activity_id' => $activityId,
+                'member_id' => $memberId,
+                'owner_user_id' => $activity->owner_user_id,
+            ]);
             return;
         }
 
@@ -713,7 +823,7 @@ class LecturerParticipationNotificationController extends Controller
             'message' => trim(($inviteeName ?: 'Một giảng viên') . ' đã xác nhận tham gia công trình ' . ($activity->title ?? '') . '.'),
             'activity_id' => $activityId,
             'invitation_id' => $memberId,
-            'action_route' => '/declarations/participatier',
+            'action_route' => self::PARTICIPATION_PAGE_ROUTE,
         ]));
     }
 
@@ -726,12 +836,29 @@ class LecturerParticipationNotificationController extends Controller
             ->select(['ra.title', 'u.id as owner_user_id'])
             ->first();
 
-        if (! $activity || ! $activity->owner_user_id) {
+        if (! $activity) {
+            Log::warning('participation.reject.owner_notification_skipped_missing_activity', [
+                'activity_id' => $activityId,
+                'member_id' => $memberId,
+            ]);
+            return;
+        }
+
+        if (! $activity->owner_user_id) {
+            Log::warning('participation.reject.owner_notification_skipped_missing_owner_user', [
+                'activity_id' => $activityId,
+                'member_id' => $memberId,
+            ]);
             return;
         }
 
         $owner = User::find($activity->owner_user_id);
         if (! $owner) {
+            Log::warning('participation.reject.owner_notification_skipped_owner_user_not_found', [
+                'activity_id' => $activityId,
+                'member_id' => $memberId,
+                'owner_user_id' => $activity->owner_user_id,
+            ]);
             return;
         }
 
@@ -742,7 +869,7 @@ class LecturerParticipationNotificationController extends Controller
             'activity_id' => $activityId,
             'invitation_id' => $memberId,
             'reason' => $reason,
-            'action_route' => '/declarations/participatier',
+            'action_route' => self::PARTICIPATION_PAGE_ROUTE,
         ]));
     }
 

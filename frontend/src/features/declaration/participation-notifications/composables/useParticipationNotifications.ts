@@ -82,6 +82,15 @@ export function useParticipationNotifications() {
     return typeof status === "number" ? status : null;
   }
 
+  function getApiErrorCode(error: unknown): string | null {
+    if (!error || typeof error !== "object") return null;
+    const maybeResponse = (
+      error as { response?: { data?: { error_code?: unknown } } }
+    ).response;
+    const code = maybeResponse?.data?.error_code;
+    return typeof code === "string" && code.trim() ? code.trim() : null;
+  }
+
   async function refreshSelectionState(): Promise<void> {
     await loadList({ withFeedback: false });
     if (selectedId.value != null && detailOpen.value) {
@@ -105,7 +114,10 @@ export function useParticipationNotifications() {
       totalItems.value = 0;
       totalPages.value = 1;
       setNotification(
-        "Không thể tải danh sách yêu cầu xác nhận. Vui lòng thử lại.",
+        resolveApiErrorMessage(
+          error,
+          "Không thể tải danh sách yêu cầu xác nhận. Vui lòng thử lại.",
+        ),
       );
     } finally {
       loading.value = false;
@@ -144,7 +156,12 @@ export function useParticipationNotifications() {
     } catch (error) {
       console.error(error);
       selected.value = null;
-      setNotification("Không thể tải chi tiết yêu cầu. Vui lòng thử lại.");
+      setNotification(
+        resolveApiErrorMessage(
+          error,
+          "Không thể tải chi tiết yêu cầu. Vui lòng thử lại.",
+        ),
+      );
     } finally {
       loading.value = false;
     }
@@ -222,11 +239,21 @@ export function useParticipationNotifications() {
     } catch (error) {
       console.error(error);
       const httpStatus = getHttpStatusCode(error);
+      const errorCode = getApiErrorCode(error);
       if (httpStatus === 404 || httpStatus === 409 || httpStatus === 422) {
         setNotification(
-          "Yêu cầu không còn ở trạng thái chờ xác nhận. Dữ liệu đã được làm mới.",
+          resolveApiErrorMessage(
+            error,
+            "Yêu cầu không còn ở trạng thái chờ xác nhận. Dữ liệu đã được làm mới.",
+          ),
         );
-        await refreshSelectionState();
+        if (
+          errorCode === "PARTICIPATION_REQUEST_NOT_FOUND" ||
+          errorCode === "PARTICIPATION_REQUEST_ALREADY_HANDLED" ||
+          errorCode === "ACTIVITY_NOT_WAITING_MEMBER_CONFIRMATIONS"
+        ) {
+          await refreshSelectionState();
+        }
       }
     } finally {
       processingDecision.value = false;
@@ -287,11 +314,21 @@ export function useParticipationNotifications() {
     } catch (error) {
       console.error(error);
       const httpStatus = getHttpStatusCode(error);
+      const errorCode = getApiErrorCode(error);
       if (httpStatus === 404 || httpStatus === 409 || httpStatus === 422) {
         setNotification(
-          "Yêu cầu không còn ở trạng thái chờ xác nhận. Dữ liệu đã được làm mới.",
+          resolveApiErrorMessage(
+            error,
+            "Yêu cầu không còn ở trạng thái chờ xác nhận. Dữ liệu đã được làm mới.",
+          ),
         );
-        await refreshSelectionState();
+        if (
+          errorCode === "PARTICIPATION_REQUEST_NOT_FOUND" ||
+          errorCode === "PARTICIPATION_REQUEST_ALREADY_HANDLED" ||
+          errorCode === "ACTIVITY_NOT_WAITING_MEMBER_CONFIRMATIONS"
+        ) {
+          await refreshSelectionState();
+        }
       }
     } finally {
       processingDecision.value = false;

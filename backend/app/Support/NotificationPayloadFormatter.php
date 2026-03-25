@@ -107,9 +107,8 @@ class NotificationPayloadFormatter
             'hours_approved', 'hours_rejected', 'hours_warning' => '/hours/personal',
             'work_submitted_to_faculty' => '/works/facapprovals',
             'hours_submitted_to_faculty' => '/hours/facapprovals',
-            'participation_invitation', 'participation_accepted', 'participation_rejected' => '/declarations/participatier',
+            'participation_invitation', 'participation_accepted', 'participation_rejected' => '/declarations/participation',
             default => '/declarations/gateway',
         };
     }
 }
-
