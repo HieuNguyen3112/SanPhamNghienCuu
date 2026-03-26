@@ -9,6 +9,7 @@ import UniversityLogo from "@/features/auth/components/UniversityLogo.vue";
 import { useActionFeedback } from "@/shared/composables/useActionFeedback";
 import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 import { useUserStore, type UserRole } from "@/app/stores/userStore";
+import { resolvePostLoginLandingPath } from "@/app/router/roleTargets";
 import {
   resolveLoginErrorMessage,
   resolveLoginValidationMessage,
@@ -37,20 +38,7 @@ function resolveRedirectTarget() {
     return redirect;
   }
 
-  const nextRole = userStore.role ?? role.value;
-  if (nextRole === "LECTURER") {
-    return "/declarations/gateway";
-  }
-
-  if (nextRole === "DEPARTMENT_BOARD") {
-    return "/works/facapprovals";
-  }
-
-  if (nextRole === "SCIENCE_OFFICE") {
-    return "/works/uniapprovals";
-  }
-
-  return "/";
+  return resolvePostLoginLandingPath(userStore.role ?? role.value);
 }
 
 const handleSubmit = async () => {

@@ -65,9 +65,9 @@
 
           <div v-else class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <RouterLink
-              to="/profile"
+              :to="accountTargetPath"
               class="flex h-10 min-w-0 items-center justify-center gap-2 rounded-full bg-white/10 px-3 text-sm font-normal text-white hover:bg-white/15 focus:outline-none sm:justify-start"
-              title="Trang cá nhân"
+              :title="accountButtonTitle"
             >
               <span
                 class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-[#234a74]"
@@ -95,7 +95,10 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import { useUserStore } from "@/app/stores/userStore";
+import { resolvePublicAccountTargetPath } from "@/app/router/roleTargets";
 
 defineProps<{
   isAuthenticated: boolean;
@@ -109,6 +112,15 @@ defineEmits<{
 }>();
 
 const route = useRoute();
+const userStore = useUserStore();
+
+const accountTargetPath = computed(() =>
+  resolvePublicAccountTargetPath(userStore.role),
+);
+
+const accountButtonTitle = computed(() =>
+  userStore.role === "LECTURER" ? "Trang cá nhân" : "Khu vực làm việc",
+);
 
 function isActiveExact(path: string) {
   return route.path === path;

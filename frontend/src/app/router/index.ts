@@ -5,6 +5,7 @@ import {
 } from "vue-router";
 import { useUserStore } from "@/app/stores/userStore";
 import type { UserRole } from "@/app/stores/userStore";
+import { resolvePostLoginLandingPath } from "@/app/router/roleTargets";
 
 // Layouts
 import MainLayout from "@/layouts/MainLayout.vue";
@@ -165,19 +166,7 @@ router.beforeEach(async (to) => {
 
   // ✅ Luồng bạn muốn: bấm /login nếu đã login -> chuyển thẳng /profile
   if (isGuestOnly && isAuthenticated) {
-    if (userStore.role === "LECTURER") {
-      return { path: "/declarations/gateway", replace: true };
-    }
-
-    if (userStore.role === "DEPARTMENT_BOARD") {
-      return { path: "/works/facapprovals", replace: true };
-    }
-
-    if (userStore.role === "SCIENCE_OFFICE") {
-      return { path: "/works/uniapprovals", replace: true };
-    }
-
-    return { path: "/", replace: true };
+    return { path: resolvePostLoginLandingPath(userStore.role), replace: true };
   }
 
   if (requiresAuth && !isAuthenticated) {
