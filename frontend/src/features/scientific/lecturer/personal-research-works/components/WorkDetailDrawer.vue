@@ -119,11 +119,22 @@
                 </div>
 
                 <div
-                  v-if="work.statusCode === 'rejected' && work.rejectionNote"
+                  v-if="
+                    work.statusCode === 'rejected' &&
+                    lecturerRejectionReasonDisplay
+                  "
                   class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"
                 >
                   <div class="text-xs font-semibold">Lý do từ chối</div>
-                  <div class="mt-1">{{ work.rejectionNote }}</div>
+                  <div class="mt-1 font-medium">
+                    {{ lecturerRejectionReasonDisplay.label }}
+                  </div>
+                  <div
+                    v-if="lecturerRejectionReasonDisplay.detail"
+                    class="mt-1 whitespace-pre-line"
+                  >
+                    {{ lecturerRejectionReasonDisplay.detail }}
+                  </div>
                 </div>
 
                 <div
@@ -335,7 +346,7 @@
                     label="Từ chối"
                     :value="formatDateTime(rejectedActedAt)"
                     :actor-name="rejectedActorName"
-                    :note="work.rejectionNote"
+                    :note="lecturerRejectionReasonDisplay?.fullText ?? null"
                     status="rejected"
                   />
                 </div>
@@ -386,6 +397,7 @@ import TimelineItem from "@/features/scientific/lecturer/personal-research-works
 import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
 import { usePdfPreview } from "@/shared/composables/usePdfPreview";
 import { formatBackendDateTimeVi } from "@/shared/utils/backendDateTime";
+import { formatResearchWorkRejectionReason } from "@/features/scientific/shared/utils/researchWorkRejectionReason";
 
 const props = defineProps<{
   open: boolean;
@@ -482,6 +494,15 @@ const rejectedActorName = computed<string | null>(() => {
     }
   }
   return null;
+});
+
+const lecturerRejectionReasonDisplay = computed(() => {
+  const rejectionNote = props.work?.rejectionNote ?? null;
+  if (!rejectionNote) return null;
+
+  return formatResearchWorkRejectionReason({
+    rawNote: rejectionNote,
+  });
 });
 
 function badgeClass(statusCode: PersonalWorkStatusCode): string {

@@ -5,6 +5,10 @@ import type {
   ResearchWorkType,
 } from "../models/researchWorkApprovalModels";
 import { parseBackendDateTime } from "../../../shared/utils/backendDateTime";
+import {
+  getResearchWorkRejectionReasonLabel,
+  getResearchWorkRejectionReasonOptions,
+} from "@/features/scientific/shared/utils/researchWorkRejectionReason";
 
 export function useResearchWorkApprovalDisplayMapping(parameters: {
   approvalScopeIdentifier: ResearchWorkApprovalScopeIdentifier;
@@ -19,11 +23,11 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
       BOOK_CHAPTER: "Chương sách",
       STUDENT_SUPERVISION: "Hướng dẫn sinh viên",
     };
+
     return mapping[researchWorkType];
   }
 
   function getApprovalStatusOptionList(): { value: string; label: string }[] {
-    // WHY: Filter options phụ thuộc scope để tránh hiển thị trạng thái không thuộc phạm vi.
     if (parameters.approvalScopeIdentifier === "FACULTY_SCOPE") {
       return [
         { value: "ALL_APPROVAL_STATUSES", label: "Tất cả trạng thái" },
@@ -38,7 +42,10 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
 
     return [
       { value: "ALL_APPROVAL_STATUSES", label: "Tất cả trạng thái" },
-      { value: "PENDING_UNIVERSITY_APPROVAL", label: "Chờ duyệt cấp trường" },
+      {
+        value: "PENDING_UNIVERSITY_APPROVAL",
+        label: "Chờ duyệt cấp trường",
+      },
       {
         value: "APPROVED_BY_UNIVERSITY_FINALIZED_HOURS",
         label: "Đã chốt giờ (cấp trường)",
@@ -70,6 +77,7 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
       APPROVED_BY_UNIVERSITY_FINALIZED_HOURS: "Đã chốt giờ (cấp trường)",
       REJECTED_BY_UNIVERSITY_RETURNED_TO_FACULTY: "Đã trả về khoa",
     };
+
     return mapping[approvalStatus];
   }
 
@@ -93,6 +101,7 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
       REJECTED_BY_UNIVERSITY_RETURNED_TO_FACULTY:
         "inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-900",
     };
+
     return mapping[approvalStatus];
   }
 
@@ -100,43 +109,15 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
     value: ResearchWorkRejectionReasonType;
     label: string;
   }[] {
-    if (parameters.approvalScopeIdentifier === "FACULTY_SCOPE") {
-      return [
-        { value: "MISSING_EVIDENCE", label: "Thiếu minh chứng" },
-        { value: "INACCURATE_INFORMATION", label: "Thông tin chưa chính xác" },
-        { value: "OUTSIDE_FACULTY_SCOPE", label: "Không thuộc phạm vi khoa" },
-        { value: "OTHER", label: "Khác" },
-      ];
-    }
-
-    return [
-      { value: "WRONG_HOUR_CONVERSION", label: "Sai quy đổi giờ" },
-      { value: "EVIDENCE_NOT_QUALIFIED", label: "Minh chứng chưa đạt" },
-      {
-        value: "NOT_COMPLIANT_WITH_RESEARCH_POLICY",
-        label: "Không đúng quy định NCKH",
-      },
-      { value: "OTHER", label: "Khác" },
-    ];
+    return getResearchWorkRejectionReasonOptions(
+      parameters.approvalScopeIdentifier,
+    ) as { value: ResearchWorkRejectionReasonType; label: string }[];
   }
 
   function mapRejectionReasonToDisplayName(
     rejectionReasonType: ResearchWorkRejectionReasonType | null,
   ): string {
-    if (!rejectionReasonType) return "Không xác định";
-
-    const mapping: Record<ResearchWorkRejectionReasonType, string> = {
-      MISSING_EVIDENCE: "Thiếu minh chứng",
-      INACCURATE_INFORMATION: "Thông tin chưa chính xác",
-      OUTSIDE_FACULTY_SCOPE: "Không thuộc phạm vi khoa",
-
-      WRONG_HOUR_CONVERSION: "Sai quy đổi giờ",
-      EVIDENCE_NOT_QUALIFIED: "Minh chứng chưa đạt",
-      NOT_COMPLIANT_WITH_RESEARCH_POLICY: "Không đúng quy định NCKH",
-
-      OTHER: "Khác",
-    };
-    return mapping[rejectionReasonType];
+    return getResearchWorkRejectionReasonLabel(rejectionReasonType);
   }
 
   function formatIntegerValue(value: number): string {

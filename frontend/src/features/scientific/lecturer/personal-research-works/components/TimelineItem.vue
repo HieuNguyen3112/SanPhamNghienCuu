@@ -7,7 +7,7 @@
       <div v-if="actorName" class="mt-1 text-xs text-slate-700">
         Người xử lý: {{ actorName }}
       </div>
-      <div v-if="note" class="mt-1 text-xs text-slate-600">
+      <div v-if="note" class="mt-1 whitespace-pre-line text-xs text-slate-600">
         {{ note }}
       </div>
     </div>
