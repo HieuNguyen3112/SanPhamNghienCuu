@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\AdminLecturerHoursSummaryExport;
 use App\Support\AcademicYearResolver;
+use App\Support\LecturerHoursSummaryReportBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -130,8 +131,17 @@ class AdminLecturerHoursController extends Controller
     {
         $result = $this->summaryData($request, false);
         $filename = $this->buildExportFilename('xlsx');
+        $academicYearId = (int) ($result['filters']['academic_year_id'] ?? 0);
+        $exportRows = $this->buildSummaryReportRows(
+            $result['rows'],
+            $academicYearId,
+            $this->resolveHoursStageId()
+        );
 
-        return app('excel')->download(new AdminLecturerHoursSummaryExport($result['rows']), $filename);
+        return app('excel')->download(new AdminLecturerHoursSummaryExport($exportRows, [
+            'academic_year_code' => $result['rows'][0]['academic_year_code'] ?? $this->resolveAcademicYearCode($academicYearId),
+            'scope_label' => $this->resolveExportScopeLabel((int) ($result['filters']['faculty_id'] ?? 0)),
+        ]), $filename);
     }
 
     public function exportSummaryPdf(Request $request)
@@ -482,5 +492,68 @@ class AdminLecturerHoursController extends Controller
             'status' => $statusLabel,
             'keyword' => $filters['q'] ?: 'Tất cả',
         ];
+    }
+    private function buildSummaryReportRows(array $rows, int $academicYearId, ?int $hoursStageId): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        $lecturerIds = collect($rows)
+            ->pluck('lecturer_id')
+            ->filter(fn ($id) => (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if ($lecturerIds === [] || ! $hoursStageId || $academicYearId <= 0) {
+            return LecturerHoursSummaryReportBuilder::build($rows, []);
+        }
+
+        $activityRows = DB::table('activity_approvals as aa')
+            ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+            ->join('research_activity_members as ram', 'ram.activity_id', '=', 'ra.id')
+            ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('activity_types as at', 'ra.type_id', '=', 'at.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->where('aa.stage_id', $hoursStageId)
+            ->where('aa.status', 'approved')
+            ->where('ra.academic_year_id', $academicYearId)
+            ->whereIn('ram.lecturer_id', $lecturerIds)
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
+            ->select([
+                'ram.lecturer_id',
+                'ra.id as activity_id',
+                'ak.code as kind_code',
+                'at.code as type_code',
+                'mr.code as member_role_code',
+                'ram.hours_assigned',
+            ])
+            ->get()
+            ->map(static function ($row) {
+                return [
+                    'lecturer_id' => (int) $row->lecturer_id,
+                    'activity_id' => (int) $row->activity_id,
+                    'kind_code' => (string) ($row->kind_code ?? ''),
+                    'type_code' => (string) ($row->type_code ?? ''),
+                    'member_role_code' => $row->member_role_code ? (string) $row->member_role_code : null,
+                    'hours_assigned' => $row->hours_assigned !== null ? (float) $row->hours_assigned : 0.0,
+                ];
+            })
+            ->all();
+
+        return LecturerHoursSummaryReportBuilder::build($rows, $activityRows);
+    }
+
+    private function resolveExportScopeLabel(int $facultyId): string
+    {
+        if ($facultyId <= 0) {
+            return 'Toàn trường';
+        }
+
+        return (string) (DB::table('faculties')->where('id', $facultyId)->value('name') ?? 'Toàn trường');
     }
 }
