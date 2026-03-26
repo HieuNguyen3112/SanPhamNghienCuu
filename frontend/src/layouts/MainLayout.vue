@@ -99,13 +99,13 @@ const resolveRoleLandingTarget = (role: UserRole | null) => {
   }
 
   if (role === "SCIENCE_OFFICE") {
-    if (router.hasRoute("works.uniapprovals")) {
-      return { name: "works.uniapprovals" };
+    if (router.hasRoute("works.unimanagement")) {
+      return { name: "works.unimanagement" };
     }
     if (router.hasRoute("user.manager")) {
       return { name: "user.manager" };
     }
-    return { path: "/works/uniapprovals" };
+    return { path: "/works/unimanagement" };
   }
 
   return { path: "/" };

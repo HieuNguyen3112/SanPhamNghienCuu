@@ -50,7 +50,6 @@ export type AppRouteName =
   // SCIENCE_OFFICE — Công trình (toàn trường)
   // =========================
   | "works.unimanagement"
-  | "works.uniapprovals"
 
   // =========================
   // SCIENCE_OFFICE — Giờ NCKH (toàn trường)

@@ -7,7 +7,6 @@ import PersonalHoursOverviewPage from "@/features/scientific/lecturer/personal-h
 import FacultyLecturerResearchWorkManagementPage from "@/features/scientific/management/research-work-management/pages/FacultyLecturerResearchWorkManagementPage.vue";
 import UniversityLecturerResearchWorkManagementPage from "@/features/scientific/management/research-work-management/pages/UniversityLecturerResearchWorkManagementPage.vue";
 import FacultyResearchWorkApprovalPage from "@/features/scientific/management/research-work-approval/faculty/pages/FacultyResearchWorkApprovalPage.vue";
-import UniversityResearchWorkApprovalPage from "@/features/scientific/management/research-work-approval/university/pages/UniversityResearchWorkApprovalPage.vue";
 
 import FacultyLecturerHoursManagementPage from "@/features/scientific/management/lecturer-hours-management/pages/FacultyLecturerHoursManagementPage.vue";
 import UniversityLecturerHoursManagementPage from "@/features/scientific/management/lecturer-hours-management/pages/UniversityLecturerHoursManagementPage.vue";
@@ -77,11 +76,6 @@ export const researchWorksRoutes: RouteRecordRaw[] = [
   },
 
   // 3) QLKH TOÀN TRƯỜNG (University)
-  {
-    path: "works/uniapprovals",
-    name: "works.uniapprovals",
-    component: UniversityResearchWorkApprovalPage,
-  },
   {
     path: "works/unimanagement",
     name: "works.unimanagement",

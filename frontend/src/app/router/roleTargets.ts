@@ -12,7 +12,7 @@ export function resolvePostLoginLandingPath(
   }
 
   if (role === "SCIENCE_OFFICE") {
-    return "/works/uniapprovals";
+    return "/works/unimanagement";
   }
 
   return "/";
