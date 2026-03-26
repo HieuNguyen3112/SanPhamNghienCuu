@@ -23,28 +23,33 @@ export const researchWorksRoutes: RouteRecordRaw[] = [
     path: "works/personal",
     name: "works.personal",
     component: PersonalResearchWorksPage,
+    meta: { roles: ["LECTURER"] },
   },
 
   {
     path: "hours/personal",
     name: "hours.personal",
     component: PersonalHoursOverviewPage,
+    meta: { roles: ["LECTURER"] },
   },
 
   {
     path: "hours/personal_warnings",
     name: "hours.personal_warnings",
     component: LecturerHoursWarningPage,
+    meta: { roles: ["LECTURER"] },
   },
   {
     path: "hours/calculate",
     name: "hours.calculate",
     component: LecturerSelectApprovedWorksForHoursPage,
+    meta: { roles: ["LECTURER"] },
   },
   {
     path: "hours/calculate/evidence-missing",
     name: "hours.calculate.evidence_missing",
     component: LecturerEvidenceMissingHoursPage,
+    meta: { roles: ["LECTURER"] },
   },
 
   // 2) BCN KHOA (Faculty)
@@ -52,27 +57,32 @@ export const researchWorksRoutes: RouteRecordRaw[] = [
     path: "works/facapprovals",
     name: "works.facapprovals",
     component: FacultyResearchWorkApprovalPage,
+    meta: { roles: ["DEPARTMENT_BOARD"] },
   },
   {
     path: "works/facmanagement",
     name: "works.facmanagement",
     component: FacultyLecturerResearchWorkManagementPage,
+    meta: { roles: ["DEPARTMENT_BOARD"] },
   },
 
   {
     path: "hours/facmanagement",
     name: "hours.facmanagement",
     component: FacultyLecturerHoursManagementPage,
+    meta: { roles: ["DEPARTMENT_BOARD"] },
   },
   {
     path: "hours/facapprovals",
     name: "hours.facapprovals",
     component: FacultyHourApprovalPage,
+    meta: { roles: ["DEPARTMENT_BOARD"] },
   },
   {
     path: "hours/facwarning",
     name: "hours.facwarning",
     component: FacultyResearchHourWarningPage,
+    meta: { roles: ["DEPARTMENT_BOARD"] },
   },
 
   // 3) QLKH TOÀN TRƯỜNG (University)
@@ -80,21 +90,25 @@ export const researchWorksRoutes: RouteRecordRaw[] = [
     path: "works/unimanagement",
     name: "works.unimanagement",
     component: UniversityLecturerResearchWorkManagementPage,
+    meta: { roles: ["SCIENCE_OFFICE"] },
   },
 
   {
     path: "hours/unimanagement",
     name: "hours.unimanagement",
     component: UniversityLecturerHoursManagementPage,
+    meta: { roles: ["SCIENCE_OFFICE"] },
   },
   {
     path: "hours/uniapprovals",
     name: "hours.uniapprovals",
     component: UniversityHourApprovalPage,
+    meta: { roles: ["SCIENCE_OFFICE"] },
   },
   {
     path: "hours/uniwarning",
     name: "hours.uniwarning",
     component: UniversityResearchHourWarningPage,
+    meta: { roles: ["SCIENCE_OFFICE"] },
   },
 ];
