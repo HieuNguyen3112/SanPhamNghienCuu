@@ -148,12 +148,21 @@ class AdminLecturerHoursController extends Controller
     {
         $result = $this->summaryData($request, false);
         $filename = $this->buildExportFilename('pdf');
-        $filters = $this->buildFilterPayload($result['filters']);
+        $academicYearId = (int) ($result['filters']['academic_year_id'] ?? 0);
+        $exportRows = $this->buildSummaryReportRows(
+            $result['rows'],
+            $academicYearId,
+            $this->resolveHoursStageId()
+        );
+        $meta = [
+            'academic_year_code' => $result['rows'][0]['academic_year_code'] ?? $this->resolveAcademicYearCode($academicYearId),
+            'scope_label' => $this->resolveExportScopeLabel((int) ($result['filters']['faculty_id'] ?? 0)),
+        ];
 
         return app('dompdf.wrapper')->loadView('exports.admin_hours_summary', [
-            'rows' => $result['rows'],
-            'filters' => $filters,
-        ])->setPaper('A4', 'landscape')->download($filename);
+            'rows' => $exportRows,
+            'meta' => $meta,
+        ])->setPaper('A3', 'landscape')->download($filename);
     }
 
     private function summaryData(Request $request, bool $paginate): array

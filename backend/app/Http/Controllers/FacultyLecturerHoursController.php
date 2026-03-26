@@ -186,12 +186,21 @@ class FacultyLecturerHoursController extends Controller
 
         $result = $this->summaryData($validated, $scope, false);
         $filename = $this->buildExportFilename('pdf');
-        $filters = $this->buildFilterPayload($result['filters'], $scope['faculty_name'] ?? '');
+        $academicYearId = (int) ($result['filters']['academic_year_id'] ?? 0);
+        $exportRows = $this->buildSummaryReportRows(
+            $result['rows'],
+            $academicYearId,
+            $this->resolveHoursStageId()
+        );
+        $meta = [
+            'academic_year_code' => $result['rows'][0]['academic_year_code'] ?? $this->resolveAcademicYearCode($academicYearId),
+            'scope_label' => (string) ($scope['faculty_name'] ?? 'Toàn khoa'),
+        ];
 
         return Pdf::loadView('exports.admin_hours_summary', [
-            'rows' => $result['rows'],
-            'filters' => $filters,
-        ])->setPaper('A4', 'landscape')->download($filename);
+            'rows' => $exportRows,
+            'meta' => $meta,
+        ])->setPaper('A3', 'landscape')->download($filename);
     }
 
     private function summaryData(array $validated, array $scope, bool $paginate): array

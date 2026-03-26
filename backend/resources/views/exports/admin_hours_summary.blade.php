@@ -1,94 +1,136 @@
+@php
+    use App\Support\LecturerHoursSummaryReportLayout;
+
+    $groups = LecturerHoursSummaryReportLayout::groups();
+    $leafColumns = LecturerHoursSummaryReportLayout::leafColumns();
+    $title = LecturerHoursSummaryReportLayout::title();
+    $emptyMessage = LecturerHoursSummaryReportLayout::emptyStateMessage();
+@endphp
 <!doctype html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <style>
+      @page {
+        margin: 14px 18px;
+      }
+
       body {
         font-family: "DejaVu Sans", sans-serif;
-        font-size: 12px;
-        color: #111;
+        font-size: 8.5px;
+        color: #111827;
       }
-      h1 {
-        font-size: 16px;
+
+      .report-title {
+        text-align: center;
+        font-weight: 700;
+        font-size: 15px;
         margin: 0 0 6px 0;
       }
-      .filters {
-        font-size: 11px;
+
+      .report-meta {
         margin-bottom: 10px;
+        font-size: 9px;
       }
-      .filters div {
+
+      .report-meta div {
         margin-bottom: 2px;
       }
+
       table {
         width: 100%;
         border-collapse: collapse;
+        table-layout: fixed;
       }
+
       th,
       td {
-        border: 1px solid #333;
-        padding: 6px 8px;
+        border: 1px solid #374151;
+        padding: 4px 3px;
+        vertical-align: middle;
+        word-wrap: break-word;
       }
-      th {
-        background: #f0f0f0;
-        font-weight: bold;
+
+      thead th {
+        background: #d9eaf7;
         text-align: center;
+        font-weight: 700;
+        line-height: 1.25;
       }
-      td.text-left {
+
+      tbody td {
+        line-height: 1.2;
+      }
+
+      .text-left {
         text-align: left;
       }
-      td.text-right {
+
+      .text-center {
+        text-align: center;
+      }
+
+      .text-right {
         text-align: right;
       }
-      td.text-center {
-        text-align: center;
-      }
+
       .empty {
         text-align: center;
-        padding: 12px 8px;
+        padding: 10px 8px;
       }
     </style>
   </head>
   <body>
-    <h1>Quản lý giờ nghiên cứu khoa học theo giảng viên</h1>
-    <div class="filters">
-      <div><strong>Khoa:</strong> {{ $filters['faculty'] ?? 'Tất cả' }}</div>
-      <div><strong>Niên học:</strong> {{ $filters['academic_year'] ?? 'Tất cả' }}</div>
-      <div><strong>Trạng thái KPI:</strong> {{ $filters['status'] ?? 'Tất cả' }}</div>
-      <div><strong>Từ khóa:</strong> {{ $filters['keyword'] ?? 'Tất cả' }}</div>
+    <h1 class="report-title">{{ $title }}</h1>
+
+    <div class="report-meta">
+      <div><strong>Năm học:</strong> {{ $meta['academic_year_code'] ?? 'Tất cả' }}</div>
+      <div><strong>Phạm vi:</strong> {{ $meta['scope_label'] ?? 'Toàn trường' }}</div>
     </div>
 
     <table>
+      <colgroup>
+        <col style="width: 4%" />
+        <col style="width: 16%" />
+        @for ($i = 0; $i < count($leafColumns) - 2; $i++)
+          <col style="width: 4.44%" />
+        @endfor
+      </colgroup>
       <thead>
         <tr>
-          <th>Giảng viên</th>
-          <th>Khoa</th>
-          <th>Tổng giờ</th>
-          <th>Định mức</th>
-          <th>Chênh lệch</th>
-          <th>Trạng thái</th>
+          <th rowspan="2">TT</th>
+          <th rowspan="2">Họ và tên</th>
+          @foreach ($groups as $group)
+            <th colspan="{{ count($group['columns']) }}">{{ $group['label'] }}</th>
+          @endforeach
+        </tr>
+        <tr>
+          @foreach ($groups as $group)
+            @foreach ($group['columns'] as $column)
+              <th>{{ $column['label'] }}</th>
+            @endforeach
+          @endforeach
         </tr>
       </thead>
       <tbody>
         @forelse ($rows as $row)
+          @php
+            $values = LecturerHoursSummaryReportLayout::dataRow($row);
+          @endphp
           <tr>
-            <td class="text-left">
-              {{ trim(($row['lecturer_full_name'] ?? '') . ' (' . ($row['lecturer_code'] ?? '') . ')') }}
-            </td>
-            <td class="text-left">
-              {{ $row['faculty_name'] ?? $row['department_name'] ?? '' }}
-            </td>
-            <td class="text-right">{{ number_format((float) ($row['hours_total'] ?? 0), 0) }}</td>
-            <td class="text-right">{{ number_format((float) ($row['required_hours'] ?? 0), 0) }}</td>
-            <td class="text-right">
-              {{ number_format(((float) ($row['hours_total'] ?? 0)) - ((float) ($row['required_hours'] ?? 0)), 0) }}
-            </td>
-            <td class="text-center">
-              {{ ((float) ($row['hours_total'] ?? 0)) - ((float) ($row['required_hours'] ?? 0)) >= 0 ? 'Đạt' : 'Thiếu' }}
-            </td>
+            @foreach ($leafColumns as $index => $column)
+              @php
+                $isTextColumn = $column['format'] === 'text';
+                $alignmentClass = $isTextColumn ? 'text-left' : ($index === 0 ? 'text-center' : 'text-right');
+              @endphp
+              <td class="{{ $alignmentClass }}">
+                {{ LecturerHoursSummaryReportLayout::formatValue($values[$index] ?? null, $column['format']) }}
+              </td>
+            @endforeach
           </tr>
         @empty
           <tr>
-            <td class="empty" colspan="6">Không có dữ liệu</td>
+            <td class="empty" colspan="{{ count($leafColumns) }}">{{ $emptyMessage }}</td>
           </tr>
         @endforelse
       </tbody>
