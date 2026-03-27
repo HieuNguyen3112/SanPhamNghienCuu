@@ -18,10 +18,10 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
     private const YEAR_ROW = 2;
     private const SCOPE_ROW = 3;
     private const LEGEND_ROW = 4;
-    private const HEADER_ROW_1 = 6;
-    private const HEADER_ROW_2 = 7;
-    private const HEADER_ROW_3 = 8;
-    private const DATA_START_ROW = 9;
+    private const HEADER_ROW_1 = 5;
+    private const HEADER_ROW_2 = 6;
+    private const HEADER_ROW_3 = 7;
+    private const DATA_START_ROW = 8;
 
     public function __construct(
         private array $rows,
@@ -36,7 +36,6 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
             [LecturerHoursSummaryReportLayout::metaLine('Năm học', $this->meta['academic_year_code'] ?? null, 'Tất cả')],
             [LecturerHoursSummaryReportLayout::metaLine('Phạm vi', $this->meta['scope_label'] ?? null, 'Toàn trường')],
             [LecturerHoursSummaryReportLayout::valueLegend()],
-            [],
             LecturerHoursSummaryReportLayout::topHeaderRow(),
             LecturerHoursSummaryReportLayout::subHeaderRow(),
             LecturerHoursSummaryReportLayout::bottomHeaderRow(),
@@ -89,7 +88,7 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
                 $tableRange = sprintf('A%d:%s%d', self::HEADER_ROW_1, $lastColumn, max($highestRow, self::DATA_START_ROW));
                 $dataRange = sprintf('A%d:%s%d', self::DATA_START_ROW, $lastColumn, $highestRow);
 
-                $sheet->freezePane('C9');
+                $sheet->freezePane('C8');
                 $sheet->getStyle($fullRange)->getFont()->setName('Times New Roman')->setSize(10);
                 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
                 $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);

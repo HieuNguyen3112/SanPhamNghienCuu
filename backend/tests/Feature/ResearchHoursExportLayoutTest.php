@@ -81,12 +81,12 @@ class ResearchHoursExportLayoutTest extends TestCase
 
         $rows = $export->array();
 
-        $this->assertCount(9, $rows);
+        $this->assertCount(8, $rows);
+        $this->assertCount(16, $rows[4]);
         $this->assertCount(16, $rows[5]);
         $this->assertCount(16, $rows[6]);
-        $this->assertCount(16, $rows[7]);
-        $this->assertSame('1', $rows[8][0]);
-        $this->assertSame('ACC GIẢNG VIÊN DEMO', $rows[8][1]);
+        $this->assertSame('1', $rows[7][0]);
+        $this->assertSame('ACC GIẢNG VIÊN DEMO', $rows[7][1]);
     }
 
     public function test_pdf_view_renders_same_nested_header_tree(): void
