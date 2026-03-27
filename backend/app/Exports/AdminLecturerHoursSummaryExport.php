@@ -20,7 +20,8 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
     private const LEGEND_ROW = 4;
     private const HEADER_ROW_1 = 6;
     private const HEADER_ROW_2 = 7;
-    private const DATA_START_ROW = 8;
+    private const HEADER_ROW_3 = 8;
+    private const DATA_START_ROW = 9;
 
     public function __construct(
         private array $rows,
@@ -38,6 +39,7 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
             [],
             LecturerHoursSummaryReportLayout::topHeaderRow(),
             LecturerHoursSummaryReportLayout::subHeaderRow(),
+            LecturerHoursSummaryReportLayout::bottomHeaderRow(),
         ];
 
         foreach ($this->rows as $row) {
@@ -75,7 +77,7 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
                     $sheet->mergeCells(sprintf('A%d:%s%d', $rowNumber, $lastColumn, $rowNumber));
                 }
 
-                foreach (LecturerHoursSummaryReportLayout::headerMergeRanges(self::HEADER_ROW_1, self::HEADER_ROW_2) as $range) {
+                foreach (LecturerHoursSummaryReportLayout::headerMergeRanges(self::HEADER_ROW_1, self::HEADER_ROW_2, self::HEADER_ROW_3) as $range) {
                     $sheet->mergeCells($range);
                 }
 
@@ -87,7 +89,7 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
                 $tableRange = sprintf('A%d:%s%d', self::HEADER_ROW_1, $lastColumn, max($highestRow, self::DATA_START_ROW));
                 $dataRange = sprintf('A%d:%s%d', self::DATA_START_ROW, $lastColumn, $highestRow);
 
-                $sheet->freezePane('C8');
+                $sheet->freezePane('C9');
                 $sheet->getStyle($fullRange)->getFont()->setName('Times New Roman')->setSize(10);
                 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
                 $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -105,19 +107,9 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
                     ],
                 ]);
 
-                foreach (LecturerHoursSummaryReportLayout::headerGroupsByColumn() as $group) {
-                    $startColumn = $group['start_column'];
-                    $endColumn = $group['end_column'];
-
-                    if ($group['column_count'] === 1) {
-                        $sheet->getStyle(sprintf('%s%d:%s%d', $startColumn, self::HEADER_ROW_1, $endColumn, self::HEADER_ROW_2))
-                            ->applyFromArray($this->headerStyle($group['header_fill']));
-                    } else {
-                        $sheet->getStyle(sprintf('%s%d:%s%d', $startColumn, self::HEADER_ROW_1, $endColumn, self::HEADER_ROW_1))
-                            ->applyFromArray($this->headerStyle($group['header_fill']));
-                        $sheet->getStyle(sprintf('%s%d:%s%d', $startColumn, self::HEADER_ROW_2, $endColumn, self::HEADER_ROW_2))
-                            ->applyFromArray($this->subHeaderStyle($group['subheader_fill']));
-                    }
+                foreach (LecturerHoursSummaryReportLayout::headerStyleRanges(self::HEADER_ROW_1, self::HEADER_ROW_2, self::HEADER_ROW_3) as $styleRange) {
+                    $sheet->getStyle($styleRange['range'])
+                        ->applyFromArray($this->headerStyle($styleRange['fill'], $styleRange['font_size']));
                 }
 
                 if ($hasRows) {
@@ -167,7 +159,8 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
                 $sheet->getStyle($dataRange)->getAlignment()->setWrapText(true);
 
                 $sheet->getRowDimension(self::HEADER_ROW_1)->setRowHeight(34);
-                $sheet->getRowDimension(self::HEADER_ROW_2)->setRowHeight(38);
+                $sheet->getRowDimension(self::HEADER_ROW_2)->setRowHeight(30);
+                $sheet->getRowDimension(self::HEADER_ROW_3)->setRowHeight(34);
 
                 $sheet->getPageSetup()
                     ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
@@ -184,26 +177,10 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
         ];
     }
 
-    private function headerStyle(string $fill): array
+    private function headerStyle(string $fill, int $fontSize): array
     {
         return [
-            'font' => ['bold' => true],
-            'alignment' => [
-                'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER,
-                'wrapText' => true,
-            ],
-            'fill' => [
-                'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => $fill],
-            ],
-        ];
-    }
-
-    private function subHeaderStyle(string $fill): array
-    {
-        return [
-            'font' => ['bold' => true, 'size' => 9],
+            'font' => ['bold' => true, 'size' => $fontSize],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
                 'vertical' => Alignment::VERTICAL_CENTER,

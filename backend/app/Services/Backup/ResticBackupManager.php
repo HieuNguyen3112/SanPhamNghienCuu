@@ -453,6 +453,39 @@ class ResticBackupManager
         ];
     }
 
+    public function findExportMetadata(string $snapshotId): ?array
+    {
+        $this->assertValidSnapshotId($snapshotId);
+
+        return $this->resolveExportMetadata($snapshotId);
+    }
+
+    public function hydrateSnapshotExportMetadata(array $snapshot, ?string $runId = null): array
+    {
+        $snapshotId = trim((string) ($snapshot['snapshot_id'] ?? $snapshot['snapshot_id_full'] ?? ''));
+        if ($snapshotId === '') {
+            return $snapshot;
+        }
+
+        $metadata = $this->resolveExportMetadata($snapshotId);
+        if (! is_array($metadata) || ! (bool) ($metadata['available'] ?? false)) {
+            return $snapshot;
+        }
+
+        $patch = $this->snapshotPatchFromExportMetadata($metadata);
+        if ($patch === []) {
+            return $snapshot;
+        }
+
+        app(BackupSnapshotStore::class)->mergeBySnapshotId(
+            $snapshotId,
+            $patch,
+            $runId ?? trim((string) ($snapshot['run_id'] ?? '')) ?: null
+        );
+
+        return array_merge($snapshot, $patch);
+    }
+
     public function getSnapshotExportMetadata(string $snapshotId, ?array $snapshotHint = null): array
     {
         $this->assertValidSnapshotId($snapshotId);
@@ -1466,14 +1499,12 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                 'synced_to_drive' => false,
             ],
         ];
-
-        $sync = $this->syncExportToDestination($destination, $localRootAbsolute, $folderName);
         $payload = [
             'available' => true,
             'snapshot_id' => $snapshotId,
             'folder_name' => $folderName,
-            'export_path' => (string) ($sync['export_path'] ?? ''),
-            'drive_path' => (string) ($sync['drive_path'] ?? ''),
+            'export_path' => str_replace('\\', '/', $localRootAbsolute),
+            'drive_path' => null,
             'remote_bundle_path' => null,
             'bundle_filename' => self::EXPORT_BUNDLE_FILENAME,
             'local_root_relative_path' => $localRootRelative,
@@ -1486,8 +1517,28 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'visible_artifacts' => $metadata['visible_artifacts'],
             'technical_artifacts' => $metadata['technical_artifacts'],
             'stats' => $metadata['stats'],
+            'sync_status' => (bool) config('backup.exports.sync_to_drive', true) ? 'local_ready' : 'skipped',
+            'sync_error' => null,
         ];
 
+        $this->storeExportMetadata($snapshotId, $payload);
+        $this->reportPostProcessProgress(
+            $runId,
+            'syncing_export',
+            'Readable export cục bộ đã hoàn tất. Đang đồng bộ tới đích lưu trữ.'
+        );
+
+        $sync = $this->syncExportToDestination($destination, $localRootAbsolute, $folderName);
+        $payload['export_path'] = (string) ($sync['export_path'] ?? $payload['export_path']);
+        $payload['drive_path'] = (string) ($sync['drive_path'] ?? '');
+        $payload['sync_status'] = (string) ($sync['sync_status'] ?? 'success');
+        $payload['sync_error'] = $sync['sync_error'] ?? null;
+
+        $this->reportPostProcessProgress(
+            $runId,
+            'publishing_export_metadata',
+            'Readable export đã đồng bộ xong. Đang công bố metadata cuối cùng.'
+        );
         $this->storeExportMetadata($snapshotId, $payload);
 
         return $payload;
@@ -2603,6 +2654,8 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             return [
                 'export_path' => $localRootAbsolute,
                 'drive_path' => null,
+                'sync_status' => 'skipped',
+                'sync_error' => null,
             ];
         }
 
@@ -2629,6 +2682,8 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             return [
                 'export_path' => $remoteDir,
                 'drive_path' => 'rclone:' . $remoteDir,
+                'sync_status' => 'success',
+                'sync_error' => null,
             ];
         }
 
@@ -2657,12 +2712,16 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             return [
                 'export_path' => str_replace('\\', '/', $targetDir),
                 'drive_path' => str_replace('\\', '/', $targetDir),
+                'sync_status' => 'success',
+                'sync_error' => null,
             ];
         }
 
         return [
             'export_path' => $localRootAbsolute,
             'drive_path' => null,
+            'sync_status' => 'local_only',
+            'sync_error' => null,
         ];
     }
 
@@ -2809,6 +2868,13 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             }
         }
 
+        $recovered = $this->recoverExportMetadataFromLocalSnapshot($snapshotId);
+        if (is_array($recovered)) {
+            $this->storeExportMetadata($snapshotId, $recovered);
+
+            return $recovered;
+        }
+
         return null;
     }
 
@@ -2933,6 +2999,118 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         }
 
         return $safe . '-' . $suffix;
+    }
+
+    private function recoverExportMetadataFromLocalSnapshot(string $snapshotId): ?array
+    {
+        $localRootRelative = $this->exportRelativePath($snapshotId);
+        $localRootAbsolute = $this->basePathFromRelative($localRootRelative);
+        if (! File::isDirectory($localRootAbsolute)) {
+            return null;
+        }
+
+        $overviewAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_OVERVIEW_FILENAME;
+        $readmeAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_README_FILENAME;
+        $dbDumpAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, self::EXPORT_DATABASE_DIR . '/' . self::EXPORT_DB_DUMP_FILENAME);
+        $manifestAbsolute = $localRootAbsolute . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, self::EXPORT_SYSTEM_DIR . '/' . self::EXPORT_MANIFEST_FILENAME);
+
+        if (! File::exists($overviewAbsolute) || ! File::exists($readmeAbsolute) || ! File::exists($dbDumpAbsolute)) {
+            return null;
+        }
+
+        $overview = json_decode((string) File::get($overviewAbsolute), true);
+        if (! is_array($overview)) {
+            return null;
+        }
+
+        $folderName = trim((string) ($overview['folder_name'] ?? ''));
+        if ($folderName === '') {
+            $folderName = basename($localRootAbsolute);
+        }
+
+        $stats = [
+            'database_dump_gzip_bytes' => $this->resolveFileSize($dbDumpAbsolute),
+            'readable_exports' => [
+                'works_count' => (int) ($overview['totals']['cong_trinh'] ?? 0),
+                'lecturers_count' => (int) ($overview['totals']['giang_vien'] ?? 0),
+                'total_evidence_files' => (int) ($overview['totals']['minh_chung'] ?? 0),
+                'copied_evidence_files' => (int) ($overview['totals']['minh_chung_da_sao_chep'] ?? 0),
+                'metadata_only_evidence_files' => (int) ($overview['totals']['minh_chung_chi_co_metadata'] ?? 0),
+                'copied_evidence_bytes' => null,
+            ],
+        ];
+
+        return [
+            'available' => true,
+            'snapshot_id' => $snapshotId,
+            'folder_name' => $folderName,
+            'export_path' => str_replace('\\', '/', $localRootAbsolute),
+            'drive_path' => null,
+            'remote_bundle_path' => null,
+            'bundle_filename' => self::EXPORT_BUNDLE_FILENAME,
+            'local_root_relative_path' => $localRootRelative,
+            'local_bundle_relative_path' => null,
+            'generated_at' => (string) ($overview['created_at'] ?? null),
+            'artifacts' => array_values(array_filter([
+                self::EXPORT_README_FILENAME,
+                self::EXPORT_OVERVIEW_FILENAME,
+                self::EXPORT_DATABASE_DIR . '/' . self::EXPORT_DB_DUMP_FILENAME,
+                File::isDirectory($localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_WORKS_DIR) ? self::EXPORT_WORKS_DIR . '/' : null,
+                File::isDirectory($localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_LECTURERS_DIR) ? self::EXPORT_LECTURERS_DIR . '/' : null,
+                File::exists($manifestAbsolute) ? self::EXPORT_SYSTEM_DIR . '/' . self::EXPORT_MANIFEST_FILENAME : null,
+            ])),
+            'visible_artifacts' => array_values(array_filter([
+                self::EXPORT_README_FILENAME,
+                self::EXPORT_OVERVIEW_FILENAME,
+                self::EXPORT_DATABASE_DIR . '/' . self::EXPORT_DB_DUMP_FILENAME,
+                File::isDirectory($localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_WORKS_DIR) ? self::EXPORT_WORKS_DIR . '/' : null,
+                File::isDirectory($localRootAbsolute . DIRECTORY_SEPARATOR . self::EXPORT_LECTURERS_DIR) ? self::EXPORT_LECTURERS_DIR . '/' : null,
+            ])),
+            'technical_artifacts' => array_values(array_filter([
+                File::exists($manifestAbsolute) ? self::EXPORT_SYSTEM_DIR . '/' . self::EXPORT_MANIFEST_FILENAME : null,
+            ])),
+            'stats' => $stats,
+            'sync_status' => 'recovered_local',
+            'sync_error' => null,
+            'recovered_from_local' => true,
+        ];
+    }
+
+    private function snapshotPatchFromExportMetadata(array $metadata): array
+    {
+        return [
+            'export_available' => (bool) ($metadata['available'] ?? false),
+            'export_path' => $metadata['export_path'] ?? null,
+            'export_drive_path' => $metadata['drive_path'] ?? null,
+            'export_generated_at' => $metadata['generated_at'] ?? null,
+            'export_bundle_filename' => $metadata['bundle_filename'] ?? null,
+            'export_artifacts' => array_values((array) ($metadata['artifacts'] ?? [])),
+            'export_sync_status' => $metadata['sync_status'] ?? null,
+            'export_sync_error' => $metadata['sync_error'] ?? null,
+        ];
+    }
+
+    private function reportPostProcessProgress(string $runId, string $step, string $message): void
+    {
+        $runId = trim($runId);
+        if ($runId === '' || ! preg_match('/^[A-Za-z0-9\-_]{8,64}$/', $runId)) {
+            return;
+        }
+
+        try {
+            $stateStore = app(BackupRunStateStore::class);
+            $stateStore->update($runId, [
+                'status' => 'running',
+                'operation' => 'backup_postprocess',
+                'step' => $step,
+                'message' => $message,
+            ]);
+            $stateStore->appendLog($runId, $message);
+        } catch (\Throwable) {
+            // Không để lỗi ghi trạng thái phụ làm hỏng tiến trình export chính.
+        }
     }
     private function exportRelativePath(string $snapshotId): string
     {

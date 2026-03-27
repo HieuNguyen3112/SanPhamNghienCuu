@@ -8,7 +8,17 @@
     $legend = LecturerHoursSummaryReportLayout::valueLegend();
     $widths = LecturerHoursSummaryReportLayout::columnWidths();
     $totalWidth = array_sum($widths);
-    $groupStyles = collect(LecturerHoursSummaryReportLayout::headerGroupsByColumn())->keyBy('key');
+
+    $leafCountForGroup = static function (array $group): int {
+        if (isset($group['children'])) {
+            return array_sum(array_map(
+                static fn (array $child): int => count($child['columns']),
+                $group['children']
+            ));
+        }
+
+        return count($group['columns']);
+    };
 @endphp
 <!doctype html>
 <html lang="vi">
@@ -76,6 +86,10 @@
         font-size: 8px;
       }
 
+      .leaf-header {
+        font-size: 7.8px;
+      }
+
       .identity-header {
         background: #d5dee9;
       }
@@ -129,18 +143,18 @@
       </colgroup>
       <thead>
         <tr>
-          <th rowspan="2" class="major-header identity-header">TT</th>
-          <th rowspan="2" class="major-header identity-header">Họ và tên</th>
+          <th rowspan="3" class="major-header identity-header">TT</th>
+          <th rowspan="3" class="major-header identity-header">Họ và tên</th>
           @foreach ($groups as $group)
             @php
-                $style = $groupStyles->get($group['key']);
-                $singleColumnGroup = count($group['columns']) === 1;
+                $leafCount = $leafCountForGroup($group);
+                $isTotalGroup = (bool) ($group['is_total'] ?? false);
             @endphp
             <th
-              colspan="{{ $singleColumnGroup ? 1 : count($group['columns']) }}"
-              @if ($singleColumnGroup) rowspan="2" @endif
-              class="major-header {{ ($group['is_total'] ?? false) ? 'total-column' : '' }}"
-              style="background: #{{ $style['header_fill'] }}"
+              colspan="{{ $leafCount }}"
+              @if ($leafCount === 1) rowspan="3" @endif
+              class="major-header {{ $isTotalGroup ? 'total-column' : '' }}"
+              style="background: #{{ $group['header_fill'] }}"
             >
               {{ $group['label'] }}
             </th>
@@ -148,19 +162,40 @@
         </tr>
         <tr>
           @foreach ($groups as $group)
-            @php
-                $style = $groupStyles->get($group['key']);
-            @endphp
-            @foreach ($group['columns'] as $column)
-              @if (count($group['columns']) > 1)
+            @if (isset($group['children']))
+              @foreach ($group['children'] as $child)
                 <th
+                  colspan="{{ count($child['columns']) }}"
+                  class="sub-header"
+                  style="background: #{{ $group['subheader_fill'] }}"
+                >
+                  {{ $child['label'] }}
+                </th>
+              @endforeach
+            @elseif (count($group['columns']) > 1)
+              @foreach ($group['columns'] as $column)
+                <th
+                  rowspan="2"
                   class="sub-header {{ ($group['is_total'] ?? false) ? 'total-column' : '' }}"
-                  style="background: #{{ $style['subheader_fill'] }}"
+                  style="background: #{{ $group['subheader_fill'] }}"
                 >
                   {!! nl2br(e($column['label'])) !!}
                 </th>
-              @endif
-            @endforeach
+              @endforeach
+            @endif
+          @endforeach
+        </tr>
+        <tr>
+          @foreach ($groups as $group)
+            @if (isset($group['children']))
+              @foreach ($group['children'] as $child)
+                @foreach ($child['columns'] as $column)
+                  <th class="leaf-header" style="background: #{{ $group['subheader_fill'] }}">
+                    {!! nl2br(e($column['label'])) !!}
+                  </th>
+                @endforeach
+              @endforeach
+            @endif
           @endforeach
         </tr>
       </thead>

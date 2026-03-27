@@ -21,6 +21,11 @@ class LecturerHoursSummaryReportLayout
         return 'Đơn vị trong ô: số lượng / giờ quy đổi';
     }
 
+    public static function headerRowCount(): int
+    {
+        return 3;
+    }
+
     public static function groups(): array
     {
         return [
@@ -32,7 +37,6 @@ class LecturerHoursSummaryReportLayout
                 'columns' => [
                     ['key' => 'national_projects_principal_summary', 'label' => 'Chủ nhiệm', 'format' => 'count_hours'],
                     ['key' => 'national_projects_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
-                    ['key' => 'national_projects_count', 'label' => 'Số đề tài', 'format' => 'count'],
                 ],
             ],
             [
@@ -43,7 +47,6 @@ class LecturerHoursSummaryReportLayout
                 'columns' => [
                     ['key' => 'school_projects_principal_summary', 'label' => 'Chủ nhiệm', 'format' => 'count_hours'],
                     ['key' => 'school_projects_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
-                    ['key' => 'school_projects_count', 'label' => 'Số đề tài', 'format' => 'count'],
                 ],
             ],
             [
@@ -52,31 +55,33 @@ class LecturerHoursSummaryReportLayout
                 'header_fill' => 'EDE7D8',
                 'subheader_fill' => 'F7F3E9',
                 'columns' => [
-                    ['key' => 'papers_point_1_2_summary', 'label' => "Điểm 1-2\nSL / giờ", 'format' => 'count_hours'],
-                    ['key' => 'papers_point_le_1_summary', 'label' => "Điểm <= 1\nSL / giờ", 'format' => 'count_hours'],
-                    ['key' => 'papers_other_summary', 'label' => "Khác\nSL / giờ", 'format' => 'count_hours'],
+                    ['key' => 'papers_point_1_2_summary', 'label' => 'Điểm 1-2', 'format' => 'count_hours'],
+                    ['key' => 'papers_point_le_1_summary', 'label' => "Điểm ≤ 1", 'format' => 'count_hours'],
+                    ['key' => 'papers_other_summary', 'label' => 'Bài báo / báo cáo khác', 'format' => 'count_hours'],
                 ],
             ],
             [
-                'key' => 'textbooks',
+                'key' => 'books',
                 'label' => 'Biên soạn giáo trình, tài liệu tham khảo',
                 'header_fill' => 'E8E1F0',
                 'subheader_fill' => 'F3EDF8',
-                'columns' => [
-                    ['key' => 'textbooks_principal_summary', 'label' => 'Chủ biên', 'format' => 'count_hours'],
-                    ['key' => 'textbooks_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
-                    ['key' => 'textbooks_hours_total', 'label' => 'Tổng giờ', 'format' => 'hours'],
-                ],
-            ],
-            [
-                'key' => 'scholarly_books',
-                'label' => 'Sách chuyên khảo, sách hướng dẫn, từ điển',
-                'header_fill' => 'E5EBDD',
-                'subheader_fill' => 'F1F5EC',
-                'columns' => [
-                    ['key' => 'scholarly_books_principal_summary', 'label' => 'Chủ biên', 'format' => 'count_hours'],
-                    ['key' => 'scholarly_books_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
-                    ['key' => 'scholarly_books_hours_total', 'label' => 'Tổng giờ', 'format' => 'hours'],
+                'children' => [
+                    [
+                        'key' => 'textbooks',
+                        'label' => 'Sách chuyên khảo, giáo trình',
+                        'columns' => [
+                            ['key' => 'textbooks_principal_summary', 'label' => 'Chủ biên', 'format' => 'count_hours'],
+                            ['key' => 'textbooks_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
+                        ],
+                    ],
+                    [
+                        'key' => 'scholarly_books',
+                        'label' => 'Sách tham khảo, sách hướng dẫn, từ điển',
+                        'columns' => [
+                            ['key' => 'scholarly_books_principal_summary', 'label' => 'Chủ biên', 'format' => 'count_hours'],
+                            ['key' => 'scholarly_books_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
+                        ],
+                    ],
                 ],
             ],
             [
@@ -87,7 +92,6 @@ class LecturerHoursSummaryReportLayout
                 'columns' => [
                     ['key' => 'conferences_report_summary', 'label' => 'Báo cáo', 'format' => 'count_hours'],
                     ['key' => 'conferences_attend_summary', 'label' => 'Tham dự', 'format' => 'count_hours'],
-                    ['key' => 'conferences_hours_total', 'label' => 'Tổng giờ', 'format' => 'hours'],
                 ],
             ],
             [
@@ -111,8 +115,17 @@ class LecturerHoursSummaryReportLayout
         ];
 
         foreach (self::groups() as $group) {
+            if (isset($group['children'])) {
+                foreach ($group['children'] as $child) {
+                    foreach ($child['columns'] as $column) {
+                        $columns[] = $column + ['align' => 'center'];
+                    }
+                }
+                continue;
+            }
+
             foreach ($group['columns'] as $column) {
-                $columns[] = $column + ['align' => $group['is_total'] ?? false ? 'right' : 'center'];
+                $columns[] = $column + ['align' => ($group['is_total'] ?? false) ? 'right' : 'center'];
             }
         }
 
@@ -121,30 +134,55 @@ class LecturerHoursSummaryReportLayout
 
     public static function topHeaderRow(): array
     {
-        $row = ['TT', 'Họ và tên'];
-
-        foreach (self::groups() as $group) {
-            $row[] = $group['label'];
-
-            for ($index = 1, $columnCount = count($group['columns']); $index < $columnCount; $index++) {
-                $row[] = '';
-            }
-        }
-
-        return $row;
+        return self::headerRows()[0];
     }
 
     public static function subHeaderRow(): array
     {
-        $row = ['', ''];
+        return self::headerRows()[1];
+    }
+
+    public static function bottomHeaderRow(): array
+    {
+        return self::headerRows()[2];
+    }
+
+    public static function headerRows(): array
+    {
+        $row1 = ['TT', 'Họ và tên'];
+        $row2 = ['', ''];
+        $row3 = ['', ''];
 
         foreach (self::groups() as $group) {
+            $leafCount = self::leafCountForGroup($group);
+
+            $row1[] = $group['label'];
+            for ($index = 1; $index < $leafCount; $index++) {
+                $row1[] = '';
+            }
+
+            if (isset($group['children'])) {
+                foreach ($group['children'] as $child) {
+                    $childLeafCount = count($child['columns']);
+                    $row2[] = $child['label'];
+                    for ($index = 1; $index < $childLeafCount; $index++) {
+                        $row2[] = '';
+                    }
+
+                    foreach ($child['columns'] as $column) {
+                        $row3[] = $column['label'];
+                    }
+                }
+                continue;
+            }
+
             foreach ($group['columns'] as $column) {
-                $row[] = $column['label'];
+                $row2[] = $column['label'];
+                $row3[] = '';
             }
         }
 
-        return $row;
+        return [$row1, $row2, $row3];
     }
 
     public static function dataRow(array $row): array
@@ -154,10 +192,15 @@ class LecturerHoursSummaryReportLayout
             self::formatValue($row['lecturer_full_name'] ?? '', 'text'),
         ];
 
-        foreach (self::groups() as $group) {
-            foreach ($group['columns'] as $column) {
-                $values[] = self::formatValue($row[$column['key']] ?? self::defaultValueForFormat($column['format']), $column['format']);
+        foreach (self::leafColumns() as $index => $column) {
+            if ($index < 2) {
+                continue;
             }
+
+            $values[] = self::formatValue(
+                $row[$column['key']] ?? self::defaultValueForFormat($column['format']),
+                $column['format']
+            );
         }
 
         return $values;
@@ -165,36 +208,28 @@ class LecturerHoursSummaryReportLayout
 
     public static function headings(): array
     {
-        return [
-            self::topHeaderRow(),
-            self::subHeaderRow(),
-        ];
+        return self::headerRows();
     }
 
     public static function columnWidths(): array
     {
         return [
-            'A' => 6,
-            'B' => 28,
-            'C' => 13,
-            'D' => 13,
+            'A' => 5,
+            'B' => 24,
+            'C' => 10,
+            'D' => 10,
             'E' => 10,
-            'F' => 13,
-            'G' => 13,
-            'H' => 10,
+            'F' => 10,
+            'G' => 11,
+            'H' => 11,
             'I' => 13,
-            'J' => 13,
-            'K' => 13,
-            'L' => 13,
-            'M' => 13,
+            'J' => 11,
+            'K' => 11,
+            'L' => 12,
+            'M' => 12,
             'N' => 11,
-            'O' => 13,
-            'P' => 13,
-            'Q' => 11,
-            'R' => 13,
-            'S' => 13,
-            'T' => 11,
-            'U' => 13,
+            'O' => 11,
+            'P' => 12,
         ];
     }
 
@@ -208,67 +243,130 @@ class LecturerHoursSummaryReportLayout
         return Coordinate::stringFromColumnIndex(count(self::leafColumns()));
     }
 
-    public static function headerMergeRanges(int $headerRowStart, int $headerRowEnd): array
+    public static function headerMergeRanges(int $headerRow1, int $headerRow2, int $headerRow3): array
     {
         $ranges = [
-            sprintf('A%d:A%d', $headerRowStart, $headerRowEnd),
-            sprintf('B%d:B%d', $headerRowStart, $headerRowEnd),
+            sprintf('A%d:A%d', $headerRow1, $headerRow3),
+            sprintf('B%d:B%d', $headerRow1, $headerRow3),
         ];
 
         $columnIndex = 3;
         foreach (self::groups() as $group) {
-            $columnCount = count($group['columns']);
+            $leafCount = self::leafCountForGroup($group);
             $startColumn = Coordinate::stringFromColumnIndex($columnIndex);
-            $endColumn = Coordinate::stringFromColumnIndex($columnIndex + $columnCount - 1);
+            $endColumn = Coordinate::stringFromColumnIndex($columnIndex + $leafCount - 1);
 
-            if ($columnCount === 1) {
-                $ranges[] = sprintf('%s%d:%s%d', $startColumn, $headerRowStart, $endColumn, $headerRowEnd);
-            } else {
-                $ranges[] = sprintf('%s%d:%s%d', $startColumn, $headerRowStart, $endColumn, $headerRowStart);
+            if ($leafCount === 1) {
+                $ranges[] = sprintf('%s%d:%s%d', $startColumn, $headerRow1, $endColumn, $headerRow3);
+                $columnIndex += $leafCount;
+                continue;
             }
 
-            $columnIndex += $columnCount;
+            $ranges[] = sprintf('%s%d:%s%d', $startColumn, $headerRow1, $endColumn, $headerRow1);
+
+            if (isset($group['children'])) {
+                $childColumnIndex = $columnIndex;
+                foreach ($group['children'] as $child) {
+                    $childLeafCount = count($child['columns']);
+                    $childStartColumn = Coordinate::stringFromColumnIndex($childColumnIndex);
+                    $childEndColumn = Coordinate::stringFromColumnIndex($childColumnIndex + $childLeafCount - 1);
+                    $ranges[] = sprintf('%s%d:%s%d', $childStartColumn, $headerRow2, $childEndColumn, $headerRow2);
+                    $childColumnIndex += $childLeafCount;
+                }
+            } else {
+                for ($offset = 0; $offset < $leafCount; $offset++) {
+                    $leafColumn = Coordinate::stringFromColumnIndex($columnIndex + $offset);
+                    $ranges[] = sprintf('%s%d:%s%d', $leafColumn, $headerRow2, $leafColumn, $headerRow3);
+                }
+            }
+
+            $columnIndex += $leafCount;
         }
 
         return $ranges;
     }
 
-    public static function headerGroupsByColumn(): array
+    public static function headerStyleRanges(int $headerRow1, int $headerRow2, int $headerRow3): array
     {
         $ranges = [
             [
-                'key' => 'identity_tt',
-                'header_fill' => 'D5DEE9',
-                'subheader_fill' => 'ECF1F6',
-                'start_column' => 'A',
-                'end_column' => 'A',
-                'column_count' => 1,
+                'range' => sprintf('A%d:A%d', $headerRow1, $headerRow3),
+                'fill' => 'D5DEE9',
+                'font_size' => 10,
                 'is_total' => false,
             ],
             [
-                'key' => 'identity_name',
-                'header_fill' => 'D5DEE9',
-                'subheader_fill' => 'ECF1F6',
-                'start_column' => 'B',
-                'end_column' => 'B',
-                'column_count' => 1,
+                'range' => sprintf('B%d:B%d', $headerRow1, $headerRow3),
+                'fill' => 'D5DEE9',
+                'font_size' => 10,
                 'is_total' => false,
             ],
         ];
 
         $columnIndex = 3;
         foreach (self::groups() as $group) {
-            $columnCount = count($group['columns']);
+            $leafCount = self::leafCountForGroup($group);
+            $startColumn = Coordinate::stringFromColumnIndex($columnIndex);
+            $endColumn = Coordinate::stringFromColumnIndex($columnIndex + $leafCount - 1);
+            $isTotal = (bool) ($group['is_total'] ?? false);
+
+            if ($leafCount === 1) {
+                $ranges[] = [
+                    'range' => sprintf('%s%d:%s%d', $startColumn, $headerRow1, $endColumn, $headerRow3),
+                    'fill' => $group['header_fill'],
+                    'font_size' => 10,
+                    'is_total' => $isTotal,
+                ];
+                $columnIndex += $leafCount;
+                continue;
+            }
+
             $ranges[] = [
-                'key' => $group['key'],
-                'header_fill' => $group['header_fill'],
-                'subheader_fill' => $group['subheader_fill'],
-                'start_column' => Coordinate::stringFromColumnIndex($columnIndex),
-                'end_column' => Coordinate::stringFromColumnIndex($columnIndex + $columnCount - 1),
-                'column_count' => $columnCount,
-                'is_total' => (bool) ($group['is_total'] ?? false),
+                'range' => sprintf('%s%d:%s%d', $startColumn, $headerRow1, $endColumn, $headerRow1),
+                'fill' => $group['header_fill'],
+                'font_size' => 10,
+                'is_total' => $isTotal,
             ];
-            $columnIndex += $columnCount;
+
+            if (isset($group['children'])) {
+                $childColumnIndex = $columnIndex;
+                foreach ($group['children'] as $child) {
+                    $childLeafCount = count($child['columns']);
+                    $childStartColumn = Coordinate::stringFromColumnIndex($childColumnIndex);
+                    $childEndColumn = Coordinate::stringFromColumnIndex($childColumnIndex + $childLeafCount - 1);
+
+                    $ranges[] = [
+                        'range' => sprintf('%s%d:%s%d', $childStartColumn, $headerRow2, $childEndColumn, $headerRow2),
+                        'fill' => $group['subheader_fill'],
+                        'font_size' => 9,
+                        'is_total' => false,
+                    ];
+
+                    for ($offset = 0; $offset < $childLeafCount; $offset++) {
+                        $leafColumn = Coordinate::stringFromColumnIndex($childColumnIndex + $offset);
+                        $ranges[] = [
+                            'range' => sprintf('%s%d:%s%d', $leafColumn, $headerRow3, $leafColumn, $headerRow3),
+                            'fill' => $group['subheader_fill'],
+                            'font_size' => 9,
+                            'is_total' => false,
+                        ];
+                    }
+
+                    $childColumnIndex += $childLeafCount;
+                }
+            } else {
+                for ($offset = 0; $offset < $leafCount; $offset++) {
+                    $leafColumn = Coordinate::stringFromColumnIndex($columnIndex + $offset);
+                    $ranges[] = [
+                        'range' => sprintf('%s%d:%s%d', $leafColumn, $headerRow2, $leafColumn, $headerRow3),
+                        'fill' => $group['subheader_fill'],
+                        'font_size' => 9,
+                        'is_total' => $isTotal,
+                    ];
+                }
+            }
+
+            $columnIndex += $leafCount;
         }
 
         return $ranges;
@@ -299,6 +397,18 @@ class LecturerHoursSummaryReportLayout
         }
 
         return $candidate;
+    }
+
+    private static function leafCountForGroup(array $group): int
+    {
+        if (isset($group['children'])) {
+            return array_sum(array_map(
+                static fn (array $child): int => count($child['columns']),
+                $group['children']
+            ));
+        }
+
+        return count($group['columns']);
     }
 
     private static function defaultValueForFormat(string $format): mixed

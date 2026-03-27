@@ -1022,6 +1022,11 @@ class AdminBackupController extends Controller
         array &$parentRunCache = [],
         array &$postProcessRunCache = []
     ): array {
+        $snapshot = $this->backupManager->hydrateSnapshotExportMetadata(
+            $snapshot,
+            isset($snapshot['run_id']) ? (string) $snapshot['run_id'] : null
+        );
+
         $postProcessRun = $this->resolvePostProcessRunForSnapshot($snapshot, $parentRunCache, $postProcessRunCache);
         $exportState = $this->resolveExportStatePayload($snapshot, $postProcessRun);
 
@@ -1075,12 +1080,22 @@ class AdminBackupController extends Controller
         $publicPostProcessRun = $this->toPublicRunState($postProcessRun);
         $safeStatus = Str::lower(trim((string) ($snapshot['status'] ?? $snapshot['run_state'] ?? '')));
         $exportAvailable = (bool) ($snapshot['export_available'] ?? false);
+        $exportDrivePath = trim((string) ($snapshot['export_drive_path'] ?? ''));
+        $exportSyncStatus = Str::lower(trim((string) ($snapshot['export_sync_status'] ?? '')));
         $exportsEnabled = (bool) config('backup.exports.enabled', true);
 
         if ($exportAvailable) {
+            $readyMessage = $exportDrivePath !== ''
+                ? 'Readable export đã sẵn sàng để tải về và mở trên Drive.'
+                : 'Readable export cục bộ đã sẵn sàng để tải về. Đồng bộ Drive có thể vẫn đang chờ hoàn tất.';
+
+            if (in_array($exportSyncStatus, ['failed', 'timeout'], true)) {
+                $readyMessage = 'Readable export cục bộ đã sẵn sàng để tải về, nhưng đồng bộ Drive chưa hoàn tất.';
+            }
+
             return [
                 'state' => 'ready',
-                'message' => 'Readable export đã sẵn sàng để tải và mở trên Drive.',
+                'message' => $readyMessage,
                 'run' => $publicPostProcessRun,
             ];
         }
@@ -1105,10 +1120,16 @@ class AdminBackupController extends Controller
         }
 
         if ($postProcessStatus === 'failed') {
+            $failedMessage = $publicPostProcessRun['user_message']
+                ?? 'Snapshot an toàn đã hoàn tất nhưng readable export chưa thể hoàn thiện.';
+
+            if (Str::lower(trim((string) ($postProcessRun['step'] ?? ''))) === 'completed_with_sync_issue') {
+                $failedMessage = 'Readable export cục bộ đã sẵn sàng để tải về, nhưng đồng bộ Drive hoặc công bố cuối cùng chưa hoàn tất.';
+            }
+
             return [
                 'state' => 'failed',
-                'message' => $publicPostProcessRun['user_message']
-                    ?? 'Snapshot an toàn đã hoàn tất nhưng readable export chưa thể hoàn thiện.',
+                'message' => $failedMessage,
                 'run' => $publicPostProcessRun,
             ];
         }

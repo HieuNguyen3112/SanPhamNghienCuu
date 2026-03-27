@@ -95,14 +95,7 @@ class SpncBackupPostProcess extends Command
                 $initiatedBy
             );
 
-            $this->snapshotStore->mergeBySnapshotId($snapshotId, [
-                'export_available' => (bool) ($export['available'] ?? false),
-                'export_path' => $export['export_path'] ?? null,
-                'export_drive_path' => $export['drive_path'] ?? null,
-                'export_generated_at' => $export['generated_at'] ?? null,
-                'export_bundle_filename' => $export['bundle_filename'] ?? null,
-                'export_artifacts' => array_values((array) ($export['artifacts'] ?? [])),
-            ], $runId);
+            $this->snapshotStore->mergeBySnapshotId($snapshotId, $this->snapshotExportPatch($export), $runId);
 
             $this->stateStore->appendLog(
                 $runId,
@@ -129,6 +122,36 @@ class SpncBackupPostProcess extends Command
                 'message' => $exception->getMessage(),
             ]);
 
+            $recoveredExport = $this->backupManager->findExportMetadata($snapshotId);
+            if (is_array($recoveredExport) && (bool) ($recoveredExport['available'] ?? false)) {
+                $this->snapshotStore->mergeBySnapshotId(
+                    $snapshotId,
+                    $this->snapshotExportPatch($recoveredExport),
+                    $runId
+                );
+
+                $message = 'Readable export cục bộ đã hoàn tất, nhưng bước đồng bộ hoặc công bố cuối cùng chưa thành công.';
+                $this->stateStore->update($runId, [
+                    'status' => 'failed',
+                    'operation' => 'backup_postprocess',
+                    'step' => 'completed_with_sync_issue',
+                    'snapshot_id' => $snapshotId,
+                    'finished_at' => now()->toIso8601String(),
+                    'message' => $message,
+                    'error_message' => $exception->getMessage(),
+                    'result' => [
+                        'export' => $recoveredExport,
+                    ],
+                ]);
+                $this->stateStore->appendLog(
+                    $runId,
+                    $message . ' Lý do: ' . $exception->getMessage(),
+                    'warning'
+                );
+
+                return self::FAILURE;
+            }
+
             $this->stateStore->update($runId, [
                 'status' => 'failed',
                 'operation' => 'backup_postprocess',
@@ -144,5 +167,19 @@ class SpncBackupPostProcess extends Command
         } finally {
             optional($lock)->release();
         }
+    }
+
+    private function snapshotExportPatch(array $export): array
+    {
+        return [
+            'export_available' => (bool) ($export['available'] ?? false),
+            'export_path' => $export['export_path'] ?? null,
+            'export_drive_path' => $export['drive_path'] ?? null,
+            'export_generated_at' => $export['generated_at'] ?? null,
+            'export_bundle_filename' => $export['bundle_filename'] ?? null,
+            'export_artifacts' => array_values((array) ($export['artifacts'] ?? [])),
+            'export_sync_status' => $export['sync_status'] ?? null,
+            'export_sync_error' => $export['sync_error'] ?? null,
+        ];
     }
 }

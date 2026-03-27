@@ -195,6 +195,10 @@ class SpncBackupRun extends Command
 
                 $postProcessState = $this->stateStore->get($postProcessRunId);
                 $postProcessStatus = strtolower(trim((string) ($postProcessState['status'] ?? '')));
+                $postProcessExport = is_array($postProcessState['result']['export'] ?? null)
+                    ? $postProcessState['result']['export']
+                    : null;
+                $postProcessExportAvailable = (bool) ($postProcessExport['available'] ?? false);
                 $postProcess = [
                     'scheduled' => true,
                     'status' => $postProcessStatus !== '' ? $postProcessStatus : ($exitCode === self::SUCCESS ? 'success' : 'failed'),
@@ -212,6 +216,13 @@ class SpncBackupRun extends Command
                         $runId,
                         'Đã hoàn tất readable export trong child run ' . $postProcessRunId . '.'
                     );
+                } elseif ($postProcessExportAvailable) {
+                    $postProcess['user_message'] = 'Snapshot thành công. Readable export cục bộ đã sẵn sàng, nhưng đồng bộ Drive hoặc công bố cuối cùng chưa hoàn tất.';
+                    $this->stateStore->appendLog(
+                        $runId,
+                        'Readable export cục bộ đã hoàn tất trong child run ' . $postProcessRunId . ', nhưng đồng bộ Drive hoặc công bố cuối cùng chưa hoàn tất.',
+                        'warning'
+                    );
                 } else {
                     $postProcess['user_message'] = 'Snapshot thành công, nhưng readable export chưa thể hoàn thiện.';
                     $this->stateStore->appendLog(
@@ -224,14 +235,18 @@ class SpncBackupRun extends Command
 
             $finalMessage = match ($postProcess['status']) {
                 'success' => 'Snapshot và readable export đã hoàn tất.',
-                'failed' => 'Snapshot thành công, nhưng readable export chưa thể hoàn thiện.',
+                'failed' => $postProcessExportAvailable
+                    ? 'Snapshot thành công. Readable export cục bộ đã sẵn sàng, nhưng đồng bộ Drive hoặc công bố cuối cùng chưa hoàn tất.'
+                    : 'Snapshot thành công, nhưng readable export chưa thể hoàn thiện.',
                 'disabled' => 'Snapshot thành công. Readable export đang tắt theo cấu hình hệ thống.',
                 default => 'Snapshot thành công. Readable export đang chờ xử lý.',
             };
 
             $finalStep = match ($postProcess['status']) {
                 'success' => 'completed',
-                'failed' => 'completed_with_export_failure',
+                'failed' => $postProcessExportAvailable
+                    ? 'completed_with_export_sync_issue'
+                    : 'completed_with_export_failure',
                 'disabled' => 'completed_without_export',
                 default => 'completed_snapshot_only',
             };
