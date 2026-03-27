@@ -17,17 +17,15 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
     private const TITLE_ROW = 1;
     private const YEAR_ROW = 2;
     private const SCOPE_ROW = 3;
-    private const HEADER_ROW_1 = 5;
-    private const HEADER_ROW_2 = 6;
-    private const DATA_START_ROW = 7;
+    private const LEGEND_ROW = 4;
+    private const HEADER_ROW_1 = 6;
+    private const HEADER_ROW_2 = 7;
+    private const DATA_START_ROW = 8;
 
-    private array $rows;
-    private array $meta;
-
-    public function __construct(array $rows, array $meta = [])
-    {
-        $this->rows = $rows;
-        $this->meta = $meta;
+    public function __construct(
+        private array $rows,
+        private array $meta = []
+    ) {
     }
 
     public function array(): array
@@ -36,6 +34,7 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
             [LecturerHoursSummaryReportLayout::title()],
             [LecturerHoursSummaryReportLayout::metaLine('Năm học', $this->meta['academic_year_code'] ?? null, 'Tất cả')],
             [LecturerHoursSummaryReportLayout::metaLine('Phạm vi', $this->meta['scope_label'] ?? null, 'Toàn trường')],
+            [LecturerHoursSummaryReportLayout::valueLegend()],
             [],
             LecturerHoursSummaryReportLayout::topHeaderRow(),
             LecturerHoursSummaryReportLayout::subHeaderRow(),
@@ -69,11 +68,12 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
                 $sheet = $event->sheet->getDelegate();
                 $highestRow = $sheet->getHighestRow();
                 $lastColumn = LecturerHoursSummaryReportLayout::lastColumnLetter();
+                $totalColumn = LecturerHoursSummaryReportLayout::totalColumnLetter();
                 $hasRows = count($this->rows) > 0;
 
-                $sheet->mergeCells(sprintf('A%d:%s%d', self::TITLE_ROW, $lastColumn, self::TITLE_ROW));
-                $sheet->mergeCells(sprintf('A%d:%s%d', self::YEAR_ROW, $lastColumn, self::YEAR_ROW));
-                $sheet->mergeCells(sprintf('A%d:%s%d', self::SCOPE_ROW, $lastColumn, self::SCOPE_ROW));
+                foreach ([self::TITLE_ROW, self::YEAR_ROW, self::SCOPE_ROW, self::LEGEND_ROW] as $rowNumber) {
+                    $sheet->mergeCells(sprintf('A%d:%s%d', $rowNumber, $lastColumn, $rowNumber));
+                }
 
                 foreach (LecturerHoursSummaryReportLayout::headerMergeRanges(self::HEADER_ROW_1, self::HEADER_ROW_2) as $range) {
                     $sheet->mergeCells($range);
@@ -84,55 +84,94 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
                 }
 
                 $fullRange = sprintf('A1:%s%d', $lastColumn, $highestRow);
-                $headerRange = sprintf('A%d:%s%d', self::HEADER_ROW_1, $lastColumn, self::HEADER_ROW_2);
                 $tableRange = sprintf('A%d:%s%d', self::HEADER_ROW_1, $lastColumn, max($highestRow, self::DATA_START_ROW));
-                $numericRange = sprintf('C%d:%s%d', self::DATA_START_ROW, $lastColumn, $highestRow);
+                $dataRange = sprintf('A%d:%s%d', self::DATA_START_ROW, $lastColumn, $highestRow);
 
-                $sheet->freezePane('A7');
-                $sheet->getStyle($fullRange)->getFont()->setName('Times New Roman')->setSize(11);
-                $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(15);
-                $sheet->getStyle('A1:A3')->getAlignment()
-                    ->setHorizontal(Alignment::HORIZONTAL_CENTER)
-                    ->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->freezePane('C8');
+                $sheet->getStyle($fullRange)->getFont()->setName('Times New Roman')->setSize(10);
+                $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+                $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A2:A3')->getFont()->setBold(true);
+                $sheet->getStyle('A2:A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle('A4')->getFont()->setItalic(true)->setSize(9);
+                $sheet->getStyle('A4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
-                $sheet->getStyle($headerRange)->applyFromArray([
-                    'font' => ['bold' => true],
-                    'alignment' => [
-                        'horizontal' => Alignment::HORIZONTAL_CENTER,
-                        'vertical' => Alignment::VERTICAL_CENTER,
-                        'wrapText' => true,
-                    ],
-                    'fill' => [
-                        'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => 'D9EAF7'],
-                    ],
+                $sheet->getStyle($tableRange)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => Border::BORDER_THIN,
-                            'color' => ['rgb' => '000000'],
+                            'color' => ['rgb' => '5B6570'],
                         ],
                     ],
                 ]);
 
-                $sheet->getStyle($tableRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getStyle(sprintf('A%d:A%d', self::DATA_START_ROW, $highestRow))
-                    ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle(sprintf('B%d:B%d', self::DATA_START_ROW, $highestRow))
-                    ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                foreach (LecturerHoursSummaryReportLayout::headerGroupsByColumn() as $group) {
+                    $startColumn = $group['start_column'];
+                    $endColumn = $group['end_column'];
 
-                if ($hasRows) {
-                    $sheet->getStyle($numericRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                } else {
-                    $sheet->getStyle(sprintf('A%d', self::DATA_START_ROW))
-                        ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    if ($group['column_count'] === 1) {
+                        $sheet->getStyle(sprintf('%s%d:%s%d', $startColumn, self::HEADER_ROW_1, $endColumn, self::HEADER_ROW_2))
+                            ->applyFromArray($this->headerStyle($group['header_fill']));
+                    } else {
+                        $sheet->getStyle(sprintf('%s%d:%s%d', $startColumn, self::HEADER_ROW_1, $endColumn, self::HEADER_ROW_1))
+                            ->applyFromArray($this->headerStyle($group['header_fill']));
+                        $sheet->getStyle(sprintf('%s%d:%s%d', $startColumn, self::HEADER_ROW_2, $endColumn, self::HEADER_ROW_2))
+                            ->applyFromArray($this->subHeaderStyle($group['subheader_fill']));
+                    }
                 }
 
-                $sheet->getRowDimension(self::HEADER_ROW_1)->setRowHeight(32);
-                $sheet->getRowDimension(self::HEADER_ROW_2)->setRowHeight(36);
+                if ($hasRows) {
+                    for ($row = self::DATA_START_ROW; $row <= $highestRow; $row++) {
+                        if (($row - self::DATA_START_ROW) % 2 === 1) {
+                            $sheet->getStyle(sprintf('A%d:%s%d', $row, $lastColumn, $row))
+                                ->getFill()
+                                ->setFillType(Fill::FILL_SOLID)
+                                ->getStartColor()
+                                ->setRGB('F9FBFD');
+                        }
+                    }
+                } else {
+                    $sheet->getStyle(sprintf('A%d', self::DATA_START_ROW))
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                }
+
+                $sheet->getStyle(sprintf('A%d:A%d', self::DATA_START_ROW, $highestRow))
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle(sprintf('B%d:B%d', self::DATA_START_ROW, $highestRow))
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle(sprintf('B%d:B%d', self::DATA_START_ROW, $highestRow))
+                    ->getFont()
+                    ->setBold(true);
+                $sheet->getStyle(sprintf('C%d:%s%d', self::DATA_START_ROW, $totalColumn, $highestRow))
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+                    ->setVertical(Alignment::VERTICAL_CENTER)
+                    ->setWrapText(true);
+
+                $sheet->getStyle(sprintf('%s%d:%s%d', $totalColumn, self::HEADER_ROW_1, $totalColumn, $highestRow))
+                    ->applyFromArray([
+                        'font' => ['bold' => true],
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'startColor' => ['rgb' => 'E1D9C9'],
+                        ],
+                    ]);
+                $sheet->getStyle(sprintf('%s%d:%s%d', $totalColumn, self::DATA_START_ROW, $totalColumn, $highestRow))
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+                $sheet->getStyle($dataRange)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle($dataRange)->getAlignment()->setWrapText(true);
+
+                $sheet->getRowDimension(self::HEADER_ROW_1)->setRowHeight(34);
+                $sheet->getRowDimension(self::HEADER_ROW_2)->setRowHeight(38);
 
                 $sheet->getPageSetup()
                     ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
-                    ->setPaperSize(PageSetup::PAPERSIZE_A4)
+                    ->setPaperSize(PageSetup::PAPERSIZE_A3)
                     ->setFitToWidth(1)
                     ->setFitToHeight(0);
 
@@ -142,6 +181,38 @@ class AdminLecturerHoursSummaryExport implements FromArray, WithColumnWidths, Wi
                     ->setLeft(0.2)
                     ->setBottom(0.35);
             },
+        ];
+    }
+
+    private function headerStyle(string $fill): array
+    {
+        return [
+            'font' => ['bold' => true],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => $fill],
+            ],
+        ];
+    }
+
+    private function subHeaderStyle(string $fill): array
+    {
+        return [
+            'font' => ['bold' => true, 'size' => 9],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => $fill],
+            ],
         ];
     }
 }

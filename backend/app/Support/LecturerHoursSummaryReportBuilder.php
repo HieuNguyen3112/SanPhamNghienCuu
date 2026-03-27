@@ -48,31 +48,51 @@ class LecturerHoursSummaryReportBuilder
             'groups' => [
                 'national_projects' => [
                     'principal_hours' => 0.0,
+                    'principal_activity_ids' => [],
                     'participant_hours' => 0.0,
+                    'participant_activity_ids' => [],
                     'activity_ids' => [],
                 ],
                 'school_projects' => [
                     'principal_hours' => 0.0,
+                    'principal_activity_ids' => [],
                     'participant_hours' => 0.0,
+                    'participant_activity_ids' => [],
                     'activity_ids' => [],
                 ],
                 'papers' => [
-                    'hours_total' => 0.0,
-                    'activity_ids' => [],
+                    'point_1_2' => [
+                        'hours_total' => 0.0,
+                        'activity_ids' => [],
+                    ],
+                    'point_le_1' => [
+                        'hours_total' => 0.0,
+                        'activity_ids' => [],
+                    ],
+                    'other' => [
+                        'hours_total' => 0.0,
+                        'activity_ids' => [],
+                    ],
                 ],
                 'textbooks' => [
                     'principal_hours' => 0.0,
+                    'principal_activity_ids' => [],
                     'participant_hours' => 0.0,
+                    'participant_activity_ids' => [],
                     'hours_total' => 0.0,
                 ],
                 'scholarly_books' => [
                     'principal_hours' => 0.0,
+                    'principal_activity_ids' => [],
                     'participant_hours' => 0.0,
+                    'participant_activity_ids' => [],
                     'hours_total' => 0.0,
                 ],
                 'conferences' => [
                     'report_ids' => [],
+                    'report_hours' => 0.0,
                     'attend_ids' => [],
+                    'attend_hours' => 0.0,
                     'hours_total' => 0.0,
                 ],
             ],
@@ -99,8 +119,14 @@ class LecturerHoursSummaryReportBuilder
             case 'school_projects':
                 if ($isPrincipal) {
                     $row['groups'][$group]['principal_hours'] += $hoursAssigned;
+                    if ($activityId > 0) {
+                        $row['groups'][$group]['principal_activity_ids'][$activityId] = true;
+                    }
                 } else {
                     $row['groups'][$group]['participant_hours'] += $hoursAssigned;
+                    if ($activityId > 0) {
+                        $row['groups'][$group]['participant_activity_ids'][$activityId] = true;
+                    }
                 }
                 if ($activityId > 0) {
                     $row['groups'][$group]['activity_ids'][$activityId] = true;
@@ -108,9 +134,10 @@ class LecturerHoursSummaryReportBuilder
                 break;
 
             case 'papers':
-                $row['groups'][$group]['hours_total'] += $hoursAssigned;
+                $paperBucket = self::resolvePaperBucket((string) ($detail['type_code'] ?? ''));
+                $row['groups'][$group][$paperBucket]['hours_total'] += $hoursAssigned;
                 if ($activityId > 0) {
-                    $row['groups'][$group]['activity_ids'][$activityId] = true;
+                    $row['groups'][$group][$paperBucket]['activity_ids'][$activityId] = true;
                 }
                 break;
 
@@ -118,8 +145,14 @@ class LecturerHoursSummaryReportBuilder
             case 'scholarly_books':
                 if ($isPrincipal) {
                     $row['groups'][$group]['principal_hours'] += $hoursAssigned;
+                    if ($activityId > 0) {
+                        $row['groups'][$group]['principal_activity_ids'][$activityId] = true;
+                    }
                 } else {
                     $row['groups'][$group]['participant_hours'] += $hoursAssigned;
+                    if ($activityId > 0) {
+                        $row['groups'][$group]['participant_activity_ids'][$activityId] = true;
+                    }
                 }
                 $row['groups'][$group]['hours_total'] += $hoursAssigned;
                 break;
@@ -128,6 +161,11 @@ class LecturerHoursSummaryReportBuilder
                 $typeBucket = self::resolveConferenceBucket((string) ($detail['type_code'] ?? ''));
                 if ($activityId > 0 && $typeBucket !== null) {
                     $row['groups'][$group][$typeBucket][$activityId] = true;
+                }
+                if ($typeBucket === 'report_ids') {
+                    $row['groups'][$group]['report_hours'] += $hoursAssigned;
+                } elseif ($typeBucket === 'attend_ids') {
+                    $row['groups'][$group]['attend_hours'] += $hoursAssigned;
                 }
                 $row['groups'][$group]['hours_total'] += $hoursAssigned;
                 break;
@@ -140,7 +178,9 @@ class LecturerHoursSummaryReportBuilder
             + $row['groups']['national_projects']['participant_hours']
             + $row['groups']['school_projects']['principal_hours']
             + $row['groups']['school_projects']['participant_hours']
-            + $row['groups']['papers']['hours_total']
+            + $row['groups']['papers']['point_1_2']['hours_total']
+            + $row['groups']['papers']['point_le_1']['hours_total']
+            + $row['groups']['papers']['other']['hours_total']
             + $row['groups']['textbooks']['hours_total']
             + $row['groups']['scholarly_books']['hours_total']
             + $row['groups']['conferences']['hours_total'];
@@ -157,22 +197,62 @@ class LecturerHoursSummaryReportBuilder
             'faculty_name' => $row['faculty_name'],
             'department_name' => $row['department_name'],
             'academic_year_code' => $row['academic_year_code'],
-            'national_projects_principal_hours' => self::roundHours($row['groups']['national_projects']['principal_hours']),
-            'national_projects_participant_hours' => self::roundHours($row['groups']['national_projects']['participant_hours']),
+            'national_projects_principal_summary' => self::summaryValue(
+                $row['groups']['national_projects']['principal_activity_ids'],
+                $row['groups']['national_projects']['principal_hours']
+            ),
+            'national_projects_participant_summary' => self::summaryValue(
+                $row['groups']['national_projects']['participant_activity_ids'],
+                $row['groups']['national_projects']['participant_hours']
+            ),
             'national_projects_count' => count($row['groups']['national_projects']['activity_ids']),
-            'school_projects_principal_hours' => self::roundHours($row['groups']['school_projects']['principal_hours']),
-            'school_projects_participant_hours' => self::roundHours($row['groups']['school_projects']['participant_hours']),
+            'school_projects_principal_summary' => self::summaryValue(
+                $row['groups']['school_projects']['principal_activity_ids'],
+                $row['groups']['school_projects']['principal_hours']
+            ),
+            'school_projects_participant_summary' => self::summaryValue(
+                $row['groups']['school_projects']['participant_activity_ids'],
+                $row['groups']['school_projects']['participant_hours']
+            ),
             'school_projects_count' => count($row['groups']['school_projects']['activity_ids']),
-            'papers_count' => count($row['groups']['papers']['activity_ids']),
-            'papers_hours_total' => self::roundHours($row['groups']['papers']['hours_total']),
-            'textbooks_principal_hours' => self::roundHours($row['groups']['textbooks']['principal_hours']),
-            'textbooks_participant_hours' => self::roundHours($row['groups']['textbooks']['participant_hours']),
+            'papers_point_1_2_summary' => self::summaryValue(
+                $row['groups']['papers']['point_1_2']['activity_ids'],
+                $row['groups']['papers']['point_1_2']['hours_total']
+            ),
+            'papers_point_le_1_summary' => self::summaryValue(
+                $row['groups']['papers']['point_le_1']['activity_ids'],
+                $row['groups']['papers']['point_le_1']['hours_total']
+            ),
+            'papers_other_summary' => self::summaryValue(
+                $row['groups']['papers']['other']['activity_ids'],
+                $row['groups']['papers']['other']['hours_total']
+            ),
+            'textbooks_principal_summary' => self::summaryValue(
+                $row['groups']['textbooks']['principal_activity_ids'],
+                $row['groups']['textbooks']['principal_hours']
+            ),
+            'textbooks_participant_summary' => self::summaryValue(
+                $row['groups']['textbooks']['participant_activity_ids'],
+                $row['groups']['textbooks']['participant_hours']
+            ),
             'textbooks_hours_total' => self::roundHours($row['groups']['textbooks']['hours_total']),
-            'scholarly_books_principal_hours' => self::roundHours($row['groups']['scholarly_books']['principal_hours']),
-            'scholarly_books_participant_hours' => self::roundHours($row['groups']['scholarly_books']['participant_hours']),
+            'scholarly_books_principal_summary' => self::summaryValue(
+                $row['groups']['scholarly_books']['principal_activity_ids'],
+                $row['groups']['scholarly_books']['principal_hours']
+            ),
+            'scholarly_books_participant_summary' => self::summaryValue(
+                $row['groups']['scholarly_books']['participant_activity_ids'],
+                $row['groups']['scholarly_books']['participant_hours']
+            ),
             'scholarly_books_hours_total' => self::roundHours($row['groups']['scholarly_books']['hours_total']),
-            'conferences_report_count' => count($row['groups']['conferences']['report_ids']),
-            'conferences_attend_count' => count($row['groups']['conferences']['attend_ids']),
+            'conferences_report_summary' => self::summaryValue(
+                $row['groups']['conferences']['report_ids'],
+                $row['groups']['conferences']['report_hours']
+            ),
+            'conferences_attend_summary' => self::summaryValue(
+                $row['groups']['conferences']['attend_ids'],
+                $row['groups']['conferences']['attend_hours']
+            ),
             'conferences_hours_total' => self::roundHours($row['groups']['conferences']['hours_total']),
             'hours_total' => self::roundHours($hoursTotal),
         ];
@@ -208,6 +288,21 @@ class LecturerHoursSummaryReportBuilder
         }
 
         return null;
+    }
+
+    private static function resolvePaperBucket(string $typeCode): string
+    {
+        $normalized = self::normalizeToken($typeCode);
+
+        if (self::containsAny($normalized, ['hdgsnn_900', 'hdgsnn_12', 'point_12'])) {
+            return 'point_1_2';
+        }
+
+        if (self::containsAny($normalized, ['hdgsnn_600', 'point_le_1', 'point_1'])) {
+            return 'point_le_1';
+        }
+
+        return 'other';
     }
 
     private static function resolveConferenceBucket(string $typeCode): ?string
@@ -256,5 +351,13 @@ class LecturerHoursSummaryReportBuilder
     private static function roundHours(float $value): float
     {
         return round($value, 2);
+    }
+
+    private static function summaryValue(array $activityIds, float $hours): array
+    {
+        return [
+            'count' => count($activityIds),
+            'hours' => self::roundHours($hours),
+        ];
     }
 }

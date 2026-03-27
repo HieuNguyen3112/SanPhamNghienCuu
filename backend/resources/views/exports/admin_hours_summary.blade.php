@@ -5,6 +5,10 @@
     $leafColumns = LecturerHoursSummaryReportLayout::leafColumns();
     $title = LecturerHoursSummaryReportLayout::title();
     $emptyMessage = LecturerHoursSummaryReportLayout::emptyStateMessage();
+    $legend = LecturerHoursSummaryReportLayout::valueLegend();
+    $widths = LecturerHoursSummaryReportLayout::columnWidths();
+    $totalWidth = array_sum($widths);
+    $groupStyles = collect(LecturerHoursSummaryReportLayout::headerGroupsByColumn())->keyBy('key');
 @endphp
 <!doctype html>
 <html lang="vi">
@@ -17,24 +21,31 @@
 
       body {
         font-family: "DejaVu Sans", sans-serif;
-        font-size: 8.5px;
+        font-size: 8.4px;
         color: #111827;
       }
 
       .report-title {
-        text-align: center;
-        font-weight: 700;
-        font-size: 15px;
         margin: 0 0 6px 0;
+        text-align: center;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.15px;
       }
 
       .report-meta {
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         font-size: 9px;
       }
 
       .report-meta div {
         margin-bottom: 2px;
+      }
+
+      .report-note {
+        margin-bottom: 10px;
+        font-style: italic;
+        color: #4b5563;
       }
 
       table {
@@ -45,38 +56,59 @@
 
       th,
       td {
-        border: 1px solid #374151;
+        border: 1px solid #5b6570;
         padding: 4px 3px;
         vertical-align: middle;
-        word-wrap: break-word;
+        word-break: break-word;
       }
 
       thead th {
-        background: #d9eaf7;
         text-align: center;
         font-weight: 700;
-        line-height: 1.25;
-      }
-
-      tbody td {
         line-height: 1.2;
       }
 
-      .text-left {
-        text-align: left;
+      .major-header {
+        font-size: 8.6px;
       }
 
-      .text-center {
+      .sub-header {
+        font-size: 8px;
+      }
+
+      .identity-header {
+        background: #d5dee9;
+      }
+
+      .name-cell {
+        text-align: left;
+        font-weight: 700;
+      }
+
+      .center-cell {
         text-align: center;
       }
 
-      .text-right {
+      .right-cell {
         text-align: right;
       }
 
+      tbody tr:nth-child(even) td {
+        background: #f9fbfd;
+      }
+
+      .total-column {
+        background: #e1d9c9;
+        font-weight: 700;
+      }
+
+      tbody tr:nth-child(even) td.total-column {
+        background: #e1d9c9;
+      }
+
       .empty {
+        padding: 12px 8px;
         text-align: center;
-        padding: 10px 8px;
       }
     </style>
   </head>
@@ -84,30 +116,50 @@
     <h1 class="report-title">{{ $title }}</h1>
 
     <div class="report-meta">
-      <div><strong>Năm học:</strong> {{ $meta['academic_year_code'] ?? 'Tất cả' }}</div>
-      <div><strong>Phạm vi:</strong> {{ $meta['scope_label'] ?? 'Toàn trường' }}</div>
+      <div><strong>Năm học:</strong> {{ LecturerHoursSummaryReportLayout::metaValue($meta['academic_year_code'] ?? null, 'Tất cả') }}</div>
+      <div><strong>Phạm vi:</strong> {{ LecturerHoursSummaryReportLayout::metaValue($meta['scope_label'] ?? null, 'Toàn trường') }}</div>
     </div>
+    <div class="report-note">{{ $legend }}</div>
 
     <table>
       <colgroup>
-        <col style="width: 4%" />
-        <col style="width: 16%" />
-        @for ($i = 0; $i < count($leafColumns) - 2; $i++)
-          <col style="width: 4.44%" />
-        @endfor
+        @foreach ($widths as $width)
+          <col style="width: {{ $totalWidth > 0 ? round(($width / $totalWidth) * 100, 3) : 4.5 }}%" />
+        @endforeach
       </colgroup>
       <thead>
         <tr>
-          <th rowspan="2">TT</th>
-          <th rowspan="2">Họ và tên</th>
+          <th rowspan="2" class="major-header identity-header">TT</th>
+          <th rowspan="2" class="major-header identity-header">Họ và tên</th>
           @foreach ($groups as $group)
-            <th colspan="{{ count($group['columns']) }}">{{ $group['label'] }}</th>
+            @php
+                $style = $groupStyles->get($group['key']);
+                $singleColumnGroup = count($group['columns']) === 1;
+            @endphp
+            <th
+              colspan="{{ $singleColumnGroup ? 1 : count($group['columns']) }}"
+              @if ($singleColumnGroup) rowspan="2" @endif
+              class="major-header {{ ($group['is_total'] ?? false) ? 'total-column' : '' }}"
+              style="background: #{{ $style['header_fill'] }}"
+            >
+              {{ $group['label'] }}
+            </th>
           @endforeach
         </tr>
         <tr>
           @foreach ($groups as $group)
+            @php
+                $style = $groupStyles->get($group['key']);
+            @endphp
             @foreach ($group['columns'] as $column)
-              <th>{{ $column['label'] }}</th>
+              @if (count($group['columns']) > 1)
+                <th
+                  class="sub-header {{ ($group['is_total'] ?? false) ? 'total-column' : '' }}"
+                  style="background: #{{ $style['subheader_fill'] }}"
+                >
+                  {!! nl2br(e($column['label'])) !!}
+                </th>
+              @endif
             @endforeach
           @endforeach
         </tr>
@@ -115,16 +167,20 @@
       <tbody>
         @forelse ($rows as $row)
           @php
-            $values = LecturerHoursSummaryReportLayout::dataRow($row);
+              $values = LecturerHoursSummaryReportLayout::dataRow($row);
           @endphp
           <tr>
             @foreach ($leafColumns as $index => $column)
               @php
-                $isTextColumn = $column['format'] === 'text';
-                $alignmentClass = $isTextColumn ? 'text-left' : ($index === 0 ? 'text-center' : 'text-right');
+                  $alignmentClass = match ($column['align'] ?? 'center') {
+                      'left' => 'name-cell',
+                      'right' => 'right-cell',
+                      default => 'center-cell',
+                  };
+                  $isTotalColumn = $column['key'] === 'hours_total';
               @endphp
-              <td class="{{ $alignmentClass }}">
-                {{ LecturerHoursSummaryReportLayout::formatValue($values[$index] ?? null, $column['format']) }}
+              <td class="{{ $alignmentClass }} {{ $isTotalColumn ? 'total-column' : '' }}">
+                {{ $values[$index] ?? '' }}
               </td>
             @endforeach
           </tr>
