@@ -12,7 +12,6 @@ use Tests\TestCase;
 
 class UniversityExportEncodingTest extends TestCase
 {
-
     public function test_university_pdf_export_views_render_clean_vietnamese_labels(): void
     {
         $cases = [
@@ -21,17 +20,17 @@ class UniversityExportEncodingTest extends TestCase
                 'data' => [
                     'rows' => [],
                     'filters' => [
-                        'faculty' => 'Táº¥t cáº£',
-                        'department' => 'Táº¥t cáº£',
+                        'faculty' => 'Tất cả',
+                        'department' => 'Tất cả',
                         'academic_year' => '2024-2025',
-                        'status' => 'Táº¥t cáº£',
-                        'keyword' => 'Táº¥t cáº£',
+                        'status' => 'Tất cả',
+                        'keyword' => 'Tất cả',
                     ],
                 ],
                 'expected' => [
-                    'Quáº£n lÃ½ cÃ´ng trÃ¬nh NCKH theo giáº£ng viÃªn',
-                    'Giáº£ng viÃªn',
-                    'KhÃ´ng cÃ³ dá»¯ liá»‡u',
+                    'Quản lý công trình NCKH theo giảng viên',
+                    'Giảng viên',
+                    'Không có dữ liệu',
                 ],
             ],
             [
@@ -54,16 +53,16 @@ class UniversityExportEncodingTest extends TestCase
                 'data' => [
                     'rows' => [],
                     'filters' => [
-                        'faculty' => 'Táº¥t cáº£',
-                        'degree' => 'Táº¥t cáº£',
-                        'academic_rank' => 'Táº¥t cáº£',
-                        'gender' => 'Táº¥t cáº£',
+                        'faculty' => 'Tất cả',
+                        'degree' => 'Tất cả',
+                        'academic_rank' => 'Tất cả',
+                        'gender' => 'Tất cả',
                     ],
                 ],
                 'expected' => [
-                    'BÃ¡o cÃ¡o nhÃ¢n sá»± giáº£ng viÃªn',
-                    'Giá»›i tÃ­nh',
-                    'KhÃ´ng cÃ³ dá»¯ liá»‡u',
+                    'Báo cáo nhân sự giảng viên',
+                    'Giới tính',
+                    'Không có dữ liệu',
                 ],
             ],
             [
@@ -90,34 +89,32 @@ class UniversityExportEncodingTest extends TestCase
                         ],
                     ],
                     'filters' => [
-                        'year' => 'Táº¥t cáº£',
-                        'department' => 'Táº¥t cáº£',
-                        'research_type' => 'Táº¥t cáº£',
-                        'lecturer' => 'Táº¥t cáº£',
-                        'keyword' => 'Táº¥t cáº£',
+                        'year' => 'Tất cả',
+                        'department' => 'Tất cả',
+                        'research_type' => 'Tất cả',
+                        'lecturer' => 'Tất cả',
+                        'keyword' => 'Tất cả',
                     ],
                 ],
                 'expected' => [
-                    'BÃ¡o cÃ¡o cÃ´ng trÃ¬nh nghiÃªn cá»©u khoa há»c',
-                    'Äá» tÃ i / Dá»± Ã¡n',
-                    'KhÃ´ng cÃ³ dá»¯ liá»‡u',
+                    'Báo cáo công trình nghiên cứu khoa học',
+                    'Đề tài / Dự án',
+                    'Không có dữ liệu',
                 ],
             ],
             [
                 'view' => 'exports.admin_hour_research_report',
                 'data' => [
                     'rows' => [],
-                    'kpis' => [],
-                    'filters' => [
-                        'faculty' => 'Táº¥t cáº£',
-                        'academic_year' => '2024-2025',
-                        'status' => 'Táº¥t cáº£',
+                    'meta' => [
+                        'academic_year_code' => '2024-2025',
+                        'scope_label' => 'Toàn trường',
                     ],
                 ],
                 'expected' => [
-                    'BÃ¡o cÃ¡o thá»‘ng kÃª giá» NCKH',
-                    'Giáº£ng viÃªn',
-                    'KhÃ´ng cÃ³ dá»¯ liá»‡u',
+                    'BÁO CÁO TỔNG HỢP GIỜ NGHIÊN CỨU KHOA HỌC',
+                    'Đề tài cấp Trường',
+                    'Không có dữ liệu cho phạm vi báo cáo đã chọn.',
                 ],
             ],
         ];
@@ -135,7 +132,7 @@ class UniversityExportEncodingTest extends TestCase
             [
                 'name' => 'AdminResearchWorksSummaryExport',
                 'payload' => (new AdminResearchWorksSummaryExport([]))->headings(),
-                'expected' => ['Giáº£ng viÃªn', 'ÄÃ£ duyá»‡t', 'Tá»« chá»‘i'],
+                'expected' => ['Giảng viên', 'Đã duyệt', 'Từ chối'],
             ],
             [
                 'name' => 'AdminLecturerHoursSummaryExport',
@@ -145,19 +142,19 @@ class UniversityExportEncodingTest extends TestCase
             [
                 'name' => 'AdminLecturerReportExport.headings',
                 'payload' => (new AdminLecturerReportExport([]))->headings(),
-                'expected' => ['Há» vÃ  tÃªn', 'Giá»›i tÃ­nh', 'ThÃ¢m niÃªn (nÄƒm)'],
+                'expected' => ['Họ và tên', 'Giới tính', 'Thâm niên (năm)'],
             ],
             [
                 'name' => 'AdminLecturerReportExport.map',
                 'payload' => (new AdminLecturerReportExport([]))->map([
-                    'full_name' => 'Nguyá»…n Thá»‹ A',
-                    'faculty' => ['name' => 'Khoa Khoa há»c'],
+                    'full_name' => 'Nguyễn Thị A',
+                    'faculty' => ['name' => 'Khoa Khoa học'],
                     'gender' => 'female',
-                    'degree' => ['name' => 'Tiáº¿n sÄ©'],
-                    'academic_rank' => ['name' => 'PhÃ³ giÃ¡o sÆ°'],
+                    'degree' => ['name' => 'Tiến sĩ'],
+                    'academic_rank' => ['name' => 'Phó giáo sư'],
                     'seniority_years' => 8,
                 ]),
-                'expected' => ['Nguyá»…n Thá»‹ A', 'Ná»¯', 'Tiáº¿n sÄ©'],
+                'expected' => ['Nguyễn Thị A', 'Nữ', 'Tiến sĩ'],
             ],
             [
                 'name' => 'AdminResearchReportExport',
@@ -183,34 +180,32 @@ class UniversityExportEncodingTest extends TestCase
                         ],
                     ],
                     [
-                        'year' => 'Táº¥t cáº£',
-                        'department' => 'Táº¥t cáº£',
-                        'research_type' => 'Táº¥t cáº£',
-                        'lecturer' => 'Táº¥t cáº£',
-                        'keyword' => 'Táº¥t cáº£',
+                        'year' => 'Tất cả',
+                        'department' => 'Tất cả',
+                        'research_type' => 'Tất cả',
+                        'lecturer' => 'Tất cả',
+                        'keyword' => 'Tất cả',
                     ]
                 ))->array(),
                 'expected' => [
-                    'BÃ¡o cÃ¡o cÃ´ng trÃ¬nh nghiÃªn cá»©u khoa há»c',
-                    'Äá» tÃ i / Dá»± Ã¡n',
-                    'KhÃ´ng cÃ³ dá»¯ liá»‡u',
+                    'Báo cáo công trình nghiên cứu khoa học',
+                    'Đề tài / Dự án',
+                    'Không có dữ liệu',
                 ],
             ],
             [
                 'name' => 'AdminResearchHoursReportExport',
                 'payload' => (new AdminResearchHoursReportExport(
                     [],
-                    [],
                     [
-                        'faculty' => 'Táº¥t cáº£',
-                        'academic_year' => '2024-2025',
-                        'status' => 'Táº¥t cáº£',
+                        'academic_year_code' => '2024-2025',
+                        'scope_label' => 'Toàn trường',
                     ]
                 ))->array(),
                 'expected' => [
-                    'BÃ¡o cÃ¡o thá»‘ng kÃª giá» NCKH',
-                    'Giáº£ng viÃªn',
-                    'KhÃ´ng cÃ³ dá»¯ liá»‡u',
+                    'BÁO CÁO TỔNG HỢP GIỜ NGHIÊN CỨU KHOA HỌC',
+                    'Họ và tên',
+                    'Không có dữ liệu cho phạm vi báo cáo đã chọn.',
                 ],
             ],
         ];
@@ -262,4 +257,3 @@ class UniversityExportEncodingTest extends TestCase
         ];
     }
 }
-

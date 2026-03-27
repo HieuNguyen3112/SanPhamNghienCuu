@@ -6,7 +6,7 @@ use Illuminate\Support\Str;
 
 class LecturerHoursSummaryReportBuilder
 {
-    public static function build(array $lecturerRows, iterable $activityRows): array
+    public static function build(array $lecturerRows, iterable $activityRows, bool $deriveTotalFromGroups = false): array
     {
         $rowsByLecturer = [];
 
@@ -28,7 +28,10 @@ class LecturerHoursSummaryReportBuilder
             self::applyDetail($rowsByLecturer[$lecturerId], $detail);
         }
 
-        return array_values(array_map(static fn (array $row) => self::finalizeRow($row), $rowsByLecturer));
+        return array_values(array_map(
+            static fn (array $row) => self::finalizeRow($row, $deriveTotalFromGroups),
+            $rowsByLecturer
+        ));
     }
 
     private static function seedRow(array $row, int $ordinal): array
@@ -131,8 +134,21 @@ class LecturerHoursSummaryReportBuilder
         }
     }
 
-    private static function finalizeRow(array $row): array
+    private static function finalizeRow(array $row, bool $deriveTotalFromGroups = false): array
     {
+        $computedHoursTotal = $row['groups']['national_projects']['principal_hours']
+            + $row['groups']['national_projects']['participant_hours']
+            + $row['groups']['school_projects']['principal_hours']
+            + $row['groups']['school_projects']['participant_hours']
+            + $row['groups']['papers']['hours_total']
+            + $row['groups']['textbooks']['hours_total']
+            + $row['groups']['scholarly_books']['hours_total']
+            + $row['groups']['conferences']['hours_total'];
+
+        $hoursTotal = $deriveTotalFromGroups
+            ? $computedHoursTotal
+            : (float) $row['hours_total'];
+
         return [
             'tt' => $row['tt'],
             'lecturer_id' => $row['lecturer_id'],
@@ -158,7 +174,7 @@ class LecturerHoursSummaryReportBuilder
             'conferences_report_count' => count($row['groups']['conferences']['report_ids']),
             'conferences_attend_count' => count($row['groups']['conferences']['attend_ids']),
             'conferences_hours_total' => self::roundHours($row['groups']['conferences']['hours_total']),
-            'hours_total' => self::roundHours($row['hours_total']),
+            'hours_total' => self::roundHours($hoursTotal),
         ];
     }
 

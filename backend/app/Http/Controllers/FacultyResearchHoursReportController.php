@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\AdminResearchHoursReportExport;
 use App\Models\User;
 use App\Http\Requests\Faculty\FacultyResearchHoursReportRequest;
+use App\Support\ResearchHoursStatisticsExportBuilder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -90,15 +91,25 @@ class FacultyResearchHoursReportController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $result = $this->reportData($validated, $facultyId, false);
+        $filters = $this->normalizeFilters($validated, $facultyId);
+        $filters['academic_year_id'] = ResearchHoursStatisticsExportBuilder::resolveAcademicYearId(
+            $filters['academic_year_id'],
+            $facultyId
+        );
+        $table = $this->buildTable($this->baseQuery($filters), false, $validated);
         $filename = $this->buildExportFilename('faculty_hour_research_report', 'xlsx');
+        $exportRows = ResearchHoursStatisticsExportBuilder::build(
+            $table['items'],
+            (int) $filters['academic_year_id'],
+            $facultyId
+        );
+        $meta = [
+            'academic_year_code' => ResearchHoursStatisticsExportBuilder::resolveAcademicYearCode((int) $filters['academic_year_id']),
+            'scope_label' => $this->resolveExportScopeLabel($facultyId),
+        ];
 
         return Excel::download(
-            new AdminResearchHoursReportExport(
-                $result['table']['items'],
-                $result['kpis'],
-                $result['filters_label']
-            ),
+            new AdminResearchHoursReportExport($exportRows, $meta),
             $filename
         );
     }
@@ -119,14 +130,27 @@ class FacultyResearchHoursReportController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $result = $this->reportData($validated, $facultyId, false);
+        $filters = $this->normalizeFilters($validated, $facultyId);
+        $filters['academic_year_id'] = ResearchHoursStatisticsExportBuilder::resolveAcademicYearId(
+            $filters['academic_year_id'],
+            $facultyId
+        );
+        $table = $this->buildTable($this->baseQuery($filters), false, $validated);
         $filename = $this->buildExportFilename('faculty_hour_research_report', 'pdf');
+        $exportRows = ResearchHoursStatisticsExportBuilder::build(
+            $table['items'],
+            (int) $filters['academic_year_id'],
+            $facultyId
+        );
+        $meta = [
+            'academic_year_code' => ResearchHoursStatisticsExportBuilder::resolveAcademicYearCode((int) $filters['academic_year_id']),
+            'scope_label' => $this->resolveExportScopeLabel($facultyId),
+        ];
 
         return Pdf::loadView('exports.admin_hour_research_report', [
-            'rows' => $result['table']['items'],
-            'kpis' => $result['kpis'],
-            'filters' => $result['filters_label'],
-        ])->setPaper('A4', 'landscape')->download($filename);
+            'rows' => $exportRows,
+            'meta' => $meta,
+        ])->setPaper('A3', 'landscape')->download($filename);
     }
 
     private function reportData(array $validated, int $facultyId, bool $paginate): array
@@ -528,5 +552,9 @@ class FacultyResearchHoursReportController extends Controller
         return DB::table('departments')
             ->where('id', $departmentId)
             ->value('faculty_id');
+    }
+    private function resolveExportScopeLabel(int $facultyId): string
+    {
+        return (string) (DB::table('faculties')->where('id', $facultyId)->value('name') ?? 'Toàn khoa');
     }
 }
