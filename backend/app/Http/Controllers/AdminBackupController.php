@@ -1350,7 +1350,7 @@ class AdminBackupController extends Controller
             }
 
             if ($errorCode === 'DRIVE_AUTH_INVALID') {
-                return 'Không thể xác thực Google Drive cho backup. Hãy reconnect remote spnc_gdrive trong tệp rclone.conf dùng chung rồi thử lại.';
+                return 'Không thể xác thực Google Drive cho backup. Hãy reconnect remote spnc_gdrive trong tệp rclone.conf dùng chung hoặc chuyển sang cấu hình service account rồi thử lại.';
             }
 
             if ($errorCode === 'RCLONE_CONFIG_INVALID') {

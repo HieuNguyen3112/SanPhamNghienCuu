@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -62,6 +63,9 @@ class AdminWorkCatalogController extends Controller
         ]);
 
         $row = DB::table('work_types')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'WORK_TYPE_CREATED', 'Truong tao loai cong trinh', 'work_type', $id, $row?->name, [
+            'after' => $this->workTypePayload($row),
+        ], Response::HTTP_CREATED);
 
         return response()->json([
             'success' => true,
@@ -93,6 +97,14 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('work_types')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'WORK_TYPE_UPDATED', 'Truong cap nhat loai cong trinh', 'work_type', $id, $row?->name, [
+            'before' => [
+                'name' => $existing->name,
+                'description' => $existing->description,
+                'is_active' => (bool) $existing->is_active,
+            ],
+            'after' => $this->workTypePayload($row),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -120,6 +132,10 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('work_types')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'WORK_TYPE_STATUS_UPDATED', 'Truong cap nhat trang thai loai cong trinh', 'work_type', $id, $row?->name, [
+            'before' => ['is_active' => (bool) $existing->is_active],
+            'after' => ['is_active' => (bool) ($row->is_active ?? $data['is_active'])],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -168,6 +184,9 @@ class AdminWorkCatalogController extends Controller
         ]);
 
         $row = DB::table('work_levels')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'WORK_LEVEL_CREATED', 'Truong tao cap cong trinh', 'work_level', $id, $row?->name, [
+            'after' => $this->workLevelPayload($row),
+        ], Response::HTTP_CREATED);
 
         return response()->json([
             'success' => true,
@@ -201,6 +220,15 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('work_levels')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'WORK_LEVEL_UPDATED', 'Truong cap nhat cap cong trinh', 'work_level', $id, $row?->name, [
+            'before' => [
+                'name' => $existing->name,
+                'priority' => $existing->priority,
+                'notes' => $existing->notes,
+                'is_active' => (bool) $existing->is_active,
+            ],
+            'after' => $this->workLevelPayload($row),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -228,6 +256,10 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('work_levels')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'WORK_LEVEL_STATUS_UPDATED', 'Truong cap nhat trang thai cap cong trinh', 'work_level', $id, $row?->name, [
+            'before' => ['is_active' => (bool) $existing->is_active],
+            'after' => ['is_active' => (bool) ($row->is_active ?? $data['is_active'])],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -302,6 +334,9 @@ class AdminWorkCatalogController extends Controller
         ]);
 
         $row = $this->journalQuery()->where('j.id', $id)->first();
+        $this->logCatalogAction($request, 'JOURNAL_CREATED', 'Truong tao tap chi', 'journal', $id, $row?->name, [
+            'after' => $this->journalPayload($row),
+        ], Response::HTTP_CREATED);
 
         return response()->json([
             'success' => true,
@@ -356,6 +391,16 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = $this->journalQuery()->where('j.id', $id)->first();
+        $this->logCatalogAction($request, 'JOURNAL_UPDATED', 'Truong cap nhat tap chi', 'journal', $id, $row?->name, [
+            'before' => [
+                'name' => $existing->name,
+                'issn' => $existing->issn,
+                'classification' => $existing->classification,
+                'research_hours' => $existing->research_hours,
+                'is_active' => (bool) $existing->is_active,
+            ],
+            'after' => $this->journalPayload($row),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -383,6 +428,10 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = $this->journalQuery()->where('j.id', $id)->first();
+        $this->logCatalogAction($request, 'JOURNAL_STATUS_UPDATED', 'Truong cap nhat trang thai tap chi', 'journal', $id, $row?->name, [
+            'before' => ['is_active' => (bool) $existing->is_active],
+            'after' => ['is_active' => (bool) ($row->is_active ?? $data['is_active'])],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -451,6 +500,9 @@ class AdminWorkCatalogController extends Controller
         ]);
 
         $row = DB::table('conferences')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'CONFERENCE_CREATED', 'Truong tao hoi nghi', 'conference', $id, $row?->name, [
+            'after' => $this->conferencePayload($row),
+        ], Response::HTTP_CREATED);
 
         return response()->json([
             'success' => true,
@@ -502,6 +554,15 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('conferences')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'CONFERENCE_UPDATED', 'Truong cap nhat hoi nghi', 'conference', $id, $row?->name, [
+            'before' => [
+                'name' => $existing->name,
+                'level' => $existing->level,
+                'isbn' => $existing->isbn,
+                'is_active' => (bool) $existing->is_active,
+            ],
+            'after' => $this->conferencePayload($row),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -529,6 +590,10 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('conferences')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'CONFERENCE_STATUS_UPDATED', 'Truong cap nhat trang thai hoi nghi', 'conference', $id, $row?->name, [
+            'before' => ['is_active' => (bool) $existing->is_active],
+            'after' => ['is_active' => (bool) ($row->is_active ?? $data['is_active'])],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -668,6 +733,11 @@ class AdminWorkCatalogController extends Controller
             ->first();
 
         $journal = $this->journalQuery()->where('j.id', $journalId)->first();
+        $this->logCatalogAction($request, 'JOURNAL_SUGGESTION_APPROVED', 'Truong duyet de xuat tap chi', 'work_catalog_suggestion', $id, $updatedSuggestion?->source_name, [
+            'suggestion_type' => 'journal',
+            'review_note' => $validated['review_note'] ?? null,
+            'resolved_catalog_id' => $journalId,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -720,6 +790,10 @@ class AdminWorkCatalogController extends Controller
                 's.updated_at',
             ])
             ->first();
+        $this->logCatalogAction($request, 'JOURNAL_SUGGESTION_REJECTED', 'Truong tu choi de xuat tap chi', 'work_catalog_suggestion', $id, $updatedSuggestion?->source_name, [
+            'suggestion_type' => 'journal',
+            'review_note' => $validated['review_note'] ?? null,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -852,6 +926,11 @@ class AdminWorkCatalogController extends Controller
             ->first();
 
         $conference = DB::table('conferences')->where('id', $conferenceId)->first();
+        $this->logCatalogAction($request, 'CONFERENCE_SUGGESTION_APPROVED', 'Truong duyet de xuat hoi nghi', 'work_catalog_suggestion', $id, $updatedSuggestion?->source_name, [
+            'suggestion_type' => 'conference',
+            'review_note' => $validated['review_note'] ?? null,
+            'resolved_catalog_id' => $conferenceId,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -904,6 +983,10 @@ class AdminWorkCatalogController extends Controller
                 's.updated_at',
             ])
             ->first();
+        $this->logCatalogAction($request, 'CONFERENCE_SUGGESTION_REJECTED', 'Truong tu choi de xuat hoi nghi', 'work_catalog_suggestion', $id, $updatedSuggestion?->source_name, [
+            'suggestion_type' => 'conference',
+            'review_note' => $validated['review_note'] ?? null,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -1045,6 +1128,11 @@ class AdminWorkCatalogController extends Controller
             ->first();
 
         $publisher = DB::table('publishers')->where('id', $publisherId)->first();
+        $this->logCatalogAction($request, 'PUBLISHER_SUGGESTION_APPROVED', 'Truong duyet de xuat nha xuat ban', 'work_catalog_suggestion', $id, $updatedSuggestion?->source_name, [
+            'suggestion_type' => 'publisher',
+            'review_note' => $validated['review_note'] ?? null,
+            'resolved_catalog_id' => $publisherId,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -1097,6 +1185,10 @@ class AdminWorkCatalogController extends Controller
                 's.updated_at',
             ])
             ->first();
+        $this->logCatalogAction($request, 'PUBLISHER_SUGGESTION_REJECTED', 'Truong tu choi de xuat nha xuat ban', 'work_catalog_suggestion', $id, $updatedSuggestion?->source_name, [
+            'suggestion_type' => 'publisher',
+            'review_note' => $validated['review_note'] ?? null,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -1158,6 +1250,9 @@ class AdminWorkCatalogController extends Controller
         ]);
 
         $row = DB::table('publishers')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'PUBLISHER_CREATED', 'Truong tao nha xuat ban', 'publisher', $id, $row?->name, [
+            'after' => $this->publisherPayload($row),
+        ], Response::HTTP_CREATED);
 
         return response()->json([
             'success' => true,
@@ -1197,6 +1292,15 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('publishers')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'PUBLISHER_UPDATED', 'Truong cap nhat nha xuat ban', 'publisher', $id, $row?->name, [
+            'before' => [
+                'name' => $existing->name,
+                'code' => $existing->code,
+                'email' => $existing->email,
+                'is_active' => (bool) $existing->is_active,
+            ],
+            'after' => $this->publisherPayload($row),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -1224,6 +1328,10 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('publishers')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'PUBLISHER_STATUS_UPDATED', 'Truong cap nhat trang thai nha xuat ban', 'publisher', $id, $row?->name, [
+            'before' => ['is_active' => (bool) $existing->is_active],
+            'after' => ['is_active' => (bool) ($row->is_active ?? $data['is_active'])],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -1277,6 +1385,9 @@ class AdminWorkCatalogController extends Controller
         ]);
 
         $row = DB::table('research_fields')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'RESEARCH_FIELD_CREATED', 'Truong tao linh vuc nghien cuu', 'research_field', $id, $row?->name, [
+            'after' => $this->researchFieldPayload($row),
+        ], Response::HTTP_CREATED);
 
         return response()->json([
             'success' => true,
@@ -1315,6 +1426,15 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('research_fields')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'RESEARCH_FIELD_UPDATED', 'Truong cap nhat linh vuc nghien cuu', 'research_field', $id, $row?->name, [
+            'before' => [
+                'code' => $existing->code,
+                'name' => $existing->name,
+                'description' => $existing->description,
+                'is_active' => (bool) $existing->is_active,
+            ],
+            'after' => $this->researchFieldPayload($row),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -1342,12 +1462,38 @@ class AdminWorkCatalogController extends Controller
             ]);
 
         $row = DB::table('research_fields')->where('id', $id)->first();
+        $this->logCatalogAction($request, 'RESEARCH_FIELD_STATUS_UPDATED', 'Truong cap nhat trang thai linh vuc nghien cuu', 'research_field', $id, $row?->name, [
+            'before' => ['is_active' => (bool) $existing->is_active],
+            'after' => ['is_active' => (bool) ($row->is_active ?? $data['is_active'])],
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Cập nhật thành công.',
             'data' => $this->researchFieldPayload($row),
         ], Response::HTTP_OK);
+    }
+
+    private function logCatalogAction(
+        Request $request,
+        string $actionCode,
+        string $actionLabel,
+        string $targetType,
+        $targetId,
+        ?string $targetDisplay,
+        array $changes = [],
+        int $status = Response::HTTP_OK
+    ): void {
+        AuditLogger::log($request, [
+            'action_group' => 'config',
+            'action_code' => $actionCode,
+            'action_label' => $actionLabel,
+            'target_type' => $targetType,
+            'target_id' => $targetId,
+            'target_display' => $targetDisplay,
+            'request_http_status' => $status,
+            'changes' => $changes,
+        ], $request->user());
     }
 
     // ===== Helpers =====

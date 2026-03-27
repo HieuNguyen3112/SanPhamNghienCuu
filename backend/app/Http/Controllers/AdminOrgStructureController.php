@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -70,6 +71,21 @@ class AdminOrgStructureController extends Controller
         ]);
 
         $row = $this->facultyQuery()->where('f.id', $id)->first();
+        AuditLogger::log($request, [
+            'action_group' => 'config',
+            'action_code' => 'FACULTY_CREATED',
+            'action_label' => 'Truong tao khoa',
+            'target_type' => 'faculty',
+            'target_id' => $id,
+            'target_display' => trim(($row->code ?? $data['code']) . ' - ' . ($row->name ?? $data['name'])),
+            'request_http_status' => Response::HTTP_CREATED,
+            'changes' => [
+                'after' => [
+                    'code' => $row->code ?? $data['code'],
+                    'name' => $row->name ?? $data['name'],
+                ],
+            ],
+        ], $request->user());
 
         return response()->json([
             'success' => true,
@@ -117,6 +133,25 @@ class AdminOrgStructureController extends Controller
             ]);
 
         $row = $this->facultyQuery()->where('f.id', $facultyId)->first();
+        AuditLogger::log($request, [
+            'action_group' => 'config',
+            'action_code' => 'FACULTY_UPDATED',
+            'action_label' => 'Truong cap nhat khoa',
+            'target_type' => 'faculty',
+            'target_id' => $facultyId,
+            'target_display' => trim(($row->code ?? $incomingCode) . ' - ' . ($row->name ?? $data['name'])),
+            'request_http_status' => Response::HTTP_OK,
+            'changes' => [
+                'before' => [
+                    'code' => $faculty->code,
+                    'name' => $faculty->name,
+                ],
+                'after' => [
+                    'code' => $row->code ?? $incomingCode,
+                    'name' => $row->name ?? $data['name'],
+                ],
+            ],
+        ], $request->user());
 
         return response()->json([
             'success' => true,
@@ -202,6 +237,22 @@ class AdminOrgStructureController extends Controller
         ]);
 
         $row = $this->departmentQuery()->where('d.id', $id)->first();
+        AuditLogger::log($request, [
+            'action_group' => 'config',
+            'action_code' => 'DEPARTMENT_CREATED',
+            'action_label' => 'Truong tao bo mon',
+            'target_type' => 'department',
+            'target_id' => $id,
+            'target_display' => trim(($row->code ?? $data['code']) . ' - ' . ($row->name ?? $data['name'])),
+            'request_http_status' => Response::HTTP_CREATED,
+            'changes' => [
+                'after' => [
+                    'faculty_id' => $row->faculty_id ?? $data['faculty_id'],
+                    'code' => $row->code ?? $data['code'],
+                    'name' => $row->name ?? $data['name'],
+                ],
+            ],
+        ], $request->user());
 
         return response()->json([
             'success' => true,
@@ -253,6 +304,27 @@ class AdminOrgStructureController extends Controller
             ]);
 
         $row = $this->departmentQuery()->where('d.id', $departmentId)->first();
+        AuditLogger::log($request, [
+            'action_group' => 'config',
+            'action_code' => 'DEPARTMENT_UPDATED',
+            'action_label' => 'Truong cap nhat bo mon',
+            'target_type' => 'department',
+            'target_id' => $departmentId,
+            'target_display' => trim(($row->code ?? $data['code']) . ' - ' . ($row->name ?? $data['name'])),
+            'request_http_status' => Response::HTTP_OK,
+            'changes' => [
+                'before' => [
+                    'faculty_id' => $department->faculty_id,
+                    'code' => $department->code,
+                    'name' => $department->name,
+                ],
+                'after' => [
+                    'faculty_id' => $row->faculty_id ?? $data['faculty_id'],
+                    'code' => $row->code ?? $data['code'],
+                    'name' => $row->name ?? $data['name'],
+                ],
+            ],
+        ], $request->user());
 
         return response()->json([
             'success' => true,

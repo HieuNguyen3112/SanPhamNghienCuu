@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\AcademicYearResolver;
+use App\Support\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -184,6 +185,22 @@ class AdminLecturerHourWarningController extends Controller
                 ->where('id', $existing->id)
                 ->update(['updated_at' => $now]);
         }
+
+        $lecturer = DB::table('lecturers')->where('id', $lecturerId)->select(['id', 'code', 'full_name'])->first();
+        AuditLogger::log($request, [
+            'action_group' => 'approval',
+            'action_code' => 'HOURS_WARNING_SENT',
+            'action_label' => 'Truong gui canh bao gio nghien cuu',
+            'target_type' => 'lecturer_yearly_hours',
+            'target_id' => $lecturerId,
+            'target_display' => trim(((string) ($lecturer->code ?? '')) . ' - ' . ((string) ($lecturer->full_name ?? ''))),
+            'request_http_status' => Response::HTTP_OK,
+            'changes' => [
+                'academic_year_identifier' => $year['code'],
+                'reason_code' => $validated['reason_code'],
+                'reason_note' => $validated['reason_note'] ?? null,
+            ],
+        ], $request->user());
 
         return response()->json([
             'success' => true,

@@ -710,6 +710,10 @@ class ResticBackupManager
             || (bool) (($databaseRuntime['pgsql_dump_binary']['exists'] ?? false) === true);
         $pgsqlRestoreBinaryOk = ! in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true)
             || (bool) (($databaseRuntime['pgsql_restore_binary']['exists'] ?? false) === true);
+        $rcloneRemoteAuthMode = (string) ($backupConfig['rclone_remote']['auth_mode'] ?? '');
+        $productionOauthTokenRisk = $requiresRclone
+            && app()->environment('production')
+            && $rcloneRemoteAuthMode === 'oauth_token';
         $repositoryEnvConfigured = $repository !== '' && $passwordSet;
         $runtimeReady = $resticBinaryOk
             && $rcloneBinaryOk
@@ -718,7 +722,8 @@ class ResticBackupManager
             && $mysqlDumpBinaryOk
             && $mysqlRestoreBinaryOk
             && $pgsqlDumpBinaryOk
-            && $pgsqlRestoreBinaryOk;
+            && $pgsqlRestoreBinaryOk
+            && ! $productionOauthTokenRisk;
 
         $blockingIssues = [];
         $warnings = [];
@@ -726,28 +731,28 @@ class ResticBackupManager
         if ($repository === '') {
             $blockingIssues[] = [
                 'code' => 'BACKUP_REPOSITORY_MISSING',
-                'message' => 'Thi?u SPNC_BACKUP_REPOSITORY n�n h? th?ng chua x�c d?nh du?c repository backup.',
+                'message' => 'Thiếu SPNC_BACKUP_REPOSITORY nên hệ thống chưa xác định được repository backup.',
             ];
         }
 
         if (! $passwordSet) {
             $blockingIssues[] = [
                 'code' => 'BACKUP_PASSWORD_MISSING',
-                'message' => 'Thi?u SPNC_BACKUP_PASSWORD n�n kh�ng th? truy c?p repository restic.',
+                'message' => 'Thiếu SPNC_BACKUP_PASSWORD nên không thể truy cập repository restic.',
             ];
         }
 
         if (! $resticBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'RESTIC_BINARY_INVALID',
-                'message' => 'Kh�ng t�m th?y restic binary trong runtime hi?n t?i.',
+                'message' => 'Không tìm thấy restic binary trong runtime hiện tại.',
             ];
         }
 
         if ($requiresRclone && ! $rcloneBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'RCLONE_BINARY_INVALID',
-                'message' => 'Kh�ng t�m th?y rclone binary trong runtime hi?n t?i.',
+                'message' => 'Không tìm thấy rclone binary trong runtime hiện tại.',
             ];
         }
 
@@ -755,42 +760,42 @@ class ResticBackupManager
             $blockingIssues[] = [
                 'code' => 'RCLONE_CONFIG_INVALID',
                 'message' => (string) (($backupConfig['rclone_config']['error'] ?? null)
-                    ?: 'Kh�ng d?c du?c t?p rclone.conf d�ng cho backup.'),
+                    ?: 'Không đọc được tệp rclone.conf dùng cho backup.'),
             ];
         }
 
         if ($requiresRclone && ! $rcloneRemoteOk) {
             $blockingIssues[] = [
                 'code' => 'RCLONE_REMOTE_UNDEFINED',
-                'message' => 'Remote rclone trong SPNC_BACKUP_REPOSITORY chua du?c khai b�o trong rclone config hi?n t?i.',
+                'message' => 'Remote rclone trong SPNC_BACKUP_REPOSITORY chưa được khai báo trong rclone config hiện tại.',
             ];
         }
 
         if (in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true) && ! $pgsqlDumpBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'PG_DUMP_BINARY_INVALID',
-                'message' => 'Kh�ng t�m th?y pg_dump trong runtime hi?n t?i n�n chua th? t?o PostgreSQL dump cho backup.',
+                'message' => 'Không tìm thấy pg_dump trong runtime hiện tại nên chưa thể tạo PostgreSQL dump cho backup.',
             ];
         }
 
         if (in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true) && ! $pgsqlRestoreBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'PSQL_BINARY_INVALID',
-                'message' => 'Kh�ng t�m th?y psql trong runtime hi?n t?i n�n chua th? ph?c h?i PostgreSQL t? backup.',
+                'message' => 'Không tìm thấy psql trong runtime hiện tại nên chưa thể phục hồi PostgreSQL từ backup.',
             ];
         }
 
         if (in_array($databaseDriver, ['mysql', 'mariadb'], true) && ! $mysqlDumpBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'MYSQLDUMP_BINARY_INVALID',
-                'message' => 'Kh�ng t�m th?y mysqldump trong runtime hi?n t?i n�n chua th? t?o database dump cho backup.',
+                'message' => 'Không tìm thấy mysqldump trong runtime hiện tại nên chưa thể tạo database dump cho backup.',
             ];
         }
 
         if (in_array($databaseDriver, ['mysql', 'mariadb'], true) && ! $mysqlRestoreBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'MYSQL_BINARY_INVALID',
-                'message' => 'Kh�ng t�m th?y mysql client trong runtime hi?n t?i n�n chua th? ph?c h?i database t? backup.',
+                'message' => 'Không tìm thấy mysql client trong runtime hiện tại nên chưa thể phục hồi database từ backup.',
             ];
         }
 
@@ -804,14 +809,21 @@ class ResticBackupManager
         if (! ($destination['valid'] ?? false)) {
             $blockingIssues[] = [
                 'code' => (string) ($destination['error_code'] ?? 'EXPORT_TARGET_INVALID'),
-                'message' => (string) ($destination['error_message'] ?? 'Kh�ng suy ra du?c d�ch export t? c?u h�nh backup hi?n t?i.'),
+                'message' => (string) ($destination['error_message'] ?? 'Không suy ra được đích export từ cấu hình backup hiện tại.'),
             ];
         }
 
-        if ($requiresRclone && (string) ($backupConfig['rclone_remote']['auth_mode'] ?? '') === 'oauth_token') {
+        if ($requiresRclone && $rcloneRemoteAuthMode === 'oauth_token') {
             $warnings[] = [
                 'code' => 'RCLONE_OAUTH_INTERACTIVE',
-                'message' => 'Backup dang ph? thu?c user OAuth token trong rclone.conf. Production n�n d�ng service account d? tr�nh ph?i re-auth th? c�ng khi token b? revoke ho?c invalid.',
+                'message' => 'Backup đang phụ thuộc user OAuth token trong rclone.conf. Nên dùng service account để tránh phải reconnect thủ công khi token bị revoke hoặc invalid.',
+            ];
+        }
+
+        if ($productionOauthTokenRisk) {
+            $blockingIssues[] = [
+                'code' => 'RCLONE_SERVICE_ACCOUNT_REQUIRED',
+                'message' => 'Production đang dùng user OAuth token cho remote backup. Hãy cấu hình SPNC_RCLONE_SERVICE_ACCOUNT_FILE hoặc SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64 để tránh lỗi invalid_grant.',
             ];
         }
 

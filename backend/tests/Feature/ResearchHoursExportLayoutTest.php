@@ -85,6 +85,10 @@ class ResearchHoursExportLayoutTest extends TestCase
         $this->assertCount(16, $rows[4]);
         $this->assertCount(16, $rows[5]);
         $this->assertCount(16, $rows[6]);
+        $this->assertSame("Tham gia\nSố thành viên/số giờ", $rows[5][3]);
+        $this->assertSame("Điểm 1-2\n(Số tác giả/số giờ)", $rows[5][6]);
+        $this->assertSame("Tham gia\n(Số tác giả/số giờ)", $rows[6][10]);
+        $this->assertSame("Tham dự\n(Số lượt/số giờ)", $rows[5][14]);
         $this->assertSame('1', $rows[7][0]);
         $this->assertSame('ACC GIẢNG VIÊN DEMO', $rows[7][1]);
     }
@@ -104,6 +108,9 @@ class ResearchHoursExportLayoutTest extends TestCase
         $this->assertStringContainsString('Biên soạn giáo trình, tài liệu tham khảo', $html);
         $this->assertStringContainsString('Sách chuyên khảo, giáo trình', $html);
         $this->assertStringContainsString('Sách tham khảo, sách hướng dẫn, từ điển', $html);
+        $this->assertStringContainsString('Số thành viên/số giờ', $html);
+        $this->assertStringContainsString('Số tác giả/số giờ', $html);
+        $this->assertStringContainsString('Số lượt/số giờ', $html);
         $this->assertStringContainsString('Hội nghị, hội thảo, seminar', $html);
         $this->assertStringContainsString('class="major-header total-column"', $html);
         $this->assertStringContainsString('Tổng số giờ', $html);

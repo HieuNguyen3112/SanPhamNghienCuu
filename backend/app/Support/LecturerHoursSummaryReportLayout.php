@@ -36,7 +36,7 @@ class LecturerHoursSummaryReportLayout
                 'subheader_fill' => 'EDF4FA',
                 'columns' => [
                     ['key' => 'national_projects_principal_summary', 'label' => 'Chủ nhiệm', 'format' => 'count_hours'],
-                    ['key' => 'national_projects_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
+                    ['key' => 'national_projects_participant_summary', 'label' => "Tham gia\nSố thành viên/số giờ", 'format' => 'count_hours'],
                 ],
             ],
             [
@@ -55,9 +55,9 @@ class LecturerHoursSummaryReportLayout
                 'header_fill' => 'EDE7D8',
                 'subheader_fill' => 'F7F3E9',
                 'columns' => [
-                    ['key' => 'papers_point_1_2_summary', 'label' => 'Điểm 1-2', 'format' => 'count_hours'],
-                    ['key' => 'papers_point_le_1_summary', 'label' => "Điểm ≤ 1", 'format' => 'count_hours'],
-                    ['key' => 'papers_other_summary', 'label' => 'Bài báo / báo cáo khác', 'format' => 'count_hours'],
+                    ['key' => 'papers_point_1_2_summary', 'label' => "Điểm 1-2\n(Số tác giả/số giờ)", 'format' => 'count_hours'],
+                    ['key' => 'papers_point_le_1_summary', 'label' => "Điểm ≤ 1\n(Số tác giả/số giờ)", 'format' => 'count_hours'],
+                    ['key' => 'papers_other_summary', 'label' => "Bài báo / báo cáo khác\n(Số tác giả/số giờ)", 'format' => 'count_hours'],
                 ],
             ],
             [
@@ -71,7 +71,7 @@ class LecturerHoursSummaryReportLayout
                         'label' => 'Sách chuyên khảo, giáo trình',
                         'columns' => [
                             ['key' => 'textbooks_principal_summary', 'label' => 'Chủ biên', 'format' => 'count_hours'],
-                            ['key' => 'textbooks_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
+                            ['key' => 'textbooks_participant_summary', 'label' => "Tham gia\n(Số tác giả/số giờ)", 'format' => 'count_hours'],
                         ],
                     ],
                     [
@@ -79,7 +79,7 @@ class LecturerHoursSummaryReportLayout
                         'label' => 'Sách tham khảo, sách hướng dẫn, từ điển',
                         'columns' => [
                             ['key' => 'scholarly_books_principal_summary', 'label' => 'Chủ biên', 'format' => 'count_hours'],
-                            ['key' => 'scholarly_books_participant_summary', 'label' => 'Tham gia', 'format' => 'count_hours'],
+                            ['key' => 'scholarly_books_participant_summary', 'label' => "Tham gia\n(Số tác giả/số giờ)", 'format' => 'count_hours'],
                         ],
                     ],
                 ],
@@ -90,8 +90,8 @@ class LecturerHoursSummaryReportLayout
                 'header_fill' => 'F4E6D7',
                 'subheader_fill' => 'FBF1E8',
                 'columns' => [
-                    ['key' => 'conferences_report_summary', 'label' => 'Báo cáo', 'format' => 'count_hours'],
-                    ['key' => 'conferences_attend_summary', 'label' => 'Tham dự', 'format' => 'count_hours'],
+                    ['key' => 'conferences_report_summary', 'label' => "Báo cáo\n(Số buổi/số giờ)", 'format' => 'count_hours'],
+                    ['key' => 'conferences_attend_summary', 'label' => "Tham dự\n(Số lượt/số giờ)", 'format' => 'count_hours'],
                 ],
             ],
             [

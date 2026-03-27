@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Lecturer;
 use App\Models\LecturerProfile;
 use App\Services\UserManagement\CreateFacultyLecturerAccountService;
+use App\Support\AuditLogger;
 use App\Support\RoleMapper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -93,7 +94,7 @@ class AdminLecturerAccountController extends Controller
             request: $request,
             assignedRole: 'DEPARTMENT_BOARD',
             auditOverrides: [
-                'action_group' => 'admin.lecturer_accounts',
+                'action_group' => 'lecturer',
                 'action_code' => 'ADMIN_DEPARTMENT_BOARD_ACCOUNT_CREATED',
                 'action_label' => 'Truong tao tai khoan BCN khoa',
             ],
@@ -241,6 +242,13 @@ class AdminLecturerAccountController extends Controller
             'position_title' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $before = [
+            'full_name' => $lecturer->full_name,
+            'email' => $lecturer->user?->email ?? $lecturer->email,
+            'unit_id' => $lecturer->department_id,
+            'position_title' => $lecturer->profile?->current_position,
+        ];
+
         DB::transaction(function () use ($data, $lecturer) {
             $lecturer->fill([
                 'full_name' => $data['full_name'],
@@ -259,6 +267,15 @@ class AdminLecturerAccountController extends Controller
         });
 
         $lecturer->refresh()->load(['user.roles', 'department', 'profile']);
+        $this->logLecturerAccountAction($request, 'ADMIN_LECTURER_ACCOUNT_UPDATED', 'Truong cap nhat tai khoan giang vien', $lecturer, [
+            'before' => $before,
+            'after' => [
+                'full_name' => $lecturer->full_name,
+                'email' => $lecturer->user?->email ?? $lecturer->email,
+                'unit_id' => $lecturer->department_id,
+                'position_title' => $lecturer->profile?->current_position,
+            ],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -288,6 +305,7 @@ class AdminLecturerAccountController extends Controller
         }
 
         $backendRoles = RoleMapper::canonicalListToBackend($roleKeys);
+        $beforeRoles = RoleMapper::backendListToCanonical($lecturer->user->getRoleNames()->values()->all());
 
         if (! empty($backendRoles)) {
             foreach ($backendRoles as $roleName) {
@@ -298,6 +316,10 @@ class AdminLecturerAccountController extends Controller
         $lecturer->user->syncRoles($backendRoles);
 
         $lecturer->refresh()->load(['user.roles', 'department', 'profile']);
+        $this->logLecturerAccountAction($request, 'ADMIN_LECTURER_ACCOUNT_ROLES_UPDATED', 'Truong cap nhat vai tro tai khoan giang vien', $lecturer, [
+            'before' => ['role_keys' => $beforeRoles],
+            'after' => ['role_keys' => RoleMapper::backendListToCanonical($lecturer->user?->getRoleNames()->values()->all() ?? [])],
+        ]);
 
         return response()->json([
             'success' => true,
@@ -313,10 +335,16 @@ class AdminLecturerAccountController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $beforeStatus = (bool) $lecturer->active;
         $lecturer->active = (bool) $data['is_active'];
         $lecturer->save();
 
         $lecturer->refresh()->load(['user.roles', 'department', 'profile']);
+        $this->logLecturerAccountAction($request, 'ADMIN_LECTURER_ACCOUNT_STATUS_UPDATED', 'Truong cap nhat trang thai tai khoan giang vien', $lecturer, [
+            'before' => ['is_active' => $beforeStatus],
+            'after' => ['is_active' => (bool) $lecturer->active],
+            'reason' => $data['reason'] ?? null,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -442,6 +470,26 @@ class AdminLecturerAccountController extends Controller
             'updated_at' => $lecturer->updated_at?->toISOString(),
             'updated_by' => null,
         ];
+    }
+
+    private function logLecturerAccountAction(
+        Request $request,
+        string $actionCode,
+        string $actionLabel,
+        Lecturer $lecturer,
+        array $changes = []
+    ): void {
+        AuditLogger::log($request, [
+            'action_group' => 'lecturer',
+            'action_code' => $actionCode,
+            'action_label' => $actionLabel,
+            'target_type' => 'lecturer_account',
+            'target_id' => $lecturer->id,
+            'target_display' => trim(($lecturer->code ? $lecturer->code . ' - ' : '') . ($lecturer->full_name ?? '')),
+            'result_status' => 'success',
+            'request_http_status' => Response::HTTP_OK,
+            'changes' => $changes,
+        ], $request->user());
     }
 
     private function roleOptions(): array
