@@ -3,8 +3,10 @@
 namespace App\Services\Backup;
 
 use Carbon\Carbon;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\ExecutableFinder;
@@ -45,6 +47,7 @@ class ResticBackupManager
     public function listSnapshots(int $limit = 50): array
     {
         $this->assertConfigured();
+        $this->assertDriveReadiness('snapshot_refresh');
         $this->ensureRepositoryReady();
 
         $result = $this->runRestic([
@@ -86,6 +89,7 @@ class ResticBackupManager
     public function runBackup(string $runId, string $trigger = 'manual', ?int $initiatedBy = null): array
     {
         $this->assertConfigured();
+        $this->assertDriveReadiness('backup');
         $this->ensureRepositoryReady();
 
         $workspaceRelative = $this->workspaceRelativePath($runId);
@@ -99,7 +103,7 @@ class ResticBackupManager
         $includePaths = $this->resolveIncludedPathsForSnapshot();
         if ($includePaths === []) {
             throw new BackupRuntimeException(
-                'Không tìm thấy thư mục dữ liệu cần backup. Vui lòng kiểm tra SPNC_BACKUP_INCLUDE_PATHS.'
+                'KhÃ´ng tÃ¬m tháº¥y thÆ° má»¥c dá»¯ liá»‡u cáº§n backup. Vui lÃ²ng kiá»ƒm tra SPNC_BACKUP_INCLUDE_PATHS.'
             );
         }
         $excludePaths = $this->resolveExcludedPaths();
@@ -111,7 +115,7 @@ class ResticBackupManager
             $this->dumpDatabase($dbDumpAbsolute);
             $dbDumpSize = $this->resolveFileSize($dbDumpAbsolute);
             if ($dbDumpSize <= 0) {
-                throw new BackupRuntimeException('DB dump rỗng, backup bị hủy để tránh tạo snapshot không hợp lệ.');
+                throw new BackupRuntimeException('DB dump rá»—ng, backup bá»‹ há»§y Ä‘á»ƒ trÃ¡nh táº¡o snapshot khÃ´ng há»£p lá»‡.');
             }
 
             $includedPathStats = $this->buildIncludedPathStats($includePaths);
@@ -161,7 +165,7 @@ class ResticBackupManager
             $snapshot = $this->findLatestSnapshotForRunId($runId);
             $snapshotId = trim((string) (($snapshot['snapshot_id'] ?? $snapshot['snapshot_id_full'] ?? '')));
             if ($snapshotId === '') {
-                throw new BackupRuntimeException('Không xác định được snapshot ID sau khi restic backup hoàn tất.');
+                throw new BackupRuntimeException('KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c snapshot ID sau khi restic backup hoÃ n táº¥t.');
             }
 
             return [
@@ -190,7 +194,7 @@ class ResticBackupManager
                 ],
             ];
         } finally {
-            // Không giữ DB dump tạm tại local sau khi đã snapshot thành công/thất bại.
+            // KhÃ´ng giá»¯ DB dump táº¡m táº¡i local sau khi Ä‘Ã£ snapshot thÃ nh cÃ´ng/tháº¥t báº¡i.
             if (File::exists($workspaceAbsolute)) {
                 File::deleteDirectory($workspaceAbsolute);
             }
@@ -204,12 +208,13 @@ class ResticBackupManager
         ?int $initiatedBy = null
     ): array {
         $this->assertConfigured();
+        $this->assertDriveReadiness('backup_postprocess');
         $this->ensureRepositoryReady();
         $this->assertValidSnapshotId($snapshotId);
 
         $snapshot = $this->findSnapshotById($snapshotId);
         if (! $snapshot) {
-            throw new BackupRuntimeException('Không tìm thấy snapshot để tạo export dễ đọc.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y snapshot Ä‘á»ƒ táº¡o export dá»… Ä‘á»c.');
         }
 
         $manifest = $this->extractManifestFromSnapshot($snapshotId);
@@ -257,6 +262,7 @@ class ResticBackupManager
     public function runRepositoryCheck(): array
     {
         $this->assertConfigured();
+        $this->assertDriveReadiness('backup_check');
         $this->ensureRepositoryReady();
 
         $subset = trim((string) config('backup.verification.read_data_subset', '1/20'));
@@ -281,6 +287,7 @@ class ResticBackupManager
     public function pruneBackups(): array
     {
         $this->assertConfigured();
+        $this->assertDriveReadiness('prune');
         $this->ensureRepositoryReady();
 
         $keepLast = max(1, (int) config('backup.retention.keep_last', 12));
@@ -319,24 +326,25 @@ class ResticBackupManager
         string $restoreRunId
     ): array {
         $this->assertConfigured();
+        $this->assertDriveReadiness('restore');
         $this->ensureRepositoryReady();
         $this->assertValidSnapshotId($snapshotId);
 
         if (! in_array($scope, ['db_only', 'files_only', 'full'], true)) {
-            throw new BackupRuntimeException('Phạm vi khôi phục không hợp lệ.');
+            throw new BackupRuntimeException('Pháº¡m vi khÃ´i phá»¥c khÃ´ng há»£p lá»‡.');
         }
         if (! in_array($target, ['staging', 'current'], true)) {
-            throw new BackupRuntimeException('Đích khôi phục không hợp lệ.');
+            throw new BackupRuntimeException('ÄÃ­ch khÃ´i phá»¥c khÃ´ng há»£p lá»‡.');
         }
 
         $snapshot = $this->findSnapshotById($snapshotId);
         if (! $snapshot) {
-            throw new BackupRuntimeException('Không tìm thấy snapshot cần khôi phục.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y snapshot cáº§n khÃ´i phá»¥c.');
         }
 
         $workspacePath = (string) ($snapshot['workspace_path'] ?? '');
         if ($workspacePath === '') {
-            throw new BackupRuntimeException('Snapshot không chứa metadata workspace để khôi phục.');
+            throw new BackupRuntimeException('Snapshot khÃ´ng chá»©a metadata workspace Ä‘á»ƒ khÃ´i phá»¥c.');
         }
 
         $restoreRelativeRoot = $this->restoreRelativePath($restoreRunId);
@@ -367,10 +375,10 @@ class ResticBackupManager
                 app()->environment('production')
                 && ! (bool) config('backup.restore.allow_live_restore_in_production', false)
             ) {
-                throw new BackupRuntimeException('Khôi phục trực tiếp trên production đang bị khóa.');
+                throw new BackupRuntimeException('KhÃ´i phá»¥c trá»±c tiáº¿p trÃªn production Ä‘ang bá»‹ khÃ³a.');
             }
             if (! (bool) config('backup.restore.allow_live_restore', false)) {
-                throw new BackupRuntimeException('Khôi phục trực tiếp bị tắt trong cấu hình hệ thống.');
+                throw new BackupRuntimeException('KhÃ´i phá»¥c trá»±c tiáº¿p bá»‹ táº¯t trong cáº¥u hÃ¬nh há»‡ thá»‘ng.');
             }
 
             if (in_array($scope, ['db_only', 'full'], true)) {
@@ -403,12 +411,12 @@ class ResticBackupManager
     {
         $snapshot = $this->findSnapshotById($snapshotId);
         if (! $snapshot) {
-            throw new BackupRuntimeException('Không tìm thấy snapshot.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y snapshot.');
         }
 
         $workspacePath = (string) ($snapshot['workspace_path'] ?? '');
         if ($workspacePath === '') {
-            throw new BackupRuntimeException('Không tìm thấy đường dẫn manifest trong snapshot.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y Ä‘Æ°á»ng dáº«n manifest trong snapshot.');
         }
 
         $relativePath = $workspacePath . '/' . self::MANIFEST_FILENAME;
@@ -419,12 +427,12 @@ class ResticBackupManager
     {
         $snapshot = $this->findSnapshotById($snapshotId);
         if (! $snapshot) {
-            throw new BackupRuntimeException('Không tìm thấy snapshot.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y snapshot.');
         }
 
         $workspacePath = (string) ($snapshot['workspace_path'] ?? '');
         if ($workspacePath === '') {
-            throw new BackupRuntimeException('Không tìm thấy đường dẫn DB dump trong snapshot.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y Ä‘Æ°á»ng dáº«n DB dump trong snapshot.');
         }
 
         $relativePath = $workspacePath . '/' . self::DB_DUMP_RELATIVE_PATH;
@@ -494,7 +502,7 @@ class ResticBackupManager
 
         $metadata = $this->resolveExportMetadata($snapshotId);
         if (! $metadata) {
-            throw new BackupRuntimeException('Snapshot chưa có export dễ đọc.');
+            throw new BackupRuntimeException('Snapshot chÆ°a cÃ³ export dá»… Ä‘á»c.');
         }
 
         return array_merge($metadata, [
@@ -550,9 +558,9 @@ class ResticBackupManager
                 'stats' => is_array($export) ? ($export['stats'] ?? null) : null,
             ],
             'messages' => [
-                'safe' => 'Hệ thống đã sao lưu an toàn.',
-                'drive' => 'Bạn có thể mở thư mục Backup trên Google Drive để xem bản sao lưu dễ đọc.',
-                'restore' => 'Khi cần khôi phục, vui lòng dùng chức năng Khôi phục trong hệ thống.',
+                'safe' => 'Há»‡ thá»‘ng Ä‘Ã£ sao lÆ°u an toÃ n.',
+                'drive' => 'Báº¡n cÃ³ thá»ƒ má»Ÿ thÆ° má»¥c Backup trÃªn Google Drive Ä‘á»ƒ xem báº£n sao lÆ°u dá»… Ä‘á»c.',
+                'restore' => 'Khi cáº§n khÃ´i phá»¥c, vui lÃ²ng dÃ¹ng chá»©c nÄƒng KhÃ´i phá»¥c trong há»‡ thá»‘ng.',
             ],
         ];
     }
@@ -574,12 +582,12 @@ class ResticBackupManager
 
         $localRootRelative = trim((string) ($metadata['local_root_relative_path'] ?? ''));
         if ($localRootRelative === '') {
-            throw new BackupRuntimeException('Không tìm thấy thư mục export để đóng gói tải xuống.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y thÆ° má»¥c export Ä‘á»ƒ Ä‘Ã³ng gÃ³i táº£i xuá»‘ng.');
         }
 
         $localRootAbsolute = $this->basePathFromRelative($localRootRelative);
         if (! File::isDirectory($localRootAbsolute)) {
-            throw new BackupRuntimeException('Không tìm thấy thư mục export trên máy chủ.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y thÆ° má»¥c export trÃªn mÃ¡y chá»§.');
         }
 
         $token = 'export_' . Str::uuid();
@@ -618,7 +626,7 @@ class ResticBackupManager
 
         $normalized = array_values(array_unique($normalized));
         if ($normalized === []) {
-            throw new BackupRuntimeException('Danh sách snapshot cần xóa không hợp lệ.');
+            throw new BackupRuntimeException('Danh sÃ¡ch snapshot cáº§n xÃ³a khÃ´ng há»£p lá»‡.');
         }
 
         $args = ['forget'];
@@ -644,7 +652,7 @@ class ResticBackupManager
         $result = $this->runRestic(['unlock'], true, 180);
         if (! ($result['successful'] ?? false)) {
             throw new BackupRuntimeException(
-                'Không thể gỡ khóa stale của repository backup.'
+                'KhÃ´ng thá»ƒ gá»¡ khÃ³a stale cá»§a repository backup.'
             );
         }
 
@@ -711,19 +719,35 @@ class ResticBackupManager
         $pgsqlRestoreBinaryOk = ! in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true)
             || (bool) (($databaseRuntime['pgsql_restore_binary']['exists'] ?? false) === true);
         $rcloneRemoteAuthMode = (string) ($backupConfig['rclone_remote']['auth_mode'] ?? '');
+        $serviceAccountLoaded = ! $requiresRclone
+            || (bool) (($backupConfig['rclone_service_account_file']['readable'] ?? false) === true);
+        $rcloneConfigSource = (string) ($backupConfig['rclone_config']['source'] ?? '');
+        $serviceAccountSource = (string) ($backupConfig['rclone_service_account_file']['source'] ?? '');
+        $staleRemoteAuthFields = (bool) (($backupConfig['rclone_remote']['has_stale_auth_fields'] ?? false) === true);
         $productionOauthTokenRisk = $requiresRclone
             && app()->environment('production')
             && $rcloneRemoteAuthMode === 'oauth_token';
+        $productionMissingServiceAccount = $requiresRclone
+            && app()->environment('production')
+            && ! $serviceAccountLoaded;
+        $productionPathOverridesBase64 = $requiresRclone
+            && app()->environment('production')
+            && $rcloneConfigSource === 'path'
+            && trim((string) config('backup.restic.rclone_config_base64', '')) !== '';
         $repositoryEnvConfigured = $repository !== '' && $passwordSet;
         $runtimeReady = $resticBinaryOk
             && $rcloneBinaryOk
             && $rcloneConfigOk
             && $rcloneRemoteOk
+            && $serviceAccountLoaded
             && $mysqlDumpBinaryOk
             && $mysqlRestoreBinaryOk
             && $pgsqlDumpBinaryOk
             && $pgsqlRestoreBinaryOk
-            && ! $productionOauthTokenRisk;
+            && ! $productionOauthTokenRisk
+            && ! $productionMissingServiceAccount
+            && ! $productionPathOverridesBase64
+            && ! $staleRemoteAuthFields;
 
         $blockingIssues = [];
         $warnings = [];
@@ -731,28 +755,28 @@ class ResticBackupManager
         if ($repository === '') {
             $blockingIssues[] = [
                 'code' => 'BACKUP_REPOSITORY_MISSING',
-                'message' => 'Thiếu SPNC_BACKUP_REPOSITORY nên hệ thống chưa xác định được repository backup.',
+                'message' => 'Thiáº¿u SPNC_BACKUP_REPOSITORY nÃªn há»‡ thá»‘ng chÆ°a xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c repository backup.',
             ];
         }
 
         if (! $passwordSet) {
             $blockingIssues[] = [
                 'code' => 'BACKUP_PASSWORD_MISSING',
-                'message' => 'Thiếu SPNC_BACKUP_PASSWORD nên không thể truy cập repository restic.',
+                'message' => 'Thiáº¿u SPNC_BACKUP_PASSWORD nÃªn khÃ´ng thá»ƒ truy cáº­p repository restic.',
             ];
         }
 
         if (! $resticBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'RESTIC_BINARY_INVALID',
-                'message' => 'Không tìm thấy restic binary trong runtime hiện tại.',
+                'message' => 'KhÃ´ng tÃ¬m tháº¥y restic binary trong runtime hiá»‡n táº¡i.',
             ];
         }
 
         if ($requiresRclone && ! $rcloneBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'RCLONE_BINARY_INVALID',
-                'message' => 'Không tìm thấy rclone binary trong runtime hiện tại.',
+                'message' => 'KhÃ´ng tÃ¬m tháº¥y rclone binary trong runtime hiá»‡n táº¡i.',
             ];
         }
 
@@ -760,42 +784,42 @@ class ResticBackupManager
             $blockingIssues[] = [
                 'code' => 'RCLONE_CONFIG_INVALID',
                 'message' => (string) (($backupConfig['rclone_config']['error'] ?? null)
-                    ?: 'Không đọc được tệp rclone.conf dùng cho backup.'),
+                    ?: 'KhÃ´ng Ä‘á»c Ä‘Æ°á»£c tá»‡p rclone.conf dÃ¹ng cho backup.'),
             ];
         }
 
         if ($requiresRclone && ! $rcloneRemoteOk) {
             $blockingIssues[] = [
                 'code' => 'RCLONE_REMOTE_UNDEFINED',
-                'message' => 'Remote rclone trong SPNC_BACKUP_REPOSITORY chưa được khai báo trong rclone config hiện tại.',
+                'message' => 'Remote rclone trong SPNC_BACKUP_REPOSITORY chÆ°a Ä‘Æ°á»£c khai bÃ¡o trong rclone config hiá»‡n táº¡i.',
             ];
         }
 
         if (in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true) && ! $pgsqlDumpBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'PG_DUMP_BINARY_INVALID',
-                'message' => 'Không tìm thấy pg_dump trong runtime hiện tại nên chưa thể tạo PostgreSQL dump cho backup.',
+                'message' => 'KhÃ´ng tÃ¬m tháº¥y pg_dump trong runtime hiá»‡n táº¡i nÃªn chÆ°a thá»ƒ táº¡o PostgreSQL dump cho backup.',
             ];
         }
 
         if (in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true) && ! $pgsqlRestoreBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'PSQL_BINARY_INVALID',
-                'message' => 'Không tìm thấy psql trong runtime hiện tại nên chưa thể phục hồi PostgreSQL từ backup.',
+                'message' => 'KhÃ´ng tÃ¬m tháº¥y psql trong runtime hiá»‡n táº¡i nÃªn chÆ°a thá»ƒ phá»¥c há»“i PostgreSQL tá»« backup.',
             ];
         }
 
         if (in_array($databaseDriver, ['mysql', 'mariadb'], true) && ! $mysqlDumpBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'MYSQLDUMP_BINARY_INVALID',
-                'message' => 'Không tìm thấy mysqldump trong runtime hiện tại nên chưa thể tạo database dump cho backup.',
+                'message' => 'KhÃ´ng tÃ¬m tháº¥y mysqldump trong runtime hiá»‡n táº¡i nÃªn chÆ°a thá»ƒ táº¡o database dump cho backup.',
             ];
         }
 
         if (in_array($databaseDriver, ['mysql', 'mariadb'], true) && ! $mysqlRestoreBinaryOk) {
             $blockingIssues[] = [
                 'code' => 'MYSQL_BINARY_INVALID',
-                'message' => 'Không tìm thấy mysql client trong runtime hiện tại nên chưa thể phục hồi database từ backup.',
+                'message' => 'KhÃ´ng tÃ¬m tháº¥y mysql client trong runtime hiá»‡n táº¡i nÃªn chÆ°a thá»ƒ phá»¥c há»“i database tá»« backup.',
             ];
         }
 
@@ -809,28 +833,59 @@ class ResticBackupManager
         if (! ($destination['valid'] ?? false)) {
             $blockingIssues[] = [
                 'code' => (string) ($destination['error_code'] ?? 'EXPORT_TARGET_INVALID'),
-                'message' => (string) ($destination['error_message'] ?? 'Không suy ra được đích export từ cấu hình backup hiện tại.'),
+                'message' => (string) ($destination['error_message'] ?? 'KhÃ´ng suy ra Ä‘Æ°á»£c Ä‘Ã­ch export tá»« cáº¥u hÃ¬nh backup hiá»‡n táº¡i.'),
             ];
         }
 
         if ($requiresRclone && $rcloneRemoteAuthMode === 'oauth_token') {
             $warnings[] = [
                 'code' => 'RCLONE_OAUTH_INTERACTIVE',
-                'message' => 'Backup đang phụ thuộc user OAuth token trong rclone.conf. Nên dùng service account để tránh phải reconnect thủ công khi token bị revoke hoặc invalid.',
+                'message' => 'Backup Ä‘ang phá»¥ thuá»™c user OAuth token trong rclone.conf. NÃªn dÃ¹ng service account Ä‘á»ƒ trÃ¡nh pháº£i reconnect thá»§ cÃ´ng khi token bá»‹ revoke hoáº·c invalid.',
             ];
         }
 
         if ($productionOauthTokenRisk) {
             $blockingIssues[] = [
                 'code' => 'RCLONE_SERVICE_ACCOUNT_REQUIRED',
-                'message' => 'Production đang dùng user OAuth token cho remote backup. Hãy cấu hình SPNC_RCLONE_SERVICE_ACCOUNT_FILE hoặc SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64 để tránh lỗi invalid_grant.',
+                'message' => 'Production Ä‘ang dÃ¹ng user OAuth token cho remote backup. HÃ£y cáº¥u hÃ¬nh SPNC_RCLONE_SERVICE_ACCOUNT_FILE hoáº·c SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64 Ä‘á»ƒ trÃ¡nh lá»—i invalid_grant.',
             ];
         }
+
+        if ($requiresRclone && ! $serviceAccountLoaded) {
+            $blockingIssues[] = [
+                'code' => 'SERVICE_ACCOUNT_INVALID',
+                'message' => (string) (($backupConfig['rclone_service_account_file']['error'] ?? null)
+                    ?: 'KhÃ´ng thá»ƒ materialize Google service account JSON cho runtime backup.'),
+            ];
+        }
+
+        if ($productionMissingServiceAccount) {
+            $blockingIssues[] = [
+                'code' => 'SERVICE_ACCOUNT_REQUIRED',
+                'message' => 'Production backup chá»‰ Ä‘Æ°á»£c phÃ©p cháº¡y báº±ng service account. HÃ£y cáº¥u hÃ¬nh SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64.',
+            ];
+        }
+
+        if ($productionPathOverridesBase64) {
+            $blockingIssues[] = [
+                'code' => 'RCLONE_CONFIG_SOURCE_MISMATCH',
+                'message' => 'Production Ä‘ang Æ°u tiÃªn file rclone.conf cÅ© theo path thay vÃ¬ cáº¥u hÃ¬nh base64 tá»« env. HÃ£y Ä‘á»ƒ SPNC_RCLONE_CONFIG rá»—ng.',
+            ];
+        }
+
+        if ($staleRemoteAuthFields) {
+            $blockingIssues[] = [
+                'code' => 'RCLONE_REMOTE_NOT_MINIMAL',
+                'message' => 'Remote backup cÃ²n chá»©a trÆ°á»ng OAuth cÅ© nhÆ° token, client_id, client_secret, team_drive hoáº·c service_account_file. HÃ£y giá»¯ remote tá»‘i giáº£n vá»›i type, scope vÃ  root_folder_id.',
+            ];
+        }
+
+        $driveProbe = $this->buildOperationReadinessProbe($repository, $requiresRclone);
 
         return [
             'repository_env_configured' => $repositoryEnvConfigured,
             'runtime_ready' => $runtimeReady,
-            'ready_for_operations' => $repositoryEnvConfigured && $runtimeReady && (bool) ($destination['valid'] ?? false),
+            'ready_for_operations' => $repositoryEnvConfigured && $runtimeReady && (bool) ($destination['valid'] ?? false) && (bool) ($driveProbe['ok'] ?? true),
             'repository' => [
                 'value' => $repository !== '' ? $repository : null,
                 'type' => $repositoryType !== 'unknown' ? $repositoryType : null,
@@ -842,6 +897,11 @@ class ResticBackupManager
                 'rclone_config' => $backupConfig['rclone_config'] ?? null,
                 'rclone_program' => $backupConfig['rclone_program'] ?? null,
                 'rclone_remote' => $backupConfig['rclone_remote'] ?? null,
+                'auth_mode' => $rcloneRemoteAuthMode !== '' ? $rcloneRemoteAuthMode : null,
+                'config_source' => $rcloneConfigSource !== '' ? $rcloneConfigSource : null,
+                'service_account_source' => $serviceAccountSource !== '' ? $serviceAccountSource : null,
+                'service_account_loaded' => $serviceAccountLoaded,
+                'drive_probe' => $driveProbe,
                 'database' => $backupConfig['database'] ?? null,
             ],
             'export_destination' => [
@@ -882,26 +942,216 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         ];
     }
 
+    public function assertDriveReadiness(string $operation = 'backup'): void
+    {
+        $this->assertConfigured();
+
+        $repository = trim((string) config('backup.restic.repository', ''));
+        if (! str_starts_with(Str::lower($repository), 'rclone:')) {
+            return;
+        }
+
+        $probe = $this->buildOperationReadinessProbe($repository, true, true);
+        $this->logBackupRuntimeContext($operation, $probe);
+
+        if ((bool) ($probe['ok'] ?? false)) {
+            return;
+        }
+
+        $errorCode = trim((string) ($probe['error_code'] ?? '')) ?: 'DRIVE_REMOTE_INACCESSIBLE';
+        $message = trim((string) ($probe['message'] ?? '')) ?: 'Khï¿½ng th? xï¿½c th?c ho?c truy c?p Google Drive backup.';
+
+        throw new BackupRuntimeException("[{$errorCode}] {$message}");
+    }
+
     public function assertValidSnapshotId(string $snapshotId): void
     {
         if (! preg_match('/^[A-Fa-f0-9]{6,64}$/', trim($snapshotId))) {
-            throw new BackupRuntimeException('Mã snapshot không hợp lệ.');
+            throw new BackupRuntimeException('MÃ£ snapshot khÃ´ng há»£p lá»‡.');
         }
     }
 
     private function assertConfigured(): void
     {
         if ((string) config('backup.engine', 'restic') !== 'restic') {
-            throw new BackupRuntimeException('Hệ thống hiện chỉ hỗ trợ engine restic.');
+            throw new BackupRuntimeException('Há»‡ thá»‘ng hiá»‡n chá»‰ há»— trá»£ engine restic.');
         }
 
         $repository = trim((string) config('backup.restic.repository', ''));
         $password = trim((string) config('backup.restic.password', ''));
         if ($repository === '' || $password === '') {
             throw new BackupRuntimeException(
-                'Thiếu cấu hình backup. Vui lòng khai báo SPNC_BACKUP_REPOSITORY và SPNC_BACKUP_PASSWORD.'
+                'Thiáº¿u cáº¥u hÃ¬nh backup. Vui lÃ²ng khai bÃ¡o SPNC_BACKUP_REPOSITORY vÃ  SPNC_BACKUP_PASSWORD.'
             );
         }
+    }
+
+    private function buildOperationReadinessProbe(
+        string $repository,
+        bool $requiresRclone,
+        bool $includeRepositoryProbe = false
+    ): array {
+        if (! $requiresRclone) {
+            return [
+                'ok' => true,
+                'remote_probe' => ['ok' => true, 'skipped' => true],
+                'repository_probe' => ['ok' => true, 'skipped' => ! $includeRepositoryProbe],
+            ];
+        }
+
+        $resticEnv = $this->resticEnv();
+        $backupConfig = $this->doctorBackupConfig($resticEnv);
+        $authMode = trim((string) ($backupConfig['rclone_remote']['auth_mode'] ?? ''));
+        $remoteName = trim((string) ($backupConfig['rclone_remote']['name'] ?? ''));
+        $configSource = trim((string) ($backupConfig['rclone_config']['source'] ?? ''));
+        $serviceAccountLoaded = (bool) (($backupConfig['rclone_service_account_file']['readable'] ?? false) === true);
+        $staleRemoteAuthFields = (bool) (($backupConfig['rclone_remote']['has_stale_auth_fields'] ?? false) === true);
+
+        if (app()->environment('production') && $authMode === 'oauth_token') {
+            return [
+                'ok' => false,
+                'error_code' => 'RCLONE_SERVICE_ACCOUNT_REQUIRED',
+                'message' => 'Production dang dï¿½ng OAuth token cu cho remote backup. Hï¿½y b? token cu vï¿½ ch? dï¿½ng service account.',
+                'remote_name' => $remoteName !== '' ? $remoteName : null,
+                'auth_mode' => $authMode,
+                'config_source' => $configSource !== '' ? $configSource : null,
+                'service_account_loaded' => $serviceAccountLoaded,
+            ];
+        }
+
+        if (! $serviceAccountLoaded) {
+            return [
+                'ok' => false,
+                'error_code' => 'SERVICE_ACCOUNT_INVALID',
+                'message' => (string) (($backupConfig['rclone_service_account_file']['error'] ?? null)
+                    ?: 'Khï¿½ng th? n?p Google service account JSON cho runtime backup.'),
+                'remote_name' => $remoteName !== '' ? $remoteName : null,
+                'auth_mode' => $authMode !== '' ? $authMode : null,
+                'config_source' => $configSource !== '' ? $configSource : null,
+                'service_account_loaded' => false,
+            ];
+        }
+
+        if (app()->environment('production') && $staleRemoteAuthFields) {
+            return [
+                'ok' => false,
+                'error_code' => 'RCLONE_REMOTE_NOT_MINIMAL',
+                'message' => 'Remote backup cï¿½n ch?a tru?ng OAuth cu. Hï¿½y gi? rclone.conf t?i gi?n v?i type, scope vï¿½ root_folder_id.',
+                'remote_name' => $remoteName !== '' ? $remoteName : null,
+                'auth_mode' => $authMode !== '' ? $authMode : null,
+                'config_source' => $configSource !== '' ? $configSource : null,
+                'service_account_loaded' => $serviceAccountLoaded,
+            ];
+        }
+
+        $rootTarget = $this->parseRcloneRemoteRoot($repository);
+        $remoteProbe = $rootTarget !== null
+            ? $this->runRclone(['lsd', $rootTarget], true, 12)
+            : ['successful' => false, 'stderr' => 'Khï¿½ng xï¿½c d?nh du?c remote rclone.', 'stdout' => ''];
+
+        if (! (bool) ($remoteProbe['successful'] ?? false)) {
+            return [
+                'ok' => false,
+                'error_code' => $this->detectDriveProbeErrorCode($remoteProbe),
+                'message' => $this->extractProcessFailureMessage($remoteProbe, 'Khï¿½ng th? truy c?p Google Drive backup.'),
+                'remote_name' => $remoteName !== '' ? $remoteName : null,
+                'auth_mode' => $authMode !== '' ? $authMode : null,
+                'config_source' => $configSource !== '' ? $configSource : null,
+                'service_account_loaded' => $serviceAccountLoaded,
+                'remote_probe' => [
+                    'ok' => false,
+                    'target' => $rootTarget,
+                ],
+            ];
+        }
+
+        $repositoryProbe = [
+            'ok' => true,
+            'skipped' => ! $includeRepositoryProbe,
+            'target' => $repository,
+        ];
+
+        if ($includeRepositoryProbe) {
+            $resticProbe = $this->runRestic(['snapshots', '--json', '--tag', 'spnc_backup'], true, 20);
+            if (! (bool) ($resticProbe['successful'] ?? false)) {
+                return [
+                    'ok' => false,
+                    'error_code' => 'REPOSITORY_ACCESS_FAILED',
+                    'message' => $this->buildRepositoryAccessFailureMessage($repository, $resticProbe),
+                    'remote_name' => $remoteName !== '' ? $remoteName : null,
+                    'auth_mode' => $authMode !== '' ? $authMode : null,
+                    'config_source' => $configSource !== '' ? $configSource : null,
+                    'service_account_loaded' => $serviceAccountLoaded,
+                    'remote_probe' => [
+                        'ok' => true,
+                        'target' => $rootTarget,
+                    ],
+                    'repository_probe' => [
+                        'ok' => false,
+                        'target' => $repository,
+                    ],
+                ];
+            }
+        }
+
+        return [
+            'ok' => true,
+            'remote_name' => $remoteName !== '' ? $remoteName : null,
+            'auth_mode' => $authMode !== '' ? $authMode : null,
+            'config_source' => $configSource !== '' ? $configSource : null,
+            'service_account_loaded' => $serviceAccountLoaded,
+            'remote_probe' => [
+                'ok' => true,
+                'target' => $rootTarget,
+            ],
+            'repository_probe' => $repositoryProbe,
+        ];
+    }
+
+    private function detectDriveProbeErrorCode(array $probe): string
+    {
+        $message = Str::lower(trim((string) (($probe['stderr'] ?? '') . ' ' . ($probe['stdout'] ?? ''))));
+
+        if ($message !== '' && Str::contains($message, ['invalid_grant', 'oauth', 'token', 'unauthorized_client'])) {
+            return 'DRIVE_AUTH_INVALID';
+        }
+
+        if ($message !== '' && Str::contains($message, ['directory not found', 'root folder', 'permission denied', 'not found'])) {
+            return 'DRIVE_REMOTE_INACCESSIBLE';
+        }
+
+        if ($message !== '' && Str::contains($message, ['timed out', 'timeout', 'deadline exceeded'])) {
+            return 'DRIVE_PROBE_TIMEOUT';
+        }
+
+        return 'DRIVE_REMOTE_INACCESSIBLE';
+    }
+
+    private function extractProcessFailureMessage(array $result, string $fallback): string
+    {
+        $stderr = trim((string) ($result['stderr'] ?? ''));
+        if ($stderr !== '') {
+            return $stderr;
+        }
+
+        $stdout = trim((string) ($result['stdout'] ?? ''));
+        if ($stdout !== '') {
+            return $stdout;
+        }
+
+        return $fallback;
+    }
+
+    private function logBackupRuntimeContext(string $operation, array $probe): void
+    {
+        Log::info('backup.runtime_context', [
+            'operation' => $operation,
+            'repository' => trim((string) config('backup.restic.repository', '')),
+            'remote_name' => $probe['remote_name'] ?? $this->extractRcloneRemoteName((string) config('backup.restic.repository', '')),
+            'auth_mode' => $probe['auth_mode'] ?? null,
+            'config_source' => $probe['config_source'] ?? null,
+            'service_account_loaded' => (bool) ($probe['service_account_loaded'] ?? false),
+        ]);
     }
 
     private function ensureRepositoryReady(): void
@@ -925,7 +1175,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         if (! $repositoryMissing) {
             throw new BackupRuntimeException(
-                'Không thể truy cập repository backup: '
+                'KhÃ´ng thá»ƒ truy cáº­p repository backup: '
                 . $this->buildRepositoryAccessFailureMessage($repository, $probe)
             );
         }
@@ -940,7 +1190,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             return;
         }
 
-        throw new BackupRuntimeException('Khởi tạo repository backup thất bại: ' . trim((string) $init['stderr']));
+        throw new BackupRuntimeException('Khá»Ÿi táº¡o repository backup tháº¥t báº¡i: ' . trim((string) $init['stderr']));
     }
 
     private function dumpDatabase(string $outputAbsolutePath): void
@@ -960,14 +1210,14 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         }
 
         throw new BackupRuntimeException(
-            'Backup database hiện chỉ hỗ trợ mysql/mariadb và pgsql. Driver hiện tại: ' . $driver
+            'Backup database hiá»‡n chá»‰ há»— trá»£ mysql/mariadb vÃ  pgsql. Driver hiá»‡n táº¡i: ' . $driver
         );
     }
 
     private function importDatabaseDump(string $dumpAbsolutePath): void
     {
         if (! File::exists($dumpAbsolutePath)) {
-            throw new BackupRuntimeException('Không tìm thấy tệp DB dump để khôi phục.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y tá»‡p DB dump Ä‘á»ƒ khÃ´i phá»¥c.');
         }
 
         $databaseConfig = $this->resolveBackupDatabaseConnection();
@@ -985,7 +1235,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         }
 
         throw new BackupRuntimeException(
-            'Khôi phục database hiện chỉ hỗ trợ mysql/mariadb và pgsql. Driver hiện tại: ' . $driver
+            'KhÃ´i phá»¥c database hiá»‡n chá»‰ há»— trá»£ mysql/mariadb vÃ  pgsql. Driver hiá»‡n táº¡i: ' . $driver
         );
     }
 
@@ -1100,7 +1350,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $snapshot = $this->findSnapshotById($snapshotId);
         if (! $snapshot) {
-            throw new BackupRuntimeException('Không tìm thấy snapshot.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y snapshot.');
         }
 
         return $snapshot;
@@ -1253,7 +1503,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                 continue;
             }
 
-            // Chỉ tự tạo thư mục trong storage/app để tránh thao tác ngoài phạm vi ứng dụng.
+            // Chá»‰ tá»± táº¡o thÆ° má»¥c trong storage/app Ä‘á»ƒ trÃ¡nh thao tÃ¡c ngoÃ i pháº¡m vi á»©ng dá»¥ng.
             if (! str_starts_with($clean, 'storage/app/')) {
                 continue;
             }
@@ -1384,7 +1634,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $destination = $this->deriveExportDestination((string) config('backup.restic.repository', ''));
         if (! ($destination['valid'] ?? false)) {
             throw new BackupRuntimeException(
-                (string) ($destination['error_message'] ?? 'Không suy ra được đích export từ cấu hình backup hiện tại.')
+                (string) ($destination['error_message'] ?? 'KhÃ´ng suy ra Ä‘Æ°á»£c Ä‘Ã­ch export tá»« cáº¥u hÃ¬nh backup hiá»‡n táº¡i.')
             );
         }
         $generatedAt ??= now();
@@ -1424,7 +1674,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $overviewPayload = [
             'snapshot_id' => $snapshotId,
             'run_id' => $runId,
-            'created_at' => $generatedAt->toIso8601String(),
+            'created_at' => $generatedAt->format(DATE_ATOM),
             'backup_type' => 'full',
             'trigger' => $trigger,
             'generated_by_user_id' => $initiatedBy,
@@ -1446,9 +1696,9 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                 'he_thong' => self::EXPORT_SYSTEM_DIR,
             ],
             'ghi_chu' => [
-                'exports_only' => 'Đây là lớp export dễ đọc để tra cứu nhanh trên Drive.',
-                'official_restore' => 'Khôi phục chính thức vẫn phải thực hiện bằng chức năng Khôi phục của hệ thống.',
-                'live_evidence' => 'Tệp PDF dưới cong-trinh/ chỉ là bản export dễ đọc, không phải nguồn runtime của chức năng xem minh chứng.',
+                'exports_only' => 'ÄÃ¢y lÃ  lá»›p export dá»… Ä‘á»c Ä‘á»ƒ tra cá»©u nhanh trÃªn Drive.',
+                'official_restore' => 'KhÃ´i phá»¥c chÃ­nh thá»©c váº«n pháº£i thá»±c hiá»‡n báº±ng chá»©c nÄƒng KhÃ´i phá»¥c cá»§a há»‡ thá»‘ng.',
+                'live_evidence' => 'Tá»‡p PDF dÆ°á»›i cong-trinh/ chá»‰ lÃ  báº£n export dá»… Ä‘á»c, khÃ´ng pháº£i nguá»“n runtime cá»§a chá»©c nÄƒng xem minh chá»©ng.',
             ],
         ];
         $this->writeJsonFile($overviewAbsolute, $overviewPayload);
@@ -1457,14 +1707,14 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'snapshot_id' => $snapshotId,
             'run_id' => $runId,
             'trigger' => $trigger,
-            'created_at' => $generatedAt->toIso8601String(),
+            'created_at' => $generatedAt->format(DATE_ATOM),
             'generated_by_user_id' => $initiatedBy,
             'folder_name' => $folderName,
-            'description_vi' => 'Lớp exports đã được tối giản cho mục đích tra cứu, còn khôi phục chính thức vẫn dựa vào restic-repo.',
+            'description_vi' => 'Lá»›p exports Ä‘Ã£ Ä‘Æ°á»£c tá»‘i giáº£n cho má»¥c Ä‘Ã­ch tra cá»©u, cÃ²n khÃ´i phá»¥c chÃ­nh thá»©c váº«n dá»±a vÃ o restic-repo.',
             'friendly_messages' => [
-                'safe' => 'Hệ thống đã sao lưu an toàn.',
-                'drive' => 'Bạn có thể mở thư mục Backup trên Google Drive để xem bản sao lưu dễ đọc.',
-                'restore' => 'Khi cần khôi phục, vui lòng dùng chức năng Khôi phục trong hệ thống.',
+                'safe' => 'Há»‡ thá»‘ng Ä‘Ã£ sao lÆ°u an toÃ n.',
+                'drive' => 'Báº¡n cÃ³ thá»ƒ má»Ÿ thÆ° má»¥c Backup trÃªn Google Drive Ä‘á»ƒ xem báº£n sao lÆ°u dá»… Ä‘á»c.',
+                'restore' => 'Khi cáº§n khÃ´i phá»¥c, vui lÃ²ng dÃ¹ng chá»©c nÄƒng KhÃ´i phá»¥c trong há»‡ thá»‘ng.',
             ],
             'repository' => trim((string) config('backup.restic.repository', '')),
             'export_destination' => [
@@ -1521,7 +1771,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'bundle_filename' => self::EXPORT_BUNDLE_FILENAME,
             'local_root_relative_path' => $localRootRelative,
             'local_bundle_relative_path' => null,
-            'generated_at' => $generatedAt->toIso8601String(),
+            'generated_at' => $generatedAt->format(DATE_ATOM),
             'artifacts' => array_values(array_unique(array_merge(
                 $metadata['visible_artifacts'],
                 $metadata['technical_artifacts']
@@ -1537,7 +1787,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $this->reportPostProcessProgress(
             $runId,
             'syncing_export',
-            'Readable export cục bộ đã hoàn tất. Đang đồng bộ tới đích lưu trữ.'
+            'Readable export cá»¥c bá»™ Ä‘Ã£ hoÃ n táº¥t. Äang Ä‘á»“ng bá»™ tá»›i Ä‘Ã­ch lÆ°u trá»¯.'
         );
 
         $sync = $this->syncExportToDestination($destination, $localRootAbsolute, $folderName);
@@ -1549,7 +1799,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $this->reportPostProcessProgress(
             $runId,
             'publishing_export_metadata',
-            'Readable export đã đồng bộ xong. Đang công bố metadata cuối cùng.'
+            'Readable export Ä‘Ã£ Ä‘á»“ng bá»™ xong. Äang cÃ´ng bá»‘ metadata cuá»‘i cÃ¹ng.'
         );
         $this->storeExportMetadata($snapshotId, $payload);
 
@@ -1910,7 +2160,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                     $ownerDescriptor['identity_key'] => $this->buildReadableParticipantEntry(
                         $ownerDescriptor,
                         true,
-                        'Chủ nhiệm',
+                        'Chá»§ nhiá»‡m',
                         null,
                         null
                     ),
@@ -1923,7 +2173,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                 $lecturers[$ownerDescriptor['identity_key']],
                 $work,
                 true,
-                'Chủ nhiệm',
+                'Chá»§ nhiá»‡m',
                 null,
                 null
             );
@@ -2255,7 +2505,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'lecturer_id' => $lecturerId > 0 ? $lecturerId : null,
             'uploaded_by_user_id' => null,
             'code' => $code !== '' ? $code : ('GV-' . $lecturerId),
-            'full_name' => $fullName !== '' ? $fullName : ('Giảng viên #' . $lecturerId),
+            'full_name' => $fullName !== '' ? $fullName : ('Giáº£ng viÃªn #' . $lecturerId),
             'email' => $email !== '' ? $email : null,
             'department' => [
                 'id' => ! empty($payload['department_id']) ? (int) $payload['department_id'] : null,
@@ -2435,6 +2685,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             $disk = 'local';
         }
 
+        /** @var FilesystemAdapter $adapter */
         $adapter = Storage::disk($disk);
         if (! method_exists($adapter, 'path')) {
             return null;
@@ -2461,6 +2712,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             return null;
         }
 
+        /** @var FilesystemAdapter $adapter */
         $adapter = Storage::disk($normalizedDisk);
         if (! method_exists($adapter, 'path')) {
             return null;
@@ -2477,7 +2729,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         }
 
         if (! File::copy($sourceAbsolutePath, $targetAbsolutePath)) {
-            throw new BackupRuntimeException('Không thể sao chép tệp minh chứng vào readable export.');
+            throw new BackupRuntimeException('KhÃ´ng thá»ƒ sao chÃ©p tá»‡p minh chá»©ng vÃ o readable export.');
         }
 
         return $this->resolveFileSize($targetAbsolutePath);
@@ -2560,7 +2812,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $zip = new ZipArchive();
         $openResult = $zip->open($bundleAbsolutePath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
         if ($openResult !== true) {
-            throw new BackupRuntimeException('Không thể tạo gói export ZIP.');
+            throw new BackupRuntimeException('KhÃ´ng thá»ƒ táº¡o gÃ³i export ZIP.');
         }
 
         foreach (File::allFiles($exportRootAbsolutePath) as $file) {
@@ -2577,18 +2829,18 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
     private function gzipFile(string $sourceAbsolutePath, string $targetAbsolutePath): void
     {
         if (! File::exists($sourceAbsolutePath)) {
-            throw new BackupRuntimeException('Không tìm thấy DB dump để tạo export.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y DB dump Ä‘á»ƒ táº¡o export.');
         }
 
         $input = fopen($sourceAbsolutePath, 'rb');
         if (! is_resource($input)) {
-            throw new BackupRuntimeException('Không thể đọc DB dump để nén export.');
+            throw new BackupRuntimeException('KhÃ´ng thá»ƒ Ä‘á»c DB dump Ä‘á»ƒ nÃ©n export.');
         }
 
         $output = gzopen($targetAbsolutePath, 'wb9');
         if (! is_resource($output)) {
             fclose($input);
-            throw new BackupRuntimeException('Không thể tạo database.sql.gz cho export.');
+            throw new BackupRuntimeException('KhÃ´ng thá»ƒ táº¡o database.sql.gz cho export.');
         }
 
         while (! feof($input)) {
@@ -2596,7 +2848,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             if ($chunk === false) {
                 gzclose($output);
                 fclose($input);
-                throw new BackupRuntimeException('Lỗi đọc DB dump khi nén export.');
+                throw new BackupRuntimeException('Lá»—i Ä‘á»c DB dump khi nÃ©n export.');
             }
             if ($chunk !== '') {
                 gzwrite($output, $chunk);
@@ -2611,7 +2863,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
     {
         $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         if ($encoded === false) {
-            throw new BackupRuntimeException('Không thể mã hóa JSON export.');
+            throw new BackupRuntimeException('KhÃ´ng thá»ƒ mÃ£ hÃ³a JSON export.');
         }
 
         File::put($absolutePath, $encoded . PHP_EOL);
@@ -2674,7 +2926,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         if (($destination['target_type'] ?? null) === 'rclone') {
             $targetRoot = rtrim((string) ($destination['target_root'] ?? ''), '/');
             if ($targetRoot === '') {
-                throw new BackupRuntimeException('Không xác định được đích rclone cho export.');
+                throw new BackupRuntimeException('KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c Ä‘Ã­ch rclone cho export.');
             }
 
             $stagingRoot = $targetRoot . '/' . self::EXPORT_STAGING_DIR;
@@ -2702,7 +2954,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         if (($destination['target_type'] ?? null) === 'local') {
             $targetRoot = (string) ($destination['target_root'] ?? '');
             if ($targetRoot === '') {
-                throw new BackupRuntimeException('Không xác định được thư mục local đích cho export.');
+                throw new BackupRuntimeException('KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c thÆ° má»¥c local Ä‘Ã­ch cho export.');
             }
 
             $stagingRoot = rtrim($targetRoot, '/\\') . DIRECTORY_SEPARATOR . self::EXPORT_STAGING_DIR;
@@ -2718,7 +2970,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             }
             File::ensureDirectoryExists(dirname($targetDir));
             if (! File::moveDirectory($stagingDir, $targetDir, true)) {
-                throw new BackupRuntimeException('Kh�ng th? c�ng b? export local t? thu m?c staging.');
+                throw new BackupRuntimeException('Khï¿½ng th? cï¿½ng b? export local t? thu m?c staging.');
             }
 
             return [
@@ -2741,7 +2993,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
     {
         $rcloneBinary = trim((string) config('backup.restic.rclone_binary', 'rclone'));
         if ($rcloneBinary === '') {
-            throw new BackupRuntimeException('Thiếu cấu hình rclone binary để đồng bộ export.');
+            throw new BackupRuntimeException('Thiáº¿u cáº¥u hÃ¬nh rclone binary Ä‘á»ƒ Ä‘á»“ng bá»™ export.');
         }
 
         return $this->runProcess(
@@ -2775,7 +3027,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                         'target_root' => null,
                         'display_root' => null,
                         'error_code' => 'EXPORT_TARGET_INVALID',
-                        'error_message' => 'SPNC_BACKUP_EXPORT_TARGET đang để dạng rclone nhưng thiếu remote/path.',
+                        'error_message' => 'SPNC_BACKUP_EXPORT_TARGET Ä‘ang Ä‘á»ƒ dáº¡ng rclone nhÆ°ng thiáº¿u remote/path.',
                     ];
                 }
 
@@ -2810,7 +3062,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                 'target_root' => null,
                 'display_root' => null,
                 'error_code' => 'BACKUP_REPOSITORY_MISSING',
-                'error_message' => 'Thiếu SPNC_BACKUP_REPOSITORY nên chưa thể suy ra thư mục exports.',
+                'error_message' => 'Thiáº¿u SPNC_BACKUP_REPOSITORY nÃªn chÆ°a thá»ƒ suy ra thÆ° má»¥c exports.',
             ];
         }
 
@@ -2848,7 +3100,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                 'target_root' => null,
                 'display_root' => null,
                 'error_code' => 'RCLONE_REMOTE_INVALID',
-                'error_message' => 'SPNC_BACKUP_REPOSITORY đang ở dạng rclone nhưng không chứa remote hợp lệ.',
+                'error_message' => 'SPNC_BACKUP_REPOSITORY Ä‘ang á»Ÿ dáº¡ng rclone nhÆ°ng khÃ´ng chá»©a remote há»£p lá»‡.',
             ];
         }
 
@@ -2949,7 +3201,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             try {
                 $this->runRclone(['purge', $exportPath], true, 900);
             } catch (\Throwable) {
-                // Không chặn thao tác forget nếu dọn export remote thất bại.
+                // KhÃ´ng cháº·n thao tÃ¡c forget náº¿u dá»n export remote tháº¥t báº¡i.
             }
         }
     }
@@ -2982,7 +3234,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         File::ensureDirectoryExists(dirname($path));
         $encoded = json_encode($index, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         if ($encoded === false) {
-            throw new BackupRuntimeException('Không thể ghi chỉ mục export backup.');
+            throw new BackupRuntimeException('KhÃ´ng thá»ƒ ghi chá»‰ má»¥c export backup.');
         }
 
         File::put($path, $encoded . PHP_EOL);
@@ -3121,7 +3373,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             ]);
             $stateStore->appendLog($runId, $message);
         } catch (\Throwable) {
-            // Không để lỗi ghi trạng thái phụ làm hỏng tiến trình export chính.
+            // KhÃ´ng Ä‘á»ƒ lá»—i ghi tráº¡ng thÃ¡i phá»¥ lÃ m há»ng tiáº¿n trÃ¬nh export chÃ­nh.
         }
     }
     private function exportRelativePath(string $snapshotId): string
@@ -3148,7 +3400,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $includes = array_values(array_unique(array_filter($includes)));
         if ($includes === []) {
-            throw new BackupRuntimeException('Không có dữ liệu phù hợp với phạm vi khôi phục đã chọn.');
+            throw new BackupRuntimeException('KhÃ´ng cÃ³ dá»¯ liá»‡u phÃ¹ há»£p vá»›i pháº¡m vi khÃ´i phá»¥c Ä‘Ã£ chá»n.');
         }
 
         return $includes;
@@ -3183,7 +3435,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
     private function restoreSingleFile(string $snapshotId, string $relativePath, string $token): array
     {
         if (! $this->isSafeRelativePath($relativePath)) {
-            throw new BackupRuntimeException('Đường dẫn tệp trong snapshot không hợp lệ.');
+            throw new BackupRuntimeException('ÄÆ°á»ng dáº«n tá»‡p trong snapshot khÃ´ng há»£p lá»‡.');
         }
 
         $downloadRelativeRoot = $this->downloadRelativePath($token);
@@ -3204,7 +3456,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $extractedAbsolutePath = $this->basePathFromRestoredRoot($downloadAbsoluteRoot, $relativePath);
         if (! File::exists($extractedAbsolutePath)) {
-            throw new BackupRuntimeException('Không tìm thấy tệp sau khi giải snapshot.');
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y tá»‡p sau khi giáº£i snapshot.');
         }
 
         return [
@@ -3576,7 +3828,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             $tests['rclone_lsd'] = [
                 'ok' => false,
                 'skipped' => true,
-                'reason' => 'Repository không dùng backend rclone hoặc không đọc được remote.',
+                'reason' => 'Repository khÃ´ng dÃ¹ng backend rclone hoáº·c khÃ´ng Ä‘á»c Ä‘Æ°á»£c remote.',
             ];
         }
 
@@ -3597,17 +3849,17 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                 'unable to open repository at rclone:',
             ])
         ) {
-            return $resticMessage !== '' ? $resticMessage : 'Không xác định được chi tiết lỗi repository.';
+            return $resticMessage !== '' ? $resticMessage : 'KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c chi tiáº¿t lá»—i repository.';
         }
 
         $probeTarget = $this->buildRcloneRepositoryProbeTarget($repository);
         if ($probeTarget === null) {
-            return $resticMessage !== '' ? $resticMessage : 'Không xác định được remote rclone.';
+            return $resticMessage !== '' ? $resticMessage : 'KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c remote rclone.';
         }
 
         $rcloneProbe = $this->runRclone(['lsd', $probeTarget], true, 30);
         if ((bool) ($rcloneProbe['successful'] ?? false)) {
-            return $resticMessage !== '' ? $resticMessage : 'Restic không đọc được repository qua rclone.';
+            return $resticMessage !== '' ? $resticMessage : 'Restic khÃ´ng Ä‘á»c Ä‘Æ°á»£c repository qua rclone.';
         }
 
         $rcloneMessage = trim((string) ($rcloneProbe['stderr'] ?? ''));
@@ -3615,7 +3867,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             $rcloneMessage = trim((string) ($rcloneProbe['stdout'] ?? ''));
         }
 
-        return $rcloneMessage !== '' ? $rcloneMessage : ($resticMessage !== '' ? $resticMessage : 'Không xác định được lỗi rclone.');
+        return $rcloneMessage !== '' ? $rcloneMessage : ($resticMessage !== '' ? $resticMessage : 'KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c lá»—i rclone.');
     }
 
     private function doctorRunCommand(array $command, array $env = [], int $timeout = 60): array
@@ -3704,7 +3956,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         if (! $allowFailure && ! $result['successful']) {
             throw new BackupRuntimeException(
-                'Lệnh backup thất bại: ' . trim((string) $result['stderr'])
+                'Lá»‡nh backup tháº¥t báº¡i: ' . trim((string) $result['stderr'])
             );
         }
 
@@ -3816,7 +4068,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $connectionName = $configuredConnection !== '' ? $configuredConnection : (string) config('database.default', 'mysql');
         $connection = config("database.connections.{$connectionName}");
         if (! is_array($connection)) {
-            throw new BackupRuntimeException('Không tìm thấy cấu hình database cho backup: ' . $connectionName);
+            throw new BackupRuntimeException('KhÃ´ng tÃ¬m tháº¥y cáº¥u hÃ¬nh database cho backup: ' . $connectionName);
         }
 
         return [
@@ -3831,7 +4083,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $database = (string) ($mysql['database'] ?? '');
         $username = (string) ($mysql['username'] ?? '');
         if ($database === '' || $username === '') {
-            throw new BackupRuntimeException('Thiếu cấu hình database để tạo dump backup.');
+            throw new BackupRuntimeException('Thiáº¿u cáº¥u hÃ¬nh database Ä‘á»ƒ táº¡o dump backup.');
         }
 
         $command = [
@@ -3856,7 +4108,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $result = $this->runProcess($command, $env, false, 1800);
         if (! $result['successful']) {
-            throw new BackupRuntimeException('Tạo DB dump thất bại: ' . trim((string) $result['stderr']));
+            throw new BackupRuntimeException('Táº¡o DB dump tháº¥t báº¡i: ' . trim((string) $result['stderr']));
         }
     }
 
@@ -3865,7 +4117,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $database = (string) ($pgsql['database'] ?? '');
         $username = (string) ($pgsql['username'] ?? '');
         if ($database === '' || $username === '') {
-            throw new BackupRuntimeException('Thiếu cấu hình PostgreSQL để tạo dump backup.');
+            throw new BackupRuntimeException('Thiáº¿u cáº¥u hÃ¬nh PostgreSQL Ä‘á»ƒ táº¡o dump backup.');
         }
 
         $command = [
@@ -3894,7 +4146,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $result = $this->runProcess($command, $env, false, 1800);
         if (! $result['successful']) {
-            throw new BackupRuntimeException('Tạo PostgreSQL dump thất bại: ' . trim((string) $result['stderr']));
+            throw new BackupRuntimeException('Táº¡o PostgreSQL dump tháº¥t báº¡i: ' . trim((string) $result['stderr']));
         }
     }
 
@@ -3903,12 +4155,12 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $database = (string) ($mysql['database'] ?? '');
         $username = (string) ($mysql['username'] ?? '');
         if ($database === '' || $username === '') {
-            throw new BackupRuntimeException('Thiếu cấu hình database để import bản sao lưu.');
+            throw new BackupRuntimeException('Thiáº¿u cáº¥u hÃ¬nh database Ä‘á»ƒ import báº£n sao lÆ°u.');
         }
 
         $blockedDatabases = ['mysql', 'information_schema', 'performance_schema', 'sys'];
         if (in_array(Str::lower($database), $blockedDatabases, true)) {
-            throw new BackupRuntimeException('Từ chối import vào database hệ thống không an toàn.');
+            throw new BackupRuntimeException('Tá»« chá»‘i import vÃ o database há»‡ thá»‘ng khÃ´ng an toÃ n.');
         }
 
         $command = [
@@ -3929,14 +4181,14 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $process = new Process($command, base_path(), $this->mergeProcessEnvironment($env), null, 3600);
         $stream = fopen($dumpAbsolutePath, 'rb');
         if ($stream === false) {
-            throw new BackupRuntimeException('Không thể đọc tệp DB dump để import.');
+            throw new BackupRuntimeException('KhÃ´ng thá»ƒ Ä‘á»c tá»‡p DB dump Ä‘á»ƒ import.');
         }
         $process->setInput($stream);
         $process->run();
         fclose($stream);
 
         if (! $process->isSuccessful()) {
-            throw new BackupRuntimeException('Khôi phục database thất bại: ' . trim((string) $process->getErrorOutput()));
+            throw new BackupRuntimeException('KhÃ´i phá»¥c database tháº¥t báº¡i: ' . trim((string) $process->getErrorOutput()));
         }
     }
 
@@ -3945,12 +4197,12 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $database = (string) ($pgsql['database'] ?? '');
         $username = (string) ($pgsql['username'] ?? '');
         if ($database === '' || $username === '') {
-            throw new BackupRuntimeException('Thiếu cấu hình PostgreSQL để import bản sao lưu.');
+            throw new BackupRuntimeException('Thiáº¿u cáº¥u hÃ¬nh PostgreSQL Ä‘á»ƒ import báº£n sao lÆ°u.');
         }
 
         $blockedDatabases = ['postgres', 'template0', 'template1'];
         if (in_array(Str::lower($database), $blockedDatabases, true)) {
-            throw new BackupRuntimeException('Từ chối import vào PostgreSQL system database không an toàn.');
+            throw new BackupRuntimeException('Tá»« chá»‘i import vÃ o PostgreSQL system database khÃ´ng an toÃ n.');
         }
 
         $command = [
@@ -3977,7 +4229,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $result = $this->runProcess($command, $env, false, 3600);
         if (! $result['successful']) {
-            throw new BackupRuntimeException('Khôi phục PostgreSQL thất bại: ' . trim((string) $result['stderr']));
+            throw new BackupRuntimeException('KhÃ´i phá»¥c PostgreSQL tháº¥t báº¡i: ' . trim((string) $result['stderr']));
         }
     }
 
@@ -3990,6 +4242,12 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'type' => null,
             'auth_mode' => null,
             'refresh_token_present' => null,
+            'has_token' => false,
+            'has_client_id' => false,
+            'has_client_secret' => false,
+            'has_team_drive' => false,
+            'has_section_service_account_file' => false,
+            'has_stale_auth_fields' => false,
             'uses_service_account_env' => trim($serviceAccountFile) !== '',
         ];
 
@@ -4014,9 +4272,17 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $section = $parsed[$remoteName];
         $tokenRaw = trim((string) ($section['token'] ?? ''));
+        $clientId = trim((string) ($section['client_id'] ?? ''));
+        $clientSecret = trim((string) ($section['client_secret'] ?? ''));
+        $teamDrive = trim((string) ($section['team_drive'] ?? ''));
         $sectionServiceAccount = trim((string) ($section['service_account_file'] ?? ''));
         $authMode = null;
         $refreshTokenPresent = null;
+        $hasToken = $tokenRaw !== '';
+        $hasClientId = $clientId !== '';
+        $hasClientSecret = $clientSecret !== '';
+        $hasTeamDrive = $teamDrive !== '';
+        $hasSectionServiceAccountFile = $sectionServiceAccount !== '';
 
         if (trim($serviceAccountFile) !== '' || $sectionServiceAccount !== '') {
             $authMode = 'service_account';
@@ -4035,6 +4301,12 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'type' => trim((string) ($section['type'] ?? '')) !== '' ? trim((string) $section['type']) : null,
             'auth_mode' => $authMode,
             'refresh_token_present' => $refreshTokenPresent,
+            'has_token' => $hasToken,
+            'has_client_id' => $hasClientId,
+            'has_client_secret' => $hasClientSecret,
+            'has_team_drive' => $hasTeamDrive,
+            'has_section_service_account_file' => $hasSectionServiceAccountFile,
+            'has_stale_auth_fields' => $hasToken || $hasClientId || $hasClientSecret || $hasTeamDrive || $hasSectionServiceAccountFile,
             'uses_service_account_env' => trim($serviceAccountFile) !== '',
         ];
     }
@@ -4203,9 +4475,29 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         string $label
     ): array {
         $configured = trim($configuredPath);
+        $inlineBase64 = trim($inlineBase64);
         $resolved = null;
         $source = null;
         $error = null;
+        $preferBase64 = app()->environment('production') && $inlineBase64 !== '';
+
+        if ($preferBase64) {
+            $materialized = $this->materializeRuntimeConfigAsset($inlineBase64, $materializedRelativePath, $label);
+            if ($materialized['resolved'] !== null) {
+                return [
+                    'configured' => $configured !== '' ? $configured : null,
+                    'resolved' => $materialized['resolved'],
+                    'exists' => true,
+                    'readable' => true,
+                    'source' => 'base64',
+                    'materialized' => true,
+                    'error' => null,
+                ];
+            }
+
+            $error = $materialized['error'];
+            $source = 'base64';
+        }
 
         if ($configured !== '') {
             $resolved = $this->resolveAbsolutePath($configured);
@@ -4223,8 +4515,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             }
         }
 
-        $inlineBase64 = trim($inlineBase64);
-        if ($inlineBase64 !== '') {
+        if (! $preferBase64 && $inlineBase64 !== '') {
             $materialized = $this->materializeRuntimeConfigAsset($inlineBase64, $materializedRelativePath, $label);
             if ($materialized['resolved'] !== null) {
                 return [
@@ -4241,7 +4532,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             $error = $materialized['error'];
             $source = 'base64';
         } elseif ($configured !== '') {
-            $error = "{$label} không tồn tại hoặc không đọc được tại đường dẫn runtime hiện tại.";
+            $error = "{$label} khÃ´ng tá»“n táº¡i hoáº·c khÃ´ng Ä‘á»c Ä‘Æ°á»£c táº¡i Ä‘Æ°á»ng dáº«n runtime hiá»‡n táº¡i.";
         }
 
         return [
@@ -4261,7 +4552,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         if ($decoded === false || $decoded === '') {
             return [
                 'resolved' => null,
-                'error' => "{$label} base64 không hợp lệ hoặc rỗng.",
+                'error' => "{$label} base64 khÃ´ng há»£p lá»‡ hoáº·c rá»—ng.",
             ];
         }
 
@@ -4604,5 +4895,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         return rtrim($restoredRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $relative;
     }
 }
+
+
 
 

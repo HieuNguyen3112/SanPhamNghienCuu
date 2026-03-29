@@ -6,6 +6,7 @@ use App\Jobs\SyncResearchEvidenceToColdStorageJob;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -77,13 +78,13 @@ class ResearchEvidenceStorageService
 
         $resolvedColdPath = trim((string) ($coldPath ?: $row->path));
         if ($resolvedColdPath === '') {
-            throw new RuntimeException('Thiếu đường dẫn cold storage cho minh chứng.');
+            throw new RuntimeException('Thiáº¿u Ä‘Æ°á»ng dáº«n cold storage cho minh chá»©ng.');
         }
 
         $resolvedHotPath = trim((string) ($hotRelativePath ?: $this->buildHotRelativePathFromRclonePath($resolvedColdPath)));
         $hotAbsolutePath = $this->resolveHotAbsolutePath($resolvedHotPath);
         if (! is_file($hotAbsolutePath) || ! is_readable($hotAbsolutePath)) {
-            throw new RuntimeException('Không tìm thấy bản sao hot storage để đồng bộ lên Google Drive.');
+            throw new RuntimeException('KhÃ´ng tÃ¬m tháº¥y báº£n sao hot storage Ä‘á»ƒ Ä‘á»“ng bá»™ lÃªn Google Drive.');
         }
 
         $uploadTimeout = max(30, (int) config('evidence.storage.upload_timeout_seconds', 600));
@@ -245,7 +246,7 @@ class ResearchEvidenceStorageService
         $hotDisk = $this->resolveHotDiskName();
         $stream = fopen($file->getRealPath(), 'rb');
         if ($stream === false) {
-            throw new RuntimeException('Không thể đọc tệp minh chứng từ yêu cầu upload.');
+            throw new RuntimeException('KhÃ´ng thá»ƒ Ä‘á»c tá»‡p minh chá»©ng tá»« yÃªu cáº§u upload.');
         }
 
         try {
@@ -257,7 +258,7 @@ class ResearchEvidenceStorageService
         }
 
         if (! $stored) {
-            throw new RuntimeException('Không thể ghi tệp minh chứng vào hot storage.');
+            throw new RuntimeException('KhÃ´ng thá»ƒ ghi tá»‡p minh chá»©ng vÃ o hot storage.');
         }
 
         return [
@@ -291,7 +292,7 @@ class ResearchEvidenceStorageService
         $storedPath = $file->storeAs($directory, $filename, $disk);
 
         if (! $storedPath) {
-            throw new RuntimeException('Không thể lưu tệp minh chứng vào kho tệp.');
+            throw new RuntimeException('KhÃ´ng thá»ƒ lÆ°u tá»‡p minh chá»©ng vÃ o kho tá»‡p.');
         }
 
         return [
@@ -306,7 +307,7 @@ class ResearchEvidenceStorageService
         $normalizedDisk = strtolower(trim($disk));
         $normalizedPath = trim($path);
         if ($normalizedPath === '') {
-            throw new RuntimeException('Đường dẫn tệp minh chứng không hợp lệ.');
+            throw new RuntimeException('ÄÆ°á»ng dáº«n tá»‡p minh chá»©ng khÃ´ng há»£p lá»‡.');
         }
 
         if ($normalizedDisk === self::RCLONE_DISK) {
@@ -315,7 +316,7 @@ class ResearchEvidenceStorageService
 
         $absolutePath = $this->resolveLocalAbsolutePath($disk, $normalizedPath);
         if ($absolutePath === '' || ! is_file($absolutePath) || ! is_readable($absolutePath)) {
-            throw new RuntimeException('Không tìm thấy tệp minh chứng để xem trước.');
+            throw new RuntimeException('KhÃ´ng tÃ¬m tháº¥y tá»‡p minh chá»©ng Ä‘á»ƒ xem trÆ°á»›c.');
         }
 
         return $absolutePath;
@@ -332,14 +333,14 @@ class ResearchEvidenceStorageService
 
         $parentDir = dirname($hotAbsolutePath);
         if (! is_dir($parentDir) && ! mkdir($parentDir, 0775, true) && ! is_dir($parentDir)) {
-            throw new RuntimeException('Không thể tạo thư mục hot storage cho minh chứng.');
+            throw new RuntimeException('KhÃ´ng thá»ƒ táº¡o thÆ° má»¥c hot storage cho minh chá»©ng.');
         }
 
         $downloadTimeout = max(30, (int) config('evidence.storage.download_timeout_seconds', 600));
         $this->runRclone(['copyto', $coldPath, $hotAbsolutePath], false, $downloadTimeout);
 
         if (! is_file($hotAbsolutePath) || ! is_readable($hotAbsolutePath)) {
-            throw new RuntimeException('Không thể nạp tệp minh chứng từ Google Drive.');
+            throw new RuntimeException('KhÃ´ng thá»ƒ náº¡p tá»‡p minh chá»©ng tá»« Google Drive.');
         }
 
         $this->touchHotFile($hotAbsolutePath);
@@ -357,7 +358,7 @@ class ResearchEvidenceStorageService
         $fileSize = filesize($absolutePath);
         $lastModified = filemtime($absolutePath);
         if ($fileSize === false || $lastModified === false) {
-            throw new RuntimeException('Không thể đọc thông tin tệp minh chứng.');
+            throw new RuntimeException('KhÃ´ng thá»ƒ Ä‘á»c thÃ´ng tin tá»‡p minh chá»©ng.');
         }
 
         $etag = '"' . sha1($absolutePath . '|' . $fileSize . '|' . $lastModified) . '"';
@@ -522,12 +523,12 @@ class ResearchEvidenceStorageService
 
         $allowBackupFallback = (bool) config('evidence.storage.allow_backup_repository_fallback', false);
         if (! $allowBackupFallback) {
-            throw new RuntimeException('Chưa cấu hình SPNC_EVIDENCE_DRIVE_TARGET cho lưu minh chứng.');
+            throw new RuntimeException('ChÆ°a cáº¥u hÃ¬nh SPNC_EVIDENCE_DRIVE_TARGET cho lÆ°u minh chá»©ng.');
         }
 
         $repository = trim((string) config('backup.restic.repository', ''));
         if (! str_starts_with(Str::lower($repository), 'rclone:')) {
-            throw new RuntimeException('Chưa cấu hình đích Google Drive cho minh chứng.');
+            throw new RuntimeException('ChÆ°a cáº¥u hÃ¬nh Ä‘Ã­ch Google Drive cho minh chá»©ng.');
         }
 
         $withoutPrefix = trim((string) Str::after($repository, 'rclone:'));
@@ -535,7 +536,7 @@ class ResearchEvidenceStorageService
         $remoteName = trim((string) ($parts[0] ?? ''));
         $repoPath = trim((string) ($parts[1] ?? ''), '/');
         if ($remoteName === '') {
-            throw new RuntimeException('Không đọc được remote rclone từ cấu hình backup.');
+            throw new RuntimeException('KhÃ´ng Ä‘á»c Ä‘Æ°á»£c remote rclone tá»« cáº¥u hÃ¬nh backup.');
         }
 
         $parentPath = $repoPath;
@@ -563,14 +564,14 @@ class ResearchEvidenceStorageService
             $raw = trim((string) Str::after($raw, 'rclone:'));
         }
         if ($raw === '' || ! str_contains($raw, ':')) {
-            throw new RuntimeException('Cấu hình SPNC_EVIDENCE_DRIVE_TARGET không hợp lệ.');
+            throw new RuntimeException('Cáº¥u hÃ¬nh SPNC_EVIDENCE_DRIVE_TARGET khÃ´ng há»£p lá»‡.');
         }
 
         $parts = explode(':', $raw, 2);
         $remoteName = trim((string) ($parts[0] ?? ''));
         $remotePath = trim((string) ($parts[1] ?? ''), '/');
         if ($remoteName === '') {
-            throw new RuntimeException('Cấu hình SPNC_EVIDENCE_DRIVE_TARGET thiếu remote.');
+            throw new RuntimeException('Cáº¥u hÃ¬nh SPNC_EVIDENCE_DRIVE_TARGET thiáº¿u remote.');
         }
 
         return $remotePath !== '' ? "{$remoteName}:{$remotePath}" : "{$remoteName}:";
@@ -587,7 +588,7 @@ class ResearchEvidenceStorageService
         $remote = trim((string) ($parts[0] ?? ''));
         $base = trim((string) ($parts[1] ?? ''), '/');
         if ($remote === '') {
-            throw new RuntimeException('Đường dẫn rclone không hợp lệ.');
+            throw new RuntimeException('ÄÆ°á»ng dáº«n rclone khÃ´ng há»£p lá»‡.');
         }
 
         $path = $base === '' ? $segment : ($base . '/' . $segment);
@@ -658,7 +659,7 @@ class ResearchEvidenceStorageService
         $disk = $this->resolveHotDiskName();
         $adapter = Storage::disk($disk);
         if (! method_exists($adapter, 'path')) {
-            throw new RuntimeException('Hot storage hiện tại không hỗ trợ stream local cho preview.');
+            throw new RuntimeException('Hot storage hiá»‡n táº¡i khÃ´ng há»— trá»£ stream local cho preview.');
         }
 
         return $adapter->path($hotRelativePath);
@@ -687,7 +688,7 @@ class ResearchEvidenceStorageService
     {
         $binary = trim((string) config('evidence.storage.rclone_binary', 'rclone'));
         if ($binary === '') {
-            throw new RuntimeException('Thiếu cấu hình rclone binary để xử lý minh chứng.');
+            throw new RuntimeException('Thiáº¿u cáº¥u hÃ¬nh rclone binary Ä‘á»ƒ xá»­ lÃ½ minh chá»©ng.');
         }
 
         $this->validateRcloneConfiguration();
@@ -709,7 +710,7 @@ class ResearchEvidenceStorageService
                 ];
             }
 
-            throw new RuntimeException('Lệnh rclone quá thời gian chờ khi xử lý minh chứng.', 0, $exception);
+            throw new RuntimeException('Lá»‡nh rclone quÃ¡ thá»i gian chá» khi xá»­ lÃ½ minh chá»©ng.', 0, $exception);
         }
 
         $result = [
@@ -723,7 +724,7 @@ class ResearchEvidenceStorageService
         if (! $allowFailure && ! $result['successful']) {
             $stderr = trim((string) $result['stderr']);
             throw new RuntimeException(
-                'Lệnh rclone thất bại: ' . ($stderr !== '' ? $stderr : 'unknown error')
+                'Lá»‡nh rclone tháº¥t báº¡i: ' . ($stderr !== '' ? $stderr : 'unknown error')
             );
         }
 
@@ -734,9 +735,7 @@ class ResearchEvidenceStorageService
     {
         $args = [];
 
-        $serviceAccountFile = $this->resolveConfiguredPath(
-            (string) config('evidence.storage.rclone_service_account_file', '')
-        );
+        $serviceAccountFile = $this->resolveRuntimeServiceAccountFile();
         if ($serviceAccountFile !== '') {
             $args[] = '--drive-service-account-file';
             $args[] = $serviceAccountFile;
@@ -770,21 +769,17 @@ class ResearchEvidenceStorageService
 
     private function validateRcloneConfiguration(): void
     {
-        $rcloneConfigPath = $this->resolveConfiguredPath(
-            (string) config('evidence.storage.rclone_config_path', '')
-        );
+        $rcloneConfigPath = $this->resolveRuntimeRcloneConfigPath();
         if ($rcloneConfigPath !== '') {
             if (! is_file($rcloneConfigPath) || ! is_readable($rcloneConfigPath)) {
-                throw new RuntimeException('Không đọc được tệp cấu hình rclone cho minh chứng.');
+                throw new RuntimeException('Khong doc duoc tep cau hinh rclone cho minh chung.');
             }
         }
 
-        $serviceAccountFile = $this->resolveConfiguredPath(
-            (string) config('evidence.storage.rclone_service_account_file', '')
-        );
+        $serviceAccountFile = $this->resolveRuntimeServiceAccountFile();
         if ($serviceAccountFile !== '') {
             if (! is_file($serviceAccountFile) || ! is_readable($serviceAccountFile)) {
-                throw new RuntimeException('Không đọc được tệp service account Google Drive cho minh chứng.');
+                throw new RuntimeException('Khong doc duoc tep service account Google Drive cho minh chung.');
             }
 
             return;
@@ -798,8 +793,8 @@ class ResearchEvidenceStorageService
         $configDir = dirname($rcloneConfigPath);
         if (! is_dir($configDir) || ! is_writable($configDir)) {
             throw new RuntimeException(
-                'Thư mục cấu hình rclone cho minh chứng không có quyền ghi. '
-                . 'Hãy cấu hình SPNC_RCLONE_CONFIG tới đường dẫn server có quyền ghi.'
+                'Thu muc cau hinh rclone cho minh chung khong co quyen ghi. '
+                . 'Hay cau hinh SPNC_RCLONE_CONFIG toi duong dan server co quyen ghi.'
             );
         }
     }
@@ -825,11 +820,14 @@ class ResearchEvidenceStorageService
             $env[$key] = (string) $value;
         }
 
-        $rcloneConfig = $this->resolveConfiguredPath(
-            (string) config('evidence.storage.rclone_config_path', '')
-        );
+        $rcloneConfig = $this->resolveRuntimeRcloneConfigPath();
         if ($rcloneConfig !== '') {
             $env['RCLONE_CONFIG'] = $rcloneConfig;
+        }
+
+        $serviceAccountFile = $this->resolveRuntimeServiceAccountFile();
+        if ($serviceAccountFile !== '') {
+            $env['RCLONE_DRIVE_SERVICE_ACCOUNT_FILE'] = $serviceAccountFile;
         }
 
         $httpProxy = trim((string) config('evidence.storage.http_proxy', ''));
@@ -866,4 +864,61 @@ class ResearchEvidenceStorageService
             || preg_match('/^[a-zA-Z]:[\/\\\\]/', $path) === 1
             || str_starts_with($path, '\\\\');
     }
+
+    private function resolveRuntimeRcloneConfigPath(): string
+    {
+        return $this->resolveRuntimeAsset(
+            (string) config('evidence.storage.rclone_config_path', ''),
+            (string) config('evidence.storage.rclone_config_base64', ''),
+            'storage/app/runtime-config/evidence/rclone.conf'
+        );
+    }
+
+    private function resolveRuntimeServiceAccountFile(): string
+    {
+        return $this->resolveRuntimeAsset(
+            (string) config('evidence.storage.rclone_service_account_file', ''),
+            (string) config('evidence.storage.rclone_service_account_json_base64', ''),
+            'storage/app/runtime-config/evidence/service-account.json'
+        );
+    }
+
+    private function resolveRuntimeAsset(string $configuredPath, string $inlineBase64, string $materializedRelativePath): string
+    {
+        $inlineBase64 = trim($inlineBase64);
+        $preferBase64 = app()->environment('production') && $inlineBase64 !== '';
+
+        if ($preferBase64) {
+            $materialized = $this->materializeRuntimeAsset($inlineBase64, $materializedRelativePath);
+            if ($materialized !== '') {
+                return $materialized;
+            }
+        }
+
+        $resolvedConfigured = $this->resolveConfiguredPath($configuredPath);
+        if ($resolvedConfigured !== '' && is_file($resolvedConfigured) && is_readable($resolvedConfigured)) {
+            return $resolvedConfigured;
+        }
+
+        if (! $preferBase64 && $inlineBase64 !== '') {
+            return $this->materializeRuntimeAsset($inlineBase64, $materializedRelativePath);
+        }
+
+        return '';
+    }
+
+    private function materializeRuntimeAsset(string $inlineBase64, string $materializedRelativePath): string
+    {
+        $decoded = base64_decode(trim($inlineBase64), true);
+        if ($decoded === false || $decoded === '') {
+            return '';
+        }
+
+        $absolutePath = base_path(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $materializedRelativePath));
+        File::ensureDirectoryExists(dirname($absolutePath));
+        File::put($absolutePath, $decoded);
+
+        return is_file($absolutePath) && is_readable($absolutePath) ? $absolutePath : '';
+    }
 }
+
