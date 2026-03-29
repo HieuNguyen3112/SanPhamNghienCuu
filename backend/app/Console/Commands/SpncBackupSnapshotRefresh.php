@@ -13,11 +13,11 @@ use Illuminate\Support\Str;
 class SpncBackupSnapshotRefresh extends Command
 {
     protected $signature = 'spnc:backup:snapshots:refresh
-        {--run-id= : Mã run theo dõi refresh}
-        {--trigger=manual : Nguồn kích hoạt}
-        {--initiated-by= : user_id kích hoạt}';
+        {--run-id= : Ma run theo doi refresh}
+        {--trigger=manual : Nguon kich hoat}
+        {--initiated-by= : user_id kich hoat}';
 
-    protected $description = 'Làm mới cache danh sách snapshot backup từ repository restic.';
+    protected $description = 'Lam moi cache danh sach snapshot backup tu repository restic.';
 
     private ResticBackupManager $backupManager;
     private BackupRunStateStore $stateStore;
@@ -57,7 +57,7 @@ class SpncBackupSnapshotRefresh extends Command
                 'trigger' => $trigger,
                 'requested_by_user_id' => $initiatedBy,
                 'requested_at' => now()->toIso8601String(),
-                'message' => 'Đã xếp lịch làm mới danh sách snapshot.',
+                'message' => 'Da xep lich lam moi danh sach snapshot.',
             ]);
         } else {
             $this->stateStore->update($runId, [
@@ -70,7 +70,7 @@ class SpncBackupSnapshotRefresh extends Command
 
         $lock = Cache::lock('spnc:backup:snapshots:refresh', 1800);
         if (! $lock->get()) {
-            $message = 'Đang có một tiến trình làm mới snapshot khác chạy.';
+            $message = 'Dang co mot tien trinh lam moi snapshot khac chay.';
             $this->stateStore->update($runId, [
                 'status' => 'failed',
                 'operation' => 'snapshot_refresh',
@@ -88,20 +88,35 @@ class SpncBackupSnapshotRefresh extends Command
             $this->stateStore->update($runId, [
                 'status' => 'running',
                 'operation' => 'snapshot_refresh',
-                'step' => 'loading_snapshots',
+                'step' => 'probing_drive',
                 'started_at' => now()->toIso8601String(),
-                'message' => 'Đang đồng bộ danh sách bản sao lưu...',
+                'message' => 'Dang kiem tra Google Drive backup...',
+            ]);
+
+            $this->backupManager->assertDriveReadiness('snapshot_refresh');
+
+            $this->stateStore->update($runId, [
+                'status' => 'running',
+                'operation' => 'snapshot_refresh',
+                'step' => 'opening_repository',
+                'message' => 'Dang mo repository backup...',
             ]);
 
             $limit = max(10, (int) config('backup.snapshot_cache.max_items', 200));
+            $this->stateStore->update($runId, [
+                'status' => 'running',
+                'operation' => 'snapshot_refresh',
+                'step' => 'listing_snapshots',
+                'message' => 'Dang dong bo danh sach ban sao luu...',
+            ]);
             $snapshots = $this->backupManager->listSnapshots($limit);
             $cache = $this->snapshotStore->replace($snapshots, $runId);
 
             $this->stateStore->update($runId, [
                 'status' => 'success',
                 'operation' => 'snapshot_refresh',
-                'step' => 'completed',
-                'message' => 'Làm mới danh sách snapshot hoàn tất.',
+                'step' => 'ready',
+                'message' => 'Lam moi danh sach snapshot hoan tat.',
                 'finished_at' => now()->toIso8601String(),
                 'result' => [
                     'snapshot_count' => count($snapshots),
@@ -139,15 +154,31 @@ class SpncBackupSnapshotRefresh extends Command
     private function toUserFacingFailureMessage(\Throwable $exception): string
     {
         $raw = Str::lower(trim((string) $exception->getMessage()));
+        if (str_contains($raw, 'service_account_invalid') || str_contains($raw, 'service_account_required')) {
+            return 'Google Drive backup chua san sang vi service account chua duoc nap dung. Vui long kiem tra cau hinh production.';
+        }
+
+        if (str_contains($raw, 'rclone_service_account_required') || str_contains($raw, 'drive_auth_invalid')) {
+            return 'Production chi ho tro Google Drive backup bang service account. Hay kiem tra lai remote spnc_gdrive.';
+        }
+
+        if (str_contains($raw, 'drive_remote_inaccessible')) {
+            return 'Khong the truy cap thu muc Google Drive backup. Vui long kiem tra root_folder_id va quyen chia se cho service account.';
+        }
+
+        if (str_contains($raw, 'repository_access_failed')) {
+            return 'Google Drive da truy cap duoc nhung repository backup chua mo duoc. Vui long kiem tra restic repository.';
+        }
+
         if (
             str_contains($raw, 'timed out')
             || str_contains($raw, 'timeout')
             || str_contains($raw, 'exceeded the timeout')
-            || str_contains($raw, 'quá thời gian')
+            || str_contains($raw, 'qua thoi gian')
         ) {
-            return 'Đồng bộ danh sách bị quá thời gian. Vui lòng thử lại.';
+            return 'Dong bo danh sach bi qua thoi gian. Vui long thu lai.';
         }
 
-        return 'Đồng bộ danh sách thất bại. Vui lòng thử lại.';
+        return 'Dong bo danh sach that bai. Vui long thu lai.';
     }
 }

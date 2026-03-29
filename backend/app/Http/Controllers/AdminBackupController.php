@@ -1436,6 +1436,18 @@ class AdminBackupController extends Controller
             return 'DRIVE_AUTH_INVALID';
         }
 
+        if (Str::contains($combined, ['service_account_invalid', 'service_account_required'])) {
+            return 'SERVICE_ACCOUNT_INVALID';
+        }
+
+        if (Str::contains($combined, ['drive_remote_inaccessible'])) {
+            return 'DRIVE_REMOTE_INACCESSIBLE';
+        }
+
+        if (Str::contains($combined, ['repository_access_failed'])) {
+            return 'REPOSITORY_ACCESS_FAILED';
+        }
+
         if ($this->containsRcloneConfigHint($combined)) {
             return 'RCLONE_CONFIG_INVALID';
         }
@@ -1674,6 +1686,7 @@ class AdminBackupController extends Controller
         return ['run_id' => $runId];
     }
 }
+
 
 
 
