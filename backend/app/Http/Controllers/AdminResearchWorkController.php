@@ -120,6 +120,15 @@ class AdminResearchWorkController extends Controller
         ], Response::HTTP_OK);
     }
 
+    private function activityYearExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => 'COALESCE(pd.year, bd.year, CAST(EXTRACT(YEAR FROM cd.held_on) AS INTEGER), CAST(EXTRACT(YEAR FROM prd.start_month) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.approved_at) AS INTEGER), CAST(EXTRACT(YEAR FROM ra.submitted_at) AS INTEGER))',
+            'sqlite' => "COALESCE(pd.year, bd.year, CAST(strftime('%Y', cd.held_on) AS INTEGER), CAST(strftime('%Y', prd.start_month) AS INTEGER), CAST(strftime('%Y', ra.approved_at) AS INTEGER), CAST(strftime('%Y', ra.submitted_at) AS INTEGER))",
+            default => 'COALESCE(pd.year, bd.year, YEAR(cd.held_on), YEAR(prd.start_month), YEAR(ra.approved_at), YEAR(ra.submitted_at))',
+        };
+    }
+
     public function approvedDetail(Request $request, int $activity)
     {
         $validated = $request->validate([
@@ -151,7 +160,7 @@ class AdminResearchWorkController extends Controller
                 'at.name as type_name',
                 'ra.academic_year_id',
                 'ay.code as academic_year_code',
-                DB::raw('COALESCE(pd.year, bd.year, YEAR(cd.held_on), YEAR(prd.start_month), YEAR(ra.approved_at), YEAR(ra.submitted_at)) as work_year'),
+                DB::raw($this->activityYearExpression() . ' as work_year'),
                 DB::raw('COALESCE(pd.journal_name, bd.publisher, cd.conference_name, prd.project_code) as venue_name'),
                 'ra.submitted_at',
                 'ra.approved_at',
