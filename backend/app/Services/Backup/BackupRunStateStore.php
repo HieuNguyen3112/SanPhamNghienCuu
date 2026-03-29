@@ -213,6 +213,9 @@ class BackupRunStateStore
             'trigger' => $state['trigger'] ?? null,
             'step' => $state['step'] ?? null,
             'message' => $state['message'] ?? null,
+            'user_message' => $state['user_message'] ?? null,
+            'error_code' => $state['error_code'] ?? null,
+            'technical_message' => $state['technical_message'] ?? null,
             'requested_by_user_id' => $state['requested_by_user_id'] ?? null,
             'requested_at' => $state['requested_at'] ?? null,
             'started_at' => $state['started_at'] ?? null,
@@ -251,14 +254,24 @@ class BackupRunStateStore
             default => 'Tiến trình nền quá thời gian chờ và đã được đánh dấu thất bại. Bạn có thể thử lại.',
         };
         $errorMessage = trim((string) ($state['error_message'] ?? ''));
+        $technicalMessage = trim((string) ($state['technical_message'] ?? ''));
+        $existingUserMessage = trim((string) ($state['user_message'] ?? $state['message'] ?? ''));
+        $existingErrorCode = trim((string) ($state['error_code'] ?? ''));
+        $existingStep = trim((string) ($state['step'] ?? ''));
+        $hasConcreteRootCause = $existingUserMessage !== '' || $errorMessage !== '' || $technicalMessage !== '' || $existingErrorCode !== '';
 
         $normalized = array_merge($state, [
             'status' => 'failed',
-            'step' => 'timeout',
-            'message' => $message,
+            'step' => $hasConcreteRootCause && $existingStep !== '' ? $existingStep : 'timeout',
+            'message' => $hasConcreteRootCause && $existingUserMessage !== '' ? $existingUserMessage : $message,
+            'user_message' => $hasConcreteRootCause && $existingUserMessage !== '' ? $existingUserMessage : $message,
+            'error_code' => $hasConcreteRootCause && $existingErrorCode !== '' ? $existingErrorCode : 'RUN_TIMEOUT',
             'error_message' => $errorMessage !== ''
                 ? $errorMessage
                 : ('Run timed out after ' . $timeoutSeconds . ' seconds.'),
+            'technical_message' => $technicalMessage !== ''
+                ? $technicalMessage
+                : ($errorMessage !== '' ? $errorMessage : ('Run timed out after ' . $timeoutSeconds . ' seconds.')),
             'finished_at' => now()->toIso8601String(),
             'updated_at' => now()->toIso8601String(),
         ]);

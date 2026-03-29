@@ -128,10 +128,13 @@ class SpncBackupSnapshotRefresh extends Command
             return self::SUCCESS;
         } catch (\Throwable $exception) {
             $userMessage = $this->toUserFacingFailureMessage($exception);
+            $errorCode = $this->detectErrorCode($exception);
+            $technicalMessage = trim((string) $exception->getMessage());
             Log::error('backup.snapshot_refresh_failed', [
                 'run_id' => $runId,
                 'trigger' => $trigger,
-                'message' => $exception->getMessage(),
+                'message' => $technicalMessage,
+                'error_code' => $errorCode,
             ]);
 
             $this->stateStore->update($runId, [
@@ -139,16 +142,57 @@ class SpncBackupSnapshotRefresh extends Command
                 'operation' => 'snapshot_refresh',
                 'step' => 'failed',
                 'message' => $userMessage,
+                'user_message' => $userMessage,
+                'error_code' => $errorCode,
                 'finished_at' => now()->toIso8601String(),
-                'error_message' => $exception->getMessage(),
+                'error_message' => $technicalMessage,
+                'technical_message' => $technicalMessage,
             ]);
-            $this->snapshotStore->markRefreshFailed($userMessage, $runId);
+            $this->snapshotStore->markRefreshFailed([
+                'operation' => 'snapshot_refresh',
+                'step' => 'failed',
+                'user_message' => $userMessage,
+                'error_code' => $errorCode,
+                'technical_message' => $technicalMessage,
+            ], $runId);
 
             $this->error('Snapshot refresh failed: ' . $exception->getMessage());
             return self::FAILURE;
         } finally {
             optional($lock)->release();
         }
+    }
+
+    private function detectErrorCode(\Throwable $exception): ?string
+    {
+        $message = Str::lower(trim((string) $exception->getMessage()));
+        if ($message === '') {
+            return null;
+        }
+
+        if (str_contains($message, 'service_account_invalid') || str_contains($message, 'service_account_required')) {
+            return 'SERVICE_ACCOUNT_INVALID';
+        }
+        if (str_contains($message, 'rclone_service_account_required')) {
+            return 'RCLONE_SERVICE_ACCOUNT_REQUIRED';
+        }
+        if (str_contains($message, 'rclone_remote_not_minimal')) {
+            return 'RCLONE_REMOTE_NOT_MINIMAL';
+        }
+        if (str_contains($message, 'drive_remote_inaccessible')) {
+            return 'DRIVE_REMOTE_INACCESSIBLE';
+        }
+        if (str_contains($message, 'repository_access_failed')) {
+            return 'REPOSITORY_ACCESS_FAILED';
+        }
+        if (str_contains($message, 'drive_probe_timeout') || str_contains($message, 'timed out') || str_contains($message, 'timeout')) {
+            return 'DRIVE_PROBE_TIMEOUT';
+        }
+        if (str_contains($message, 'invalid_grant') || str_contains($message, 'couldn\'t fetch token')) {
+            return 'DRIVE_AUTH_INVALID';
+        }
+
+        return null;
     }
 
     private function toUserFacingFailureMessage(\Throwable $exception): string

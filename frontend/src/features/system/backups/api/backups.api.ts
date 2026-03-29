@@ -119,6 +119,9 @@ export interface BackupCacheMeta {
   last_refresh_run_id: string | null;
   last_error: string | null;
   last_error_code?: string | null;
+  last_error_step?: string | null;
+  last_error_technical_message?: string | null;
+  last_error_operation?: BackupOperation | null;
   stale: boolean;
   stale_after_seconds?: number;
   refresh_queued?: boolean;

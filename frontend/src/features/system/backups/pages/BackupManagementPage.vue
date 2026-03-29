@@ -110,6 +110,31 @@
             </button>
           </div>
         </div>
+        <div
+          v-if="backupDebugInfo"
+          class="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700"
+        >
+          <p class="font-semibold text-slate-900">{{ backupDebugInfo.message }}</p>
+          <p v-if="backupDebugInfo.suggestion" class="mt-1 text-slate-600">
+            {{ backupDebugInfo.suggestion }}
+          </p>
+          <p class="mt-2 font-mono text-[11px] text-slate-500">
+            {{ backupDebugInfo.code || "UNKNOWN" }}<span v-if="backupDebugInfo.step"> • {{ toStepLabel(backupDebugInfo.step) }}</span>
+          </p>
+          <details v-if="backupDebugInfo.technicalMessage" class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <summary class="cursor-pointer font-medium text-slate-700">Chi tiết kỹ thuật</summary>
+            <div class="mt-2 space-y-2">
+              <pre class="whitespace-pre-wrap break-words rounded bg-slate-50 p-2 font-mono text-[11px] text-slate-700">{{ backupDebugInfo.technicalMessage }}</pre>
+              <button
+                type="button"
+                class="rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+                @click="copyTechnicalDetails(backupDebugInfo.technicalMessage)"
+              >
+                Sao chép chi tiết
+              </button>
+            </div>
+          </details>
+        </div>
 
         <div v-if="isLoading && snapshots.length === 0" class="space-y-2 py-2">
           <div v-for="n in 5" :key="n" class="h-10 animate-pulse rounded-xl bg-slate-100" />
@@ -499,6 +524,8 @@ const isDeleteBlocked = computed(
 const cacheRefreshOperation = computed(() => (cacheMeta.value?.refresh_operation || "").toLowerCase());
 const cacheRefreshStatus = computed(() => (cacheMeta.value?.refresh_status || "").toLowerCase());
 const cacheLastErrorCode = computed(() => (cacheMeta.value?.last_error_code || "").toUpperCase());
+const cacheLastErrorStep = computed(() => (cacheMeta.value?.last_error_step || "").trim());
+const cacheLastTechnicalMessage = computed(() => (cacheMeta.value?.last_error_technical_message || "").trim());
 const isCacheSnapshotRefreshRunning = computed(
   () =>
     (Boolean(cacheMeta.value?.refreshing) || Boolean(cacheMeta.value?.refresh_queued))
@@ -604,6 +631,58 @@ function toFriendlySyncMessage(rawMessage: string | null | undefined) {
   return "\u0110\u1ed3ng b\u1ed9 danh s\u00e1ch th\u1ea5t b\u1ea1i. B\u1ea1n c\u00f3 th\u1ec3 th\u1eed l\u1ea1i.";
 }
 
+function toStepLabel(step: string | null | undefined) {
+  const normalized = (step || "").trim().toLowerCase();
+  switch (normalized) {
+    case "probing_drive":
+    case "probing_drive_root":
+      return "probing_drive_root";
+    case "opening_repository":
+      return "opening_repository";
+    case "listing_snapshots":
+      return "listing_snapshots";
+    case "running_backup":
+      return "running_backup";
+    case "postprocessing_export":
+      return "postprocessing_export";
+    case "launching_refresh":
+      return "launching_refresh";
+    case "timeout":
+      return "timeout";
+    default:
+      return normalized || "-";
+  }
+}
+
+function buildBackupSuggestion(errorCode: string | null | undefined, step: string | null | undefined) {
+  const code = (errorCode || "").trim().toUpperCase();
+  const normalizedStep = (step || "").trim().toLowerCase();
+
+  if (code === "DRIVE_REMOTE_INACCESSIBLE" || normalizedStep === "probing_drive_root") {
+    return "Kiểm tra root_folder_id, service account và quyền chia sẻ thư mục Google Drive backup.";
+  }
+  if (code === "REPOSITORY_ACCESS_FAILED" || normalizedStep === "opening_repository") {
+    return "Đã vào được Google Drive nhưng chưa mở được restic-repo. Kiểm tra đường dẫn repository và nội dung thư mục.";
+  }
+  if (code === "SERVICE_ACCOUNT_INVALID") {
+    return "Kiểm tra SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64 và xác nhận file JSON service account còn hợp lệ.";
+  }
+  if (code === "RCLONE_SERVICE_ACCOUNT_REQUIRED" || code === "RCLONE_REMOTE_NOT_MINIMAL") {
+    return "Production phải dùng service account và rclone.conf tối giản, không để lại token OAuth cũ.";
+  }
+  if (code === "DRIVE_AUTH_INVALID") {
+    return "Xác nhận runtime đang nạp service account mới, không còn fallback sang cấu hình OAuth cũ.";
+  }
+  if (code === "DRIVE_PROBE_TIMEOUT" || normalizedStep === "timeout") {
+    return "Kết nối Google Drive không phản hồi kịp thời. Kiểm tra remote, quyền truy cập và log backend để xác định điểm treo.";
+  }
+  if (normalizedStep === "listing_snapshots") {
+    return "Google Drive và repository đã mở được, nhưng bước đọc snapshot thất bại. Kiểm tra restic snapshots và log backend.";
+  }
+
+  return "";
+}
+
 function toFriendlyBackgroundRunFailureMessage(
   userMessage: string | null | undefined,
   errorCode: string | null | undefined,
@@ -633,17 +712,46 @@ const activeRunDescription = computed(() =>
   readableBackupMessage(activeRunState.value?.user_message || activeRunState.value?.message, "\u0110ang x\u1eed l\u00fd...")
 );
 
-const syncFailedMessage = computed(() => {
+const preferredSyncError = computed(() => {
   if (activeRunOperation.value === "snapshot_refresh" && activeRunStatus.value === "failed") {
-    return toFriendlySyncMessage(activeRunState.value?.user_message || activeRunState.value?.message);
+    return {
+      message: (activeRunState.value?.user_message || activeRunState.value?.message || "").trim(),
+      code: activeRunErrorCode.value || null,
+      step: (activeRunState.value?.step || "").trim() || null,
+      technicalMessage: (activeRunState.value?.technical_message || activeRunState.value?.error_message || "").trim() || null,
+    };
   }
 
-  const lastError = cacheMeta.value?.last_error?.trim();
+  const lastError = (cacheMeta.value?.last_error || "").trim();
   if (lastError) {
-    return toFriendlySyncMessage(lastError);
+    return {
+      message: lastError,
+      code: cacheLastErrorCode.value || null,
+      step: cacheLastErrorStep.value || null,
+      technicalMessage: cacheLastTechnicalMessage.value || null,
+    };
   }
 
-  return "";
+  return null;
+});
+
+const syncFailedMessage = computed(() => {
+  if (!preferredSyncError.value) return "";
+  return toFriendlySyncMessage(preferredSyncError.value.message);
+});
+
+const backupDebugInfo = computed(() => {
+  if (!preferredSyncError.value) return null;
+  const message = syncFailedMessage.value.trim();
+  if (!message) return null;
+
+  return {
+    message,
+    suggestion: buildBackupSuggestion(preferredSyncError.value.code, preferredSyncError.value.step),
+    code: preferredSyncError.value.code,
+    step: preferredSyncError.value.step,
+    technicalMessage: preferredSyncError.value.technicalMessage,
+  };
 });
 const showRetrySyncButton = computed(
   () => !effectiveListSyncing.value && (syncFailedMessage.value !== "" || Boolean(cacheMeta.value?.stale))
@@ -679,6 +787,17 @@ const cacheRefreshLabel = computed(() => {
   }
   return "";
 });
+
+async function copyTechnicalDetails(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return;
+
+  try {
+    await navigator.clipboard.writeText(normalized);
+  } catch {
+    // No-op: this is an admin convenience action, not a critical workflow.
+  }
+}
 
 const exportsRootPath = computed(() => {
   const byInfo = exportsInfo.value?.exports_root_path?.trim();

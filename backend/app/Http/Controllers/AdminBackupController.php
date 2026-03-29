@@ -182,11 +182,13 @@ class AdminBackupController extends Controller
             $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
             $activeRun = $this->toPublicRunState($activeRun);
             $systemActiveRun = $this->toPublicRunState($systemActiveRun);
-            $cacheLastError = $this->toPublicErrorPayload(
-                (string) ($cacheMeta['last_error'] ?? ''),
-                'snapshot_refresh',
-                'failed'
-            );
+            $cacheLastError = $this->toPublicErrorPayload([
+                'message' => $cacheMeta['last_error'] ?? null,
+                'user_message' => $cacheMeta['last_error'] ?? null,
+                'error_code' => $cacheMeta['last_error_code'] ?? null,
+                'technical_message' => $cacheMeta['last_error_technical_message'] ?? null,
+                'step' => $cacheMeta['last_error_step'] ?? null,
+            ], 'snapshot_refresh', 'failed');
             $readinessIssue = $this->primaryReadinessIssue($readiness);
             $repositoryError = $cacheLastError['user_message']
                 ?? ($readinessIssue['message'] ?? null);
@@ -207,6 +209,8 @@ class AdminBackupController extends Controller
                     'cache' => array_merge($cacheMeta, [
                         'last_error' => $cacheLastError['user_message'],
                         'last_error_code' => $cacheLastError['error_code'],
+                        'last_error_step' => $cacheLastError['step'],
+                        'last_error_technical_message' => $cacheLastError['technical_message'],
                         'refresh_queued' => $refreshRun !== null,
                         'refresh_run_id' => $refreshRun['run_id'] ?? ($cacheMeta['refresh_run_id'] ?? null),
                         'refresh_operation' => $cacheRefreshOperation !== '' ? $cacheRefreshOperation : null,

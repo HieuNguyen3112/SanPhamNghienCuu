@@ -63,6 +63,10 @@ class BackupSnapshotStore
         $payload['refresh_started_at'] = null;
         $payload['refresh_run_id'] = null;
         $payload['last_error'] = null;
+        $payload['last_error_code'] = null;
+        $payload['last_error_step'] = null;
+        $payload['last_error_technical_message'] = null;
+        $payload['last_error_operation'] = null;
         $payload['last_refresh_run_id'] = $runId;
         $payload['refreshed_at'] = now()->toIso8601String();
         $payload['updated_at'] = now()->toIso8601String();
@@ -106,6 +110,10 @@ class BackupSnapshotStore
         $payload['refresh_started_at'] = null;
         $payload['refresh_run_id'] = null;
         $payload['last_error'] = null;
+        $payload['last_error_code'] = null;
+        $payload['last_error_step'] = null;
+        $payload['last_error_technical_message'] = null;
+        $payload['last_error_operation'] = null;
         $payload['last_refresh_run_id'] = $runId;
         $payload['refreshed_at'] = now()->toIso8601String();
         $payload['updated_at'] = now()->toIso8601String();
@@ -184,13 +192,24 @@ class BackupSnapshotStore
         return $payload;
     }
 
-    public function markRefreshFailed(string $message, ?string $runId = null): array
+    public function markRefreshFailed(string|array $error, ?string $runId = null): array
     {
+        $errorPayload = is_array($error) ? $error : ['user_message' => $error];
+        $userMessage = trim((string) ($errorPayload['user_message'] ?? $errorPayload['message'] ?? ''));
+        $technicalMessage = trim((string) ($errorPayload['technical_message'] ?? $errorPayload['error_message'] ?? ''));
+        $errorCode = trim((string) ($errorPayload['error_code'] ?? ''));
+        $step = trim((string) ($errorPayload['step'] ?? ''));
+        $operation = trim((string) ($errorPayload['operation'] ?? ''));
+
         $payload = $this->read();
         $payload['refreshing'] = false;
         $payload['refresh_started_at'] = null;
         $payload['refresh_run_id'] = null;
-        $payload['last_error'] = trim($message);
+        $payload['last_error'] = $userMessage !== '' ? $userMessage : null;
+        $payload['last_error_code'] = $errorCode !== '' ? $errorCode : null;
+        $payload['last_error_step'] = $step !== '' ? $step : null;
+        $payload['last_error_technical_message'] = $technicalMessage !== '' ? $technicalMessage : null;
+        $payload['last_error_operation'] = $operation !== '' ? $operation : 'snapshot_refresh';
         $payload['last_refresh_run_id'] = $runId;
         $payload['updated_at'] = now()->toIso8601String();
         $payload['context'] = $this->contextPayload();
@@ -336,6 +355,10 @@ class BackupSnapshotStore
             'refresh_run_id' => $payload['refresh_run_id'] ?? null,
             'last_refresh_run_id' => $payload['last_refresh_run_id'] ?? null,
             'last_error' => $payload['last_error'] ?? null,
+            'last_error_code' => $payload['last_error_code'] ?? null,
+            'last_error_step' => $payload['last_error_step'] ?? null,
+            'last_error_technical_message' => $payload['last_error_technical_message'] ?? null,
+            'last_error_operation' => $payload['last_error_operation'] ?? null,
             'stale' => $this->isStale(),
             'stale_after_seconds' => $this->effectiveStaleAfterSeconds(),
         ];
@@ -441,6 +464,10 @@ class BackupSnapshotStore
             'refresh_run_id' => null,
             'last_refresh_run_id' => null,
             'last_error' => null,
+            'last_error_code' => null,
+            'last_error_step' => null,
+            'last_error_technical_message' => null,
+            'last_error_operation' => null,
             'updated_at' => null,
             'context' => $this->contextPayload(),
         ];
