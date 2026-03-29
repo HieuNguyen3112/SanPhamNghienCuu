@@ -10,7 +10,7 @@
         </div>
         <p class="mt-1 text-sm text-slate-500">
           Chỉ hiển thị công trình
-          <span class="font-medium text-slate-700">đã duyệt</span> (read-only).
+          <span class="font-medium text-slate-700">đã duyệt</span>
         </p>
       </div>
 
@@ -66,7 +66,6 @@
               <th class="px-3 py-2 font-semibold">Thông tin</th>
               <th class="px-3 py-2 font-semibold">Năm</th>
               <th class="px-3 py-2 font-semibold">Vai trò</th>
-              <th class="px-3 py-2 font-semibold text-right">Hành động</th>
             </tr>
           </thead>
 
@@ -94,7 +93,7 @@
                 {{ row.role || "—" }}
               </td>
 
-              <td class="px-3 py-2 text-right">
+              <!-- <td class="px-3 py-2 text-right">
                 <div class="inline-flex items-center justify-end gap-2">
                   <button
                     type="button"
@@ -114,7 +113,7 @@
                     <Paperclip class="h-4 w-4" />
                   </button>
                 </div>
-              </td>
+              </td> -->
             </tr>
 
             <tr v-if="!loading && rows.length === 0">
@@ -274,7 +273,6 @@
 import { computed, ref } from "vue";
 import {
   BookOpen,
-  Eye,
   FileText,
   FlaskConical,
   Paperclip,
@@ -296,7 +294,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (
     e: "request-toast",
-    payload: { type: "success" | "error"; message: string }
+    payload: { type: "success" | "error"; message: string },
   ): void;
 }>();
 
