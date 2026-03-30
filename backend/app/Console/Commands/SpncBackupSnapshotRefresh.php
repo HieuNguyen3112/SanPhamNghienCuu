@@ -104,7 +104,13 @@ class SpncBackupSnapshotRefresh extends Command
                 'step' => 'opening_repository',
                 'message' => 'Dang mo repository backup...',
             ]);
+            $repositoryProbeStartedAt = microtime(true);
             $this->backupManager->assertRepositoryReady('snapshot_refresh');
+            $this->stateStore->appendLog(
+                $runId,
+                'Repository backup da mo xong sau ' . number_format(microtime(true) - $repositoryProbeStartedAt, 2) . ' giay.',
+                'info'
+            );
 
             $limit = max(10, (int) config('backup.snapshot_cache.max_items', 200));
             $currentStep = 'listing_snapshots';
@@ -114,7 +120,13 @@ class SpncBackupSnapshotRefresh extends Command
                 'step' => 'listing_snapshots',
                 'message' => 'Dang dong bo danh sach ban sao luu...',
             ]);
+            $snapshotListingStartedAt = microtime(true);
             $snapshots = $this->backupManager->listSnapshots($limit, true);
+            $this->stateStore->appendLog(
+                $runId,
+                'Da doc ' . count($snapshots) . ' snapshot sau ' . number_format(microtime(true) - $snapshotListingStartedAt, 2) . ' giay.',
+                'info'
+            );
             $cache = $this->snapshotStore->replace($snapshots, $runId);
 
             $this->stateStore->update($runId, [
