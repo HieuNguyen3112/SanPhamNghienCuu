@@ -84,32 +84,37 @@ class SpncBackupSnapshotRefresh extends Command
             return self::FAILURE;
         }
 
+        $currentStep = 'probing_drive_root';
+
         try {
             $this->stateStore->update($runId, [
                 'status' => 'running',
                 'operation' => 'snapshot_refresh',
-                'step' => 'probing_drive',
+                'step' => 'probing_drive_root',
                 'started_at' => now()->toIso8601String(),
                 'message' => 'Dang kiem tra Google Drive backup...',
             ]);
 
             $this->backupManager->assertDriveReadiness('snapshot_refresh');
 
+            $currentStep = 'opening_repository';
             $this->stateStore->update($runId, [
                 'status' => 'running',
                 'operation' => 'snapshot_refresh',
                 'step' => 'opening_repository',
                 'message' => 'Dang mo repository backup...',
             ]);
+            $this->backupManager->assertRepositoryReady('snapshot_refresh');
 
             $limit = max(10, (int) config('backup.snapshot_cache.max_items', 200));
+            $currentStep = 'listing_snapshots';
             $this->stateStore->update($runId, [
                 'status' => 'running',
                 'operation' => 'snapshot_refresh',
                 'step' => 'listing_snapshots',
                 'message' => 'Dang dong bo danh sach ban sao luu...',
             ]);
-            $snapshots = $this->backupManager->listSnapshots($limit);
+            $snapshots = $this->backupManager->listSnapshots($limit, true);
             $cache = $this->snapshotStore->replace($snapshots, $runId);
 
             $this->stateStore->update($runId, [
@@ -140,7 +145,7 @@ class SpncBackupSnapshotRefresh extends Command
             $this->stateStore->update($runId, [
                 'status' => 'failed',
                 'operation' => 'snapshot_refresh',
-                'step' => 'failed',
+                'step' => $currentStep,
                 'message' => $userMessage,
                 'user_message' => $userMessage,
                 'error_code' => $errorCode,
@@ -150,7 +155,7 @@ class SpncBackupSnapshotRefresh extends Command
             ]);
             $this->snapshotStore->markRefreshFailed([
                 'operation' => 'snapshot_refresh',
-                'step' => 'failed',
+                'step' => $currentStep,
                 'user_message' => $userMessage,
                 'error_code' => $errorCode,
                 'technical_message' => $technicalMessage,
@@ -182,6 +187,12 @@ class SpncBackupSnapshotRefresh extends Command
         if (str_contains($message, 'drive_remote_inaccessible')) {
             return 'DRIVE_REMOTE_INACCESSIBLE';
         }
+        if (str_contains($message, 'snapshot_list_timeout')) {
+            return 'SNAPSHOT_LIST_TIMEOUT';
+        }
+        if (str_contains($message, 'repository_open_timeout')) {
+            return 'REPOSITORY_OPEN_TIMEOUT';
+        }
         if (str_contains($message, 'repository_access_failed')) {
             return 'REPOSITORY_ACCESS_FAILED';
         }
@@ -212,6 +223,14 @@ class SpncBackupSnapshotRefresh extends Command
 
         if (str_contains($raw, 'repository_access_failed')) {
             return 'Google Drive da truy cap duoc nhung repository backup chua mo duoc. Vui long kiem tra restic repository.';
+        }
+
+        if (str_contains($raw, 'snapshot_list_timeout')) {
+            return 'Khong mo rong duoc danh sach snapshot trong repository backup trong thoi gian cho phep. Vui long thu lai.';
+        }
+
+        if (str_contains($raw, 'repository_open_timeout')) {
+            return 'Repository backup phan hoi qua cham khi mo qua Google Drive. Vui long thu lai.';
         }
 
         if (

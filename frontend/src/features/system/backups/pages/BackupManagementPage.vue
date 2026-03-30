@@ -664,6 +664,12 @@ function buildBackupSuggestion(errorCode: string | null | undefined, step: strin
   if (code === "REPOSITORY_ACCESS_FAILED" || normalizedStep === "opening_repository") {
     return "Đã vào được Google Drive nhưng chưa mở được restic-repo. Kiểm tra đường dẫn repository và nội dung thư mục.";
   }
+  if (code === "REPOSITORY_OPEN_TIMEOUT") {
+    return "Google Drive đã truy cập được nhưng repository mở quá chậm. Có thể cần tăng timeout hoặc kiểm tra hiệu năng restic-repo.";
+  }
+  if (code === "SNAPSHOT_LIST_TIMEOUT" || normalizedStep === "listing_snapshots") {
+    return "Repository đã mở được nhưng bước đọc danh sách snapshot quá chậm. Kiểm tra số lượng snapshot cũ và hiệu năng repository.";
+  }
   if (code === "SERVICE_ACCOUNT_INVALID") {
     return "Kiểm tra SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64 và xác nhận file JSON service account còn hợp lệ.";
   }
@@ -679,10 +685,6 @@ function buildBackupSuggestion(errorCode: string | null | undefined, step: strin
   if (code === "DRIVE_PROBE_TIMEOUT" || normalizedStep === "timeout") {
     return "Kết nối Google Drive không phản hồi kịp thời. Kiểm tra remote, quyền truy cập và log backend để xác định điểm treo.";
   }
-  if (normalizedStep === "listing_snapshots") {
-    return "Google Drive và repository đã mở được, nhưng bước đọc snapshot thất bại. Kiểm tra restic snapshots và log backend.";
-  }
-
   return "";
 }
 

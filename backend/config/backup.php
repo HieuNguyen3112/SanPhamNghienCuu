@@ -110,6 +110,12 @@ return [
         'refresh_interval_minutes' => min(59, max(5, (int) env('SPNC_BACKUP_SNAPSHOT_REFRESH_INTERVAL_MINUTES', 10))),
     ],
 
+    'timeouts' => [
+        'drive_probe_seconds' => max(5, (int) env('SPNC_BACKUP_DRIVE_PROBE_TIMEOUT_SECONDS', 12)),
+        'repository_open_seconds' => max(30, (int) env('SPNC_BACKUP_REPOSITORY_OPEN_TIMEOUT_SECONDS', 120)),
+        'snapshot_listing_seconds' => max(60, (int) env('SPNC_BACKUP_SNAPSHOT_LIST_TIMEOUT_SECONDS', 300)),
+    ],
+
     'schedule' => [
         // Carbon dayOfWeek: 0=Sunday, 1=Monday, ... 6=Saturday.
         'days' => array_values(array_filter(array_map(

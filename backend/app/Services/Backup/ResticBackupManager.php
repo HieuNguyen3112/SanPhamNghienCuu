@@ -44,18 +44,29 @@ class ResticBackupManager
 
     private ?array $exportIndexCache = null;
 
-    public function listSnapshots(int $limit = 50): array
+    public function listSnapshots(int $limit = 50, bool $skipPreflight = false): array
     {
-        $this->assertConfigured();
-        $this->assertDriveReadiness('snapshot_refresh');
-        $this->ensureRepositoryReady();
+        if (! $skipPreflight) {
+            $this->assertConfigured();
+            $this->assertDriveReadiness('snapshot_refresh');
+            $this->assertRepositoryReady('snapshot_refresh');
+        }
 
-        $result = $this->runRestic([
-            'snapshots',
-            '--json',
-            '--tag',
-            'spnc_backup',
-        ], false, 300);
+        try {
+            $result = $this->runRestic([
+                'snapshots',
+                '--json',
+                '--tag',
+                'spnc_backup',
+            ], false, $this->snapshotListingTimeoutSeconds());
+        } catch (\Throwable $exception) {
+            $normalizedMessage = Str::lower(trim((string) $exception->getMessage()));
+            if (Str::contains($normalizedMessage, ['timed out', 'timeout', 'deadline exceeded'])) {
+                throw new BackupRuntimeException('[SNAPSHOT_LIST_TIMEOUT] restic snapshots --json bi qua thoi gian cho khi doc metadata repository.');
+            }
+
+            throw $exception;
+        }
 
         $decoded = json_decode((string) $result['stdout'], true);
         $snapshots = is_array($decoded) ? $decoded : [];
@@ -951,7 +962,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             return;
         }
 
-        $probe = $this->buildOperationReadinessProbe($repository, true, true);
+        $probe = $this->buildOperationReadinessProbe($repository, true, false);
         $this->logBackupRuntimeContext($operation, $probe);
 
         if ((bool) ($probe['ok'] ?? false)) {
@@ -962,6 +973,12 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $message = trim((string) ($probe['message'] ?? '')) ?: 'Khï¿½ng th? xï¿½c th?c ho?c truy c?p Google Drive backup.';
 
         throw new BackupRuntimeException("[{$errorCode}] {$message}");
+    }
+
+    public function assertRepositoryReady(string $operation = 'backup'): void
+    {
+        $this->assertConfigured();
+        $this->ensureRepositoryReady($operation);
     }
 
     public function assertValidSnapshotId(string $snapshotId): void
@@ -1046,7 +1063,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $rootTarget = $this->parseRcloneRemoteRoot($repository);
         $remoteProbe = $rootTarget !== null
-            ? $this->runRclone(['lsd', $rootTarget], true, 12)
+            ? $this->runRclone(['lsd', $rootTarget], true, $this->driveProbeTimeoutSeconds())
             : ['successful' => false, 'stderr' => 'Khï¿½ng xï¿½c d?nh du?c remote rclone.', 'stdout' => ''];
 
         if (! (bool) ($remoteProbe['successful'] ?? false)) {
@@ -1072,11 +1089,15 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         ];
 
         if ($includeRepositoryProbe) {
-            $resticProbe = $this->runRestic(['snapshots', '--json', '--tag', 'spnc_backup'], true, 20);
+            $resticProbe = $this->runRestic(
+                ['snapshots', '--json', '--tag', 'spnc_backup'],
+                true,
+                $this->repositoryOpenTimeoutSeconds()
+            );
             if (! (bool) ($resticProbe['successful'] ?? false)) {
                 return [
                     'ok' => false,
-                    'error_code' => 'REPOSITORY_ACCESS_FAILED',
+                    'error_code' => $this->detectRepositoryProbeErrorCode($resticProbe),
                     'message' => $this->buildRepositoryAccessFailureMessage($repository, $resticProbe),
                     'remote_name' => $remoteName !== '' ? $remoteName : null,
                     'auth_mode' => $authMode !== '' ? $authMode : null,
@@ -1127,6 +1148,32 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         return 'DRIVE_REMOTE_INACCESSIBLE';
     }
 
+    private function detectRepositoryProbeErrorCode(array $probe): string
+    {
+        $message = Str::lower(trim((string) (($probe['stderr'] ?? '') . ' ' . ($probe['stdout'] ?? ''))));
+
+        if ($message !== '' && Str::contains($message, ['timed out', 'timeout', 'deadline exceeded'])) {
+            return 'REPOSITORY_OPEN_TIMEOUT';
+        }
+
+        return 'REPOSITORY_ACCESS_FAILED';
+    }
+
+    private function driveProbeTimeoutSeconds(): int
+    {
+        return max(5, (int) config('backup.timeouts.drive_probe_seconds', 12));
+    }
+
+    private function repositoryOpenTimeoutSeconds(): int
+    {
+        return max(30, (int) config('backup.timeouts.repository_open_seconds', 120));
+    }
+
+    private function snapshotListingTimeoutSeconds(): int
+    {
+        return max(60, (int) config('backup.timeouts.snapshot_listing_seconds', 300));
+    }
+
     private function extractProcessFailureMessage(array $result, string $fallback): string
     {
         $stderr = trim((string) ($result['stderr'] ?? ''));
@@ -1154,7 +1201,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         ]);
     }
 
-    private function ensureRepositoryReady(): void
+    private function ensureRepositoryReady(string $operation = 'backup'): void
     {
         $repository = trim((string) config('backup.restic.repository', ''));
         $probe = $this->runRestic([
@@ -1162,7 +1209,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             '--json',
             '--tag',
             'spnc_backup',
-        ], true, 180);
+        ], true, $this->repositoryOpenTimeoutSeconds());
 
         if ($probe['successful']) {
             return;
