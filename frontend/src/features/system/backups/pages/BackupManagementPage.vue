@@ -673,6 +673,9 @@ function buildBackupSuggestion(errorCode: string | null | undefined, step: strin
   if (code === "DRIVE_AUTH_INVALID") {
     return "Xác nhận runtime đang nạp service account mới, không còn fallback sang cấu hình OAuth cũ.";
   }
+  if (code === "RUN_LAUNCH_TIMEOUT" || normalizedStep === "launching_refresh") {
+    return "Runtime backup kh\u00f4ng kh\u1edfi \u0111\u1ed9ng \u0111\u01b0\u1ee3c ti\u1ebfn tr\u00ecnh l\u00e0m m\u1edbi danh s\u00e1ch. Ki\u1ec3m tra worker ho\u1eb7c launcher tr\u00ean production.";
+  }
   if (code === "DRIVE_PROBE_TIMEOUT" || normalizedStep === "timeout") {
     return "Kết nối Google Drive không phản hồi kịp thời. Kiểm tra remote, quyền truy cập và log backend để xác định điểm treo.";
   }

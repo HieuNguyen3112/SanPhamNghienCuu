@@ -375,15 +375,32 @@ class AdminBackupController extends Controller
             ], Response::HTTP_ACCEPTED);
         }
 
+        if (($run['status'] ?? 'queued') === 'failed') {
+            return response()->json([
+                'success' => false,
+                'message' => $run['user_message'] ?? 'Không thể làm mới danh sách backup.',
+                'data' => [
+                    'run_id' => $run['run_id'] ?? null,
+                    'operation' => 'snapshot_refresh',
+                    'status' => 'failed',
+                    'user_message' => $run['user_message'] ?? null,
+                    'error_code' => $run['error_code'] ?? null,
+                    'step' => $run['step'] ?? null,
+                    'technical_message' => $run['technical_message'] ?? $run['error_message'] ?? null,
+                    'status_url' => isset($run['run_id']) ? '/api/admin/backups/runs/' . $run['run_id'] : null,
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
             'data' => [
                 'run_id' => $run['run_id'],
                 'operation' => 'snapshot_refresh',
-                'status' => 'queued',
-                'user_message' => 'Đã tiếp nhận yêu cầu làm mới danh sách.',
-                'error_code' => null,
+                'status' => $run['status'] ?? 'queued',
+                'user_message' => $run['user_message'] ?? 'Đã tiếp nhận yêu cầu làm mới danh sách.',
+                'error_code' => $run['error_code'] ?? null,
                 'status_url' => '/api/admin/backups/runs/' . $run['run_id'],
             ],
         ], Response::HTTP_ACCEPTED);
@@ -1197,9 +1214,16 @@ class AdminBackupController extends Controller
         $operation = Str::lower(trim((string) ($run['operation'] ?? '')));
         $status = Str::lower(trim((string) ($run['status'] ?? '')));
         $rawMessage = trim((string) ($run['message'] ?? ''));
+        $storedUserMessage = trim((string) ($run['user_message'] ?? ''));
         $rawError = trim((string) ($run['error_message'] ?? ''));
-        $errorCode = $this->detectErrorCode($rawMessage, $rawError);
-        $userMessage = $this->buildUserMessage($operation, $status, $errorCode, $rawMessage);
+        $technicalMessage = trim((string) ($run['technical_message'] ?? ''));
+        $storedErrorCode = trim((string) ($run['error_code'] ?? ''));
+        $errorCode = $storedErrorCode !== ''
+            ? $storedErrorCode
+            : $this->detectErrorCode($rawMessage, $rawError !== '' ? $rawError : $technicalMessage);
+        $userMessage = $storedUserMessage !== ''
+            ? $storedUserMessage
+            : $this->buildUserMessage($operation, $status, $errorCode, $rawMessage);
 
         $payload = [
             'run_id' => $run['run_id'] ?? null,
@@ -1225,9 +1249,11 @@ class AdminBackupController extends Controller
             'target' => $run['target'] ?? null,
         ];
 
-        if ($includeTechnical) {
+        if ($includeTechnical || $status === 'failed') {
             $payload['error_message'] = $rawError !== '' ? $rawError : null;
-            $payload['technical_message'] = $rawError !== '' ? $rawError : null;
+            $payload['technical_message'] = $technicalMessage !== ''
+                ? $technicalMessage
+                : ($rawError !== '' ? $rawError : null);
             if (is_array($run['logs'] ?? null)) {
                 $payload['logs'] = $run['logs'];
             }
@@ -1240,15 +1266,43 @@ class AdminBackupController extends Controller
     }
 
     private function toPublicErrorPayload(
-        string $rawMessage,
+        string|array|null $rawMessage,
         string $operation = 'snapshot_refresh',
         string $status = 'failed'
     ): array {
-        $raw = trim($rawMessage);
+        if (is_array($rawMessage)) {
+            $raw = trim((string) ($rawMessage['message'] ?? $rawMessage['user_message'] ?? ''));
+            $storedCode = trim((string) ($rawMessage['error_code'] ?? ''));
+            $step = trim((string) ($rawMessage['step'] ?? ''));
+            $technicalMessage = trim((string) ($rawMessage['technical_message'] ?? $rawMessage['error_message'] ?? ''));
+            if ($raw === '' && $technicalMessage === '' && $storedCode === '') {
+                return [
+                    'user_message' => null,
+                    'error_code' => null,
+                    'step' => null,
+                    'technical_message' => null,
+                ];
+            }
+
+            $errorCode = $storedCode !== ''
+                ? $storedCode
+                : $this->detectErrorCode($raw, $technicalMessage !== '' ? $technicalMessage : $raw);
+
+            return [
+                'user_message' => $this->buildUserMessage($operation, $status, $errorCode, $raw),
+                'error_code' => $errorCode,
+                'step' => $step !== '' ? $step : null,
+                'technical_message' => $technicalMessage !== '' ? $technicalMessage : null,
+            ];
+        }
+
+        $raw = trim((string) $rawMessage);
         if ($raw === '') {
             return [
                 'user_message' => null,
                 'error_code' => null,
+                'step' => null,
+                'technical_message' => null,
             ];
         }
 
@@ -1256,6 +1310,8 @@ class AdminBackupController extends Controller
         return [
             'user_message' => $this->buildUserMessage($operation, $status, $errorCode, $raw),
             'error_code' => $errorCode,
+            'step' => null,
+            'technical_message' => $this->isTechnicalMessage($raw) ? $raw : null,
         ];
     }
 
@@ -1357,6 +1413,22 @@ class AdminBackupController extends Controller
                 return 'Không thể xác thực Google Drive cho backup. Hãy reconnect remote spnc_gdrive trong tệp rclone.conf dùng chung hoặc chuyển sang cấu hình service account rồi thử lại.';
             }
 
+            if ($errorCode === 'SERVICE_ACCOUNT_INVALID') {
+                return 'Không thể nạp service account Google Drive cho backup. Hãy kiểm tra lại biến môi trường trên production.';
+            }
+
+            if ($errorCode === 'DRIVE_REMOTE_INACCESSIBLE') {
+                return 'Không thể truy cập thư mục Google Drive backup. Hãy kiểm tra root_folder_id và quyền chia sẻ cho service account.';
+            }
+
+            if ($errorCode === 'REPOSITORY_ACCESS_FAILED') {
+                return 'Đã truy cập được Google Drive nhưng chưa mở được repository backup. Hãy kiểm tra restic-repo.';
+            }
+
+            if ($errorCode === 'RUN_LAUNCH_TIMEOUT') {
+                return 'Tiến trình làm mới danh sách không khởi động được trên máy chủ. Hãy kiểm tra runtime backup rồi thử lại.';
+            }
+
             if ($errorCode === 'RCLONE_CONFIG_INVALID') {
                 return 'Không đọc được tệp rclone.conf dùng chung cho backup và minh chứng. Hãy kiểm tra SPNC_RCLONE_CONFIG.';
             }
@@ -1450,6 +1522,10 @@ class AdminBackupController extends Controller
 
         if (Str::contains($combined, ['repository_access_failed'])) {
             return 'REPOSITORY_ACCESS_FAILED';
+        }
+
+        if (Str::contains($combined, ['run_launch_timeout', 'launcher did not update run state'])) {
+            return 'RUN_LAUNCH_TIMEOUT';
         }
 
         if ($this->containsRcloneConfigHint($combined)) {
@@ -1656,6 +1732,7 @@ class AdminBackupController extends Controller
             'status' => 'queued',
             'operation' => 'snapshot_refresh',
             'trigger' => $trigger,
+            'step' => 'probing_drive_root',
             'requested_by_user_id' => $userId > 0 ? $userId : null,
             'requested_at' => now()->toIso8601String(),
             'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
@@ -1663,6 +1740,13 @@ class AdminBackupController extends Controller
         ]);
 
         try {
+            $this->backupManager->assertDriveReadiness('snapshot_refresh');
+            $this->stateStore->update($runId, [
+                'status' => 'queued',
+                'operation' => 'snapshot_refresh',
+                'step' => 'launching_refresh',
+                'message' => 'Đã xác nhận kết nối Google Drive. Đang khởi động tiến trình đồng bộ snapshot.',
+            ]);
             $this->launcher->launchSnapshotRefresh($runId, $userId, $trigger);
         } catch (\Throwable $exception) {
             $errorCode = $this->detectErrorCode($exception->getMessage(), $exception->getMessage());
@@ -1682,12 +1766,125 @@ class AdminBackupController extends Controller
             Log::warning('backup.snapshot_refresh_launch_failed', [
                 'run_id' => $runId,
                 'message' => $exception->getMessage(),
+                'trigger' => $trigger,
             ]);
 
-            return null;
+            return $this->failSnapshotRefreshRun($runId, 'launching_refresh', $exception);
         }
 
-        return ['run_id' => $runId];
+        $bootstrappedState = $this->waitForRunBootstrap($runId, 5000);
+        if (! is_array($bootstrappedState)) {
+            return $this->failSnapshotRefreshRun(
+                $runId,
+                'launching_refresh',
+                new \RuntimeException('Snapshot refresh launcher did not update run state within 5 seconds.'),
+                'RUN_LAUNCH_TIMEOUT'
+            );
+        }
+
+        $bootstrappedStatus = Str::lower(trim((string) ($bootstrappedState['status'] ?? '')));
+        $bootstrappedStep = Str::lower(trim((string) ($bootstrappedState['step'] ?? '')));
+        if (
+            $bootstrappedStatus === 'queued'
+            && in_array($bootstrappedStep, ['', 'probing_drive_root', 'launching_refresh'], true)
+        ) {
+            return $this->failSnapshotRefreshRun(
+                $runId,
+                'launching_refresh',
+                new \RuntimeException('Snapshot refresh launcher did not update run state within 5 seconds.'),
+                'RUN_LAUNCH_TIMEOUT'
+            );
+        }
+
+        return $this->toPublicRunState($bootstrappedState, true) ?? ['run_id' => $runId];
+    }
+
+    private function failSnapshotRefreshRun(
+        string $runId,
+        string $step,
+        \Throwable $exception,
+        ?string $forcedErrorCode = null
+    ): array {
+        $technicalMessage = trim((string) $exception->getMessage());
+        $errorCode = $forcedErrorCode !== null && $forcedErrorCode !== ''
+            ? $forcedErrorCode
+            : $this->detectErrorCode($technicalMessage, $technicalMessage);
+        $userMessage = $this->buildUserMessage('snapshot_refresh', 'failed', $errorCode, '');
+
+        $this->snapshotStore->markRefreshFailed([
+            'message' => $userMessage,
+            'user_message' => $userMessage,
+            'technical_message' => $technicalMessage !== '' ? $technicalMessage : null,
+            'error_code' => $errorCode,
+            'step' => $step,
+            'operation' => 'snapshot_refresh',
+        ], $runId);
+
+        $state = $this->stateStore->update($runId, [
+            'status' => 'failed',
+            'operation' => 'snapshot_refresh',
+            'step' => $step,
+            'message' => $userMessage,
+            'user_message' => $userMessage,
+            'finished_at' => now()->toIso8601String(),
+            'error_message' => $technicalMessage !== '' ? $technicalMessage : null,
+            'technical_message' => $technicalMessage !== '' ? $technicalMessage : null,
+            'error_code' => $errorCode,
+        ]);
+
+        $state = $this->stateStore->appendLog(
+            $runId,
+            $technicalMessage !== ''
+                ? 'Snapshot refresh thất bại: ' . $technicalMessage
+                : 'Snapshot refresh thất bại.',
+            'error'
+        );
+
+        return $this->toPublicRunState($state, true) ?? [
+            'run_id' => $runId,
+            'operation' => 'snapshot_refresh',
+            'status' => 'failed',
+            'step' => $step,
+            'user_message' => $userMessage,
+            'message' => $userMessage,
+            'error_code' => $errorCode,
+            'technical_message' => $technicalMessage !== '' ? $technicalMessage : null,
+        ];
+    }
+
+    private function waitForRunBootstrap(string $runId, int $maxWaitMs = 5000): ?array
+    {
+        $sleepMicros = 250000;
+        $deadline = microtime(true) + max(0.5, $maxWaitMs / 1000);
+
+        do {
+            $state = $this->stateStore->get($runId);
+            if (! is_array($state)) {
+                return null;
+            }
+
+            $status = Str::lower(trim((string) ($state['status'] ?? '')));
+            $step = Str::lower(trim((string) ($state['step'] ?? '')));
+            $startedAt = trim((string) ($state['started_at'] ?? ''));
+            $lastLogAt = trim((string) ($state['last_log_at'] ?? ''));
+            $errorCode = trim((string) ($state['error_code'] ?? ''));
+
+            if ($status !== 'queued') {
+                return $state;
+            }
+
+            if (! in_array($step, ['', 'probing_drive_root', 'launching_refresh'], true)) {
+                return $state;
+            }
+
+            if ($startedAt !== '' || $lastLogAt !== '' || $errorCode !== '') {
+                return $state;
+            }
+
+            usleep($sleepMicros);
+        } while (microtime(true) < $deadline);
+
+        return $this->stateStore->get($runId);
     }
 }
 
