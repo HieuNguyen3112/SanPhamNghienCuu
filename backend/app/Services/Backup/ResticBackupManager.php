@@ -1046,10 +1046,37 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         }
 
         $rootTarget = $this->parseRcloneRemoteRoot($repository);
+        $probeStartedAt = microtime(true);
+        Log::info('backup.drive_probe_started', [
+            'repository' => $repository,
+            'remote_name' => $remoteName !== '' ? $remoteName : null,
+            'target' => $rootTarget,
+            'auth_mode' => $authMode !== '' ? $authMode : null,
+            'config_source' => $configSource !== '' ? $configSource : null,
+            'service_account_loaded' => $serviceAccountLoaded,
+            'timeout_seconds' => $this->driveProbeTimeoutSeconds(),
+            'rclone_config_path' => $backupConfig['rclone_config']['resolved'] ?? null,
+            'rclone_config_fingerprint' => $backupConfig['rclone_config']['fingerprint'] ?? null,
+        ]);
         $remoteProbe = $rootTarget !== null
             ? $this->runRclone(['lsd', $rootTarget], true, $this->driveProbeTimeoutSeconds())
             : ['successful' => false, 'stderr' => 'Khï¿½ng xï¿½c d?nh du?c remote rclone.', 'stdout' => ''];
+        $probeDurationMs = (int) round((microtime(true) - $probeStartedAt) * 1000);
 
+        Log::info('backup.drive_probe_finished', [
+            'repository' => $repository,
+            'remote_name' => $remoteName !== '' ? $remoteName : null,
+            'target' => $rootTarget,
+            'auth_mode' => $authMode !== '' ? $authMode : null,
+            'config_source' => $configSource !== '' ? $configSource : null,
+            'service_account_loaded' => $serviceAccountLoaded,
+            'timeout_seconds' => $this->driveProbeTimeoutSeconds(),
+            'duration_ms' => $probeDurationMs,
+            'successful' => (bool) ($remoteProbe['successful'] ?? false),
+            'exit_code' => $remoteProbe['exit_code'] ?? null,
+            'stderr_preview' => $this->trimDoctorOutput((string) ($remoteProbe['stderr'] ?? ''), 4, 800),
+            'stdout_preview' => $this->trimDoctorOutput((string) ($remoteProbe['stdout'] ?? ''), 4, 800),
+        ]);
         if (! (bool) ($remoteProbe['successful'] ?? false)) {
             return [
                 'ok' => false,
@@ -1194,6 +1221,11 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'auth_mode' => $probe['auth_mode'] ?? null,
             'config_source' => $probe['config_source'] ?? null,
             'service_account_loaded' => (bool) ($probe['service_account_loaded'] ?? false),
+            'service_account_branch_skipped' => ($probe['auth_mode'] ?? null) !== 'service_account',
+            'rclone_config_path' => $backupConfig['rclone_config']['resolved'] ?? null,
+            'rclone_config_fingerprint' => $backupConfig['rclone_config']['fingerprint'] ?? null,
+            'service_account_path' => $backupConfig['rclone_service_account_file']['resolved'] ?? null,
+            'service_account_fingerprint' => $backupConfig['rclone_service_account_file']['fingerprint'] ?? null,
             'root_folder_id' => $backupConfig['rclone_remote']['root_folder_id'] ?? null,
             'repository_root_target' => $this->parseRcloneRemoteRoot($repository),
             'repository_parent_target' => $this->buildRcloneRepositoryProbeTarget($repository),
@@ -4689,6 +4721,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                     'readable' => true,
                     'source' => 'base64',
                     'materialized' => true,
+                    'fingerprint' => $this->buildRuntimeConfigFingerprint($materialized['resolved']),
                     'error' => null,
                 ];
             }
@@ -4708,6 +4741,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                     'readable' => true,
                     'source' => $source,
                     'materialized' => false,
+                    'fingerprint' => $this->buildRuntimeConfigFingerprint($resolved),
                     'error' => null,
                 ];
             }
@@ -4723,6 +4757,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                     'readable' => true,
                     'source' => 'base64',
                     'materialized' => true,
+                    'fingerprint' => $this->buildRuntimeConfigFingerprint($materialized['resolved']),
                     'error' => null,
                 ];
             }
@@ -4740,7 +4775,26 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'readable' => $resolved !== null ? is_readable($resolved) : false,
             'source' => $source,
             'materialized' => false,
+            'fingerprint' => $this->buildRuntimeConfigFingerprint($resolved),
             'error' => $error,
+        ];
+    }
+
+    private function buildRuntimeConfigFingerprint(?string $path): ?array
+    {
+        $resolvedPath = trim((string) $path);
+        if ($resolvedPath === '' || ! is_file($resolvedPath) || ! is_readable($resolvedPath)) {
+            return null;
+        }
+
+        $hash = @sha1_file($resolvedPath);
+        $size = @filesize($resolvedPath);
+        $modifiedAt = @filemtime($resolvedPath);
+
+        return [
+            'sha1_12' => is_string($hash) && $hash !== '' ? substr($hash, 0, 12) : null,
+            'size_bytes' => is_int($size) ? $size : null,
+            'modified_at' => is_int($modifiedAt) ? date(DATE_ATOM, $modifiedAt) : null,
         ];
     }
 

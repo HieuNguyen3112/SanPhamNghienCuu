@@ -1424,11 +1424,11 @@ class AdminBackupController extends Controller
             }
 
             if ($errorCode === 'SERVICE_ACCOUNT_INVALID') {
-                return 'Không thể nạp service account Google Drive cho backup. Hãy kiểm tra lại biến môi trường trên production.';
+                return 'Không thể nạp thông tin xác thực Google Drive cho backup. Hãy kiểm tra lại cấu hình runtime trên production.';
             }
 
             if ($errorCode === 'DRIVE_REMOTE_INACCESSIBLE') {
-                return 'Không thể truy cập thư mục Google Drive backup. Hãy kiểm tra root_folder_id và quyền chia sẻ cho service account.';
+                return 'Không thể truy cập thư mục Google Drive backup. Hãy kiểm tra root_folder_id, token OAuth và trạng thái remote spnc_gdrive.';
             }
 
             if ($errorCode === 'REPOSITORY_ACCESS_FAILED') {
@@ -1810,7 +1810,7 @@ class AdminBackupController extends Controller
         if (! $configValid) {
             $blockingIssues[] = [
                 'code' => $cacheMeta['last_error_code'] ?? 'CONFIG_INVALID',
-                'message' => 'Cấu hình backup chưa hợp lệ. Vui lòng kiểm tra repository, password và service account.',
+                'message' => 'Cấu hình backup chưa hợp lệ. Vui lòng kiểm tra repository, password và auth Google Drive.',
             ];
         } elseif ($driveReachable === false) {
             $blockingIssues[] = [

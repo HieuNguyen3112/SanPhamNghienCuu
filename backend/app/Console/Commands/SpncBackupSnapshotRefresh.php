@@ -291,7 +291,7 @@ class SpncBackupSnapshotRefresh extends Command
     {
         $raw = Str::lower(trim((string) $exception->getMessage()));
         if (str_contains($raw, 'service_account_invalid') || str_contains($raw, 'service_account_required')) {
-            return 'Google Drive backup chua san sang vi service account chua duoc nap dung. Vui long kiem tra cau hinh production.';
+            return 'Google Drive backup chua san sang vi thong tin xac thuc runtime chua duoc nap dung. Vui long kiem tra cau hinh production.';
         }
 
         if (str_contains($raw, 'rclone_service_account_required') || str_contains($raw, 'drive_auth_invalid')) {
@@ -303,11 +303,11 @@ class SpncBackupSnapshotRefresh extends Command
         }
 
         if (str_contains($raw, 'rclone_remote_auth_invalid')) {
-            return 'Remote backup khong co auth hop le. Vui long kiem tra token OAuth hoac service account trong rclone.conf.';
+            return 'Remote backup khong co auth hop le. Vui long kiem tra token OAuth trong rclone.conf hoac runtime config da materialize.';
         }
 
         if (str_contains($raw, 'drive_remote_inaccessible')) {
-            return 'Khong the truy cap thu muc Google Drive backup. Vui long kiem tra root_folder_id va quyen chia se cho service account.';
+            return 'Khong the truy cap thu muc Google Drive backup. Vui long kiem tra root_folder_id, token OAuth va remote spnc_gdrive.';
         }
 
         if (str_contains($raw, 'repository_access_failed')) {
