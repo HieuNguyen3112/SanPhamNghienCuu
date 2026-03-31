@@ -4,6 +4,7 @@ namespace App\Services\Backup;
 
 use Carbon\Carbon;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -454,7 +455,6 @@ class ResticBackupManager
     {
         $repository = trim((string) config('backup.restic.repository', ''));
         $destination = $this->deriveExportDestination($repository);
-        $readiness = $this->buildReadinessReport();
 
         return [
             'enabled' => (bool) config('backup.exports.enabled', true),
@@ -465,9 +465,6 @@ class ResticBackupManager
             'available' => (bool) ($destination['valid'] ?? false),
             'error_code' => $destination['error_code'] ?? null,
             'error_message' => $destination['error_message'] ?? null,
-            'repository_env_configured' => (bool) ($readiness['repository_env_configured'] ?? false),
-            'runtime_ready' => (bool) ($readiness['runtime_ready'] ?? false),
-            'ready_for_operations' => (bool) ($readiness['ready_for_operations'] ?? false),
             'note' => "Th\u{01B0} m\u{1EE5}c restic-repo gi\u{1EEF} l\u{1EDB}p sao l\u{01B0}u k\u{1EF9} thu\u{1EAD}t. L\u{1EDB}p exports ch\u{1EC9} ch\u{1EE9}a README.txt, tong-quan.json, database/, cong-trinh/, giang-vien/ v\u{00E0} _he-thong/.",
         ];
     }
@@ -730,17 +727,13 @@ class ResticBackupManager
         $pgsqlRestoreBinaryOk = ! in_array($databaseDriver, ['pgsql', 'postgres', 'postgresql'], true)
             || (bool) (($databaseRuntime['pgsql_restore_binary']['exists'] ?? false) === true);
         $rcloneRemoteAuthMode = (string) ($backupConfig['rclone_remote']['auth_mode'] ?? '');
-        $serviceAccountLoaded = ! $requiresRclone
-            || (bool) (($backupConfig['rclone_service_account_file']['readable'] ?? false) === true);
+        $serviceAccountLoaded = (bool) (($backupConfig['rclone_service_account_file']['readable'] ?? false) === true);
+        $authReady = ! $requiresRclone
+            || $rcloneRemoteAuthMode === 'oauth_token'
+            || ($rcloneRemoteAuthMode === 'service_account' && $serviceAccountLoaded);
         $rcloneConfigSource = (string) ($backupConfig['rclone_config']['source'] ?? '');
         $serviceAccountSource = (string) ($backupConfig['rclone_service_account_file']['source'] ?? '');
-        $staleRemoteAuthFields = (bool) (($backupConfig['rclone_remote']['has_stale_auth_fields'] ?? false) === true);
-        $productionOauthTokenRisk = $requiresRclone
-            && app()->environment('production')
-            && $rcloneRemoteAuthMode === 'oauth_token';
-        $productionMissingServiceAccount = $requiresRclone
-            && app()->environment('production')
-            && ! $serviceAccountLoaded;
+        $conflictingRemoteAuthFields = (bool) (($backupConfig['rclone_remote']['has_conflicting_auth_fields'] ?? false) === true);
         $productionPathOverridesBase64 = $requiresRclone
             && app()->environment('production')
             && $rcloneConfigSource === 'path'
@@ -750,15 +743,13 @@ class ResticBackupManager
             && $rcloneBinaryOk
             && $rcloneConfigOk
             && $rcloneRemoteOk
-            && $serviceAccountLoaded
+            && $authReady
             && $mysqlDumpBinaryOk
             && $mysqlRestoreBinaryOk
             && $pgsqlDumpBinaryOk
             && $pgsqlRestoreBinaryOk
-            && ! $productionOauthTokenRisk
-            && ! $productionMissingServiceAccount
             && ! $productionPathOverridesBase64
-            && ! $staleRemoteAuthFields;
+            && ! $conflictingRemoteAuthFields;
 
         $blockingIssues = [];
         $warnings = [];
@@ -834,7 +825,7 @@ class ResticBackupManager
             ];
         }
 
-        if (! empty($backupConfig['rclone_service_account_file']['error'])) {
+        if ($rcloneRemoteAuthMode === 'service_account' && ! empty($backupConfig['rclone_service_account_file']['error'])) {
             $warnings[] = [
                 'code' => 'RCLONE_SERVICE_ACCOUNT_INVALID',
                 'message' => (string) $backupConfig['rclone_service_account_file']['error'],
@@ -851,29 +842,15 @@ class ResticBackupManager
         if ($requiresRclone && $rcloneRemoteAuthMode === 'oauth_token') {
             $warnings[] = [
                 'code' => 'RCLONE_OAUTH_INTERACTIVE',
-                'message' => 'Backup Ä‘ang phá»¥ thuá»™c user OAuth token trong rclone.conf. NÃªn dÃ¹ng service account Ä‘á»ƒ trÃ¡nh pháº£i reconnect thá»§ cÃ´ng khi token bá»‹ revoke hoáº·c invalid.',
+                'message' => 'Backup dang dung OAuth token trong rclone.conf. Can theo doi token vi co the phai reconnect lai khi token het han hoac bi revoke.',
             ];
         }
 
-        if ($productionOauthTokenRisk) {
-            $blockingIssues[] = [
-                'code' => 'RCLONE_SERVICE_ACCOUNT_REQUIRED',
-                'message' => 'Production Ä‘ang dÃ¹ng user OAuth token cho remote backup. HÃ£y cáº¥u hÃ¬nh SPNC_RCLONE_SERVICE_ACCOUNT_FILE hoáº·c SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64 Ä‘á»ƒ trÃ¡nh lá»—i invalid_grant.',
-            ];
-        }
-
-        if ($requiresRclone && ! $serviceAccountLoaded) {
+        if ($requiresRclone && $rcloneRemoteAuthMode === 'service_account' && ! $serviceAccountLoaded) {
             $blockingIssues[] = [
                 'code' => 'SERVICE_ACCOUNT_INVALID',
                 'message' => (string) (($backupConfig['rclone_service_account_file']['error'] ?? null)
-                    ?: 'KhÃ´ng thá»ƒ materialize Google service account JSON cho runtime backup.'),
-            ];
-        }
-
-        if ($productionMissingServiceAccount) {
-            $blockingIssues[] = [
-                'code' => 'SERVICE_ACCOUNT_REQUIRED',
-                'message' => 'Production backup chá»‰ Ä‘Æ°á»£c phÃ©p cháº¡y báº±ng service account. HÃ£y cáº¥u hÃ¬nh SPNC_RCLONE_SERVICE_ACCOUNT_JSON_BASE64.',
+                    ?: 'Khong the materialize Google service account JSON cho runtime backup.'),
             ];
         }
 
@@ -884,10 +861,17 @@ class ResticBackupManager
             ];
         }
 
-        if ($staleRemoteAuthFields) {
+        if ($requiresRclone && $rcloneRemoteAuthMode === '') {
             $blockingIssues[] = [
-                'code' => 'RCLONE_REMOTE_NOT_MINIMAL',
-                'message' => 'Remote backup cÃ²n chá»©a trÆ°á»ng OAuth cÅ© nhÆ° token, client_id, client_secret, team_drive hoáº·c service_account_file. HÃ£y giá»¯ remote tá»‘i giáº£n vá»›i type, scope vÃ  root_folder_id.',
+                'code' => 'RCLONE_REMOTE_AUTH_INVALID',
+                'message' => 'Remote backup khong co auth hop le. Hay kiem tra token OAuth hoac service_account_file trong rclone.conf.',
+            ];
+        }
+
+        if ($conflictingRemoteAuthFields) {
+            $blockingIssues[] = [
+                'code' => 'RCLONE_REMOTE_AUTH_CONFLICT',
+                'message' => 'Remote backup dang tron OAuth va service account trong cung mot cau hinh. Hay giu duy nhat mot auth mode.',
             ];
         }
 
@@ -1022,38 +1006,38 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $remoteName = trim((string) ($backupConfig['rclone_remote']['name'] ?? ''));
         $configSource = trim((string) ($backupConfig['rclone_config']['source'] ?? ''));
         $serviceAccountLoaded = (bool) (($backupConfig['rclone_service_account_file']['readable'] ?? false) === true);
-        $staleRemoteAuthFields = (bool) (($backupConfig['rclone_remote']['has_stale_auth_fields'] ?? false) === true);
+        $conflictingRemoteAuthFields = (bool) (($backupConfig['rclone_remote']['has_conflicting_auth_fields'] ?? false) === true);
 
-        if (app()->environment('production') && $authMode === 'oauth_token') {
+        if ($authMode === '') {
             return [
                 'ok' => false,
-                'error_code' => 'RCLONE_SERVICE_ACCOUNT_REQUIRED',
-                'message' => 'Production dang dï¿½ng OAuth token cu cho remote backup. Hï¿½y b? token cu vï¿½ ch? dï¿½ng service account.',
+                'error_code' => 'DRIVE_AUTH_INVALID',
+                'message' => 'Khong xac dinh duoc auth mode cho remote backup. Hay kiem tra token OAuth trong rclone.conf hoac service account runtime.',
                 'remote_name' => $remoteName !== '' ? $remoteName : null,
-                'auth_mode' => $authMode,
+                'auth_mode' => null,
                 'config_source' => $configSource !== '' ? $configSource : null,
                 'service_account_loaded' => $serviceAccountLoaded,
             ];
         }
 
-        if (! $serviceAccountLoaded) {
+        if ($authMode === 'service_account' && ! $serviceAccountLoaded) {
             return [
                 'ok' => false,
                 'error_code' => 'SERVICE_ACCOUNT_INVALID',
                 'message' => (string) (($backupConfig['rclone_service_account_file']['error'] ?? null)
-                    ?: 'Khï¿½ng th? n?p Google service account JSON cho runtime backup.'),
+                    ?: 'Khong the nap Google service account JSON cho runtime backup.'),
                 'remote_name' => $remoteName !== '' ? $remoteName : null,
-                'auth_mode' => $authMode !== '' ? $authMode : null,
+                'auth_mode' => $authMode,
                 'config_source' => $configSource !== '' ? $configSource : null,
                 'service_account_loaded' => false,
             ];
         }
 
-        if (app()->environment('production') && $staleRemoteAuthFields) {
+        if ($conflictingRemoteAuthFields) {
             return [
                 'ok' => false,
-                'error_code' => 'RCLONE_REMOTE_NOT_MINIMAL',
-                'message' => 'Remote backup cï¿½n ch?a tru?ng OAuth cu. Hï¿½y gi? rclone.conf t?i gi?n v?i type, scope vï¿½ root_folder_id.',
+                'error_code' => 'RCLONE_REMOTE_AUTH_CONFLICT',
+                'message' => 'Remote backup dang tron ca OAuth va service account. Hay giu duy nhat mot auth mode trong runtime backup.',
                 'remote_name' => $remoteName !== '' ? $remoteName : null,
                 'auth_mode' => $authMode !== '' ? $authMode : null,
                 'config_source' => $configSource !== '' ? $configSource : null,
@@ -1089,11 +1073,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         ];
 
         if ($includeRepositoryProbe) {
-            $resticProbe = $this->runRestic(
-                ['snapshots', '--json', '--tag', 'spnc_backup'],
-                true,
-                $this->repositoryOpenTimeoutSeconds()
-            );
+            $resticProbe = $this->runRestic(['cat', 'config'], true, $this->repositoryOpenTimeoutSeconds());
             if (! (bool) ($resticProbe['successful'] ?? false)) {
                 return [
                     'ok' => false,
@@ -1152,8 +1132,16 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
     {
         $message = Str::lower(trim((string) (($probe['stderr'] ?? '') . ' ' . ($probe['stdout'] ?? ''))));
 
+        if ($message !== '' && Str::contains($message, ['already locked', 'repository is already locked', 'lock was created'])) {
+            return 'REPOSITORY_LOCKED';
+        }
+
         if ($message !== '' && Str::contains($message, ['timed out', 'timeout', 'deadline exceeded'])) {
             return 'REPOSITORY_OPEN_TIMEOUT';
+        }
+
+        if ($message !== '' && Str::contains($message, ['unable to open config file', 'is there a repository', 'config file does not exist', 'permission denied', 'directory not found', 'not found'])) {
+            return 'REPOSITORY_NOT_VISIBLE';
         }
 
         return 'REPOSITORY_ACCESS_FAILED';
@@ -1174,6 +1162,11 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         return max(60, (int) config('backup.timeouts.snapshot_listing_seconds', 300));
     }
 
+    private function repositoryOpenReuseSeconds(): int
+    {
+        return max(0, (int) config('backup.timeouts.repository_open_reuse_seconds', 120));
+    }
+
     private function extractProcessFailureMessage(array $result, string $fallback): string
     {
         $stderr = trim((string) ($result['stderr'] ?? ''));
@@ -1191,27 +1184,61 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
     private function logBackupRuntimeContext(string $operation, array $probe): void
     {
+        $resticEnv = $this->resticEnv();
+        $backupConfig = $this->doctorBackupConfig($resticEnv);
+        $repository = trim((string) config('backup.restic.repository', ''));
         Log::info('backup.runtime_context', [
             'operation' => $operation,
-            'repository' => trim((string) config('backup.restic.repository', '')),
-            'remote_name' => $probe['remote_name'] ?? $this->extractRcloneRemoteName((string) config('backup.restic.repository', '')),
+            'repository' => $repository,
+            'remote_name' => $probe['remote_name'] ?? $this->extractRcloneRemoteName($repository),
             'auth_mode' => $probe['auth_mode'] ?? null,
             'config_source' => $probe['config_source'] ?? null,
             'service_account_loaded' => (bool) ($probe['service_account_loaded'] ?? false),
+            'root_folder_id' => $backupConfig['rclone_remote']['root_folder_id'] ?? null,
+            'repository_root_target' => $this->parseRcloneRemoteRoot($repository),
+            'repository_parent_target' => $this->buildRcloneRepositoryProbeTarget($repository),
+            'repository_target' => $this->buildRcloneRepositoryTarget($repository),
         ]);
     }
 
     private function ensureRepositoryReady(string $operation = 'backup'): void
     {
         $repository = trim((string) config('backup.restic.repository', ''));
-        $probe = $this->runRestic([
-            'snapshots',
-            '--json',
-            '--tag',
-            'spnc_backup',
-        ], true, $this->repositoryOpenTimeoutSeconds());
+        $cacheKey = $this->repositoryOpenStateCacheKey($repository);
+        $reuseSeconds = $this->repositoryOpenReuseSeconds();
+        if ($reuseSeconds > 0) {
+            $cachedProbe = Cache::get($cacheKey);
+            if (is_array($cachedProbe) && ! empty($cachedProbe['opened_at'])) {
+                Log::info('backup.repository_open_cache_hit', [
+                    'operation' => $operation,
+                    'repository' => $repository,
+                    'opened_at' => $cachedProbe['opened_at'],
+                    'duration_ms' => $cachedProbe['duration_ms'] ?? null,
+                    'reuse_seconds' => $reuseSeconds,
+                ]);
+
+                return;
+            }
+        }
+
+        $startedAt = microtime(true);
+        try {
+            $probe = $this->runRestic(['cat', 'config'], true, $this->repositoryOpenTimeoutSeconds());
+        } catch (\Throwable $exception) {
+            $normalizedMessage = Str::lower(trim((string) $exception->getMessage()));
+            if (Str::contains($normalizedMessage, ['timed out', 'timeout', 'deadline exceeded'])) {
+                throw new BackupRuntimeException('[REPOSITORY_OPEN_TIMEOUT] restic cat config bi qua thoi gian cho khi mo repository backup.');
+            }
+
+            throw $exception;
+        }
 
         if ($probe['successful']) {
+            Cache::put($cacheKey, [
+                'opened_at' => now()->toIso8601String(),
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            ], now()->addSeconds(max(1, $reuseSeconds)));
+
             return;
         }
 
@@ -1227,6 +1254,12 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             );
         }
 
+        if ($operation !== 'backup') {
+            throw new BackupRuntimeException(
+                '[REPOSITORY_NOT_VISIBLE] Repository backup khong co config visible trong buoc kiem tra. Hay kiem tra path repository va quyen truy cap noi dung repository.'
+            );
+        }
+
         $init = $this->runRestic(['init'], true, 300);
         if ($init['successful']) {
             return;
@@ -1234,6 +1267,11 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
         $initErr = Str::lower((string) $init['stderr']);
         if (str_contains($initErr, 'already initialized')) {
+            Cache::put($cacheKey, [
+                'opened_at' => now()->toIso8601String(),
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            ], now()->addSeconds(max(1, $reuseSeconds)));
+
             return;
         }
 
@@ -3852,6 +3890,17 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $tests = [
             'snapshot_limit_requested' => $snapshotLimit,
             'rclone_version' => $this->doctorRunCommand([$rcloneBinary, 'version'], [], 20),
+            'restic_repository_config' => $this->doctorRunCommand(
+                array_merge(
+                    [(string) config('backup.restic.binary', 'restic')],
+                    $rcloneProgram !== null
+                        ? ['-o', 'rclone.program=' . $rcloneProgram]
+                        : [],
+                    ['cat', 'config']
+                ),
+                $this->resticEnv(),
+                $this->repositoryOpenTimeoutSeconds()
+            ),
             'restic_snapshots' => $this->doctorRunCommand(
                 array_merge(
                     [(string) config('backup.restic.binary', 'restic')],
@@ -3861,7 +3910,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                     ['snapshots', '--json', '--tag', 'spnc_backup']
                 ),
                 $this->resticEnv(),
-                90
+                $this->snapshotListingTimeoutSeconds()
             ),
         ];
 
@@ -3869,7 +3918,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             $tests['rclone_lsd'] = $this->doctorRunCommand(
                 [$rcloneBinary, 'lsd', $rcloneProbeTarget],
                 $this->resticEnv(),
-                30
+                $this->driveProbeTimeoutSeconds()
             );
         } else {
             $tests['rclone_lsd'] = [
@@ -3904,6 +3953,25 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             return $resticMessage !== '' ? $resticMessage : 'KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c remote rclone.';
         }
 
+        $diagnostics = $this->probeRepositoryVisibility($repository);
+        Log::warning('backup.repository_visibility_probe', $diagnostics);
+
+        if ((bool) ($diagnostics['repository_contents_probe']['successful'] ?? false)) {
+            return $resticMessage !== '' ? $resticMessage : 'Repository backup da visible qua rclone, nhung restic van mo rat cham hoac khong doc duoc config.';
+        }
+
+        if ((bool) ($diagnostics['repository_folder_probe']['successful'] ?? false)) {
+            return 'Repository folder da visible tren Google Drive, nhung khong doc duoc noi dung repository can thiet (config/data/index/keys/locks/snapshots).';
+        }
+
+        if ((bool) ($diagnostics['repository_parent_probe']['successful'] ?? false)) {
+            return 'Da truy cap duoc thu muc cha cua repository tren Google Drive, nhung chua thay duoc thu muc repository mong doi. Hay kiem tra lai path repository.';
+        }
+
+        if ((bool) ($diagnostics['remote_root_probe']['successful'] ?? false)) {
+            return 'Da truy cap duoc Google Drive root da cau hinh, nhung khong doc duoc thu muc cha cua repository backup.';
+        }
+
         $rcloneProbe = $this->runRclone(['lsd', $probeTarget], true, 30);
         if ((bool) ($rcloneProbe['successful'] ?? false)) {
             return $resticMessage !== '' ? $resticMessage : 'Restic khÃ´ng Ä‘á»c Ä‘Æ°á»£c repository qua rclone.';
@@ -3919,9 +3987,10 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
 
     private function doctorRunCommand(array $command, array $env = [], int $timeout = 60): array
     {
+        $startedAt = microtime(true);
         try {
             $result = $this->runProcess($command, $env, true, $timeout);
-            return $this->formatDoctorProcessResult($result);
+            return $this->formatDoctorProcessResult($result, $startedAt);
         } catch (\Throwable $exception) {
             return [
                 'ok' => false,
@@ -3929,12 +3998,13 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
                 'command' => implode(' ', array_map(static fn ($part): string => (string) $part, $command)),
                 'stdout_preview' => null,
                 'stderr_preview' => null,
+                'duration_seconds' => round(max(0, microtime(true) - $startedAt), 2),
                 'exception' => $exception->getMessage(),
             ];
         }
     }
 
-    private function formatDoctorProcessResult(array $result): array
+    private function formatDoctorProcessResult(array $result, float $startedAt): array
     {
         return [
             'ok' => (bool) ($result['successful'] ?? false),
@@ -3942,6 +4012,78 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'command' => (string) ($result['command'] ?? ''),
             'stdout_preview' => $this->trimDoctorOutput((string) ($result['stdout'] ?? ''), 12, 3000),
             'stderr_preview' => $this->trimDoctorOutput((string) ($result['stderr'] ?? ''), 12, 3000),
+            'duration_seconds' => round(max(0, microtime(true) - $startedAt), 2),
+        ];
+    }
+
+    private function buildRcloneRepositoryTarget(string $repository): ?string
+    {
+        $repository = trim($repository);
+        if (! str_starts_with(Str::lower($repository), 'rclone:')) {
+            return null;
+        }
+
+        $target = trim((string) Str::after($repository, 'rclone:'));
+
+        return $target !== '' ? $target : null;
+    }
+
+    private function repositoryOpenStateCacheKey(string $repository): string
+    {
+        return 'spnc:backup:repository-open:' . sha1(Str::lower(trim($repository)));
+    }
+
+    private function probeRepositoryVisibility(string $repository): array
+    {
+        $rootTarget = $this->parseRcloneRemoteRoot($repository);
+        $parentTarget = $this->buildRcloneRepositoryProbeTarget($repository);
+        $repositoryTarget = $this->buildRcloneRepositoryTarget($repository);
+
+        $remoteRootProbe = $rootTarget !== null
+            ? $this->runRclone(['lsd', $rootTarget], true, $this->driveProbeTimeoutSeconds())
+            : ['successful' => false, 'stdout' => '', 'stderr' => 'Unable to resolve remote root target.'];
+
+        $repositoryParentProbe = $parentTarget !== null
+            ? $this->runRclone(['lsd', $parentTarget], true, min(60, $this->repositoryOpenTimeoutSeconds()))
+            : ['successful' => false, 'stdout' => '', 'stderr' => 'Unable to resolve repository parent target.'];
+
+        $repositoryFolderProbe = $repositoryTarget !== null
+            ? $this->runRclone(['lsd', $repositoryTarget], true, min(60, $this->repositoryOpenTimeoutSeconds()))
+            : ['successful' => false, 'stdout' => '', 'stderr' => 'Unable to resolve repository target.'];
+
+        $repositoryContentsProbe = $repositoryTarget !== null
+            ? $this->runRclone(['lsf', $repositoryTarget, '--max-depth', '1'], true, min(60, $this->repositoryOpenTimeoutSeconds()))
+            : ['successful' => false, 'stdout' => '', 'stderr' => 'Unable to resolve repository target.'];
+
+        return [
+            'repository' => $repository,
+            'repository_root_target' => $rootTarget,
+            'repository_parent_target' => $parentTarget,
+            'repository_target' => $repositoryTarget,
+            'remote_root_probe' => $this->summarizeRepositoryProbe($remoteRootProbe),
+            'repository_parent_probe' => $this->summarizeRepositoryProbe($repositoryParentProbe),
+            'repository_folder_probe' => $this->summarizeRepositoryProbe($repositoryFolderProbe),
+            'repository_contents_probe' => $this->summarizeRepositoryProbe($repositoryContentsProbe),
+        ];
+    }
+
+    private function summarizeRepositoryProbe(array $probe): array
+    {
+        $stdout = trim((string) ($probe['stdout'] ?? ''));
+        $stderr = trim((string) ($probe['stderr'] ?? ''));
+        $entries = preg_split('/\r\n|\r|\n/', $stdout) ?: [];
+        $entries = array_values(array_filter(array_map(
+            static fn ($entry): string => trim((string) $entry),
+            $entries
+        )));
+
+        return [
+            'successful' => (bool) ($probe['successful'] ?? false),
+            'exit_code' => $probe['exit_code'] ?? null,
+            'command' => $probe['command'] ?? null,
+            'stdout_preview' => $stdout !== '' ? implode(PHP_EOL, array_slice($entries, 0, 12)) : null,
+            'stderr' => $stderr !== '' ? $stderr : null,
+            'entries_preview' => array_slice($entries, 0, 12),
         ];
     }
 
@@ -4287,6 +4429,7 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'name' => $remoteName,
             'defined' => false,
             'type' => null,
+            'root_folder_id' => null,
             'auth_mode' => null,
             'refresh_token_present' => null,
             'has_token' => false,
@@ -4331,9 +4474,14 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         $hasTeamDrive = $teamDrive !== '';
         $hasSectionServiceAccountFile = $sectionServiceAccount !== '';
 
-        if (trim($serviceAccountFile) !== '' || $sectionServiceAccount !== '') {
+        $usesServiceAccountEnv = trim($serviceAccountFile) !== '';
+        $usesServiceAccountSection = $sectionServiceAccount !== '';
+        $usesOauthFields = $tokenRaw !== '';
+        $hasConflictingAuthFields = ($usesServiceAccountEnv || $usesServiceAccountSection) && $usesOauthFields;
+
+        if ($usesServiceAccountEnv || $usesServiceAccountSection) {
             $authMode = 'service_account';
-        } elseif ($tokenRaw !== '') {
+        } elseif ($usesOauthFields) {
             $authMode = 'oauth_token';
             $decoded = json_decode($tokenRaw, true);
             if (is_array($decoded)) {
@@ -4346,6 +4494,9 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'name' => $remoteName,
             'defined' => true,
             'type' => trim((string) ($section['type'] ?? '')) !== '' ? trim((string) $section['type']) : null,
+            'root_folder_id' => trim((string) ($section['root_folder_id'] ?? '')) !== ''
+                ? trim((string) ($section['root_folder_id']))
+                : null,
             'auth_mode' => $authMode,
             'refresh_token_present' => $refreshTokenPresent,
             'has_token' => $hasToken,
@@ -4353,11 +4504,11 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
             'has_client_secret' => $hasClientSecret,
             'has_team_drive' => $hasTeamDrive,
             'has_section_service_account_file' => $hasSectionServiceAccountFile,
-            'has_stale_auth_fields' => $hasToken || $hasClientId || $hasClientSecret || $hasTeamDrive || $hasSectionServiceAccountFile,
-            'uses_service_account_env' => trim($serviceAccountFile) !== '',
+            'has_stale_auth_fields' => $hasConflictingAuthFields,
+            'has_conflicting_auth_fields' => $hasConflictingAuthFields,
+            'uses_service_account_env' => $usesServiceAccountEnv,
         ];
     }
-
     private function extractRcloneRemoteName(string $repository): ?string
     {
         $repository = trim($repository);
@@ -4942,7 +5093,3 @@ public function buildDoctorReport(int $snapshotLimit = 10): array
         return rtrim($restoredRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $relative;
     }
 }
-
-
-
-

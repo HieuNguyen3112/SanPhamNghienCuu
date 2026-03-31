@@ -78,7 +78,7 @@ class AdminBackupController extends Controller
             $schedule = $this->backupManager->buildScheduleMeta();
             $scheduleRuntime = $this->latestScheduleRunSummary();
             $retention = $this->backupManager->buildRetentionMeta();
-            $readiness = $this->backupManager->buildReadinessReport();
+            $readiness = $this->buildCachedRuntimeReadiness($cacheMeta);
             $exportOverview = $this->backupManager->buildExportOverview();
             $lastSuccess = $this->stateStore->latestSuccessfulBackup();
 
@@ -89,6 +89,7 @@ class AdminBackupController extends Controller
                 $refreshRun = $this->startSnapshotRefresh($request, 'manual_refresh');
                 if ($refreshRun !== null) {
                     $cacheMeta = $this->snapshotStore->cacheMeta();
+                    $readiness = $this->buildCachedRuntimeReadiness($cacheMeta);
                 }
             }
 
@@ -252,7 +253,8 @@ class AdminBackupController extends Controller
     public function exportsInfo(Request $request)
     {
         try {
-            $readiness = $this->backupManager->buildReadinessReport();
+            $cacheMeta = $this->snapshotStore->cacheMeta();
+            $readiness = $this->buildCachedRuntimeReadiness($cacheMeta);
             $overview = $this->backupManager->buildExportOverview();
             $openUrl = trim((string) config('backup.exports.open_url', ''));
             $readinessIssue = $this->primaryReadinessIssue($readiness);
@@ -1410,7 +1412,15 @@ class AdminBackupController extends Controller
             }
 
             if ($errorCode === 'DRIVE_AUTH_INVALID') {
-                return 'Không thể xác thực Google Drive cho backup. Hãy reconnect remote spnc_gdrive trong tệp rclone.conf dùng chung hoặc chuyển sang cấu hình service account rồi thử lại.';
+                return 'Không thể xác thực Google Drive cho backup. Hãy reconnect remote spnc_gdrive trong tệp rclone.conf dùng chung rồi thử lại.';
+            }
+
+            if ($errorCode === 'RCLONE_REMOTE_AUTH_INVALID') {
+                return 'Remote Google Drive backup chưa có auth hợp lệ. Hãy kiểm tra token OAuth trong tệp rclone.conf.';
+            }
+
+            if ($errorCode === 'RCLONE_REMOTE_AUTH_CONFLICT') {
+                return 'Remote Google Drive backup đang trộn OAuth và service account. Hãy giữ đúng một auth mode.';
             }
 
             if ($errorCode === 'SERVICE_ACCOUNT_INVALID') {
@@ -1514,6 +1524,14 @@ class AdminBackupController extends Controller
 
         if (Str::contains($combined, ['service_account_invalid', 'service_account_required'])) {
             return 'SERVICE_ACCOUNT_INVALID';
+        }
+
+        if (Str::contains($combined, ['rclone_remote_auth_invalid'])) {
+            return 'RCLONE_REMOTE_AUTH_INVALID';
+        }
+
+        if (Str::contains($combined, ['rclone_remote_auth_conflict'])) {
+            return 'RCLONE_REMOTE_AUTH_CONFLICT';
         }
 
         if (Str::contains($combined, ['drive_remote_inaccessible'])) {
@@ -1732,7 +1750,7 @@ class AdminBackupController extends Controller
             'status' => 'queued',
             'operation' => 'snapshot_refresh',
             'trigger' => $trigger,
-            'step' => 'probing_drive_root',
+            'step' => 'launching_refresh',
             'requested_by_user_id' => $userId > 0 ? $userId : null,
             'requested_at' => now()->toIso8601String(),
             'launcher_log_relative_path' => $this->launcher->logRelativePath($runId),
@@ -1740,13 +1758,6 @@ class AdminBackupController extends Controller
         ]);
 
         try {
-            $this->backupManager->assertDriveReadiness('snapshot_refresh');
-            $this->stateStore->update($runId, [
-                'status' => 'queued',
-                'operation' => 'snapshot_refresh',
-                'step' => 'launching_refresh',
-                'message' => 'Đã xác nhận kết nối Google Drive. Đang khởi động tiến trình đồng bộ snapshot.',
-            ]);
             $this->launcher->launchSnapshotRefresh($runId, $userId, $trigger);
         } catch (\Throwable $exception) {
             $errorCode = $this->detectErrorCode($exception->getMessage(), $exception->getMessage());
@@ -1772,31 +1783,101 @@ class AdminBackupController extends Controller
             return $this->failSnapshotRefreshRun($runId, 'launching_refresh', $exception);
         }
 
-        $bootstrappedState = $this->waitForRunBootstrap($runId, 5000);
-        if (! is_array($bootstrappedState)) {
-            return $this->failSnapshotRefreshRun(
-                $runId,
-                'launching_refresh',
-                new \RuntimeException('Snapshot refresh launcher did not update run state within 5 seconds.'),
-                'RUN_LAUNCH_TIMEOUT'
-            );
+        return $this->toPublicRunState($this->stateStore->get($runId), true) ?? ['run_id' => $runId];
+    }
+
+    private function buildCachedRuntimeReadiness(array $cacheMeta): array
+    {
+        $repository = trim((string) config('backup.restic.repository', ''));
+        $passwordSet = trim((string) config('backup.restic.password', '')) !== '';
+        $serviceAccountConfigured = trim((string) config('backup.restic.rclone_service_account_file', '')) !== ''
+            || trim((string) config('backup.restic.rclone_service_account_json_base64', '')) !== '';
+        $rcloneConfigConfigured = trim((string) config('backup.restic.rclone_config_path', '')) !== ''
+            || trim((string) config('backup.restic.rclone_config_base64', '')) !== '';
+        $health = is_array($cacheMeta['health'] ?? null) ? $cacheMeta['health'] : [];
+        $metrics = is_array($cacheMeta['metrics'] ?? null) ? $cacheMeta['metrics'] : [];
+
+        $configValid = array_key_exists('config_valid', $health)
+            ? (bool) $health['config_valid']
+            : ($repository !== '' && $passwordSet && $rcloneConfigConfigured);
+        $driveReachable = $health['drive_reachable'] ?? null;
+        $repositoryOpenable = $health['repository_openable'] ?? null;
+        $snapshotsReadable = $health['snapshots_readable'] ?? null;
+        $snapshotCacheFresh = $health['snapshot_cache_fresh'] ?? ! ((bool) ($cacheMeta['stale'] ?? true));
+        $blockingIssues = [];
+        $warnings = [];
+
+        if (! $configValid) {
+            $blockingIssues[] = [
+                'code' => $cacheMeta['last_error_code'] ?? 'CONFIG_INVALID',
+                'message' => 'Cấu hình backup chưa hợp lệ. Vui lòng kiểm tra repository, password và service account.',
+            ];
+        } elseif ($driveReachable === false) {
+            $blockingIssues[] = [
+                'code' => $cacheMeta['last_error_code'] ?? 'DRIVE_UNREACHABLE',
+                'message' => 'Google Drive backup chưa truy cập được ở lần kiểm tra gần nhất.',
+            ];
+        } elseif ($repositoryOpenable === false) {
+            $blockingIssues[] = [
+                'code' => $cacheMeta['last_error_code'] ?? 'REPOSITORY_OPEN_FAILED',
+                'message' => 'Repository backup đang phản hồi chậm hoặc chưa mở được ở lần refresh gần nhất.',
+            ];
+        } elseif ($snapshotsReadable === false) {
+            $blockingIssues[] = [
+                'code' => $cacheMeta['last_error_code'] ?? 'SNAPSHOT_REFRESH_FAILED',
+                'message' => 'Repository mở được nhưng bước đọc danh sách snapshot đã thất bại ở lần refresh gần nhất.',
+            ];
         }
 
-        $bootstrappedStatus = Str::lower(trim((string) ($bootstrappedState['status'] ?? '')));
-        $bootstrappedStep = Str::lower(trim((string) ($bootstrappedState['step'] ?? '')));
-        if (
-            $bootstrappedStatus === 'queued'
-            && in_array($bootstrappedStep, ['', 'probing_drive_root', 'launching_refresh'], true)
-        ) {
-            return $this->failSnapshotRefreshRun(
-                $runId,
-                'launching_refresh',
-                new \RuntimeException('Snapshot refresh launcher did not update run state within 5 seconds.'),
-                'RUN_LAUNCH_TIMEOUT'
-            );
+        if (! $snapshotCacheFresh) {
+            $warnings[] = [
+                'code' => 'SNAPSHOT_CACHE_STALE',
+                'message' => 'Dữ liệu backup đang hiển thị từ cache và có thể chưa mới nhất. Hệ thống có thể đang làm mới nền.',
+            ];
         }
 
-        return $this->toPublicRunState($bootstrappedState, true) ?? ['run_id' => $runId];
+        return [
+            'repository_env_configured' => $repository !== '' && $passwordSet,
+            'runtime_ready' => $configValid,
+            'ready_for_operations' => $configValid && $driveReachable === true && $repositoryOpenable === true,
+            'repository' => [
+                'value' => $repository !== '' ? $repository : null,
+                'password_set' => $passwordSet,
+            ],
+            'runtime' => [
+                'auth_mode' => $serviceAccountConfigured ? 'service_account' : ($rcloneConfigConfigured ? 'oauth_token' : null),
+                'config_source' => trim((string) config('backup.restic.rclone_config_base64', '')) !== '' ? 'base64' : 'path',
+                'service_account_loaded' => $serviceAccountConfigured,
+                'drive_probe' => [
+                    'ok' => $driveReachable,
+                    'cached' => true,
+                    'checked_at' => $metrics['last_drive_probe_at'] ?? null,
+                    'duration_seconds' => $metrics['last_drive_probe_duration_seconds'] ?? null,
+                ],
+                'repository_probe' => [
+                    'ok' => $repositoryOpenable,
+                    'cached' => true,
+                    'checked_at' => $metrics['last_repository_open_at'] ?? null,
+                    'duration_seconds' => $metrics['last_repository_open_duration_seconds'] ?? null,
+                ],
+                'snapshot_cache' => [
+                    'fresh' => $snapshotCacheFresh,
+                    'checked_at' => $cacheMeta['refreshed_at'] ?? null,
+                    'duration_seconds' => $metrics['last_snapshot_refresh_duration_seconds'] ?? null,
+                ],
+            ],
+            'health_layers' => [
+                'config_valid' => $configValid,
+                'drive_reachable' => $driveReachable,
+                'repository_openable' => $repositoryOpenable,
+                'snapshots_readable' => $snapshotsReadable,
+                'snapshot_cache_fresh' => $snapshotCacheFresh,
+            ],
+            'metrics' => $metrics,
+            'blocking_issues' => $blockingIssues,
+            'warnings' => $warnings,
+            'cached' => true,
+        ];
     }
 
     private function failSnapshotRefreshRun(
@@ -1852,40 +1933,6 @@ class AdminBackupController extends Controller
         ];
     }
 
-    private function waitForRunBootstrap(string $runId, int $maxWaitMs = 5000): ?array
-    {
-        $sleepMicros = 250000;
-        $deadline = microtime(true) + max(0.5, $maxWaitMs / 1000);
-
-        do {
-            $state = $this->stateStore->get($runId);
-            if (! is_array($state)) {
-                return null;
-            }
-
-            $status = Str::lower(trim((string) ($state['status'] ?? '')));
-            $step = Str::lower(trim((string) ($state['step'] ?? '')));
-            $startedAt = trim((string) ($state['started_at'] ?? ''));
-            $lastLogAt = trim((string) ($state['last_log_at'] ?? ''));
-            $errorCode = trim((string) ($state['error_code'] ?? ''));
-
-            if ($status !== 'queued') {
-                return $state;
-            }
-
-            if (! in_array($step, ['', 'probing_drive_root', 'launching_refresh'], true)) {
-                return $state;
-            }
-
-            if ($startedAt !== '' || $lastLogAt !== '' || $errorCode !== '') {
-                return $state;
-            }
-
-            usleep($sleepMicros);
-        } while (microtime(true) < $deadline);
-
-        return $this->stateStore->get($runId);
-    }
 }
 
 

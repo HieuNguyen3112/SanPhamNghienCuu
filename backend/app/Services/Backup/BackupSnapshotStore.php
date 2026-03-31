@@ -77,6 +77,39 @@ class BackupSnapshotStore
         return $payload;
     }
 
+    public function updateHealth(array $health = [], array $metrics = []): array
+    {
+        $payload = $this->read();
+        $currentHealth = is_array($payload['health'] ?? null) ? $payload['health'] : $this->defaultHealthPayload();
+        $currentMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : $this->defaultMetricsPayload();
+
+        foreach ($health as $key => $value) {
+            if (! is_string($key) || $key === '') {
+                continue;
+            }
+
+            $currentHealth[$key] = $value;
+        }
+
+        foreach ($metrics as $key => $value) {
+            if (! is_string($key) || $key === '') {
+                continue;
+            }
+
+            $currentMetrics[$key] = $value;
+        }
+
+        $currentHealth['updated_at'] = now()->toIso8601String();
+        $payload['health'] = $currentHealth;
+        $payload['metrics'] = $currentMetrics;
+        $payload['updated_at'] = now()->toIso8601String();
+        $payload['context'] = $this->contextPayload();
+
+        $this->write($payload);
+
+        return $payload;
+    }
+
     public function upsert(array $item, ?string $runId = null): array
     {
         $snapshotId = trim((string) ($item['snapshot_id'] ?? ''));
@@ -359,6 +392,8 @@ class BackupSnapshotStore
             'last_error_step' => $payload['last_error_step'] ?? null,
             'last_error_technical_message' => $payload['last_error_technical_message'] ?? null,
             'last_error_operation' => $payload['last_error_operation'] ?? null,
+            'health' => is_array($payload['health'] ?? null) ? $payload['health'] : $this->defaultHealthPayload(),
+            'metrics' => is_array($payload['metrics'] ?? null) ? $payload['metrics'] : $this->defaultMetricsPayload(),
             'stale' => $this->isStale(),
             'stale_after_seconds' => $this->effectiveStaleAfterSeconds(),
         ];
@@ -468,8 +503,40 @@ class BackupSnapshotStore
             'last_error_step' => null,
             'last_error_technical_message' => null,
             'last_error_operation' => null,
+            'health' => $this->defaultHealthPayload(),
+            'metrics' => $this->defaultMetricsPayload(),
             'updated_at' => null,
             'context' => $this->contextPayload(),
+        ];
+    }
+
+    private function defaultHealthPayload(): array
+    {
+        return [
+            'config_valid' => null,
+            'drive_reachable' => null,
+            'repository_openable' => null,
+            'snapshots_readable' => null,
+            'snapshot_cache_fresh' => null,
+            'last_successful_refresh_at' => null,
+            'last_failure_at' => null,
+            'last_failure_code' => null,
+            'last_failure_step' => null,
+            'updated_at' => null,
+        ];
+    }
+
+    private function defaultMetricsPayload(): array
+    {
+        return [
+            'last_drive_probe_at' => null,
+            'last_drive_probe_duration_seconds' => null,
+            'last_repository_open_at' => null,
+            'last_repository_open_duration_seconds' => null,
+            'last_snapshot_refresh_at' => null,
+            'last_snapshot_refresh_duration_seconds' => null,
+            'last_snapshot_listing_at' => null,
+            'last_snapshot_listing_duration_seconds' => null,
         ];
     }
 

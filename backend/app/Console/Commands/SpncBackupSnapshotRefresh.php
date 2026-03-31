@@ -41,6 +41,10 @@ class SpncBackupSnapshotRefresh extends Command
         $initiatedBy = $this->option('initiated-by') !== null
             ? (int) $this->option('initiated-by')
             : null;
+        $refreshStartedAt = microtime(true);
+        $driveProbeDurationSeconds = null;
+        $repositoryOpenDurationSeconds = null;
+        $snapshotListingDurationSeconds = null;
 
         try {
             $this->stateStore->assertValidRunId($runId);
@@ -96,6 +100,14 @@ class SpncBackupSnapshotRefresh extends Command
             ]);
 
             $this->backupManager->assertDriveReadiness('snapshot_refresh');
+            $driveProbeDurationSeconds = round(microtime(true) - $refreshStartedAt, 3);
+            $this->snapshotStore->updateHealth([
+                'config_valid' => true,
+                'drive_reachable' => true,
+            ], [
+                'last_drive_probe_at' => now()->toIso8601String(),
+                'last_drive_probe_duration_seconds' => $driveProbeDurationSeconds,
+            ]);
 
             $currentStep = 'opening_repository';
             $this->stateStore->update($runId, [
@@ -106,9 +118,18 @@ class SpncBackupSnapshotRefresh extends Command
             ]);
             $repositoryProbeStartedAt = microtime(true);
             $this->backupManager->assertRepositoryReady('snapshot_refresh');
+            $repositoryOpenDurationSeconds = round(microtime(true) - $repositoryProbeStartedAt, 3);
+            $this->snapshotStore->updateHealth([
+                'config_valid' => true,
+                'drive_reachable' => true,
+                'repository_openable' => true,
+            ], [
+                'last_repository_open_at' => now()->toIso8601String(),
+                'last_repository_open_duration_seconds' => $repositoryOpenDurationSeconds,
+            ]);
             $this->stateStore->appendLog(
                 $runId,
-                'Repository backup da mo xong sau ' . number_format(microtime(true) - $repositoryProbeStartedAt, 2) . ' giay.',
+                'Repository backup da mo xong sau ' . number_format((float) $repositoryOpenDurationSeconds, 2) . ' giay.',
                 'info'
             );
 
@@ -122,12 +143,30 @@ class SpncBackupSnapshotRefresh extends Command
             ]);
             $snapshotListingStartedAt = microtime(true);
             $snapshots = $this->backupManager->listSnapshots($limit, true);
+            $snapshotListingDurationSeconds = round(microtime(true) - $snapshotListingStartedAt, 3);
             $this->stateStore->appendLog(
                 $runId,
-                'Da doc ' . count($snapshots) . ' snapshot sau ' . number_format(microtime(true) - $snapshotListingStartedAt, 2) . ' giay.',
+                'Da doc ' . count($snapshots) . ' snapshot sau ' . number_format((float) $snapshotListingDurationSeconds, 2) . ' giay.',
                 'info'
             );
             $cache = $this->snapshotStore->replace($snapshots, $runId);
+            $refreshDurationSeconds = round(microtime(true) - $refreshStartedAt, 3);
+            $this->snapshotStore->updateHealth([
+                'config_valid' => true,
+                'drive_reachable' => true,
+                'repository_openable' => true,
+                'snapshots_readable' => true,
+                'snapshot_cache_fresh' => true,
+                'last_successful_refresh_at' => $cache['refreshed_at'] ?? now()->toIso8601String(),
+                'last_failure_at' => null,
+                'last_failure_code' => null,
+                'last_failure_step' => null,
+            ], [
+                'last_snapshot_refresh_at' => $cache['refreshed_at'] ?? now()->toIso8601String(),
+                'last_snapshot_refresh_duration_seconds' => $refreshDurationSeconds,
+                'last_snapshot_listing_at' => now()->toIso8601String(),
+                'last_snapshot_listing_duration_seconds' => $snapshotListingDurationSeconds,
+            ]);
 
             $this->stateStore->update($runId, [
                 'status' => 'success',
@@ -146,7 +185,25 @@ class SpncBackupSnapshotRefresh extends Command
         } catch (\Throwable $exception) {
             $userMessage = $this->toUserFacingFailureMessage($exception);
             $errorCode = $this->detectErrorCode($exception);
+            if ($errorCode === 'DRIVE_PROBE_TIMEOUT' && $currentStep === 'opening_repository') {
+                $errorCode = 'REPOSITORY_OPEN_TIMEOUT';
+            }
+            if ($errorCode === 'DRIVE_PROBE_TIMEOUT' && $currentStep === 'listing_snapshots') {
+                $errorCode = 'SNAPSHOT_LIST_TIMEOUT';
+            }
             $technicalMessage = trim((string) $exception->getMessage());
+            $userMessage = $this->refineUserFacingFailureMessage($userMessage, $errorCode, $currentStep);
+            $this->snapshotStore->updateHealth(
+                $this->buildFailureHealthState($currentStep, $errorCode),
+                array_filter([
+                    'last_drive_probe_at' => $driveProbeDurationSeconds !== null ? now()->toIso8601String() : null,
+                    'last_drive_probe_duration_seconds' => $driveProbeDurationSeconds,
+                    'last_repository_open_at' => $repositoryOpenDurationSeconds !== null ? now()->toIso8601String() : null,
+                    'last_repository_open_duration_seconds' => $repositoryOpenDurationSeconds,
+                    'last_snapshot_listing_at' => $snapshotListingDurationSeconds !== null ? now()->toIso8601String() : null,
+                    'last_snapshot_listing_duration_seconds' => $snapshotListingDurationSeconds,
+                ], static fn ($value) => $value !== null)
+            );
             Log::error('backup.snapshot_refresh_failed', [
                 'run_id' => $runId,
                 'trigger' => $trigger,
@@ -193,6 +250,12 @@ class SpncBackupSnapshotRefresh extends Command
         if (str_contains($message, 'rclone_service_account_required')) {
             return 'RCLONE_SERVICE_ACCOUNT_REQUIRED';
         }
+        if (str_contains($message, 'rclone_remote_auth_conflict')) {
+            return 'RCLONE_REMOTE_AUTH_CONFLICT';
+        }
+        if (str_contains($message, 'rclone_remote_auth_invalid')) {
+            return 'RCLONE_REMOTE_AUTH_INVALID';
+        }
         if (str_contains($message, 'rclone_remote_not_minimal')) {
             return 'RCLONE_REMOTE_NOT_MINIMAL';
         }
@@ -204,6 +267,12 @@ class SpncBackupSnapshotRefresh extends Command
         }
         if (str_contains($message, 'repository_open_timeout')) {
             return 'REPOSITORY_OPEN_TIMEOUT';
+        }
+        if (str_contains($message, 'repository_not_visible')) {
+            return 'REPOSITORY_NOT_VISIBLE';
+        }
+        if (str_contains($message, 'repository_locked')) {
+            return 'REPOSITORY_LOCKED';
         }
         if (str_contains($message, 'repository_access_failed')) {
             return 'REPOSITORY_ACCESS_FAILED';
@@ -226,7 +295,15 @@ class SpncBackupSnapshotRefresh extends Command
         }
 
         if (str_contains($raw, 'rclone_service_account_required') || str_contains($raw, 'drive_auth_invalid')) {
-            return 'Production chi ho tro Google Drive backup bang service account. Hay kiem tra lai remote spnc_gdrive.';
+            return 'Khong the xac thuc Google Drive backup. Hay kiem tra lai remote spnc_gdrive va token OAuth trong rclone.conf.';
+        }
+
+        if (str_contains($raw, 'rclone_remote_auth_conflict')) {
+            return 'Remote backup dang tron OAuth va service account. Vui long giu duy nhat mot auth mode.';
+        }
+
+        if (str_contains($raw, 'rclone_remote_auth_invalid')) {
+            return 'Remote backup khong co auth hop le. Vui long kiem tra token OAuth hoac service account trong rclone.conf.';
         }
 
         if (str_contains($raw, 'drive_remote_inaccessible')) {
@@ -235,6 +312,14 @@ class SpncBackupSnapshotRefresh extends Command
 
         if (str_contains($raw, 'repository_access_failed')) {
             return 'Google Drive da truy cap duoc nhung repository backup chua mo duoc. Vui long kiem tra restic repository.';
+        }
+
+        if (str_contains($raw, 'repository_not_visible')) {
+            return 'Khong thay duoc config repository backup trong Google Drive. Vui long kiem tra path repository va quyen truy cap noi dung repository.';
+        }
+
+        if (str_contains($raw, 'repository_locked')) {
+            return 'Repository backup dang bi khoa. Vui long kiem tra stale lock truoc khi refresh lai.';
         }
 
         if (str_contains($raw, 'snapshot_list_timeout')) {
@@ -255,5 +340,66 @@ class SpncBackupSnapshotRefresh extends Command
         }
 
         return 'Dong bo danh sach that bai. Vui long thu lai.';
+    }
+
+    private function refineUserFacingFailureMessage(string $message, ?string $errorCode, string $step): string
+    {
+        $normalizedMessage = Str::lower(trim($message));
+        $normalizedCode = Str::upper(trim((string) $errorCode));
+        $normalizedStep = trim(Str::lower($step));
+        $isGenericTimeout = $normalizedMessage === 'dong bo danh sach bi qua thoi gian. vui long thu lai.';
+        $isGenericFailure = $normalizedMessage === 'dong bo danh sach that bai. vui long thu lai.';
+
+        if (($normalizedCode === 'REPOSITORY_OPEN_TIMEOUT' || $normalizedStep === 'opening_repository') && ($isGenericTimeout || $isGenericFailure)) {
+            return 'Da vao duoc Google Drive nhung repository backup phan hoi qua cham khi mo. Vui long kiem tra hieu nang restic-repo hoac tang timeout opening_repository.';
+        }
+
+        if (($normalizedCode === 'SNAPSHOT_LIST_TIMEOUT' || $normalizedStep === 'listing_snapshots') && ($isGenericTimeout || $isGenericFailure)) {
+            return 'Repository backup da mo duoc nhung buoc doc danh sach snapshot qua cham. Vui long kiem tra so luong snapshot cu hoac hieu nang repository.';
+        }
+
+        if (($normalizedCode === 'DRIVE_PROBE_TIMEOUT' || $normalizedStep === 'probing_drive_root') && ($isGenericTimeout || $isGenericFailure)) {
+            return 'Google Drive backup khong phan hoi kip trong buoc kiem tra ban dau. Vui long kiem tra remote spnc_gdrive va ket noi runtime.';
+        }
+
+        return $message;
+    }
+
+    private function buildFailureHealthState(string $step, ?string $errorCode): array
+    {
+        $normalizedStep = Str::lower(trim($step));
+        $normalizedCode = Str::upper(trim((string) $errorCode));
+        $configErrors = [
+            'SERVICE_ACCOUNT_INVALID',
+            'RCLONE_SERVICE_ACCOUNT_REQUIRED',
+            'RCLONE_REMOTE_AUTH_INVALID',
+            'RCLONE_REMOTE_AUTH_CONFLICT',
+            'RCLONE_REMOTE_NOT_MINIMAL',
+            'SERVICE_ACCOUNT_REQUIRED',
+            'RCLONE_CONFIG_INVALID',
+            'RCLONE_REMOTE_UNDEFINED',
+        ];
+
+        $health = [
+            'config_valid' => ! in_array($normalizedCode, $configErrors, true),
+            'last_failure_at' => now()->toIso8601String(),
+            'last_failure_code' => $normalizedCode !== '' ? $normalizedCode : null,
+            'last_failure_step' => $normalizedStep !== '' ? $normalizedStep : null,
+        ];
+
+        if ($normalizedStep === 'probing_drive_root') {
+            $health['drive_reachable'] = false;
+        } elseif ($normalizedStep === 'opening_repository') {
+            $health['drive_reachable'] = true;
+            $health['repository_openable'] = false;
+        } elseif ($normalizedStep === 'listing_snapshots') {
+            $health['drive_reachable'] = true;
+            $health['repository_openable'] = true;
+            $health['snapshots_readable'] = false;
+        }
+
+        $health['snapshot_cache_fresh'] = ! $this->snapshotStore->isStale();
+
+        return $health;
     }
 }

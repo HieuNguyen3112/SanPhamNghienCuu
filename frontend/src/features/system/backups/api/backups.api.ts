@@ -122,6 +122,28 @@ export interface BackupCacheMeta {
   last_error_step?: string | null;
   last_error_technical_message?: string | null;
   last_error_operation?: BackupOperation | null;
+  health?: {
+    config_valid?: boolean | null;
+    drive_reachable?: boolean | null;
+    repository_openable?: boolean | null;
+    snapshots_readable?: boolean | null;
+    snapshot_cache_fresh?: boolean | null;
+    last_successful_refresh_at?: string | null;
+    last_failure_at?: string | null;
+    last_failure_code?: string | null;
+    last_failure_step?: string | null;
+    updated_at?: string | null;
+  } | null;
+  metrics?: {
+    last_drive_probe_at?: string | null;
+    last_drive_probe_duration_seconds?: number | null;
+    last_repository_open_at?: string | null;
+    last_repository_open_duration_seconds?: number | null;
+    last_snapshot_refresh_at?: string | null;
+    last_snapshot_refresh_duration_seconds?: number | null;
+    last_snapshot_listing_at?: string | null;
+    last_snapshot_listing_duration_seconds?: number | null;
+  } | null;
   stale: boolean;
   stale_after_seconds?: number;
   refresh_queued?: boolean;
@@ -220,6 +242,7 @@ export interface ExportsInfoResponse {
   repository_type?: string | null;
   open_url?: string | null;
   note?: string | null;
+  runtime_readiness?: Record<string, unknown> | null;
 }
 
 export interface BackupActionRunResponse {
