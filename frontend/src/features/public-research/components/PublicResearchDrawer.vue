@@ -349,7 +349,7 @@
                       </div>
 
                       <div>
-                        <div class="text-xs text-slate-500">Người tham gia</div>
+                        <div class="text-xs text-slate-500">Tác giả</div>
                         <div class="mt-1 font-medium text-slate-900">
                           {{ projectParticipantsLabel }}
                         </div>
@@ -506,8 +506,8 @@
                         </thead>
                         <tbody>
                           <tr
-                            v-for="p in detail?.participants ?? []"
-                            :key="`${p.lecturerCode}-${p.roleName}`"
+                            v-for="(p, idx) in detail?.participants ?? []"
+                            :key="`${p.lecturerCode ?? 'external'}-${p.lecturerName}-${p.roleName}-${idx}`"
                             class="border-t"
                           >
                             <td class="px-4 py-3 font-normal text-slate-900">

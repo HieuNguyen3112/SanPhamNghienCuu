@@ -42,6 +42,7 @@ const HOURS_MODE_OPTIONS: WorksFilterState["hoursMode"][] = [
   "all",
   "hours_not_submitted",
   "hours_pending_faculty",
+  "hours_need_revision",
   "hours_approved",
   "hours_rejected",
 ];
@@ -59,6 +60,12 @@ const BACKEND_ERROR_MESSAGE_MAP: Record<string, string> = {
     "Không tìm thấy công trình hoặc bạn không còn quyền thao tác với công trình này.",
   EVIDENCE_REQUIRED:
     "Mỗi công trình phải có ít nhất một minh chứng PDF hợp lệ trước khi gửi duyệt giờ.",
+  HOURS_ALREADY_PENDING:
+    "Bạn đã gửi duyệt giờ trước đó và đang chờ khoa xử lý.",
+  HOURS_FINAL_REJECTED:
+    "Yêu cầu này đã bị từ chối hẳn và không thể gửi lại.",
+  NO_SUBMITTABLE_WORKS:
+    "Không có công trình đủ điều kiện để gửi duyệt trong yêu cầu này.",
 };
 
 function dedupeMessages(messages: string[]): string[] {
@@ -206,11 +213,17 @@ export function useSelectHoursRequest() {
 
     if (
       row.hoursRequestState !== "hours_not_submitted" &&
-      row.hoursRequestState !== "hours_rejected"
+      row.hoursRequestState !== "hours_need_revision"
     ) {
-      issues.push(
-        "Chỉ công trình chưa gửi duyệt giờ hoặc đã bị khoa từ chối giờ mới được gửi lại."
-      );
+      if (row.hoursRequestState === "hours_rejected") {
+        issues.push(
+          "Công trình này đã bị từ chối hẳn nên không thể chỉnh sửa và gửi lại."
+        );
+      } else {
+        issues.push(
+          "Chỉ công trình chưa gửi duyệt giờ hoặc được yêu cầu chỉnh sửa mới được gửi lại."
+        );
+      }
     }
 
     if (row.effectiveHoursDisplay === null) {

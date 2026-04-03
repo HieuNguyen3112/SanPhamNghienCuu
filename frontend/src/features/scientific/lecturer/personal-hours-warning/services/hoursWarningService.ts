@@ -42,6 +42,7 @@ const WARNING_EVENT_KEYS = [
   "deadline_passed",
   "approved_not_submitted",
   "hours_pending",
+  "hours_need_revision",
   "hours_rejected",
 ];
 
@@ -50,6 +51,7 @@ const WARNING_TYPE_KEYS = new Set([
   "deadline_near",
   "approved_not_submitted",
   "hours_pending",
+  "hours_need_revision",
   "hours_rejected",
   "missing_evidence",
 ]);
@@ -112,6 +114,9 @@ function resolveActionLabel(item: AppNotificationItem): string | null {
   if (typeKey === "missing_hours" || typeKey === "approved_not_submitted") {
     return "Tính giờ NCKH";
   }
+  if (typeKey === "hours_need_revision") {
+    return "Chỉnh sửa và gửi lại";
+  }
   if (typeKey === "deadline_passed" || typeKey === "hours_rejected") {
     return "Xem công trình";
   }
@@ -150,6 +155,9 @@ function resolveActionRoute(item: AppNotificationItem, typeKey: string): string 
   }
 
   if (typeKey === "missing_hours" || typeKey === "approved_not_submitted") {
+    return "/hours/calculate";
+  }
+  if (typeKey === "hours_need_revision") {
     return "/hours/calculate";
   }
   if (

@@ -143,8 +143,9 @@ class LecturerParticipationNotificationController extends Controller
             $activityStatus = DB::table('research_activities as ra')
                 ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
                 ->where('ra.id', $member->activity_id)
-                ->value('ast.code');
-            if ($this->normalizeStatus($activityStatus) !== self::ACT_PENDING_MEMBER_CONFIRM) {
+                ->select(['ra.status_id', 'ast.code'])
+                ->first();
+            if (! $activityStatus || $this->normalizeStatus($activityStatus->code) !== self::ACT_PENDING_MEMBER_CONFIRM) {
                 return $this->errorPayload(
                     'Công trình không còn ở trạng thái chờ thành viên xác nhận nên không thể phản hồi yêu cầu này.',
                     'ACTIVITY_NOT_WAITING_MEMBER_CONFIRMATIONS',
@@ -169,6 +170,15 @@ class LecturerParticipationNotificationController extends Controller
                     Response::HTTP_CONFLICT
                 );
             }
+
+            $this->appendActivityHistoryEvent(
+                (int) $member->activity_id,
+                (int) $activityStatus->status_id,
+                (int) $activityStatus->status_id,
+                $actorUserId,
+                $now,
+                $this->buildMemberTimelineNote('member_accepted_invitation', (int) $requestId, (string) ($lecturer->full_name ?? ''))
+            );
 
             $this->markInvitationNotificationAsRead($request, $requestId);
 
@@ -327,7 +337,11 @@ class LecturerParticipationNotificationController extends Controller
                     (int) $member->activity_id,
                     $now,
                     (int) $request->user()->id,
-                    'member_rejected_by_invitee'
+                    $this->buildMemberTimelineNote(
+                        'member_rejected_by_invitee',
+                        (int) $requestId,
+                        (string) ($lecturer->full_name ?? '')
+                    )
                 );
             } catch (\RuntimeException $e) {
                 return $this->errorPayload(
@@ -523,6 +537,36 @@ class LecturerParticipationNotificationController extends Controller
         return $id ? (int) $id : null;
     }
 
+    private function appendActivityHistoryEvent(
+        int $activityId,
+        int $fromStatusId,
+        int $toStatusId,
+        int $actedByUserId,
+        $actedAt,
+        string $note
+    ): void {
+        DB::table('activity_status_histories')->insert([
+            'activity_id' => $activityId,
+            'from_status_id' => $fromStatusId,
+            'to_status_id' => $toStatusId,
+            'acted_by_user_id' => $actedByUserId,
+            'acted_at' => $actedAt,
+            'note' => $note,
+            'created_at' => $actedAt,
+            'updated_at' => $actedAt,
+        ]);
+    }
+
+    private function buildMemberTimelineNote(string $action, int $memberId, string $lecturerName = ''): string
+    {
+        $safeName = str_replace('|', '/', trim($lecturerName));
+        if ($safeName === '') {
+            return $action . '|' . $memberId;
+        }
+
+        return $action . '|' . $memberId . '|' . $safeName;
+    }
+
     private function resolveLecturer(Request $request)
     {
         $user = $request->user();
@@ -702,28 +746,38 @@ class LecturerParticipationNotificationController extends Controller
     private function buildParticipants(int $activityId, int $currentLecturerId): array
     {
         return DB::table('research_activity_members as ram')
-            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
-            ->join('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
             ->where('ram.activity_id', $activityId)
             ->orderBy('ram.id')
             ->select([
+                'ram.id as member_id',
                 'l.id as lecturer_id',
                 'l.full_name as lecturer_name',
                 'mr.name as role_name',
                 'f.name as faculty_name',
                 'd.name as department_name',
                 'ram.confirmation_status',
+                'ram.is_external',
+                'ram.external_full_name',
+                'ram.external_department_name',
             ])
             ->get()
             ->map(function ($row) use ($currentLecturerId) {
-                $unit = $row->department_name ?: $row->faculty_name;
+                $isExternal = (bool) ($row->is_external ?? false);
+                $fullName = $isExternal
+                    ? trim((string) ($row->external_full_name ?? ''))
+                    : trim((string) ($row->lecturer_name ?? ''));
+                $unit = $isExternal
+                    ? trim((string) ($row->external_department_name ?? ''))
+                    : trim((string) ($row->department_name ?? $row->faculty_name ?? ''));
                 return [
-                    'id' => (int) $row->lecturer_id,
-                    'full_name' => $row->lecturer_name,
-                    'unit' => $unit,
-                    'role' => $row->role_name,
+                    'id' => (int) $row->member_id,
+                    'full_name' => $fullName !== '' ? $fullName : '—',
+                    'unit' => $unit !== '' ? $unit : '—',
+                    'role' => $row->role_name ?: 'Thành viên',
                     'status' => $this->mapStatusToUi($row->confirmation_status),
                     'is_current_user' => (int) $row->lecturer_id === (int) $currentLecturerId,
                 ];

@@ -8,6 +8,7 @@
         :icon="Users"
         :status="shell.status.value"
         :canSubmit="canSubmit"
+        :participantCount="1"
         :pending="shell.pending.value"
         :errorMessage="shell.error_message.value"
         :successVisible="shell.success_visible.value"
@@ -678,19 +679,32 @@ async function persistRowEvidence(
   }
 }
 
-async function loadDraftFromQuery() {
-  const raw = route.query.activity_id;
+function parseQueryActivityId(key: "activity_id" | "copy_from"): number | null {
+  const raw = route.query[key];
   const rawValue = Array.isArray(raw) ? raw[0] : raw;
-  const activityId = rawValue ? Number(rawValue) : null;
+  const parsed = rawValue ? Number(rawValue) : null;
 
-  if (!activityId || Number.isNaN(activityId)) return;
+  if (!parsed || Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+async function loadDraftFromQuery() {
+  const copyFromId = parseQueryActivityId("copy_from");
+  const activityId = parseQueryActivityId("activity_id");
+  const sourceActivityId = copyFromId ?? activityId;
+  const isCopyMode = copyFromId !== null;
+
+  if (!sourceActivityId) return;
 
   try {
-    const data = await fetch_activity(activityId);
+    const data = await fetch_activity(sourceActivityId);
     const activity = data.activity;
     if (!activity) return;
 
-    form.activityIds = [activity.id];
+    form.activityIds = isCopyMode ? [] : [activity.id];
     form.academicYearId = activity.academic_year_id ?? null;
     form.kindId = activity.kind_id ?? form.kindId;
 
@@ -718,7 +732,9 @@ async function loadDraftFromQuery() {
     ];
     openEvidenceRowId.value = null;
 
-    const statusCode = (activity.status_code ?? "draft") as any;
+    const statusCode = (
+      isCopyMode ? "draft" : (activity.status_code ?? "draft")
+    ) as any;
     shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
   } catch (err) {
     shell.error_message.value = normalizeErrorMessage(
@@ -854,8 +870,9 @@ const shell = useDeclarationFormShell({
 
       form.activityIds = createdIds;
       if (createdIds.length === 1) {
+        const { copy_from: _copyFrom, ...restQuery } = route.query;
         await router.replace({
-          query: { ...route.query, activity_id: String(createdIds[0]) },
+          query: { ...restQuery, activity_id: String(createdIds[0]) },
         });
       }
     } catch (err) {
@@ -864,7 +881,7 @@ const shell = useDeclarationFormShell({
       );
     }
   },
-  on_submit: async () => {
+  on_submit: async (payload) => {
     await shell.save_draft({ silent_success: true });
     if (form.activityIds.length === 0) {
       throw new Error("Không có dòng hội thảo hợp lệ để gửi duyệt.");
@@ -872,7 +889,7 @@ const shell = useDeclarationFormShell({
 
     let nextStatusCode = "pending_faculty_review";
     for (const activityId of form.activityIds) {
-      const submitResult = await submit_activity(activityId);
+      const submitResult = await submit_activity(activityId, payload);
       const activityStatusCode =
         submitResult?.workflow?.status_code ??
         submitResult?.data?.status_code ??

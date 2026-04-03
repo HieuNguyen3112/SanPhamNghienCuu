@@ -185,7 +185,7 @@
                 <ul v-else class="mt-2 space-y-2">
                   <li
                     v-for="author in detail.authors"
-                    :key="author.lecturerId"
+                    :key="author.memberId"
                     class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"
                   >
                     <div class="min-w-0">

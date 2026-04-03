@@ -1,6 +1,8 @@
 <template>
   <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-    <div v-if="loading" class="p-6 text-sm text-slate-600">Đang tải danh sách...</div>
+    <div v-if="loading" class="p-6 text-sm text-slate-600">
+      Đang tải danh sách...
+    </div>
 
     <div v-else-if="error" class="p-6 text-sm text-rose-700">
       <div class="font-semibold">Không tải được danh sách</div>
@@ -16,7 +18,9 @@
       class="personal-research-works-table-scroll max-h-[min(70vh,560px)] overflow-x-auto overflow-y-scroll overscroll-contain"
     >
       <table class="w-full min-w-[980px] text-left text-sm">
-        <thead class="bg-slate-50 text-xs font-semibold uppercase text-slate-600">
+        <thead
+          class="bg-slate-50 text-xs font-semibold uppercase text-slate-600"
+        >
           <tr>
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
               <button
@@ -27,11 +31,15 @@
                 title="Sắp xếp theo tên"
               >
                 Tên công trình
-                <span class="text-xs text-slate-400">{{ sortIcon("title") }}</span>
+                <span class="text-xs text-slate-400">{{
+                  sortIcon("title")
+                }}</span>
               </button>
             </th>
 
-            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">Loại công trình</th>
+            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
+              Loại công trình
+            </th>
 
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">
               <button
@@ -42,7 +50,9 @@
                 title="Sắp xếp theo vai trò"
               >
                 Vai trò
-                <span class="text-xs text-slate-400">{{ sortIcon("roleName") }}</span>
+                <span class="text-xs text-slate-400">{{
+                  sortIcon("roleName")
+                }}</span>
               </button>
             </th>
 
@@ -55,11 +65,15 @@
                 title="Sắp xếp theo năm"
               >
                 Năm
-                <span class="text-xs text-slate-400">{{ sortIcon("workYear") }}</span>
+                <span class="text-xs text-slate-400">{{
+                  sortIcon("workYear")
+                }}</span>
               </button>
             </th>
 
-            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">Giờ quy đổi</th>
+            <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right">
+              Giờ quy đổi
+            </th>
             <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3">Trạng thái</th>
           </tr>
         </thead>
@@ -75,7 +89,9 @@
             @keydown.space.prevent="emit('open-detail', row.activityId)"
           >
             <td class="px-4 py-3">
-              <div class="max-w-[420px] truncate font-semibold text-slate-900 hover:underline">
+              <div
+                class="max-w-[420px] truncate font-semibold text-slate-900 hover:underline"
+              >
                 {{ row.title }}
               </div>
               <div class="mt-1 text-xs text-slate-500">
@@ -87,14 +103,18 @@
 
             <td class="px-4 py-3 text-slate-700">
               <div class="font-medium">{{ row.kindName }}</div>
-              <div v-if="row.typeName" class="mt-0.5 text-xs text-slate-500">{{ row.typeName }}</div>
+              <div v-if="row.typeName" class="mt-0.5 text-xs text-slate-500">
+                {{ row.typeName }}
+              </div>
             </td>
 
             <td class="px-4 py-3 text-slate-700">{{ row.roleName ?? "—" }}</td>
             <td class="px-4 py-3 text-slate-700">{{ row.workYear ?? "—" }}</td>
 
             <td class="px-4 py-3 text-right tabular-nums text-slate-900">
-              <span v-if="row.statusCode === 'approved'">{{ row.lecturerHours ?? "—" }}</span>
+              <span v-if="row.statusCode === 'approved'">{{
+                row.lecturerHours ?? "—"
+              }}</span>
               <span v-else class="text-slate-400">—</span>
             </td>
 
@@ -193,8 +213,9 @@ function statusBadgeClass(statusCode: PersonalWorkStatusCode): string {
       return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
     case "pending_member_confirm":
     case "pending_faculty_review":
-    case "submitted":
       return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+    case "need_revision":
+      return "bg-sky-50 text-sky-700 ring-1 ring-sky-200";
     case "member_rejected":
     case "rejected":
       return "bg-rose-50 text-rose-700 ring-1 ring-rose-200";

@@ -42,8 +42,8 @@ export function mapPublicResearchDetailDtoToModel(
     ...base,
     activityCode: dto.activity_code ?? "",
     participants: (dto.participants ?? []).map((p) => ({
-      lecturerId: p.lecturer_id,
-      lecturerCode: p.lecturer_code,
+      lecturerId: p.lecturer_id ?? null,
+      lecturerCode: p.lecturer_code ?? null,
       lecturerName: p.lecturer_name,
       facultyName: p.faculty_name,
       roleName: p.role_name,

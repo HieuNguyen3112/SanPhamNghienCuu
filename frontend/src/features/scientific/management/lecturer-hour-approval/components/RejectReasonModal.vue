@@ -10,14 +10,64 @@
           <div class="border-b border-slate-200 px-4 py-3">
             <div class="flex items-center gap-2">
               <Info class="h-5 w-5 text-slate-500" />
-              <div class="text-sm font-semibold text-slate-900">Từ chối yêu cầu</div>
+              <div class="text-sm font-semibold text-slate-900">
+                Phản hồi yêu cầu
+              </div>
             </div>
             <div class="mt-1 text-xs text-slate-500">
-              Chọn lý do để phản hồi rõ ràng cho giảng viên.
+              Chọn hình thức phản hồi và lý do cụ thể để giảng viên xử lý đúng
+              hướng.
             </div>
           </div>
 
           <div class="p-4">
+            <div
+              class="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+            >
+              <div class="text-xs font-semibold text-slate-700">
+                Hình thức phản hồi
+              </div>
+              <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label
+                  class="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2.5 hover:bg-slate-50"
+                >
+                  <input
+                    type="radio"
+                    class="mt-1"
+                    value="revision"
+                    v-model="decisionMode"
+                  />
+                  <div>
+                    <div class="text-sm font-medium text-slate-900">
+                      Yêu cầu chỉnh sửa
+                    </div>
+                    <div class="text-xs text-slate-500">
+                      Giảng viên được chỉnh sửa và gửi lại các mục này.
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  class="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-2.5 hover:bg-slate-50"
+                >
+                  <input
+                    type="radio"
+                    class="mt-1"
+                    value="reject"
+                    v-model="decisionMode"
+                  />
+                  <div>
+                    <div class="text-sm font-medium text-slate-900">
+                      Từ chối hẳn
+                    </div>
+                    <div class="text-xs text-slate-500">
+                      Yêu cầu kết thúc, giảng viên không thể gửi lại.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div class="space-y-2">
               <label
                 class="flex items-start gap-2 rounded-xl border border-slate-200 p-3 hover:bg-slate-50"
@@ -25,13 +75,15 @@
                 <input
                   type="radio"
                   class="mt-1"
-                  value="hours_not_reasonable"
+                  value="INVALID_EVIDENCE"
                   v-model="reasonCode"
                 />
                 <div>
-                  <div class="text-sm font-medium text-slate-900">Giờ quy đổi chưa hợp lý</div>
+                  <div class="text-sm font-medium text-slate-900">
+                    Minh chứng chưa hợp lệ
+                  </div>
                   <div class="text-xs text-slate-500">
-                    Cần rà soát lại phân bổ hoặc định mức quy đổi.
+                    Thiếu hồ sơ hoặc minh chứng chưa đáp ứng yêu cầu kiểm tra.
                   </div>
                 </div>
               </label>
@@ -42,13 +94,15 @@
                 <input
                   type="radio"
                   class="mt-1"
-                  value="work_not_eligible"
+                  value="INVALID_HOURS"
                   v-model="reasonCode"
                 />
                 <div>
-                  <div class="text-sm font-medium text-slate-900">Công trình chưa đủ điều kiện</div>
+                  <div class="text-sm font-medium text-slate-900">
+                    Giờ quy đổi chưa hợp lệ
+                  </div>
                   <div class="text-xs text-slate-500">
-                    Một số công trình chưa đáp ứng tiêu chí để tính giờ.
+                    Cần rà soát lại phân bổ hoặc định mức quy đổi giờ.
                   </div>
                 </div>
               </label>
@@ -59,13 +113,15 @@
                 <input
                   type="radio"
                   class="mt-1"
-                  value="missing_evidence"
+                  value="INVALID_ACTIVITY"
                   v-model="reasonCode"
                 />
                 <div>
-                  <div class="text-sm font-medium text-slate-900">Thiếu minh chứng</div>
+                  <div class="text-sm font-medium text-slate-900">
+                    Công trình chưa hợp lệ
+                  </div>
                   <div class="text-xs text-slate-500">
-                    Cần bổ sung hồ sơ hoặc bằng chứng liên quan.
+                    Thông tin công trình chưa chính xác hoặc chưa đầy đủ.
                   </div>
                 </div>
               </label>
@@ -73,28 +129,36 @@
               <label
                 class="flex items-start gap-2 rounded-xl border border-slate-200 p-3 hover:bg-slate-50"
               >
-                <input type="radio" class="mt-1" value="other" v-model="reasonCode" />
+                <input
+                  type="radio"
+                  class="mt-1"
+                  value="NOT_ELIGIBLE"
+                  v-model="reasonCode"
+                />
                 <div class="w-full">
-                  <div class="text-sm font-medium text-slate-900">Lý do khác</div>
-                  <div class="text-xs text-slate-500">Nhập nội dung chi tiết.</div>
-
-                  <textarea
-                    v-if="reasonCode === 'other'"
-                    class="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm focus:border-slate-400 focus:ring-0"
-                    rows="3"
-                    :value="reasonNote"
-                    placeholder="Nhập lý do..."
-                    @input="reasonNote = ($event.target as HTMLTextAreaElement).value"
-                  />
+                  <div class="text-sm font-medium text-slate-900">
+                    Công trình chưa đủ điều kiện
+                  </div>
+                  <div class="text-xs text-slate-500">
+                    Công trình chưa đáp ứng tiêu chí để tính giờ NCKH.
+                  </div>
                 </div>
               </label>
-            </div>
 
-            <div
-              v-if="validationError"
-              class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"
-            >
-              {{ validationError }}
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <label class="text-xs font-medium text-slate-700">
+                  Ghi chú chi tiết cho giảng viên (không bắt buộc)
+                </label>
+                <textarea
+                  class="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm focus:border-slate-400 focus:ring-0"
+                  rows="3"
+                  :value="reasonNote"
+                  placeholder="Ví dụ: thiếu biên bản nghiệm thu hoặc cần cập nhật lại tỷ lệ đóng góp..."
+                  @input="
+                    reasonNote = ($event.target as HTMLTextAreaElement).value
+                  "
+                />
+              </div>
             </div>
           </div>
 
@@ -116,7 +180,11 @@
               @click="submit"
             >
               <X class="h-4 w-4" />
-              Xác nhận từ chối
+              {{
+                decisionMode === "revision"
+                  ? "Xác nhận yêu cầu chỉnh sửa"
+                  : "Xác nhận từ chối hẳn"
+              }}
             </button>
           </div>
         </div>
@@ -126,9 +194,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import { Info, X } from "lucide-vue-next";
-import type { HourApprovalRejectReasonCode } from "../contracts/hourApproval.contract";
+import type {
+  HourApprovalDecisionMode,
+  HourApprovalRejectReasonCode,
+} from "../contracts/hourApproval.contract";
 
 interface Props {
   open: boolean;
@@ -143,33 +214,30 @@ const emit = defineEmits<{
     payload: {
       reasonCode: HourApprovalRejectReasonCode;
       reasonNote: string | null;
-    }
+      decisionMode: HourApprovalDecisionMode;
+    },
   ): void;
 }>();
 
-const reasonCode = ref<HourApprovalRejectReasonCode>("hours_not_reasonable");
+const reasonCode = ref<HourApprovalRejectReasonCode>("INVALID_EVIDENCE");
 const reasonNote = ref<string>("");
+const decisionMode = ref<HourApprovalDecisionMode>("revision");
 
 watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) return;
-    reasonCode.value = "hours_not_reasonable";
+    reasonCode.value = "INVALID_EVIDENCE";
     reasonNote.value = "";
-  }
+    decisionMode.value = "revision";
+  },
 );
 
-const validationError = computed(() => {
-  if (reasonCode.value !== "other") return null;
-  if (!reasonNote.value.trim()) return "Vui lòng nhập nội dung cho lý do khác.";
-  return null;
-});
-
 function submit() {
-  if (validationError.value) return;
   emit("submit", {
     reasonCode: reasonCode.value,
-    reasonNote: reasonCode.value === "other" ? reasonNote.value.trim() : null,
+    reasonNote: reasonNote.value.trim() || null,
+    decisionMode: decisionMode.value,
   });
 }
 </script>

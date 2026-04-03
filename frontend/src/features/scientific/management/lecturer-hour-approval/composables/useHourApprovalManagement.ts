@@ -128,7 +128,9 @@ export function useHourApprovalManagement(
     errorDetail.value = null;
 
     try {
-      const dto = await service.getRequestDetail(requestId);
+      const dto = await service.getRequestDetail(requestId, {
+        academicYearId: filter.academicYearId,
+      });
       requestDetail.value = hourApprovalMappers.detailFromDto(dto);
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -197,6 +199,7 @@ export function useHourApprovalManagement(
   async function rejectRequest(requestId: number, payload: RejectPayload) {
     loadingReject.value = true;
     errorReject.value = null;
+    const isRevisionMode = payload.decisionMode === "revision";
 
     try {
       await runWithFeedback(
@@ -212,19 +215,27 @@ export function useHourApprovalManagement(
         },
         {
           loading: {
-            title: "Đang xử lý từ chối",
+            title: isRevisionMode
+              ? "Đang gửi yêu cầu chỉnh sửa"
+              : "Đang xử lý từ chối",
             message: "Hệ thống đang cập nhật kết quả xét duyệt...",
           },
           success: {
             title: "Thành công",
-            message: "Đã từ chối yêu cầu giờ NCKH.",
+            message: isRevisionMode
+              ? "Đã gửi yêu cầu chỉnh sửa cho giảng viên."
+              : "Đã từ chối yêu cầu giờ NCKH.",
           },
           error: {
-            title: "Từ chối yêu cầu thất bại",
+            title: isRevisionMode
+              ? "Gửi yêu cầu chỉnh sửa thất bại"
+              : "Từ chối yêu cầu thất bại",
             message: (error) =>
               resolveApiErrorMessage(
                 error,
-                "Không thể từ chối yêu cầu. Vui lòng thử lại."
+                isRevisionMode
+                  ? "Không thể gửi yêu cầu chỉnh sửa. Vui lòng thử lại."
+                  : "Không thể từ chối yêu cầu. Vui lòng thử lại."
               ),
           },
         }
@@ -234,7 +245,9 @@ export function useHourApprovalManagement(
       console.error(error);
       errorReject.value = resolveApiErrorMessage(
         error,
-        "Không thể từ chối yêu cầu. Vui lòng thử lại."
+        isRevisionMode
+          ? "Không thể gửi yêu cầu chỉnh sửa. Vui lòng thử lại."
+          : "Không thể từ chối yêu cầu. Vui lòng thử lại."
       );
     } finally {
       loadingReject.value = false;

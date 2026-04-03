@@ -26,8 +26,8 @@ const label = computed(() => {
       return "Thành viên từ chối";
     case "PENDING_FACULTY_REVIEW":
       return "Chờ khoa duyệt";
-    case "SUBMITTED":
-      return "Đã gửi duyệt";
+    case "NEED_REVISION":
+      return "Cần chỉnh sửa";
     case "APPROVED":
       return "Được duyệt";
     case "REJECTED":
@@ -45,8 +45,8 @@ const badgeClass = computed(() => {
       return "border border-rose-200 bg-rose-50 text-rose-700";
     case "PENDING_FACULTY_REVIEW":
       return "border border-blue-200 bg-blue-50 text-blue-700";
-    case "SUBMITTED":
-      return "border border-blue-200 bg-blue-50 text-blue-700";
+    case "NEED_REVISION":
+      return "border border-amber-200 bg-amber-50 text-amber-700";
     case "APPROVED":
       return "border border-emerald-200 bg-emerald-50 text-emerald-700";
     case "REJECTED":

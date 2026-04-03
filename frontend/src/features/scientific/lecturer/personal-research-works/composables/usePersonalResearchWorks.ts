@@ -65,7 +65,9 @@ export function usePersonalResearchWorks() {
 
   const activeRow = computed(() => {
     if (!selectedWorkId.value) return null;
-    return rows.value.find((row) => row.activityId === selectedWorkId.value) ?? null;
+    return (
+      rows.value.find((row) => row.activityId === selectedWorkId.value) ?? null
+    );
   });
 
   const buildSortParam = () => {
@@ -101,7 +103,9 @@ export function usePersonalResearchWorks() {
       delete nextQuery.activity_id;
     }
 
-    await router.replace({ path: route.path, query: nextQuery }).catch(() => undefined);
+    await router
+      .replace({ path: route.path, query: nextQuery })
+      .catch(() => undefined);
   }
 
   async function loadWorksInternal() {
@@ -122,7 +126,9 @@ export function usePersonalResearchWorks() {
       totalItemCount.value = dto.pagination.total;
     } catch (error) {
       errorList.value =
-        error instanceof Error ? error.message : "Không tải được danh sách công trình.";
+        error instanceof Error
+          ? error.message
+          : "Không tải được danh sách công trình.";
     } finally {
       loadingList.value = false;
     }
@@ -152,7 +158,8 @@ export function usePersonalResearchWorks() {
     await runPageLoad(loadWorksInternal, {
       loading: {
         title: "Đang khởi tạo công trình của tôi",
-        message: "Hệ thống đang chuẩn bị dữ liệu công trình nghiên cứu cá nhân...",
+        message:
+          "Hệ thống đang chuẩn bị dữ liệu công trình nghiên cứu cá nhân...",
       },
     });
 
@@ -163,7 +170,7 @@ export function usePersonalResearchWorks() {
       if (selectedWorkDetail.value?.activityId === requestedActivityId) {
         noticeTone.value = "info";
         noticeMessage.value =
-          "Công trình bị khoa trả về đã được mở trong Công trình của tôi. Chủ nhiệm và các thành viên đã chấp nhận tham gia đều xem lý do và tiếp tục cập nhật tại đây.";
+          "Công trình bị khoa trả về đã được mở trong Công trình của tôi. Chủ nhiệm và các thành viên đã chấp nhận tham gia đều xem lý do và sao chép sang bản kê khai mới tại đây.";
       }
     }
 
@@ -207,14 +214,18 @@ export function usePersonalResearchWorks() {
       selectedWorkDetail.value = mapper.detailFromDto(dto);
     } catch (error) {
       errorDetail.value =
-        error instanceof Error ? error.message : "Không tải được chi tiết công trình.";
+        error instanceof Error
+          ? error.message
+          : "Không tải được chi tiết công trình.";
     } finally {
       loadingDetail.value = false;
     }
   }
 
   function findKindCode(workId: number): string | null {
-    const rowKindCode = rows.value.find((row) => row.activityId === workId)?.kindCode;
+    const rowKindCode = rows.value.find(
+      (row) => row.activityId === workId,
+    )?.kindCode;
     if (rowKindCode) return rowKindCode;
     if (selectedWorkDetail.value?.activityId === workId) {
       return selectedWorkDetail.value.kindCode;
@@ -222,9 +233,12 @@ export function usePersonalResearchWorks() {
     return null;
   }
 
-  function goToEditDraft(workId: number) {
+  function goToDeclaration(workId: number, options?: { copyFrom?: number }) {
     const kindCode = findKindCode(workId);
-    const query = `?activity_id=${workId}`;
+    const query =
+      typeof options?.copyFrom === "number"
+        ? `?copy_from=${options.copyFrom}`
+        : `?activity_id=${workId}`;
 
     if (kindCode === "book") {
       window.location.assign(`/declarations/books${query}`);
@@ -244,34 +258,41 @@ export function usePersonalResearchWorks() {
     window.location.assign(`/declarations/articles${query}`);
   }
 
+  function goToEditDraft(workId: number) {
+    goToDeclaration(workId);
+  }
+
   function copyFromRejected(workId: number) {
-    goToEditDraft(workId);
+    goToDeclaration(workId, { copyFrom: workId });
   }
 
   async function reinviteFromRow(workId: number) {
     noticeMessage.value = null;
 
-    if (!selectedWorkDetail.value || selectedWorkDetail.value.activityId !== workId) {
+    if (
+      !selectedWorkDetail.value ||
+      selectedWorkDetail.value.activityId !== workId
+    ) {
       await openDetail(workId);
     }
 
     const detail = selectedWorkDetail.value;
     if (!detail) {
       noticeTone.value = "error";
-      noticeMessage.value = "Không tải được danh sách thành viên bị từ chối.";
+      noticeMessage.value = "Không tải được danh sách tác giả bị từ chối.";
       return;
     }
 
     if (detail.rejectedMembers.length === 0) {
       noticeTone.value = "info";
-      noticeMessage.value = "Không còn thành viên nào ở trạng thái từ chối.";
+      noticeMessage.value = "Không còn tác giả nào ở trạng thái từ chối.";
       return;
     }
 
     if (detail.rejectedMembers.length > 1) {
       noticeTone.value = "info";
       noticeMessage.value =
-        "Công trình có nhiều thành viên từ chối. Vui lòng mở chi tiết và chọn người cần gửi lại yêu cầu.";
+        "Công trình có nhiều tác giả từ chối. Vui lòng mở chi tiết và chọn người cần gửi lại yêu cầu.";
       isDetailOpen.value = true;
       return;
     }
@@ -285,12 +306,13 @@ export function usePersonalResearchWorks() {
     if (!selectedWorkDetail.value) return;
 
     noticeMessage.value = null;
+    const activityId = selectedWorkDetail.value.activityId;
 
     try {
       await runPageLoad(
         async () => {
           await personalResearchWorksService.reinviteMember(
-            selectedWorkDetail.value!.activityId,
+            activityId,
             memberId,
           );
         },
@@ -308,12 +330,103 @@ export function usePersonalResearchWorks() {
         "Đã gửi lại yêu cầu xác nhận tham gia cho thành viên.";
       await Promise.all([
         loadWorks({ withFeedback: false }),
-        loadDetail(selectedWorkDetail.value.activityId),
+        loadDetail(activityId),
       ]);
     } catch (error) {
       noticeTone.value = "error";
       noticeMessage.value =
-        error instanceof Error ? error.message : "Không thể gửi lại yêu cầu xác nhận.";
+        error instanceof Error
+          ? error.message
+          : "Không thể gửi lại yêu cầu xác nhận.";
+    }
+  }
+
+  async function resendPendingInvitation(memberId: number) {
+    if (!selectedWorkDetail.value) return;
+
+    noticeMessage.value = null;
+    const activityId = selectedWorkDetail.value.activityId;
+
+    try {
+      await runPageLoad(
+        async () => {
+          await personalResearchWorksService.resendPendingInvitation(
+            activityId,
+            memberId,
+          );
+        },
+        {
+          loading: {
+            title: "Đang gửi lại lời mời",
+            message: "Hệ thống đang gửi lại yêu cầu xác nhận tới thành viên...",
+          },
+          rethrow: true,
+        },
+      );
+
+      noticeTone.value = "success";
+      noticeMessage.value = "Đã gửi lại lời mời xác nhận cho thành viên.";
+      await Promise.all([
+        loadWorks({ withFeedback: false }),
+        loadDetail(activityId),
+      ]);
+    } catch (error) {
+      noticeTone.value = "error";
+      noticeMessage.value =
+        error instanceof Error
+          ? error.message
+          : "Không thể gửi lại lời mời xác nhận.";
+    }
+  }
+
+  async function removePendingMember(memberId: number) {
+    if (!selectedWorkDetail.value) return;
+
+    noticeMessage.value = null;
+    const activityId = selectedWorkDetail.value.activityId;
+    const previousStatus = selectedWorkDetail.value.statusCode;
+
+    try {
+      await runPageLoad(
+        async () => {
+          await personalResearchWorksService.removePendingMember(
+            activityId,
+            memberId,
+          );
+        },
+        {
+          loading: {
+            title: "Đang xóa thành viên chờ xác nhận",
+            message: "Hệ thống đang cập nhật danh sách tác giả...",
+          },
+          rethrow: true,
+        },
+      );
+
+      await Promise.all([
+        loadWorks({ withFeedback: false }),
+        loadDetail(activityId),
+      ]);
+
+      const nextStatus = selectedWorkDetail.value?.statusCode;
+      if (
+        previousStatus === "pending_member_confirm" &&
+        nextStatus === "pending_faculty_review"
+      ) {
+        noticeTone.value = "info";
+        noticeMessage.value =
+          "Không còn thành viên chờ xác nhận. Công trình đã được chuyển lên khoa duyệt.";
+        return;
+      }
+
+      noticeTone.value = "success";
+      noticeMessage.value = "Đã xóa thành viên khỏi danh sách chờ xác nhận.";
+    } catch (error) {
+      noticeTone.value = "error";
+      noticeMessage.value =
+        error instanceof Error
+          ? error.message
+          : "Không thể xóa thành viên chờ xác nhận.";
     }
   }
 
@@ -369,6 +482,8 @@ export function usePersonalResearchWorks() {
     copyFromRejected,
     reinviteFromRow,
     reinviteMember,
+    resendPendingInvitation,
+    removePendingMember,
     handleSortChange,
     setPage,
     setPageSize,

@@ -42,6 +42,12 @@ const WORK_REVISION_KEYS = new Set([
   "returned_for_revision",
 ]);
 
+const HOURS_REVISION_KEYS = new Set([
+  "hours_need_revision",
+  "hours_revision_requested",
+  "hours_returned",
+]);
+
 function normalizeKey(value: unknown): string {
   if (typeof value !== "string") return "";
   return value.trim().toLowerCase();
@@ -79,6 +85,9 @@ function canonicalEventKey(rawKey: string): string {
   }
   if (WORK_REVISION_KEYS.has(rawKey)) {
     return "work_revision_requested";
+  }
+  if (HOURS_REVISION_KEYS.has(rawKey)) {
+    return "hours_need_revision";
   }
 
   if (rawKey === "participation_confirmed") return "participation_accepted";
@@ -171,6 +180,13 @@ export function getNotificationVisual(notification: NotificationLike): Notificat
         icon: Clock3,
         wrapClass: "bg-cyan-50 ring-cyan-200",
         iconClass: "text-cyan-600",
+      };
+    case "hours_need_revision":
+      return {
+        eventKey,
+        icon: Undo2,
+        wrapClass: "bg-blue-50 ring-blue-200",
+        iconClass: "text-blue-600",
       };
     case "hours_rejected":
       return {

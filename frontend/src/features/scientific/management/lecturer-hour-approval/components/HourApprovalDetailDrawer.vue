@@ -76,6 +76,49 @@
                 </div>
               </div>
             </div>
+
+            <div
+              v-if="detail"
+              class="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 p-3"
+            >
+              <div class="text-xs font-semibold text-cyan-900">
+                Tổng hợp trạng thái theo công trình
+              </div>
+              <div class="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <div
+                  class="rounded-lg border border-cyan-200 bg-white px-2.5 py-2 text-cyan-900"
+                >
+                  Chờ duyệt:
+                  <span class="font-semibold">{{
+                    itemStatusSummary.pending
+                  }}</span>
+                </div>
+                <div
+                  class="rounded-lg border border-cyan-200 bg-white px-2.5 py-2 text-cyan-900"
+                >
+                  Đã duyệt:
+                  <span class="font-semibold">{{
+                    itemStatusSummary.approved
+                  }}</span>
+                </div>
+                <div
+                  class="rounded-lg border border-cyan-200 bg-white px-2.5 py-2 text-cyan-900"
+                >
+                  Cần chỉnh sửa:
+                  <span class="font-semibold">{{
+                    itemStatusSummary.needRevision
+                  }}</span>
+                </div>
+                <div
+                  class="rounded-lg border border-cyan-200 bg-white px-2.5 py-2 text-cyan-900"
+                >
+                  Bị từ chối:
+                  <span class="font-semibold">{{
+                    itemStatusSummary.rejected
+                  }}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="flex-1 overflow-auto px-4 py-4 lg:px-5">
@@ -266,10 +309,20 @@
                         </div>
                       </div>
                       <div
-                        v-if="item.rejectionReason"
+                        v-if="item.rejectionReason || item.rejectionReasonCode"
                         class="mt-1 text-xs text-rose-700"
                       >
-                        Lý do từ chối: {{ item.rejectionReason }}
+                        <div>
+                          {{
+                            item.approvalStatus === "need_revision"
+                              ? "Yêu cầu chỉnh sửa"
+                              : "Lý do từ chối"
+                          }}:
+                          {{ reasonLabel(item.rejectionReasonCode) }}
+                        </div>
+                        <div v-if="itemRejectionReasonText(item)">
+                          {{ itemRejectionReasonText(item) }}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -338,10 +391,19 @@
                       }}
                     </div>
                     <div
-                      v-if="detail.noteFromFaculty"
+                      v-if="
+                        detail.noteFromFaculty ||
+                        detail.noteFromFacultyReasonCode
+                      "
                       class="mt-1 text-xs text-rose-700"
                     >
-                      Ghi chú từ khoa: {{ detail.noteFromFaculty }}
+                      <div>
+                        Phản hồi từ khoa:
+                        {{ reasonLabel(detail.noteFromFacultyReasonCode) }}
+                      </div>
+                      <div v-if="detailFacultyReasonText">
+                        {{ detailFacultyReasonText }}
+                      </div>
                     </div>
                     <div
                       v-if="detail.noteFromLecturer"
@@ -395,7 +457,7 @@
                   @click="rejectModalOpen = true"
                 >
                   <X class="h-4 w-4" />
-                  Từ chối các mục đã chọn
+                  Phản hồi các mục đã chọn
                 </button>
               </div>
             </div>
@@ -440,6 +502,7 @@ import type {
 import {
   formatBytes,
   formatDateTimeVietnamese,
+  hourApprovalRejectReasonLabel,
 } from "../contracts/hourApproval.contract";
 import RejectReasonModal from "./RejectReasonModal.vue";
 
@@ -475,11 +538,13 @@ watch(
 );
 
 watch(
-  () => props.detail?.status,
-  (status) => {
-    if (!status) return;
+  () => props.detail,
+  (detail) => {
+    if (!detail) return;
     // Với yêu cầu đã xử lý xong, mặc định hiển thị toàn bộ để tiện đối soát lịch sử.
-    showHandledItems.value = status !== "pending";
+    showHandledItems.value = detail.items.every(
+      (item) => item.approvalStatus !== "pending",
+    );
   },
   { immediate: true },
 );
@@ -501,10 +566,48 @@ const displayedItems = computed(() => {
 });
 
 const canAct = computed(() => {
-  return Boolean(
-    props.detail &&
-    props.detail.status === "pending" &&
-    pendingItems.value.length > 0,
+  return Boolean(props.detail && pendingItems.value.length > 0);
+});
+
+const itemStatusSummary = computed(() => {
+  const summary = {
+    pending: 0,
+    approved: 0,
+    needRevision: 0,
+    rejected: 0,
+  };
+
+  if (!props.detail) {
+    return summary;
+  }
+
+  props.detail.items.forEach((item) => {
+    if (item.approvalStatus === "approved") {
+      summary.approved += 1;
+      return;
+    }
+
+    if (item.approvalStatus === "need_revision") {
+      summary.needRevision += 1;
+      return;
+    }
+
+    if (item.approvalStatus === "rejected") {
+      summary.rejected += 1;
+      return;
+    }
+
+    summary.pending += 1;
+  });
+
+  return summary;
+});
+
+const detailFacultyReasonText = computed(() => {
+  return (
+    props.detail?.noteFromFacultyReasonDetail ??
+    props.detail?.noteFromFaculty ??
+    null
   );
 });
 
@@ -537,19 +640,24 @@ function formatHours(v: number | null): string {
 }
 
 function statusLabel(status: HourApprovalRequestStatus) {
-  if (status === "pending") return "Chờ khoa duyệt giờ";
-  if (status === "approved") return "Đã duyệt giờ";
-  return "Khoa từ chối giờ";
+  if (status === "pending") return "Đang xử lý (còn mục chờ duyệt)";
+  if (status === "need_revision") return "Cần chỉnh sửa";
+  if (status === "partially_approved") return "Đã duyệt một phần";
+  if (status === "approved") return "Đã duyệt";
+  return "Bị từ chối";
 }
 
 function statusTextClass(status: HourApprovalRequestStatus) {
   if (status === "pending") return "text-amber-700";
+  if (status === "need_revision") return "text-blue-700";
+  if (status === "partially_approved") return "text-cyan-700";
   if (status === "approved") return "text-emerald-700";
   return "text-rose-700";
 }
 
 function itemStatusLabel(status: HourApprovalRequestItem["approvalStatus"]) {
   if (status === "approved") return "Đã duyệt";
+  if (status === "need_revision") return "Cần chỉnh sửa";
   if (status === "rejected") return "Bị từ chối";
   return "Chờ duyệt";
 }
@@ -559,8 +667,22 @@ function itemStatusPillClass(
 ) {
   if (status === "approved")
     return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  if (status === "need_revision")
+    return "bg-blue-50 text-blue-700 ring-blue-200";
   if (status === "rejected") return "bg-rose-50 text-rose-700 ring-rose-200";
   return "bg-amber-50 text-amber-700 ring-amber-200";
+}
+
+function reasonLabel(
+  code:
+    | HourApprovalRequestDetail["noteFromFacultyReasonCode"]
+    | HourApprovalRequestItem["rejectionReasonCode"],
+): string {
+  return hourApprovalRejectReasonLabel(code ?? null);
+}
+
+function itemRejectionReasonText(item: HourApprovalRequestItem): string | null {
+  return item.rejectionReasonDetail ?? item.rejectionReason ?? null;
 }
 
 function isActivitySelected(activityId: number): boolean {
@@ -599,6 +721,7 @@ function onApproveSelected() {
 function onRejectSubmit(payload: {
   reasonCode: RejectPayload["reasonCode"];
   reasonNote: RejectPayload["reasonNote"];
+  decisionMode: RejectPayload["decisionMode"];
 }) {
   if (!props.detail || selectedActivityIds.value.length === 0) return;
   rejectModalOpen.value = false;

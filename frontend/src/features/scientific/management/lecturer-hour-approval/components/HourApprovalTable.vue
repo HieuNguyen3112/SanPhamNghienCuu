@@ -1,10 +1,14 @@
 <template>
   <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-    <div v-if="loading" class="p-4 text-sm text-slate-700">Đang tải danh sách...</div>
+    <div v-if="loading" class="p-4 text-sm text-slate-700">
+      Đang tải danh sách...
+    </div>
 
     <div v-else-if="error" class="p-4">
       <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
-        <div class="text-sm font-medium text-rose-700">Không tải được dữ liệu</div>
+        <div class="text-sm font-medium text-rose-700">
+          Không tải được dữ liệu
+        </div>
         <div class="mt-1 whitespace-pre-wrap text-xs text-rose-700">
           {{ error }}
         </div>
@@ -13,7 +17,9 @@
 
     <div v-else-if="rows.length === 0" class="p-6 text-center">
       <div class="text-sm font-medium text-slate-900">Không có yêu cầu</div>
-      <div class="mt-1 text-xs text-slate-500">Thử đổi bộ lọc hoặc khoảng thời gian.</div>
+      <div class="mt-1 text-xs text-slate-500">
+        Thử đổi bộ lọc hoặc khoảng thời gian.
+      </div>
     </div>
 
     <div v-else class="max-h-[560px] overflow-auto">
@@ -37,8 +43,12 @@
             @click="emit('row-click', row.requestId)"
           >
             <td class="px-3 py-2">
-              <div class="font-medium text-slate-900">{{ row.lecturerFullName }}</div>
-              <div class="mt-0.5 text-xs text-slate-500">{{ row.lecturerCode }}</div>
+              <div class="font-medium text-slate-900">
+                {{ row.lecturerFullName }}
+              </div>
+              <div class="mt-0.5 text-xs text-slate-500">
+                {{ row.lecturerCode }}
+              </div>
             </td>
 
             <td class="px-3 py-2 text-slate-700">{{ row.facultyName }}</td>
@@ -51,7 +61,9 @@
               {{ formatHours(row.totalHours) }} giờ
             </td>
 
-            <td class="px-3 py-2 text-slate-700">{{ formatDate(row.submittedAt) }}</td>
+            <td class="px-3 py-2 text-slate-700">
+              {{ formatDate(row.submittedAt) }}
+            </td>
 
             <td class="px-3 py-2 text-center">
               <span
@@ -92,7 +104,13 @@ import type {
   HourApprovalRequestSummary,
   HourApprovalRequestStatus,
 } from "../contracts/hourApproval.contract";
-import { CheckCircle2, Hourglass, XCircle } from "lucide-vue-next";
+import {
+  CheckCircle2,
+  Hourglass,
+  PieChart,
+  Undo2,
+  XCircle,
+} from "lucide-vue-next";
 import SharedPaginationControls from "@/shared/components/layout/SharedPaginationControls.vue";
 import { formatDateVietnamese } from "../contracts/hourApproval.contract";
 
@@ -125,19 +143,27 @@ function formatDate(iso: string) {
 }
 
 function statusLabel(status: HourApprovalRequestStatus) {
-  if (status === "pending") return "Chờ khoa duyệt giờ";
-  if (status === "approved") return "Đã duyệt giờ";
-  return "Khoa từ chối giờ";
+  if (status === "pending") return "Đang xử lý";
+  if (status === "need_revision") return "Cần chỉnh sửa";
+  if (status === "partially_approved") return "Đã duyệt một phần";
+  if (status === "approved") return "Đã duyệt";
+  return "Bị từ chối";
 }
 
 function statusIcon(status: HourApprovalRequestStatus) {
   if (status === "pending") return Hourglass;
+  if (status === "need_revision") return Undo2;
+  if (status === "partially_approved") return PieChart;
   if (status === "approved") return CheckCircle2;
   return XCircle;
 }
 
 function statusPillClass(status: HourApprovalRequestStatus) {
   if (status === "pending") return "bg-amber-50 text-amber-700 ring-amber-200";
+  if (status === "need_revision")
+    return "bg-blue-50 text-blue-700 ring-blue-200";
+  if (status === "partially_approved")
+    return "bg-cyan-50 text-cyan-700 ring-cyan-200";
   if (status === "approved")
     return "bg-emerald-50 text-emerald-700 ring-emerald-200";
   return "bg-rose-50 text-rose-700 ring-rose-200";

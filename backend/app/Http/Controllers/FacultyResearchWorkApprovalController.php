@@ -16,6 +16,7 @@ class FacultyResearchWorkApprovalController extends Controller
     private const STATUS_PENDING = 'PENDING_FACULTY_APPROVAL';
     private const STATUS_APPROVED = 'APPROVED_BY_FACULTY_FINAL';
     private const STATUS_REJECTED = 'REJECTED_BY_FACULTY';
+    private const STATUS_NEED_REVISION = 'NEED_REVISION_BY_FACULTY';
     private HoursRecomputeService $hoursRecomputeService;
 
     public function __construct(
@@ -62,6 +63,7 @@ class FacultyResearchWorkApprovalController extends Controller
                     ['code' => 'all', 'name' => 'Tất cả'],
                     ['code' => self::STATUS_PENDING, 'name' => 'Chờ khoa duyệt'],
                     ['code' => self::STATUS_APPROVED, 'name' => 'Đã duyệt cuối cùng tại khoa'],
+                    ['code' => self::STATUS_NEED_REVISION, 'name' => 'Yêu cầu chỉnh sửa'],
                     ['code' => self::STATUS_REJECTED, 'name' => 'Bị từ chối ở khoa'],
                 ],
                 'faculty' => [
@@ -177,9 +179,12 @@ class FacultyResearchWorkApprovalController extends Controller
             : ($row->total_hours_calc !== null ? (float) $row->total_hours_calc : null);
 
         $memberCount = count($members);
+        $internalMemberCount = collect($members)
+            ->filter(fn($member) => ! ((bool) ($member->is_external ?? false)) && (int) ($member->lecturer_id ?? 0) > 0)
+            ->count();
         $recommendedPerMember = null;
-        if ($computedTotalHours !== null && $memberCount > 0) {
-            $recommendedPerMember = (float) $computedTotalHours / $memberCount;
+        if ($computedTotalHours !== null && $internalMemberCount > 0) {
+            $recommendedPerMember = (float) $computedTotalHours / $internalMemberCount;
         }
 
         $ruleResolved = ! empty($calculation['rule_id']);
@@ -189,7 +194,7 @@ class FacultyResearchWorkApprovalController extends Controller
         $hoursResolutionNote = null;
         if (! $ruleResolved) {
             $hoursResolutionNote = $this->buildMissingRuleReason($row);
-        } elseif ($memberCount === 0) {
+        } elseif ($internalMemberCount === 0) {
             $hoursResolutionNote = 'Chưa có thành viên hợp lệ để tính giờ quy đổi.';
         } elseif ($computedTotalHours === null) {
             $hoursResolutionNote = 'Không thể tính giờ quy đổi tự động cho công trình này.';
@@ -197,8 +202,14 @@ class FacultyResearchWorkApprovalController extends Controller
 
         $membersPayload = array_map(function ($member) use ($recommendedPerMember, $computedHoursByLecturer) {
             $payload = (array) $member;
-            $computed = $computedHoursByLecturer[(int) $member->lecturer_id]['hours_assigned'] ?? null;
-            $declared = $member->hours_assigned !== null
+            $isExternal = (bool) ($member->is_external ?? false);
+            $lecturerId = ! $isExternal && $member->lecturer_id !== null
+                ? (int) $member->lecturer_id
+                : null;
+            $computed = $lecturerId !== null
+                ? ($computedHoursByLecturer[$lecturerId]['hours_assigned'] ?? null)
+                : null;
+            $declared = ! $isExternal && $member->hours_assigned !== null
                 ? (float) $member->hours_assigned
                 : ($computed !== null ? (float) $computed : null);
             $ownerFacultyId = isset($member->owner_faculty_id) && $member->owner_faculty_id !== null
@@ -210,15 +221,15 @@ class FacultyResearchWorkApprovalController extends Controller
 
             $payload['declared_hours'] = $declared;
             $payload['computed_member_hours'] = $computed !== null ? (float) $computed : $declared;
-            $payload['recommended_hours'] = $recommendedPerMember !== null
+            $payload['recommended_hours'] = (! $isExternal && $recommendedPerMember !== null)
                 ? (float) $recommendedPerMember
                 : null;
             $payload['official_hours'] = null;
             $payload['owner_faculty_id'] = $ownerFacultyId;
             $payload['member_faculty_id'] = $memberFacultyId;
-            $payload['is_outside_faculty'] = $ownerFacultyId !== null
+            $payload['is_outside_faculty'] = $isExternal || ($ownerFacultyId !== null
                 && $memberFacultyId !== null
-                && $ownerFacultyId !== $memberFacultyId;
+                && $ownerFacultyId !== $memberFacultyId);
             return $payload;
         }, $members);
 
@@ -318,7 +329,7 @@ class FacultyResearchWorkApprovalController extends Controller
                 abort(Response::HTTP_NOT_FOUND, 'activity not found');
             }
 
-            if (! in_array($locked->status_code, ['pending_faculty_review', 'submitted'], true)) {
+            if (! in_array($locked->status_code, ['pending_faculty_review'], true)) {
                 abort(Response::HTTP_CONFLICT, 'activity is not pending faculty approval');
             }
 
@@ -429,16 +440,19 @@ class FacultyResearchWorkApprovalController extends Controller
             return $this->buildApproverConflictResponse($approverConflict);
         }
 
-        $rejectedStatusId = $this->getStatusId('rejected');
-        if (! $rejectedStatusId) {
-            return response()->json(['message' => 'rejected status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        $decision = strtolower((string) $request->input('decision', 'reject'));
+        $isReturnForRevision = $decision === 'return_for_revision';
+        $targetStatusCode = $isReturnForRevision ? 'need_revision' : 'rejected';
+        $targetStatusId = $this->getStatusId($targetStatusCode);
+        if (! $targetStatusId) {
+            return response()->json(['message' => $targetStatusCode . ' status not configured'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $note = $this->buildRejectNote($request);
         $now = now();
         $user = $request->user();
 
-        DB::transaction(function () use ($activity, $rejectedStatusId, $stageIds, $now, $request, $note, $user) {
+        DB::transaction(function () use ($activity, $targetStatusId, $targetStatusCode, $stageIds, $now, $request, $note, $user) {
             $locked = DB::table('research_activities as ra')
                 ->join('activity_statuses as ast', 'ra.status_id', '=', 'ast.id')
                 ->where('ra.id', $activity)
@@ -450,12 +464,12 @@ class FacultyResearchWorkApprovalController extends Controller
                 abort(Response::HTTP_NOT_FOUND, 'activity not found');
             }
 
-            if (! in_array($locked->status_code, ['pending_faculty_review', 'submitted'], true)) {
+            if (! in_array($locked->status_code, ['pending_faculty_review'], true)) {
                 abort(Response::HTTP_CONFLICT, 'activity is not pending faculty approval');
             }
 
             DB::table('research_activities')->where('id', $activity)->update([
-                'status_id' => $rejectedStatusId,
+                'status_id' => $targetStatusId,
                 'approved_at' => null,
                 'updated_at' => $now,
             ]);
@@ -478,7 +492,7 @@ class FacultyResearchWorkApprovalController extends Controller
             DB::table('activity_status_histories')->insert([
                 'activity_id' => $activity,
                 'from_status_id' => $locked->status_id,
-                'to_status_id' => $rejectedStatusId,
+                'to_status_id' => $targetStatusId,
                 'acted_by_user_id' => $user->id,
                 'acted_at' => $now,
                 'note' => $note,
@@ -488,8 +502,12 @@ class FacultyResearchWorkApprovalController extends Controller
 
             AuditLogger::log($request, [
                 'action_group' => 'approval',
-                'action_code' => 'FACULTY_WORK_REJECTED',
-                'action_label' => 'Khoa tu choi cong trinh',
+                'action_code' => $targetStatusCode === 'need_revision'
+                    ? 'FACULTY_WORK_RETURNED_FOR_REVISION'
+                    : 'FACULTY_WORK_REJECTED',
+                'action_label' => $targetStatusCode === 'need_revision'
+                    ? 'Khoa yeu cau chinh sua cong trinh'
+                    : 'Khoa tu choi cong trinh',
                 'severity' => 'important',
                 'result_status' => 'success',
                 'target_type' => 'research_activity',
@@ -497,7 +515,7 @@ class FacultyResearchWorkApprovalController extends Controller
                 'request_http_status' => Response::HTTP_OK,
                 'changes' => [
                     'from_status' => $locked->status_code,
-                    'to_status' => 'rejected',
+                    'to_status' => $targetStatusCode,
                     'reason' => $note,
                 ],
             ], $user);
@@ -512,22 +530,27 @@ class FacultyResearchWorkApprovalController extends Controller
         WorkflowNotification::notifyLecturers(
             $recipientLecturerIds,
             WorkflowNotification::makePayload(
-                'work_rejected',
-                'Công trình bị từ chối',
-                $workTitle !== ''
-                    ? 'Công trình "' . $workTitle . '" đã bị khoa từ chối và trả về để nhóm cập nhật.'
-                    : 'Công trình đã bị khoa từ chối và trả về để nhóm cập nhật.',
-                '/works/personal?tab=rejected&activity_id=' . $activity,
+                $isReturnForRevision ? 'work_need_revision' : 'work_rejected',
+                $isReturnForRevision ? 'Công trình cần chỉnh sửa' : 'Công trình bị từ chối',
+                $isReturnForRevision
+                    ? ($workTitle !== ''
+                        ? 'Công trình "' . $workTitle . '" đã được khoa yêu cầu chỉnh sửa và gửi lại.'
+                        : 'Công trình đã được khoa yêu cầu chỉnh sửa và gửi lại.')
+                    : ($workTitle !== ''
+                        ? 'Công trình "' . $workTitle . '" đã bị khoa từ chối và trả về để nhóm cập nhật.'
+                        : 'Công trình đã bị khoa từ chối và trả về để nhóm cập nhật.'),
+                '/works/personal?tab=' . ($isReturnForRevision ? 'pending' : 'rejected') . '&activity_id=' . $activity,
                 [
                     'activity_id' => (int) $activity,
                     'activity_title' => $workTitle !== '' ? $workTitle : null,
                     'rejection_note' => $note,
+                    'decision' => $decision,
                 ]
             )
         );
 
         return response()->json([
-            'message' => 'faculty approval rejected',
+            'message' => $isReturnForRevision ? 'faculty returned for revision' : 'faculty approval rejected',
         ], Response::HTTP_OK);
     }
 
@@ -599,7 +622,7 @@ class FacultyResearchWorkApprovalController extends Controller
                     ->where('aa_manager.stage_id', $stageIds['manager']);
             })
             ->where('f.id', $facultyId)
-            ->whereIn('ast.code', ['pending_faculty_review', 'submitted', 'approved', 'rejected'])
+            ->whereIn('ast.code', ['pending_faculty_review', 'need_revision', 'approved', 'rejected'])
             ->select([
                 'ra.id as activity_id',
                 'ra.activity_code',
@@ -652,7 +675,7 @@ class FacultyResearchWorkApprovalController extends Controller
                     ->where('aa_manager.stage_id', $stageIds['manager']);
             })
             ->where('f.id', $facultyId)
-            ->whereIn('ast.code', ['pending_faculty_review', 'submitted', 'approved', 'rejected']);
+            ->whereIn('ast.code', ['pending_faculty_review', 'need_revision', 'approved', 'rejected']);
     }
 
     private function applyFilters($query, array $filters): void
@@ -682,12 +705,17 @@ class FacultyResearchWorkApprovalController extends Controller
         }
 
         if ($status === 'pending') {
-            $query->whereIn('ast.code', ['pending_faculty_review', 'submitted']);
+            $query->whereIn('ast.code', ['pending_faculty_review']);
             return;
         }
 
         if ($status === 'approved') {
             $query->where('ast.code', 'approved');
+            return;
+        }
+
+        if ($status === 'need_revision') {
+            $query->where('ast.code', 'need_revision');
             return;
         }
 
@@ -698,6 +726,10 @@ class FacultyResearchWorkApprovalController extends Controller
 
     private function resolveFacultyApprovalStatus(object $row): ?string
     {
+        if ($row->status_code === 'need_revision') {
+            return self::STATUS_NEED_REVISION;
+        }
+
         if ($row->status_code === 'rejected') {
             return self::STATUS_REJECTED;
         }
@@ -706,7 +738,7 @@ class FacultyResearchWorkApprovalController extends Controller
             return self::STATUS_APPROVED;
         }
 
-        if (in_array($row->status_code, ['pending_faculty_review', 'submitted'], true)) {
+        if (in_array($row->status_code, ['pending_faculty_review'], true)) {
             return self::STATUS_PENDING;
         }
 
@@ -872,19 +904,22 @@ class FacultyResearchWorkApprovalController extends Controller
             ->selectRaw("
                 SUM(CASE WHEN ast.code = 'rejected' THEN 1 ELSE 0 END) as rejected_count,
                 SUM(CASE WHEN ast.code = 'approved' THEN 1 ELSE 0 END) as approved_count,
-                SUM(CASE WHEN ast.code IN ('pending_faculty_review', 'submitted') THEN 1 ELSE 0 END) as pending_count
+                SUM(CASE WHEN ast.code = 'pending_faculty_review' THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN ast.code = 'need_revision' THEN 1 ELSE 0 END) as need_revision_count
             ")
             ->first();
 
         $rejected = (int) ($row->rejected_count ?? 0);
         $approved = (int) ($row->approved_count ?? 0);
         $pending = (int) ($row->pending_count ?? 0);
+        $needRevision = (int) ($row->need_revision_count ?? 0);
 
         return [
             'pending' => $pending,
             'approved' => $approved,
             'rejected' => $rejected,
-            'total' => $pending + $approved + $rejected,
+            'need_revision' => $needRevision,
+            'total' => $pending + $approved + $rejected + $needRevision,
         ];
     }
 
@@ -896,7 +931,7 @@ class FacultyResearchWorkApprovalController extends Controller
 
         $rows = DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
-            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->join('lecturers as owner_l', 'ra.owner_lecturer_id', '=', 'owner_l.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
@@ -909,6 +944,7 @@ class FacultyResearchWorkApprovalController extends Controller
             })
             ->select([
                 'ram.activity_id',
+                'ram.id as member_id',
                 'ram.lecturer_id',
                 'l.code as lecturer_code',
                 'l.full_name as lecturer_full_name',
@@ -918,6 +954,9 @@ class FacultyResearchWorkApprovalController extends Controller
                 'f.id as member_faculty_id',
                 'f.name as faculty_name',
                 'owner_d.faculty_id as owner_faculty_id',
+                'ram.is_external',
+                'ram.external_full_name',
+                'ram.external_department_name',
             ])
             ->orderBy('ram.activity_id')
             ->get();
@@ -925,21 +964,32 @@ class FacultyResearchWorkApprovalController extends Controller
         $grouped = [];
         foreach ($rows as $row) {
             $activityId = (int) $row->activity_id;
+            $isExternal = (bool) ($row->is_external ?? false);
             $ownerFacultyId = $row->owner_faculty_id !== null ? (int) $row->owner_faculty_id : null;
             $memberFacultyId = $row->member_faculty_id !== null ? (int) $row->member_faculty_id : null;
+            $displayName = $isExternal
+                ? trim((string) ($row->external_full_name ?? ''))
+                : trim((string) ($row->lecturer_full_name ?? ''));
+            $displayUnit = $isExternal
+                ? trim((string) ($row->external_department_name ?? ''))
+                : trim((string) ($row->faculty_name ?? $row->department_name ?? ''));
             $grouped[$activityId][] = [
-                'lecturer_id' => (int) $row->lecturer_id,
+                'member_id' => (int) $row->member_id,
+                'lecturer_id' => $row->lecturer_id !== null ? (int) $row->lecturer_id : null,
                 'lecturer_code' => $row->lecturer_code,
-                'lecturer_full_name' => $row->lecturer_full_name,
+                'lecturer_full_name' => $displayName !== '' ? $displayName : '—',
                 'member_role_code' => $row->member_role_code,
                 'member_role_name' => $row->member_role_name,
-                'department_name' => $row->department_name,
+                'department_name' => $isExternal
+                    ? ($displayUnit !== '' ? $displayUnit : null)
+                    : $row->department_name,
                 'member_faculty_id' => $memberFacultyId,
                 'owner_faculty_id' => $ownerFacultyId,
-                'is_outside_faculty' => $ownerFacultyId !== null
+                'is_outside_faculty' => $isExternal || ($ownerFacultyId !== null
                     && $memberFacultyId !== null
-                    && $ownerFacultyId !== $memberFacultyId,
-                'faculty_name' => $row->faculty_name,
+                    && $ownerFacultyId !== $memberFacultyId),
+                'faculty_name' => $displayUnit !== '' ? $displayUnit : $row->faculty_name,
+                'is_external' => $isExternal,
             ];
         }
 
@@ -950,7 +1000,7 @@ class FacultyResearchWorkApprovalController extends Controller
     {
         return DB::table('research_activity_members as ram')
             ->join('research_activities as ra', 'ram.activity_id', '=', 'ra.id')
-            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->join('lecturers as owner_l', 'ra.owner_lecturer_id', '=', 'owner_l.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
@@ -962,6 +1012,7 @@ class FacultyResearchWorkApprovalController extends Controller
                     ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
             })
             ->select([
+                'ram.id as member_id',
                 'ram.lecturer_id',
                 'l.code as lecturer_code',
                 'l.full_name as lecturer_full_name',
@@ -974,9 +1025,40 @@ class FacultyResearchWorkApprovalController extends Controller
                 'f.id as member_faculty_id',
                 'd.name as department_name',
                 'f.name as faculty_name',
+                'ram.is_external',
+                'ram.external_full_name',
+                'ram.external_department_name',
             ])
             ->orderBy('ram.id')
             ->get()
+            ->map(function ($row) {
+                $isExternal = (bool) ($row->is_external ?? false);
+                $displayName = $isExternal
+                    ? trim((string) ($row->external_full_name ?? ''))
+                    : trim((string) ($row->lecturer_full_name ?? ''));
+                $displayUnit = $isExternal
+                    ? trim((string) ($row->external_department_name ?? ''))
+                    : trim((string) ($row->faculty_name ?? $row->department_name ?? ''));
+
+                return (object) [
+                    'member_id' => (int) $row->member_id,
+                    'lecturer_id' => $row->lecturer_id !== null ? (int) $row->lecturer_id : null,
+                    'lecturer_code' => $row->lecturer_code,
+                    'lecturer_full_name' => $displayName !== '' ? $displayName : '—',
+                    'member_role_id' => $row->member_role_id !== null ? (int) $row->member_role_id : null,
+                    'member_role_code' => $row->member_role_code,
+                    'member_role_name' => $row->member_role_name,
+                    'contribution_share' => $row->contribution_share,
+                    'hours_assigned' => $row->hours_assigned,
+                    'owner_faculty_id' => $row->owner_faculty_id !== null ? (int) $row->owner_faculty_id : null,
+                    'member_faculty_id' => $row->member_faculty_id !== null ? (int) $row->member_faculty_id : null,
+                    'department_name' => $isExternal
+                        ? ($displayUnit !== '' ? $displayUnit : null)
+                        : $row->department_name,
+                    'faculty_name' => $displayUnit !== '' ? $displayUnit : $row->faculty_name,
+                    'is_external' => $isExternal,
+                ];
+            })
             ->all();
     }
 

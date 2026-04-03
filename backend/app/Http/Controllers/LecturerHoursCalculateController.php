@@ -202,6 +202,8 @@ class LecturerHoursCalculateController extends Controller
                 'activity_status_code' => $row->activity_status_code,
                 'hours_request_state' => $hoursMeta['state'],
                 'hours_rejection_reason' => $hoursMeta['rejection_reason'],
+                'hours_rejection_reason_code' => $hoursMeta['rejection_reason_code'],
+                'hours_rejection_reason_detail' => $hoursMeta['rejection_reason_detail'],
                 'next_action_code' => $hoursMeta['next_action_code'],
                 'next_action_text' => $hoursMeta['next_action_text'],
                 'evidence_files' => $this->fetchEvidenceFiles((int) $row->activity_id),
@@ -259,6 +261,9 @@ class LecturerHoursCalculateController extends Controller
 
         $missingHours = [];
         $missingEvidence = [];
+        $pendingActivities = [];
+        $approvedActivities = [];
+        $finalRejectedActivities = [];
 
         foreach ($eligibleIds as $activityId) {
             $row = $rows->get($activityId);
@@ -267,6 +272,26 @@ class LecturerHoursCalculateController extends Controller
                     'activity_id' => (int) $activityId,
                     'reason' => 'ACTIVITY_CONTEXT_NOT_FOUND',
                 ];
+                continue;
+            }
+
+            $hoursMeta = $this->resolveHoursMeta(
+                $row->hours_approval_status ?? null,
+                $row->hours_approval_note ?? null
+            );
+
+            if ($hoursMeta['state'] === 'hours_pending_faculty') {
+                $pendingActivities[] = (int) $activityId;
+                continue;
+            }
+
+            if ($hoursMeta['state'] === 'hours_approved') {
+                $approvedActivities[] = (int) $activityId;
+                continue;
+            }
+
+            if ($hoursMeta['state'] === 'hours_rejected') {
+                $finalRejectedActivities[] = (int) $activityId;
                 continue;
             }
 
@@ -303,6 +328,30 @@ class LecturerHoursCalculateController extends Controller
             if ($evidenceCount === 0) {
                 $missingEvidence[] = (int) $activityId;
             }
+        }
+
+        if (! empty($pendingActivities)) {
+            return response()->json([
+                'message' => 'Một số công trình đang chờ khoa duyệt giờ, không thể gửi lại.',
+                'code' => 'HOURS_ALREADY_PENDING',
+                'invalid_activity_ids' => array_values($pendingActivities),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! empty($approvedActivities)) {
+            return response()->json([
+                'message' => 'Một số công trình đã duyệt giờ nên không cần gửi lại.',
+                'code' => 'HOURS_ALREADY_APPROVED',
+                'invalid_activity_ids' => array_values($approvedActivities),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! empty($finalRejectedActivities)) {
+            return response()->json([
+                'message' => 'Một số công trình đã bị từ chối hẳn, không thể gửi lại.',
+                'code' => 'HOURS_FINAL_REJECTED',
+                'invalid_activity_ids' => array_values($finalRejectedActivities),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         if (! empty($missingHours)) {
@@ -349,7 +398,7 @@ class LecturerHoursCalculateController extends Controller
                     continue;
                 }
 
-                if ($row->status === 'rejected') {
+                if ($row->status === 'rejected' && $this->isNeedRevisionNote($row->note)) {
                     DB::table('activity_approvals')
                         ->where('id', $row->id)
                         ->update([
@@ -369,6 +418,18 @@ class LecturerHoursCalculateController extends Controller
                 ];
             }
         });
+
+        if (empty($submittedIds)) {
+            return response()->json([
+                'message' => 'Không có công trình hợp lệ để gửi duyệt giờ.',
+                'code' => 'NO_SUBMITTABLE_WORKS',
+                'data' => [
+                    'submitted_count' => 0,
+                    'skipped_count' => count($skipped),
+                    'skipped' => $skipped,
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         if (! empty($submittedIds)) {
             $academicYearCode = DB::table('research_activities as ra')
@@ -393,6 +454,17 @@ class LecturerHoursCalculateController extends Controller
                     ]
                 ),
                 (int) ($request->user()?->id ?? 0)
+            );
+
+            $this->recordHoursHistory(
+                (int) $lecturer->id,
+                'submit',
+                (int) ($request->user()?->id ?? 0),
+                json_encode([
+                    'activity_ids' => array_values(array_map('intval', $submittedIds)),
+                    'count' => count($submittedIds),
+                    'academic_year' => $academicYearCode,
+                ], JSON_UNESCAPED_UNICODE)
             );
         }
 
@@ -918,14 +990,22 @@ class LecturerHoursCalculateController extends Controller
         }
 
         $normalized = strtolower(trim($status));
+        $revisionMarker = '%"decision_mode":"revision"%';
         if (in_array($normalized, ['not_submitted', 'hours_not_submitted'], true)) {
             $query->whereNull('aa_hours.status');
         } elseif (in_array($normalized, ['pending', 'hours_pending_faculty'], true)) {
             $query->where('aa_hours.status', 'pending');
         } elseif (in_array($normalized, ['approved', 'hours_approved'], true)) {
             $query->where('aa_hours.status', 'approved');
+        } elseif (in_array($normalized, ['need_revision', 'hours_need_revision'], true)) {
+            $query->where('aa_hours.status', 'rejected')
+                ->where('aa_hours.note', 'like', $revisionMarker);
         } elseif (in_array($normalized, ['rejected', 'hours_rejected'], true)) {
-            $query->where('aa_hours.status', 'rejected');
+            $query->where('aa_hours.status', 'rejected')
+                ->where(function ($sub) use ($revisionMarker) {
+                    $sub->whereNull('aa_hours.note')
+                        ->orWhere('aa_hours.note', 'not like', $revisionMarker);
+                });
         }
     }
 
@@ -1122,6 +1202,8 @@ class LecturerHoursCalculateController extends Controller
             'activity_status_code' => $row->activity_status_code,
             'hours_request_state' => $hoursMeta['state'],
             'hours_rejection_reason' => $hoursMeta['rejection_reason'],
+            'hours_rejection_reason_code' => $hoursMeta['rejection_reason_code'],
+            'hours_rejection_reason_detail' => $hoursMeta['rejection_reason_detail'],
             'next_action_code' => $hoursMeta['next_action_code'],
             'next_action_text' => $hoursMeta['next_action_text'],
             'evidence_count' => $evidenceCount,
@@ -1137,7 +1219,7 @@ class LecturerHoursCalculateController extends Controller
 
     private function canSubmitHours(string $hoursRequestState, ?float $effectiveHoursDisplay, int $evidenceCount): bool
     {
-        return in_array($hoursRequestState, ['hours_not_submitted', 'hours_rejected'], true)
+        return in_array($hoursRequestState, ['hours_not_submitted', 'hours_need_revision'], true)
             && $effectiveHoursDisplay !== null
             && $evidenceCount > 0;
     }
@@ -1145,11 +1227,14 @@ class LecturerHoursCalculateController extends Controller
     private function resolveHoursMeta(?string $hoursStatus, ?string $note): array
     {
         $normalized = $hoursStatus ? strtolower(trim($hoursStatus)) : null;
+        $rejectMeta = $this->resolveRejectionMeta($note);
 
         if (! $normalized) {
             return [
                 'state' => 'hours_not_submitted',
                 'rejection_reason' => null,
+                'rejection_reason_code' => null,
+                'rejection_reason_detail' => null,
                 'next_action_code' => 'submit_hours',
                 'next_action_text' => 'Tải tối thiểu 1 minh chứng PDF và bấm Gửi duyệt giờ',
             ];
@@ -1159,23 +1244,40 @@ class LecturerHoursCalculateController extends Controller
             return [
                 'state' => 'hours_approved',
                 'rejection_reason' => null,
+                'rejection_reason_code' => null,
+                'rejection_reason_detail' => null,
                 'next_action_code' => 'none',
                 'next_action_text' => 'Đã duyệt giờ',
             ];
         }
 
         if ($normalized === 'rejected') {
+            if ($this->isNeedRevisionNote($note)) {
+                return [
+                    'state' => 'hours_need_revision',
+                    'rejection_reason' => $rejectMeta['reason_text'],
+                    'rejection_reason_code' => $rejectMeta['reason_code'],
+                    'rejection_reason_detail' => $rejectMeta['reason_detail'],
+                    'next_action_code' => 'resubmit_hours',
+                    'next_action_text' => 'Cần chỉnh sửa và gửi lại theo góp ý của khoa',
+                ];
+            }
+
             return [
                 'state' => 'hours_rejected',
-                'rejection_reason' => $this->resolveRejectionReason($note),
-                'next_action_code' => 'resubmit_hours',
-                'next_action_text' => 'Khoa từ chối giờ',
+                'rejection_reason' => $rejectMeta['reason_text'],
+                'rejection_reason_code' => $rejectMeta['reason_code'],
+                'rejection_reason_detail' => $rejectMeta['reason_detail'],
+                'next_action_code' => 'none',
+                'next_action_text' => 'Khoa đã từ chối hồ sơ giờ',
             ];
         }
 
         return [
             'state' => 'hours_pending_faculty',
             'rejection_reason' => null,
+            'rejection_reason_code' => null,
+            'rejection_reason_detail' => null,
             'next_action_code' => 'wait_faculty',
             'next_action_text' => 'Chờ khoa duyệt giờ',
         ];
@@ -1183,28 +1285,96 @@ class LecturerHoursCalculateController extends Controller
 
     private function resolveRejectionReason(?string $note): ?string
     {
+        $meta = $this->resolveRejectionMeta($note);
+        return $meta['reason_text'];
+    }
+
+    private function resolveRejectionMeta(?string $note): array
+    {
         if (! $note || trim($note) === '') {
+            return [
+                'reason_code' => null,
+                'reason_detail' => null,
+                'reason_text' => null,
+            ];
+        }
+
+        $decoded = json_decode($note, true);
+        if (! is_array($decoded)) {
+            $raw = trim($note);
+            return [
+                'reason_code' => null,
+                'reason_detail' => $raw !== '' ? $raw : null,
+                'reason_text' => $raw !== '' ? $raw : null,
+            ];
+        }
+
+        $reasonCode = $this->canonicalReasonCode($decoded['reason_code'] ?? null);
+        $reasonDetail = isset($decoded['reason_detail']) ? trim((string) $decoded['reason_detail']) : '';
+        $reasonText = $reasonDetail !== ''
+            ? $reasonDetail
+            : $this->reasonCodeLabel($reasonCode);
+
+        return [
+            'reason_code' => $reasonCode,
+            'reason_detail' => $reasonDetail !== '' ? $reasonDetail : null,
+            'reason_text' => $reasonText,
+        ];
+    }
+
+    private function canonicalReasonCode($reasonCode): ?string
+    {
+        $normalized = strtoupper(trim((string) $reasonCode));
+        if ($normalized === '') {
             return null;
+        }
+
+        return match ($normalized) {
+            'INVALID_EVIDENCE', 'MISSING_EVIDENCE' => 'INVALID_EVIDENCE',
+            'INVALID_HOURS', 'HOURS_NOT_REASONABLE' => 'INVALID_HOURS',
+            'INVALID_ACTIVITY', 'OTHER' => 'INVALID_ACTIVITY',
+            'NOT_ELIGIBLE', 'WORK_NOT_ELIGIBLE' => 'NOT_ELIGIBLE',
+            default => $normalized,
+        };
+    }
+
+    private function reasonCodeLabel(?string $reasonCode): ?string
+    {
+        return match ($reasonCode) {
+            'INVALID_EVIDENCE' => 'Minh chứng không hợp lệ hoặc còn thiếu',
+            'INVALID_HOURS' => 'Giờ quy đổi chưa hợp lý',
+            'INVALID_ACTIVITY' => 'Hoạt động không hợp lệ',
+            'NOT_ELIGIBLE' => 'Không đủ điều kiện xét duyệt giờ',
+            default => null,
+        };
+    }
+
+    private function isNeedRevisionNote(?string $note): bool
+    {
+        if (! $note || trim($note) === '') {
+            return false;
         }
 
         $decoded = json_decode($note, true);
         if (is_array($decoded)) {
-            $reasonDetail = isset($decoded['reason_detail']) ? trim((string) $decoded['reason_detail']) : '';
-            if ($reasonDetail !== '') {
-                return $reasonDetail;
+            $decisionMode = strtolower(trim((string) ($decoded['decision_mode'] ?? '')));
+            if ($decisionMode === 'revision') {
+                return true;
             }
-
-            $reasonCode = isset($decoded['reason_code']) ? trim((string) $decoded['reason_code']) : '';
-            return match ($reasonCode) {
-                'hours_not_reasonable' => 'Giờ quy đổi chưa hợp lý',
-                'work_not_eligible' => 'Công trình chưa đủ điều kiện',
-                'missing_evidence' => 'Thiếu minh chứng',
-                'other' => 'Lý do khác',
-                default => $reasonCode !== '' ? $reasonCode : null,
-            };
         }
 
-        return trim($note);
+        return str_contains($note, '"decision_mode":"revision"');
+    }
+
+    private function recordHoursHistory(int $lecturerId, string $action, int $performedBy, ?string $reason = null): void
+    {
+        DB::table('hours_history')->insert([
+            'lecturer_id' => $lecturerId,
+            'action' => $action,
+            'performed_by' => $performedBy > 0 ? $performedBy : null,
+            'reason' => $reason,
+            'created_at' => now(),
+        ]);
     }
 
     private function resolvePublicationOrUnit(object $row): string

@@ -3,10 +3,16 @@ import type { DeclarationStatusUi } from "../contracts/declarationSharedContract
 import { useActionFeedback } from "@/shared/composables/useActionFeedback";
 import { useActionResultModal } from "@/shared/composables/useActionResultModal";
 
+export type SubmitForApprovalPayload = {
+  minorChange: boolean;
+};
+
 type UseDeclarationShellOptions = {
   initial_status: DeclarationStatusUi;
   on_save_draft: () => Promise<void>;
-  on_submit: () => Promise<DeclarationStatusUi | void>;
+  on_submit: (
+    payload: SubmitForApprovalPayload,
+  ) => Promise<DeclarationStatusUi | void>;
 };
 
 export function useDeclarationFormShell(opts: UseDeclarationShellOptions) {
@@ -24,7 +30,7 @@ export function useDeclarationFormShell(opts: UseDeclarationShellOptions) {
 
   const pending = computed(() => is_saving.value || is_submitting.value);
   const is_read_only = computed(
-    () => !["DRAFT", "MEMBER_REJECTED", "REJECTED"].includes(status.value)
+    () => !["DRAFT", "MEMBER_REJECTED", "NEED_REVISION"].includes(status.value),
   );
 
   async function close_success_modal() {
@@ -57,7 +63,7 @@ export function useDeclarationFormShell(opts: UseDeclarationShellOptions) {
             title: "Lưu bản nháp thất bại",
             fallbackMessage: "Không thể lưu bản nháp. Vui lòng thử lại.",
           },
-        }
+        },
       );
     } catch (error) {
       error_message.value =
@@ -69,14 +75,16 @@ export function useDeclarationFormShell(opts: UseDeclarationShellOptions) {
     }
   }
 
-  async function submit_for_approval() {
+  async function submit_for_approval(payload?: SubmitForApprovalPayload) {
     error_message.value = null;
     is_submitting.value = true;
 
     try {
       await runWithFeedback(
         async () => {
-          const nextStatus = await opts.on_submit();
+          const nextStatus = await opts.on_submit(
+            payload ?? { minorChange: false },
+          );
           status.value = nextStatus ?? "PENDING_FACULTY_REVIEW";
         },
         {
@@ -92,7 +100,7 @@ export function useDeclarationFormShell(opts: UseDeclarationShellOptions) {
             title: "Gửi duyệt thất bại",
             fallbackMessage: "Không thể gửi duyệt. Vui lòng thử lại.",
           },
-        }
+        },
       );
     } catch (error) {
       error_message.value =

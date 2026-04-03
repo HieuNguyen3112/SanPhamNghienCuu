@@ -55,7 +55,6 @@ export type AppRouteName =
   // SCIENCE_OFFICE — Giờ NCKH (toàn trường)
   // =========================
   | "hours.unimanagement"
-  | "hours.uniapprovals"
 
   // =========================
   // MANAGERS (DEPARTMENT_BOARD + SCIENCE_OFFICE) — Cảnh báo / tổng quan

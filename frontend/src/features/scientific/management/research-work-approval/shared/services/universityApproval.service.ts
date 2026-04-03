@@ -37,13 +37,15 @@ export type UniversityApprovalListItem = {
     faculty_name: string | null;
   };
   authors: {
-    lecturer_id: number;
-    lecturer_code: string;
+    member_id: number;
+    lecturer_id: number | null;
+    lecturer_code: string | null;
     lecturer_full_name: string;
     member_role_code: string | null;
     member_role_name: string | null;
     department_name: string | null;
     faculty_name: string | null;
+    is_external?: boolean;
   }[];
 };
 
@@ -60,8 +62,9 @@ export type UniversityApprovalDetailResponse = {
     } | null;
   };
   members: {
-    lecturer_id: number;
-    lecturer_code: string;
+    member_id: number;
+    lecturer_id: number | null;
+    lecturer_code: string | null;
     lecturer_full_name: string;
     member_role_id: number | null;
     member_role_code: string | null;
@@ -73,6 +76,7 @@ export type UniversityApprovalDetailResponse = {
     official_hours: number | null;
     department_name: string | null;
     faculty_name: string | null;
+    is_external?: boolean;
   }[];
   evidence_files: {
     id: number;
@@ -125,7 +129,7 @@ function normalizeParams(filters: UniversityApprovalFilters) {
 }
 
 export async function fetchUniversityApprovals(
-  filters: UniversityApprovalFilters
+  filters: UniversityApprovalFilters,
 ): Promise<UniversityApprovalListResponse> {
   const response = await http.get("/api/admin/uni-approvals", {
     params: normalizeParams(filters),
@@ -134,7 +138,7 @@ export async function fetchUniversityApprovals(
 }
 
 export async function fetchUniversityApprovalDetail(
-  activityId: number
+  activityId: number,
 ): Promise<UniversityApprovalDetailResponse> {
   const response = await http.get(`/api/admin/uni-approvals/${activityId}`);
   return response.data?.data as UniversityApprovalDetailResponse;
@@ -145,7 +149,7 @@ export async function finalizeUniversityApproval(
   payload: {
     members: { lecturer_id: number; official_hours: number }[];
     note?: string | null;
-  }
+  },
 ): Promise<void> {
   await ensureCsrfCookie();
   await http.put(`/api/admin/uni-approvals/${activityId}/finalize`, payload);
@@ -153,7 +157,7 @@ export async function finalizeUniversityApproval(
 
 export async function rejectUniversityApproval(
   activityId: number,
-  payload: { reason_type: string; reason_detail?: string | null }
+  payload: { reason_type: string; reason_detail?: string | null },
 ): Promise<void> {
   await ensureCsrfCookie();
   await http.put(`/api/admin/uni-approvals/${activityId}/reject`, payload);

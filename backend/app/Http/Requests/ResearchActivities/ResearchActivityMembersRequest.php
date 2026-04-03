@@ -99,7 +99,7 @@ class ResearchActivityMembersRequest extends FormRequest
 
                 $normalizedLecturerId = (int) $lecturerId;
                 if (in_array($normalizedLecturerId, $internalLecturerIds, true)) {
-                    $validator->errors()->add("items.$index.lecturer_id", 'Giảng viên bị trùng trong danh sách thành viên.');
+                    $validator->errors()->add("items.$index.lecturer_id", 'Giảng viên bị trùng trong danh sách tác giả.');
                     continue;
                 }
 

@@ -5,9 +5,7 @@
       class="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:justify-between md:p-6"
     >
       <div class="min-w-0">
-        <h2 class="text-sm font-semibold text-slate-900">
-          Danh sách người tham gia
-        </h2>
+        <h2 class="text-sm font-semibold text-slate-900">Danh sách tác giả</h2>
         <p class="mt-1 text-xs text-slate-500">
           Thêm/xóa chỉ khả dụng khi đang ở trạng thái bản nháp.
         </p>
@@ -19,7 +17,7 @@
           class="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/20 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="readOnly"
           @click="addRow"
-          aria-label="Thêm người tham gia"
+          aria-label="Thêm tác giả"
         >
           <Plus class="h-4 w-4" />
           <span>Thêm</span>
@@ -294,7 +292,7 @@
                 >
                   <div class="flex flex-col items-center gap-2">
                     <div class="text-2xl">👥</div>
-                    <div>Chưa có danh sách người tham gia.</div>
+                    <div>Chưa có danh sách tác giả.</div>
                     <button
                       v-if="!readOnly"
                       type="button"
@@ -302,7 +300,7 @@
                       @click="addRow"
                     >
                       <Plus class="h-4 w-4" />
-                      Thêm người tham gia
+                      Thêm tác giả
                     </button>
                   </div>
                 </td>
@@ -356,10 +354,10 @@
       <div v-if="modelValue.length === 0" class="p-6 text-center">
         <div class="text-2xl">👥</div>
         <div class="mt-2 text-sm font-medium text-slate-900">
-          Chưa có danh sách người tham gia
+          Chưa có danh sách tác giả
         </div>
         <div class="mt-1 text-xs text-slate-500">
-          Thêm người tham gia để phân công vai trò và theo dõi giờ NCKH.
+          Thêm tác giả để phân công vai trò và theo dõi giờ NCKH.
         </div>
         <button
           v-if="!readOnly"
@@ -368,7 +366,7 @@
           @click="addRow"
         >
           <Plus class="h-4 w-4" />
-          Thêm người tham gia
+          Thêm tác giả
         </button>
       </div>
 
@@ -382,7 +380,7 @@
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="text-xs font-semibold text-slate-600">
-                Người tham gia #{{ idx + 1 }}
+                Tác giả #{{ idx + 1 }}
               </div>
 
               <!-- Mobile: checkbox vẫn giữ trong card -->
@@ -811,7 +809,7 @@ const warnings = computed(() => {
     );
     if (!hasDeclarer) {
       list.push(
-        "Lưu ý: Người kê khai chưa có trong danh sách thành viên. Vui lòng thêm mình vào danh sách thành viên.",
+        "Lưu ý: Người kê khai chưa có trong danh sách tác giả. Vui lòng thêm mình vào danh sách tác giả.",
       );
     }
   }

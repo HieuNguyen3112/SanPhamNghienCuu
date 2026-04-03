@@ -47,9 +47,11 @@
             @change="onChangeStatus"
           >
             <option value="all">Tất cả</option>
-            <option value="pending">Chờ khoa duyệt giờ</option>
-            <option value="approved">Đã duyệt giờ</option>
-            <option value="rejected">Khoa từ chối giờ</option>
+            <option value="pending">Chờ khoa duyệt</option>
+            <option value="need_revision">Cần chỉnh sửa</option>
+            <option value="partially_approved">Đã duyệt một phần</option>
+            <option value="approved">Đã duyệt</option>
+            <option value="rejected">Bị từ chối</option>
           </select>
         </div>
 

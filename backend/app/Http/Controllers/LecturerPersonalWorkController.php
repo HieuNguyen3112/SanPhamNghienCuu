@@ -225,7 +225,7 @@ class LecturerPersonalWorkController extends Controller
     {
         if (! empty($filters['status']) && $filters['status'] !== 'all') {
             if ($filters['status'] === 'pending') {
-                $query->whereIn('ast.code', ['pending_member_confirm', 'pending_faculty_review', 'submitted']);
+                $query->whereIn('ast.code', ['pending_member_confirm', 'pending_faculty_review', 'need_revision']);
             } elseif ($filters['status'] === 'rejected') {
                 $query->whereIn('ast.code', ['member_rejected', 'rejected']);
             } else {
@@ -332,7 +332,7 @@ class LecturerPersonalWorkController extends Controller
                     break;
                 case 'pending_member_confirm':
                 case 'pending_faculty_review':
-                case 'submitted':
+                case 'need_revision':
                     $counts['pending_count'] += $count;
                     break;
                 case 'member_rejected':
@@ -429,11 +429,13 @@ class LecturerPersonalWorkController extends Controller
     private function buildActions(?string $statusCode, bool $isOwner, ?string $memberConfirmationStatus): array
     {
         $canTeamReworkRejected = ! $isOwner
-            && $statusCode === 'rejected'
+            && in_array($statusCode, ['need_revision'], true)
             && $memberConfirmationStatus === 'accepted';
 
-        $canEdit = ($isOwner && in_array($statusCode, ['draft', 'member_rejected', 'rejected'], true))
+        $canEdit = ($isOwner && in_array($statusCode, ['draft', 'member_rejected', 'need_revision'], true))
             || $canTeamReworkRejected;
+
+        $canManagePendingMembers = $isOwner && $statusCode === 'pending_member_confirm';
 
         return [
             'can_edit' => $canEdit,
@@ -441,24 +443,31 @@ class LecturerPersonalWorkController extends Controller
             'can_delete' => $isOwner && in_array($statusCode, ['draft', 'member_rejected'], true),
             'can_view' => true,
             'can_reinvite' => $isOwner && $statusCode === 'member_rejected',
+            'can_manage_pending_members' => $canManagePendingMembers,
+            'can_remove_pending_member' => $canManagePendingMembers,
+            'can_resend_pending_invitation' => $canManagePendingMembers,
         ];
     }
 
     private function buildAuthors(int $activityId): array
     {
         return DB::table('research_activity_members as ram')
-            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->where('ram.activity_id', $activityId)
             ->orderBy('ram.id')
             ->select([
+                'ram.id as member_id',
                 'l.id as lecturer_id',
                 'l.full_name as lecturer_full_name',
                 'mr.id as member_role_id',
                 'mr.code as member_role_code',
                 'mr.name as member_role_name',
                 'd.name as department_name',
+                'ram.is_external',
+                'ram.external_full_name',
+                'ram.external_department_name',
                 'ram.contribution_share',
                 'ram.confirmation_status',
                 'ram.confirmation_note',
@@ -466,16 +475,26 @@ class LecturerPersonalWorkController extends Controller
             ])
             ->get()
             ->map(function ($row) {
+                $isExternal = (bool) ($row->is_external ?? false);
+                $displayName = $isExternal
+                    ? trim((string) ($row->external_full_name ?? ''))
+                    : trim((string) ($row->lecturer_full_name ?? ''));
+                $departmentName = $isExternal
+                    ? trim((string) ($row->external_department_name ?? ''))
+                    : trim((string) ($row->department_name ?? ''));
+
                 return [
-                    'lecturer_id' => (int) $row->lecturer_id,
-                    'lecturer_full_name' => $row->lecturer_full_name,
+                    'member_id' => (int) $row->member_id,
+                    'lecturer_id' => $row->lecturer_id !== null ? (int) $row->lecturer_id : null,
+                    'lecturer_full_name' => $displayName !== '' ? $displayName : '—',
                     'member_role_id' => $row->member_role_id ? (int) $row->member_role_id : null,
                     'member_role_name' => $this->mapRoleName($row->member_role_code, $row->member_role_name),
-                    'department_name' => $row->department_name,
+                    'department_name' => $departmentName !== '' ? $departmentName : null,
                     'contribution_share' => $row->contribution_share !== null ? (string) $row->contribution_share : null,
                     'confirmation_status' => $row->confirmation_status,
                     'confirmation_note' => $row->confirmation_note,
                     'responded_at' => $this->normalizeDateTime($row->responded_at),
+                    'is_external' => $isExternal,
                 ];
             })
             ->all();
@@ -636,7 +655,7 @@ class LecturerPersonalWorkController extends Controller
         $row = DB::table('activity_status_histories as ash')
             ->join('activity_statuses as ast', 'ash.to_status_id', '=', 'ast.id')
             ->where('ash.activity_id', $activityId)
-            ->where('ast.code', 'rejected')
+            ->whereIn('ast.code', ['need_revision', 'rejected'])
             ->orderByDesc('ash.acted_at')
             ->select(['ash.note'])
             ->first();
@@ -683,7 +702,7 @@ class LecturerPersonalWorkController extends Controller
             'pending_member_confirm' => 'Chờ thành viên xác nhận',
             'member_rejected' => 'Thành viên từ chối',
             'pending_faculty_review' => 'Chờ khoa duyệt',
-            'submitted' => 'Đã gửi duyệt',
+            'need_revision' => 'Cần chỉnh sửa theo yêu cầu khoa',
             'approved' => 'Đã duyệt',
             'rejected' => 'Từ chối',
             default => null,

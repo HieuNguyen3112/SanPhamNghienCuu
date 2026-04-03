@@ -77,11 +77,13 @@ export interface ApprovedSummaryDTO {
 }
 
 export interface AuthorDTO {
-  lecturer_id: number;
+  member_id?: number;
+  lecturer_id: number | null;
   lecturer_full_name: string;
 
-  member_role_id: number;
-  member_role_name: string;
+  member_role_id: number | null;
+  member_role_name: string | null;
+  is_external?: boolean | null;
 
   contribution_share: string | null;
 }
@@ -225,11 +227,13 @@ export interface ApprovedSummary {
 }
 
 export interface Author {
-  lecturerId: number;
+  memberId: number;
+  lecturerId: number | null;
   lecturerFullName: string;
 
-  memberRoleId: number;
-  memberRoleName: string;
+  memberRoleId: number | null;
+  memberRoleName: string | null;
+  isExternal: boolean;
 
   contributionShare: string | null;
 }
@@ -384,10 +388,12 @@ export const mapper = {
       lecturerHours: dto.lecturer_hours ?? null,
       approvedAt: dto.approved_at,
       authors: dto.authors.map((a) => ({
-        lecturerId: a.lecturer_id,
+        memberId: a.member_id ?? a.lecturer_id ?? 0,
+        lecturerId: a.lecturer_id ?? null,
         lecturerFullName: a.lecturer_full_name,
         memberRoleId: a.member_role_id,
         memberRoleName: a.member_role_name,
+        isExternal: Boolean(a.is_external),
         contributionShare: a.contribution_share,
       })),
       evidenceItems: dto.evidence_items.map((e) => ({

@@ -3,6 +3,7 @@ import type {
   HourApprovalFilter,
   HourApprovalListResponseDTO,
   HourApprovalRequestDetailDTO,
+  HourApprovalRequestStatus,
   HourApprovalRequestSummaryDTO,
   RejectPayloadDTO,
 } from "../contracts/hourApproval.contract";
@@ -16,14 +17,20 @@ export interface HourApprovalService {
   getRequests(
     filter: HourApprovalFilter,
     page: number,
-    perPage: number
+    perPage: number,
   ): Promise<HourApprovalListResponseDTO>;
-  getRequestDetail(requestId: number): Promise<HourApprovalRequestDetailDTO>;
+  getRequestDetail(
+    requestId: number,
+    options?: { academicYearId?: number | null },
+  ): Promise<HourApprovalRequestDetailDTO>;
   approve(
     requestId: number,
-    payload?: ApprovePayloadDTO
+    payload?: ApprovePayloadDTO,
   ): Promise<HourApprovalRequestDetailDTO>;
-  reject(requestId: number, payload: RejectPayloadDTO): Promise<HourApprovalRequestDetailDTO>;
+  reject(
+    requestId: number,
+    payload: RejectPayloadDTO,
+  ): Promise<HourApprovalRequestDetailDTO>;
 }
 
 function delay(ms: number) {
@@ -41,7 +48,7 @@ function normalizeText(input: string): string {
 function inDateRange(
   iso: string,
   from: string | null,
-  to: string | null
+  to: string | null,
 ): boolean {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return true;
@@ -57,8 +64,29 @@ function inDateRange(
   return true;
 }
 
+function resolveAggregateStatus(
+  items: HourApprovalRequestDetailDTO["items"],
+): HourApprovalRequestStatus {
+  const statuses = items.map((item) => item.approval_status ?? "pending");
+  if (statuses.length === 0) {
+    return "pending";
+  }
+
+  if (statuses.includes("pending")) {
+    return "pending";
+  }
+
+  const uniqueStatuses = Array.from(new Set(statuses));
+
+  if (uniqueStatuses.length === 1) {
+    return uniqueStatuses[0] as HourApprovalRequestStatus;
+  }
+
+  return "partially_approved";
+}
+
 export function createHourApprovalService(
-  db: HourApprovalServiceDatabase
+  db: HourApprovalServiceDatabase,
 ): HourApprovalService {
   const state: HourApprovalServiceDatabase = {
     summaries: db.summaries.map((s) => ({ ...s })),
@@ -66,14 +94,14 @@ export function createHourApprovalService(
       Object.entries(db.detailsById).map(([k, v]) => [
         k,
         { ...v, items: v.items.map((i) => ({ ...i })) },
-      ])
+      ]),
     ),
   };
 
   async function getRequests(
     filter: HourApprovalFilter,
     page: number,
-    perPage: number
+    perPage: number,
   ): Promise<HourApprovalListResponseDTO> {
     await delay(randomLatencyMs());
 
@@ -88,7 +116,7 @@ export function createHourApprovalService(
     }
 
     rows = rows.filter((r) =>
-      inDateRange(r.submitted_at, filter.submittedFrom, filter.submittedTo)
+      inDateRange(r.submitted_at, filter.submittedFrom, filter.submittedTo),
     );
 
     const q = normalizeText(filter.searchText);
@@ -102,7 +130,7 @@ export function createHourApprovalService(
 
     rows.sort(
       (a, b) =>
-        new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+        new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime(),
     );
 
     const total = rows.length;
@@ -125,7 +153,8 @@ export function createHourApprovalService(
   }
 
   async function getRequestDetail(
-    requestId: number
+    requestId: number,
+    _options?: { academicYearId?: number | null },
   ): Promise<HourApprovalRequestDetailDTO> {
     await delay(randomLatencyMs());
     const detail = state.detailsById[requestId];
@@ -135,7 +164,7 @@ export function createHourApprovalService(
 
   async function approve(
     requestId: number,
-    payload?: ApprovePayloadDTO
+    payload?: ApprovePayloadDTO,
   ): Promise<HourApprovalRequestDetailDTO> {
     await delay(randomLatencyMs());
 
@@ -143,35 +172,39 @@ export function createHourApprovalService(
     const detail = state.detailsById[requestId];
 
     if (!summary || !detail) throw new Error("Không tìm thấy yêu cầu.");
-    if (summary.status !== "pending") return detail;
 
     const selectedActivityIds = new Set(payload?.activity_ids ?? []);
     const shouldApplyPartial = selectedActivityIds.size > 0;
+    const pendingItems = detail.items.filter(
+      (item) => item.approval_status === "pending",
+    );
+    if (pendingItems.length === 0) {
+      return detail;
+    }
 
     detail.items = detail.items.map((item) => {
       if (item.approval_status !== "pending") return item;
-      if (shouldApplyPartial && !selectedActivityIds.has(item.activity_id)) return item;
-      return { ...item, approval_status: "approved", rejection_reason: null };
+      if (shouldApplyPartial && !selectedActivityIds.has(item.activity_id))
+        return item;
+      return {
+        ...item,
+        approval_status: "approved",
+        rejection_reason: null,
+        rejection_reason_code: null,
+        rejection_reason_detail: null,
+      };
     });
 
-    const statuses = detail.items.map((item) => item.approval_status ?? "pending");
-    if (statuses.includes("pending")) {
-      summary.status = "pending";
-      detail.status = "pending";
-    } else if (statuses.includes("rejected")) {
-      summary.status = "rejected";
-      detail.status = "rejected";
-    } else {
-      summary.status = "approved";
-      detail.status = "approved";
-    }
+    const nextStatus = resolveAggregateStatus(detail.items);
+    summary.status = nextStatus;
+    detail.status = nextStatus;
 
     return detail;
   }
 
   async function reject(
     requestId: number,
-    payload: RejectPayloadDTO
+    payload: RejectPayloadDTO,
   ): Promise<HourApprovalRequestDetailDTO> {
     await delay(randomLatencyMs());
 
@@ -179,28 +212,35 @@ export function createHourApprovalService(
     const detail = state.detailsById[requestId];
 
     if (!summary || !detail) throw new Error("Không tìm thấy yêu cầu.");
-    if (summary.status !== "pending") return detail;
 
     const selectedActivityIds = new Set(payload.activity_ids ?? []);
     const shouldApplyPartial = selectedActivityIds.size > 0;
+    const pendingItems = detail.items.filter(
+      (item) => item.approval_status === "pending",
+    );
+    if (pendingItems.length === 0) {
+      return detail;
+    }
+
+    const rejectedStatus =
+      payload.decision_mode === "revision" ? "need_revision" : "rejected";
 
     detail.items = detail.items.map((item) => {
       if (item.approval_status !== "pending") return item;
-      if (shouldApplyPartial && !selectedActivityIds.has(item.activity_id)) return item;
-      return { ...item, approval_status: "rejected", rejection_reason: payload.reason_detail ?? null };
+      if (shouldApplyPartial && !selectedActivityIds.has(item.activity_id))
+        return item;
+      return {
+        ...item,
+        approval_status: rejectedStatus,
+        rejection_reason: payload.reason_detail ?? null,
+        rejection_reason_code: payload.reason_code,
+        rejection_reason_detail: payload.reason_detail ?? null,
+      };
     });
 
-    const statuses = detail.items.map((item) => item.approval_status ?? "pending");
-    if (statuses.includes("pending")) {
-      summary.status = "pending";
-      detail.status = "pending";
-    } else if (statuses.includes("rejected")) {
-      summary.status = "rejected";
-      detail.status = "rejected";
-    } else {
-      summary.status = "approved";
-      detail.status = "approved";
-    }
+    const nextStatus = resolveAggregateStatus(detail.items);
+    summary.status = nextStatus;
+    detail.status = nextStatus;
 
     return detail;
   }

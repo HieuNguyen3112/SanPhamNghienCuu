@@ -49,9 +49,13 @@ const normalizeWorkStatusParam = (status?: string): string | undefined => {
     case "pending_faculty_review":
     case "cho_khoa_duyet":
       return "pending_faculty_review";
+    case "need_revision":
+    case "can_chinh_sua":
+    case "yeu_cau_chinh_sua":
+      return "need_revision";
     case "submitted":
     case "da_gui_duyet":
-      return "submitted";
+      return "pending_faculty_review";
     case "approved":
     case "da_duyet":
     case "khoa_duyet":
@@ -78,7 +82,7 @@ const extractErrorMessage = (err: unknown, fallback: string) => {
 
 export const personalResearchWorksService = {
   async getIndex(
-    params: PersonalWorksIndexParams
+    params: PersonalWorksIndexParams,
   ): Promise<PersonalWorkIndexResponseDTO> {
     try {
       const response = await http.get<{ data: PersonalWorkIndexResponseDTO }>(
@@ -88,24 +92,28 @@ export const personalResearchWorksService = {
             ...params,
             status: normalizeWorkStatusParam(params.status),
           },
-        }
+        },
       );
 
       return response.data.data;
     } catch (err) {
-      throw new Error(extractErrorMessage(err, "Không tải được danh sách công trình."));
+      throw new Error(
+        extractErrorMessage(err, "Không tải được danh sách công trình."),
+      );
     }
   },
 
   async getDetail(activityId: number): Promise<PersonalWorkDetailDTO> {
     try {
       const response = await http.get<{ data: PersonalWorkDetailDTO }>(
-        `/api/lecturer/works/my/${activityId}`
+        `/api/lecturer/works/my/${activityId}`,
       );
 
       return response.data.data;
     } catch (err) {
-      throw new Error(extractErrorMessage(err, "Không tải được chi tiết công trình."));
+      throw new Error(
+        extractErrorMessage(err, "Không tải được chi tiết công trình."),
+      );
     }
   },
 
@@ -113,11 +121,46 @@ export const personalResearchWorksService = {
     try {
       await ensureCsrfCookie();
       await http.post(
-        `/api/research-activities/${activityId}/members/${memberId}/reinvite`
+        `/api/research-activities/${activityId}/members/${memberId}/reinvite`,
       );
     } catch (err) {
       throw new Error(
-        extractErrorMessage(err, "Không thể gửi lại yêu cầu xác nhận tham gia.")
+        extractErrorMessage(
+          err,
+          "Không thể gửi lại yêu cầu xác nhận tham gia.",
+        ),
+      );
+    }
+  },
+
+  async resendPendingInvitation(
+    activityId: number,
+    memberId: number,
+  ): Promise<void> {
+    try {
+      await ensureCsrfCookie();
+      await http.post(
+        `/api/research-activities/${activityId}/members/${memberId}/pending/resend`,
+      );
+    } catch (err) {
+      throw new Error(
+        extractErrorMessage(err, "Không thể gửi lại lời mời xác nhận."),
+      );
+    }
+  },
+
+  async removePendingMember(
+    activityId: number,
+    memberId: number,
+  ): Promise<void> {
+    try {
+      await ensureCsrfCookie();
+      await http.delete(
+        `/api/research-activities/${activityId}/members/${memberId}/pending`,
+      );
+    } catch (err) {
+      throw new Error(
+        extractErrorMessage(err, "Không thể xóa thành viên đang chờ xác nhận."),
       );
     }
   },

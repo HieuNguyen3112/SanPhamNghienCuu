@@ -51,7 +51,7 @@ class FacultyResearchWorkSummaryRequest extends FormRequest
         return [
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
             'q' => ['nullable', 'string', 'max:255'],
-            'count_status' => ['nullable', 'string', 'in:all,approved,pending,rejected'],
+            'count_status' => ['nullable', 'string', 'in:all,approved,pending,need_revision,rejected'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];

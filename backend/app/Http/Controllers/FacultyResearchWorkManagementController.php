@@ -18,8 +18,8 @@ use Symfony\Component\HttpFoundation\Response;
 class FacultyResearchWorkManagementController extends Controller
 {
     private const MANAGEMENT_VISIBLE_STATUS_CODES = [
-        'submitted',
         'pending_faculty_review',
+        'need_revision',
         'approved',
         'rejected',
         'member_rejected',
@@ -137,7 +137,11 @@ class FacultyResearchWorkManagementController extends Controller
             })
             ->when($filters['status'], function ($q, $status) {
                 if ($status === 'pending' || $status === 'submitted') {
-                    $q->whereIn('ast.code', ['pending_faculty_review', 'submitted']);
+                    $q->whereIn('ast.code', ['pending_faculty_review', 'need_revision']);
+                    return;
+                }
+                if ($status === 'need_revision') {
+                    $q->where('ast.code', 'need_revision');
                     return;
                 }
                 if ($status === 'rejected') {
@@ -244,18 +248,39 @@ class FacultyResearchWorkManagementController extends Controller
         }
 
         $authors = DB::table('research_activity_members as ram')
-            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
-            ->join('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activity)
             ->orderBy('ram.id')
             ->select([
+                'ram.id as member_id',
                 'ram.lecturer_id',
                 'l.full_name as lecturer_full_name',
                 'ram.member_role_id',
                 'mr.name as member_role_name',
                 'ram.contribution_share',
+                'ram.is_external',
+                'ram.external_full_name',
             ])
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                $isExternal = (bool) ($row->is_external ?? false);
+                $displayName = $isExternal
+                    ? trim((string) ($row->external_full_name ?? ''))
+                    : trim((string) ($row->lecturer_full_name ?? ''));
+
+                return [
+                    'member_id' => (int) $row->member_id,
+                    'lecturer_id' => $row->lecturer_id !== null ? (int) $row->lecturer_id : null,
+                    'lecturer_full_name' => $displayName !== '' ? $displayName : '—',
+                    'member_role_id' => $row->member_role_id !== null ? (int) $row->member_role_id : null,
+                    'member_role_name' => $row->member_role_name,
+                    'contribution_share' => $row->contribution_share !== null ? (string) $row->contribution_share : null,
+                    'is_external' => $isExternal,
+                ];
+            })
+            ->values()
+            ->all();
 
         $evidenceItems = DB::table('evidence_files as ef')
             ->join('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')
@@ -574,7 +599,8 @@ class FacultyResearchWorkManagementController extends Controller
                 'al.lecturer_id',
                 DB::raw('COUNT(*) as total_declared_research_work_count'),
                 DB::raw("SUM(CASE WHEN ast.code = 'approved' THEN 1 ELSE 0 END) as approved_research_work_count"),
-                DB::raw("SUM(CASE WHEN ast.code IN ('submitted','pending_faculty_review') THEN 1 ELSE 0 END) as pending_research_work_count"),
+                DB::raw("SUM(CASE WHEN ast.code IN ('pending_faculty_review','need_revision') THEN 1 ELSE 0 END) as pending_research_work_count"),
+                DB::raw("SUM(CASE WHEN ast.code = 'need_revision' THEN 1 ELSE 0 END) as need_revision_research_work_count"),
                 DB::raw("SUM(CASE WHEN ast.code IN ('rejected','member_rejected') THEN 1 ELSE 0 END) as rejected_research_work_count"),
             ]);
 
@@ -600,6 +626,7 @@ class FacultyResearchWorkManagementController extends Controller
                 DB::raw('COALESCE(agg.total_declared_research_work_count, 0) as total_declared_research_work_count'),
                 DB::raw('COALESCE(agg.approved_research_work_count, 0) as approved_research_work_count'),
                 DB::raw('COALESCE(agg.pending_research_work_count, 0) as pending_research_work_count'),
+                DB::raw('COALESCE(agg.need_revision_research_work_count, 0) as need_revision_research_work_count'),
                 DB::raw('COALESCE(agg.rejected_research_work_count, 0) as rejected_research_work_count'),
             ]);
 
@@ -633,20 +660,29 @@ class FacultyResearchWorkManagementController extends Controller
         $payload['total_declared_research_work_count'] = (int) ($row['total_declared_research_work_count'] ?? 0);
         $payload['approved_research_work_count'] = (int) ($row['approved_research_work_count'] ?? 0);
         $payload['pending_research_work_count'] = (int) ($row['pending_research_work_count'] ?? 0);
+        $payload['need_revision_research_work_count'] = (int) ($row['need_revision_research_work_count'] ?? 0);
         $payload['rejected_research_work_count'] = (int) ($row['rejected_research_work_count'] ?? 0);
 
         if ($mode === 'approved') {
             $payload['total_declared_research_work_count'] = (int) ($row['approved_research_work_count'] ?? 0);
             $payload['pending_research_work_count'] = 0;
+            $payload['need_revision_research_work_count'] = 0;
             $payload['rejected_research_work_count'] = 0;
         } elseif ($mode === 'pending') {
             $payload['total_declared_research_work_count'] = (int) ($row['pending_research_work_count'] ?? 0);
             $payload['approved_research_work_count'] = 0;
+            $payload['need_revision_research_work_count'] = 0;
+            $payload['rejected_research_work_count'] = 0;
+        } elseif ($mode === 'need_revision') {
+            $payload['total_declared_research_work_count'] = (int) ($row['need_revision_research_work_count'] ?? 0);
+            $payload['approved_research_work_count'] = 0;
+            $payload['pending_research_work_count'] = 0;
             $payload['rejected_research_work_count'] = 0;
         } elseif ($mode === 'rejected') {
             $payload['total_declared_research_work_count'] = (int) ($row['rejected_research_work_count'] ?? 0);
             $payload['approved_research_work_count'] = 0;
             $payload['pending_research_work_count'] = 0;
+            $payload['need_revision_research_work_count'] = 0;
         }
 
         return $payload;
@@ -690,11 +726,11 @@ class FacultyResearchWorkManagementController extends Controller
     private function statusOptions(): array
     {
         $rows = DB::table('activity_statuses')
-            ->whereIn('code', ['approved', 'submitted', 'rejected'])
+            ->whereIn('code', ['pending_faculty_review', 'need_revision', 'approved', 'rejected'])
             ->orderBy('id')
             ->get()
             ->map(function ($row) {
-                $code = $row->code === 'submitted' ? 'pending' : $row->code;
+                $code = $row->code === 'pending_faculty_review' ? 'pending' : $row->code;
                 return [
                     'code' => $code,
                     'name' => $row->name,
@@ -745,6 +781,7 @@ class FacultyResearchWorkManagementController extends Controller
         $statusLabel = match ($filters['count_status'] ?? 'all') {
             'approved' => 'Đã duyệt',
             'pending' => 'Chờ duyệt',
+            'need_revision' => 'Yêu cầu chỉnh sửa',
             'rejected' => 'Từ chối',
             default => 'Tất cả',
         };

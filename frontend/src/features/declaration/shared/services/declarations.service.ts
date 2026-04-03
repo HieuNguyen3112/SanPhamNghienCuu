@@ -140,6 +140,10 @@ export type DownloadEvidenceFileResult = {
   filename: string;
 };
 
+export type SubmitActivityPayload = {
+  minorChange?: boolean;
+};
+
 let next_id = 1000;
 const activities = new Map<number, ResearchActivityDto>();
 const paper_details = new Map<number, PaperDetailsDto>();
@@ -329,7 +333,7 @@ export async function upsert_members(
 
 export async function submit_activity(
   activity_id: number,
-  _submitted_status_id?: number,
+  payload?: SubmitActivityPayload,
 ): Promise<{
   message: string;
   data: ResearchActivityDto & { status_code?: string };
@@ -352,6 +356,10 @@ export async function submit_activity(
     };
   };
 }> {
+  const requestPayload = {
+    minor_change: payload?.minorChange ?? false,
+  };
+
   if (!MOCK) {
     await ensureCsrfCookie();
     const { data } = await http.post<{
@@ -375,7 +383,7 @@ export async function submit_activity(
           matched_catalog_id?: number;
         };
       };
-    }>(`/api/research-activities/${activity_id}/submit`);
+    }>(`/api/research-activities/${activity_id}/submit`, requestPayload);
     return data;
   }
   const prev = activities.get(activity_id);
