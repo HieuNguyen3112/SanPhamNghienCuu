@@ -64,3 +64,13 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Queue Worker (Project Requirement)
+
+This project dispatches workflow notifications through the `database` queue connection.
+
+Run a queue worker in deployment/runtime environments:
+
+```bash
+php artisan queue:work database --queue=default --sleep=1 --tries=3
+```

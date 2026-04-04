@@ -82,6 +82,17 @@ export interface FormulaExplanationDTO {
   member_share_percent: number | null;
   member_role_code: string | null;
   contribution_share: number | null;
+  progress?: number | null;
+  role?: string | null;
+  claimed_before?: number | null;
+  final_hours?: number | null;
+  explainability?: {
+    base_hours?: number | null;
+    progress?: number | null;
+    role?: string | null;
+    claimed_before?: number | null;
+    final_hours?: number | null;
+  } | null;
 }
 
 export interface FormulaModifier {
@@ -101,6 +112,10 @@ export interface FormulaExplanation {
   memberSharePercent: number | null;
   memberRoleCode: string | null;
   contributionShare: number | null;
+  progress: number | null;
+  role: string | null;
+  claimedBefore: number | null;
+  finalHours: number | null;
 }
 
 function normalizeFormulaModifiers(modifiers: unknown): FormulaModifier[] {
@@ -165,6 +180,8 @@ export interface HourApprovalRequestSummaryDTO {
   status: HourApprovalRequestStatus;
   status_code?: HourApprovalRequestStatus;
   status_label?: string;
+  partial_approved?: boolean;
+  partially_approved?: boolean;
 }
 
 export interface HourApprovalRequestItemDTO {
@@ -200,6 +217,8 @@ export interface HourApprovalRequestDetailDTO {
 
   submitted_at: string; // ISO
   status: HourApprovalRequestStatus;
+  partial_approved?: boolean;
+  partially_approved?: boolean;
 
   note_from_lecturer: string | null;
   note_from_faculty?: string | null;
@@ -262,6 +281,7 @@ export interface HourApprovalRequestSummary {
 
   submittedAt: string; // ISO
   status: HourApprovalRequestStatus;
+  partiallyApproved: boolean;
 }
 
 export interface HourApprovalRequestItem {
@@ -297,6 +317,7 @@ export interface HourApprovalRequestDetail {
 
   submittedAt: string;
   status: HourApprovalRequestStatus;
+  partiallyApproved: boolean;
 
   noteFromLecturer: string | null;
   noteFromFaculty: string | null;
@@ -354,12 +375,33 @@ export const hourApprovalMappers = {
       memberSharePercent: dto.member_share_percent,
       memberRoleCode: dto.member_role_code,
       contributionShare: dto.contribution_share,
+      progress:
+        dto.progress ??
+        dto.explainability?.progress ??
+        dto.progress_percent ??
+        null,
+      role:
+        dto.role ?? dto.explainability?.role ?? dto.member_role_code ?? null,
+      claimedBefore:
+        dto.claimed_before ?? dto.explainability?.claimed_before ?? null,
+      finalHours:
+        dto.final_hours ??
+        dto.explainability?.final_hours ??
+        dto.member_hours ??
+        null,
     };
   },
 
   summaryFromDto(
     dto: HourApprovalRequestSummaryDTO,
   ): HourApprovalRequestSummary {
+    const partiallyApproved =
+      dto.partially_approved ?? dto.partial_approved ?? false;
+    const status = resolveSummaryStatus(
+      dto.status_code ?? dto.status,
+      partiallyApproved,
+    );
+
     return {
       requestId: dto.request_id,
       lecturerId: dto.lecturer_id,
@@ -370,11 +412,16 @@ export const hourApprovalMappers = {
       activityCount: dto.activity_count,
       totalHours: dto.total_hours ?? dto.total_hours_requested ?? 0,
       submittedAt: dto.submitted_at,
-      status: dto.status_code ?? dto.status,
+      status,
+      partiallyApproved: status === "partially_approved" || partiallyApproved,
     };
   },
 
   detailFromDto(dto: HourApprovalRequestDetailDTO): HourApprovalRequestDetail {
+    const partiallyApproved =
+      dto.partially_approved ?? dto.partial_approved ?? false;
+    const status = resolveSummaryStatus(dto.status, partiallyApproved);
+
     return {
       requestId: dto.request_id,
       lecturerId: dto.lecturer_id,
@@ -383,7 +430,8 @@ export const hourApprovalMappers = {
       facultyId: dto.faculty_id,
       facultyName: dto.faculty_name,
       submittedAt: dto.submitted_at,
-      status: dto.status,
+      status,
+      partiallyApproved: status === "partially_approved" || partiallyApproved,
       noteFromLecturer: dto.note_from_lecturer,
       noteFromFaculty: dto.note_from_faculty ?? null,
       noteFromFacultyReasonCode: normalizeHourApprovalRejectReasonCode(
@@ -438,6 +486,17 @@ export const hourApprovalMappers = {
     };
   },
 };
+
+function resolveSummaryStatus(
+  status: HourApprovalRequestStatus,
+  partiallyApproved: boolean,
+): HourApprovalRequestStatus {
+  if (partiallyApproved) {
+    return "partially_approved";
+  }
+
+  return status;
+}
 
 /** ========== Small utils ========== */
 

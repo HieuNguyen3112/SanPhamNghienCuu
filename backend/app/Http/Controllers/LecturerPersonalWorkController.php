@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Lecturer\LecturerPersonalWorkIndexRequest;
 use App\Services\Hours\HoursRecomputeService;
+use App\Support\ResearchWorkDetailSchemaBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,10 +12,14 @@ use Symfony\Component\HttpFoundation\Response;
 class LecturerPersonalWorkController extends Controller
 {
     private HoursRecomputeService $hoursRecomputeService;
+    private ResearchWorkDetailSchemaBuilder $researchWorkDetailSchemaBuilder;
 
-    public function __construct(HoursRecomputeService $hoursRecomputeService)
-    {
+    public function __construct(
+        HoursRecomputeService $hoursRecomputeService,
+        ResearchWorkDetailSchemaBuilder $researchWorkDetailSchemaBuilder
+    ) {
         $this->hoursRecomputeService = $hoursRecomputeService;
+        $this->researchWorkDetailSchemaBuilder = $researchWorkDetailSchemaBuilder;
     }
 
     public function index(LecturerPersonalWorkIndexRequest $request)
@@ -416,6 +421,7 @@ class LecturerPersonalWorkController extends Controller
             'evidence_items' => $this->buildEvidenceItems((int) $row->activity_id),
             'approvals' => $this->buildApprovals((int) $row->activity_id),
             'status_histories' => $this->buildStatusHistories((int) $row->activity_id),
+            'work_detail' => $this->buildWorkDetailSchema($row),
             'actions' => $this->buildActions(
                 $row->status_code,
                 (int) $row->owner_lecturer_id === (int) $lecturerId,
@@ -424,6 +430,73 @@ class LecturerPersonalWorkController extends Controller
         ];
 
         return $detail;
+    }
+
+    private function buildWorkDetailSchema(object $row): array
+    {
+        $kindCode = $row->kind_code !== null ? (string) $row->kind_code : null;
+        $schema = $this->researchWorkDetailSchemaBuilder->build((int) $row->activity_id, $kindCode);
+        $sections = is_array($schema['sections'] ?? null) ? $schema['sections'] : [];
+
+        if ($sections !== []) {
+            return $schema;
+        }
+
+        $fields = match ($kindCode) {
+            'paper' => [
+                $this->detailField('journal_name', 'Tên tạp chí', $row->journal_name ?? null),
+                $this->detailField('issn', 'ISSN', $row->issn ?? null),
+                $this->detailField('doi', 'DOI', $row->doi ?? null),
+            ],
+            'book' => [
+                $this->detailField('publisher', 'Nhà xuất bản', $row->publisher ?? null),
+                $this->detailField('isbn', 'ISBN', $row->isbn ?? null),
+            ],
+            'project' => [
+                $this->detailField('project_code', 'Mã đề tài', $row->project_code ?? null),
+            ],
+            'conference' => [
+                $this->detailField('conference_name', 'Tên hội thảo', $row->conference_name ?? null),
+                $this->detailField('location', 'Địa điểm', $row->location ?? null),
+            ],
+            default => [],
+        };
+
+        $normalizedFields = array_values(array_filter($fields));
+        if ($normalizedFields === []) {
+            return [
+                'kind_code' => $kindCode,
+                'sections' => [],
+            ];
+        }
+
+        return [
+            'kind_code' => $kindCode,
+            'sections' => [
+                [
+                    'code' => 'personal_work_fallback_detail',
+                    'title' => 'Thông tin chi tiết công trình',
+                    'fields' => $normalizedFields,
+                ],
+            ],
+        ];
+    }
+
+    private function detailField(string $key, string $label, mixed $value): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value) && trim($value) === '') {
+            return null;
+        }
+
+        return [
+            'key' => $key,
+            'label' => $label,
+            'value' => $value,
+        ];
     }
 
     private function buildActions(?string $statusCode, bool $isOwner, ?string $memberConfirmationStatus): array

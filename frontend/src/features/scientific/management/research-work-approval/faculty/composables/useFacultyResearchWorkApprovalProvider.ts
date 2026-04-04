@@ -15,6 +15,7 @@ import {
   rejectFacultyApproval,
   type FacultyApprovalDetailResponse,
   type FacultyApprovalListItem,
+  type WorkDetailDto,
 } from "../../shared/services/facultyApproval.service";
 import {
   resolveApiErrorMessage,
@@ -171,6 +172,33 @@ export function useFacultyResearchWorkApprovalProvider() {
     return mapping[kindCode] ?? "JOURNAL_ARTICLE";
   }
 
+  function mapWorkDetail(
+    workDetail: WorkDetailDto | null | undefined,
+  ): ResearchWorkApprovalEntry["researchWorkDetail"] {
+    if (!workDetail) return null;
+
+    const sections = (workDetail.sections ?? [])
+      .map((section) => ({
+        code: section.code,
+        title: section.title,
+        fields: (section.fields ?? [])
+          .filter((field) => field && field.label)
+          .map((field) => ({
+            key: field.key,
+            label: field.label,
+            value: field.value ?? null,
+          })),
+      }))
+      .filter((section) => section.fields.length > 0);
+
+    if (sections.length === 0) return null;
+
+    return {
+      kindCode: workDetail.kind_code ?? null,
+      sections,
+    };
+  }
+
   function buildFinalApprovalHistory(
     approvals: FacultyApprovalDetailResponse["approvals"],
   ): ResearchWorkApprovalEntry["approvalHistoryList"] {
@@ -306,6 +334,7 @@ export function useFacultyResearchWorkApprovalProvider() {
       researchWorkAuthorList: mapAuthors(item, item.lecturer.id),
       coAuthorList: [],
       approvalHistoryList: [],
+      researchWorkDetail: null,
     };
   }
 
@@ -441,6 +470,7 @@ export function useFacultyResearchWorkApprovalProvider() {
       researchWorkAuthorList: authorList,
       coAuthorList: [],
       approvalHistoryList,
+      researchWorkDetail: mapWorkDetail(detail.activity.work_detail),
     };
   }
 

@@ -220,7 +220,7 @@
 
                   <div>
                     <div class="text-xs font-semibold text-slate-500">
-                      Giờ NCKH của bạn
+                      Giờ NCKH của người kê khai
                     </div>
                     <div class="mt-1 text-slate-900">
                       {{ submittingLecturerHoursDisplayValue }}
@@ -235,110 +235,40 @@
               </section>
 
               <section
-                v-if="selectedResearchWorkApprovalEntry.journalInfo"
+                v-for="workDetailSection in workDetailSections"
+                :key="workDetailSection.code"
                 class="rounded-2xl border border-slate-200 bg-white p-4"
               >
                 <div class="text-sm font-semibold text-slate-900">
-                  Thông tin tạp chí
+                  {{ workDetailSection.title }}
                 </div>
 
                 <div class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-                  <div class="md:col-span-2">
+                  <div
+                    v-for="detailField in workDetailSection.fields"
+                    :key="`${workDetailSection.code}-${detailField.key}`"
+                    :class="{
+                      'md:col-span-2': shouldSpanTwoColumns(
+                        detailField.key,
+                        detailField.value,
+                      ),
+                    }"
+                  >
                     <div class="text-xs font-semibold text-slate-500">
-                      Tên tạp chí
-                    </div>
-                    <div class="mt-1 text-slate-900">
-                      {{
-                        selectedResearchWorkApprovalEntry.journalInfo
-                          .journalName || "—"
-                      }}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div class="text-xs font-semibold text-slate-500">ISSN</div>
-                    <div class="mt-1 text-slate-900">
-                      {{
-                        selectedResearchWorkApprovalEntry.journalInfo.issn ||
-                        "—"
-                      }}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div class="text-xs font-semibold text-slate-500">
-                      Điểm tạp chí
-                    </div>
-                    <div class="mt-1 text-slate-900">
-                      {{
-                        selectedResearchWorkApprovalEntry.journalInfo
-                          .workScore === null
-                          ? "—"
-                          : selectedResearchWorkApprovalEntry.journalInfo
-                              .workScore
-                      }}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div class="text-xs font-semibold text-slate-500">
-                      Phạm vi
-                    </div>
-                    <div class="mt-1 text-slate-900">
-                      {{
-                        selectedResearchWorkApprovalEntry.journalInfo
-                          .journalScope || "—"
-                      }}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div class="text-xs font-semibold text-slate-500">
-                      Nguồn xếp loại
-                    </div>
-                    <div class="mt-1 text-slate-900">
-                      {{
-                        selectedResearchWorkApprovalEntry.journalInfo
-                          .journalSourceName || "—"
-                      }}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div class="text-xs font-semibold text-slate-500">
-                      Cơ quan xuất bản
-                    </div>
-                    <div class="mt-1 text-slate-900">
-                      {{
-                        selectedResearchWorkApprovalEntry.journalInfo
-                          .journalPublisher || "—"
-                      }}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div class="text-xs font-semibold text-slate-500">
-                      Website
+                      {{ detailField.label }}
                     </div>
                     <a
-                      v-if="
-                        selectedResearchWorkApprovalEntry.journalInfo
-                          .journalWebsite
-                      "
-                      :href="
-                        selectedResearchWorkApprovalEntry.journalInfo
-                          .journalWebsite
-                      "
+                      v-if="isLinkFieldValue(detailField.value)"
+                      :href="String(detailField.value)"
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="mt-1 inline-flex text-sky-700 hover:underline"
+                      class="mt-1 inline-flex break-all text-sky-700 hover:underline"
                     >
-                      {{
-                        selectedResearchWorkApprovalEntry.journalInfo
-                          .journalWebsite
-                      }}
+                      {{ String(detailField.value) }}
                     </a>
-                    <div v-else class="mt-1 text-slate-900">—</div>
+                    <div v-else class="mt-1 whitespace-pre-wrap text-slate-900">
+                      {{ formatDetailFieldValue(detailField.value) }}
+                    </div>
                   </div>
                 </div>
               </section>
@@ -787,6 +717,7 @@ import type {
   EvidenceAttachment,
   ResearchWorkApprovalEntry,
   ResearchWorkApprovalScopeIdentifier,
+  ResearchWorkDetailField,
   ResearchWorkRejectionReasonType,
 } from "../models/researchWorkApprovalModels";
 import { useResearchWorkApprovalDisplayMapping } from "../composables/useResearchWorkApprovalDisplayMapping";
@@ -1201,6 +1132,45 @@ const submittingLecturerHoursDisplayValue = computed(() => {
   const value = valueFromRow ?? official ?? recommended ?? declared;
   return Number.isFinite(value) ? formatIntegerValue(value) : "—";
 });
+
+const workDetailSections = computed(() => {
+  return (
+    selectedResearchWorkApprovalEntry.value?.researchWorkDetail?.sections ?? []
+  );
+});
+
+function formatDetailFieldValue(
+  value: ResearchWorkDetailField["value"],
+): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Có" : "Không";
+  const text = String(value).trim();
+  return text === "" ? "—" : text;
+}
+
+function isLinkFieldValue(value: ResearchWorkDetailField["value"]): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("http://") || normalized.startsWith("https://");
+}
+
+function shouldSpanTwoColumns(
+  key: string,
+  value: ResearchWorkDetailField["value"],
+): boolean {
+  const wideFieldKeys = new Set([
+    "objectives",
+    "content_summary",
+    "main_results",
+    "keywords",
+    "application_address",
+    "article_url",
+    "journal_website",
+  ]);
+  if (wideFieldKeys.has(key)) return true;
+  if (typeof value !== "string") return false;
+  return value.trim().length > 70;
+}
 
 function onEscapeKeyDown(event: KeyboardEvent): void {
   if (event.key !== "Escape") return;

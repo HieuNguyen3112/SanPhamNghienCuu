@@ -6,6 +6,7 @@ use App\Exports\AdminResearchWorksSummaryExport;
 use App\Http\Requests\Faculty\FacultyResearchWorkLecturerWorksRequest;
 use App\Http\Requests\Faculty\FacultyResearchWorkSummaryRequest;
 use App\Services\Evidence\ResearchEvidenceStorageService;
+use App\Support\ResearchWorkDetailSchemaBuilder;
 use App\Support\StorageDownload;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -26,7 +27,8 @@ class FacultyResearchWorkManagementController extends Controller
     ];
 
     public function __construct(
-        private ResearchEvidenceStorageService $evidenceStorageService
+        private ResearchEvidenceStorageService $evidenceStorageService,
+        private ResearchWorkDetailSchemaBuilder $researchWorkDetailSchemaBuilder
     ) {}
 
     public function lookups(Request $request)
@@ -231,6 +233,7 @@ class FacultyResearchWorkManagementController extends Controller
                 'ra.title',
                 'ra.abstract',
                 'ra.kind_id',
+                'ak.code as kind_code',
                 'ak.name as kind_name',
                 'ra.type_id',
                 'at.name as type_name',
@@ -332,6 +335,29 @@ class FacultyResearchWorkManagementController extends Controller
             ])
             ->first();
 
+        if (! $finalApproval) {
+            $finalApproval = DB::table('activity_approvals as aa')
+                ->join('approval_stages as st', 'aa.stage_id', '=', 'st.id')
+                ->leftJoin('users as u', 'aa.decided_by_user_id', '=', 'u.id')
+                ->where('aa.activity_id', $activity)
+                ->where('aa.status', 'approved')
+                ->where(function ($query) {
+                    $query->whereNotNull('aa.decided_at')
+                        ->orWhereNotNull('aa.decided_by_user_id');
+                })
+                ->orderByDesc('aa.decided_at')
+                ->orderByDesc('aa.id')
+                ->select([
+                    'st.code as stage_code',
+                    'aa.status',
+                    'aa.decided_by_user_id',
+                    'u.name as decided_by_user_name',
+                    'aa.decided_at',
+                    'aa.note',
+                ])
+                ->first();
+        }
+
         $memberSnapshot = null;
         if ($lecturerId !== null) {
             $memberSnapshot = DB::table('research_activity_members as ram')
@@ -359,6 +385,7 @@ class FacultyResearchWorkManagementController extends Controller
                 'title' => $activityRow->title,
                 'abstract' => $activityRow->abstract,
                 'kind_id' => $activityRow->kind_id,
+                'kind_code' => $activityRow->kind_code,
                 'kind_name' => $activityRow->kind_name,
                 'type_id' => $activityRow->type_id,
                 'type_name' => $activityRow->type_name,
@@ -375,6 +402,10 @@ class FacultyResearchWorkManagementController extends Controller
                 'authors' => $authors,
                 'evidence_items' => $evidenceItems,
                 'final_approval' => $finalApproval,
+                'work_detail' => $this->researchWorkDetailSchemaBuilder->build(
+                    (int) $activityRow->activity_id,
+                    $activityRow->kind_code !== null ? (string) $activityRow->kind_code : null
+                ),
             ],
         ], Response::HTTP_OK);
     }

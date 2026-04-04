@@ -394,20 +394,7 @@ class FacultyResearchHoursReportController extends Controller
 
     private function resolveHoursSourceQuery(array $filters)
     {
-        if ($this->hasYearlyHoursRows($filters)) {
-            return DB::table('lecturer_yearly_hours as lyh')
-                ->select([
-                    'lyh.lecturer_id',
-                    'lyh.academic_year_id',
-                    DB::raw('COALESCE(lyh.hours_total, 0) as hours_total'),
-                ]);
-        }
-
-        if ($this->hasApprovedHoursRows($filters)) {
-            return $this->approvedHoursByLecturerYearQuery($filters);
-        }
-
-        return $this->approvedActivityHoursByLecturerYearQuery($filters);
+        return $this->approvedHoursByLecturerYearQuery($filters);
     }
 
     private function hasYearlyHoursRows(array $filters): bool
@@ -432,15 +419,28 @@ class FacultyResearchHoursReportController extends Controller
 
     private function approvedHoursByLecturerYearQuery(array $filters)
     {
-        $query = DB::table('activity_approvals as aa')
-            ->join('approval_stages as st', 'aa.stage_id', '=', 'st.id')
-            ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+        $hoursStageId = $this->resolveHoursStageId();
+        if (! $hoursStageId) {
+            return DB::table('research_activities as ra')
+                ->whereRaw('1 = 0')
+                ->selectRaw('0 as lecturer_id, 0 as academic_year_id, 0 as hours_total');
+        }
+
+        $query = DB::table('research_activities as ra')
             ->join('research_activity_members as ram', 'ram.activity_id', '=', 'ra.id')
+            ->leftJoin('activity_approvals as aa_hours', function ($join) use ($hoursStageId) {
+                $join->on('aa_hours.activity_id', '=', 'ra.id')
+                    ->where('aa_hours.stage_id', '=', $hoursStageId);
+            })
+            ->leftJoin('activity_member_approvals as ama_hours', function ($join) use ($hoursStageId) {
+                $join->on('ama_hours.activity_id', '=', 'ra.id')
+                    ->on('ama_hours.lecturer_id', '=', 'ram.lecturer_id')
+                    ->where('ama_hours.stage_id', '=', $hoursStageId);
+            })
             ->join('lecturers as l2', 'ram.lecturer_id', '=', 'l2.id')
             ->leftJoin('departments as d2', 'l2.department_id', '=', 'd2.id')
             ->leftJoin('faculties as f2', 'd2.faculty_id', '=', 'f2.id')
-            ->where('st.code', 'hours')
-            ->where('aa.status', 'approved')
+            ->whereRaw("COALESCE(ama_hours.status, aa_hours.status) = 'approved'")
             ->where('f2.id', $filters['faculty_id'])
             ->whereNotNull('ra.academic_year_id')
             ->where(function ($query) {
@@ -457,6 +457,15 @@ class FacultyResearchHoursReportController extends Controller
         }
 
         return $query;
+    }
+
+    private function resolveHoursStageId(): ?int
+    {
+        $id = DB::table('approval_stages')
+            ->where('code', 'hours')
+            ->value('id');
+
+        return $id ? (int) $id : null;
     }
 
     private function approvedActivityHoursByLecturerYearQuery(array $filters)

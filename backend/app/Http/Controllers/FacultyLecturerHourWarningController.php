@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Support\WorkflowNotification;
 use App\Support\AcademicYearResolver;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -41,9 +40,19 @@ class FacultyLecturerHourWarningController extends Controller
             ->where('academic_year_id', $year['id'])
             ->value('required_hours') ?? 600);
 
+        $hoursStageId = $this->resolveHoursStageId();
+        $approvedHoursByLecturer = $this->approvedHoursByLecturerYearQuery(
+            (int) $year['id'],
+            (int) $scope['faculty_id'],
+            $hoursStageId
+        );
+
         $rows = DB::table('lecturers as l')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
+            ->leftJoinSub($approvedHoursByLecturer, 'hours_src', function ($join) {
+                $join->on('hours_src.lecturer_id', '=', 'l.id');
+            })
             ->leftJoin('lecturer_yearly_hours as lyh', function ($join) use ($year) {
                 $join->on('lyh.lecturer_id', '=', 'l.id')
                     ->where('lyh.academic_year_id', '=', $year['id']);
@@ -63,19 +72,18 @@ class FacultyLecturerHourWarningController extends Controller
                 'f.id as faculty_id',
                 'f.code as faculty_code',
                 'f.name as faculty_name',
-                'lyh.hours_total',
-                'lyh.created_at as hours_created_at',
-                'lyh.updated_at as hours_updated_at',
+                DB::raw('COALESCE(hours_src.hours_total, 0) as hours_total'),
+                'lyh.last_notified_at',
             ])
             ->get();
 
-        $entries = collect($rows)->map(function ($row) use ($requiredHours, $year) {
+        $entries = collect($rows)->map(function (object $row) use ($requiredHours, $year) {
             $currentHours = (float) ($row->hours_total ?? 0);
             $remaining = max($requiredHours - $currentHours, 0);
             $severity = $this->resolveSeverity($remaining, $requiredHours);
 
-            $hasRequested = $this->hasRequestedWarning($row->hours_created_at, $row->hours_updated_at);
-            $lastRequestedAt = $hasRequested ? $row->hours_updated_at : null;
+            $hasRequested = $this->hasRequestedWarning($row->last_notified_at ?? null);
+            $lastRequestedAt = $hasRequested ? $row->last_notified_at : null;
 
             return [
                 'lecturer_identifier' => (string) $row->lecturer_id,
@@ -177,14 +185,18 @@ class FacultyLecturerHourWarningController extends Controller
                 ],
                 [
                     'hours_total' => 0,
-                    'created_at' => $now->copy()->subMinute(),
+                    'last_notified_at' => $now,
+                    'created_at' => $now,
                     'updated_at' => $now,
                 ]
             );
         } else {
             DB::table('lecturer_yearly_hours')
                 ->where('id', $existing->id)
-                ->update(['updated_at' => $now]);
+                ->update([
+                    'last_notified_at' => $now,
+                    'updated_at' => $now,
+                ]);
         }
 
         $reasonLabel = match ($validated['reason_code']) {
@@ -295,16 +307,51 @@ class FacultyLecturerHourWarningController extends Controller
         return 'MILD';
     }
 
-    private function hasRequestedWarning($createdAt, $updatedAt): bool
+    private function hasRequestedWarning($lastNotifiedAt): bool
     {
-        if (! $createdAt || ! $updatedAt) {
-            return false;
+        return ! empty($lastNotifiedAt);
+    }
+
+    private function resolveHoursStageId(): ?int
+    {
+        $id = DB::table('approval_stages')
+            ->where('code', 'hours')
+            ->value('id');
+
+        return $id ? (int) $id : null;
+    }
+
+    private function approvedHoursByLecturerYearQuery(int $academicYearId, int $facultyId, ?int $hoursStageId)
+    {
+        if (! $hoursStageId) {
+            return DB::table('research_activities as ra')
+                ->whereRaw('1 = 0')
+                ->selectRaw('0 as lecturer_id, 0 as hours_total');
         }
 
-        $created = Carbon::parse($createdAt);
-        $updated = Carbon::parse($updatedAt);
-
-        return $updated->gt($created->addMinute());
+        return DB::table('research_activity_members as ram')
+            ->join('research_activities as ra', 'ra.id', '=', 'ram.activity_id')
+            ->leftJoin('activity_approvals as aa_hours', function ($join) use ($hoursStageId) {
+                $join->on('aa_hours.activity_id', '=', 'ra.id')
+                    ->where('aa_hours.stage_id', '=', $hoursStageId);
+            })
+            ->leftJoin('activity_member_approvals as ama_hours', function ($join) use ($hoursStageId) {
+                $join->on('ama_hours.activity_id', '=', 'ra.id')
+                    ->on('ama_hours.lecturer_id', '=', 'ram.lecturer_id')
+                    ->where('ama_hours.stage_id', '=', $hoursStageId);
+            })
+            ->join('lecturers as l', 'l.id', '=', 'ram.lecturer_id')
+            ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
+            ->where('d.faculty_id', $facultyId)
+            ->where('ra.academic_year_id', $academicYearId)
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
+            ->whereRaw("COALESCE(ama_hours.status, aa_hours.status) = 'approved'")
+            ->selectRaw('ram.lecturer_id as lecturer_id')
+            ->selectRaw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as hours_total')
+            ->groupBy('ram.lecturer_id');
     }
 
     private function applyFilters($entries, string $severity, string $notificationState)
