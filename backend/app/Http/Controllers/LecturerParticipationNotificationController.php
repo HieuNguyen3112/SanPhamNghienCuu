@@ -9,6 +9,7 @@ use App\Notifications\ParticipationInvitationNotification;
 use App\Notifications\ParticipationInvitationAcceptedNotification;
 use App\Notifications\ParticipationInvitationRejectedNotification;
 use App\Support\AuditLogger;
+use App\Support\ResearchWorkDetailSchemaBuilder;
 use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,13 @@ class LecturerParticipationNotificationController extends Controller
     private const ACT_MEMBER_REJECTED = 'member_rejected';
     private const ACT_PENDING_FACULTY_REVIEW = 'pending_faculty_review';
     private const PARTICIPATION_PAGE_ROUTE = '/declarations/participation';
+
+    private ResearchWorkDetailSchemaBuilder $researchWorkDetailSchemaBuilder;
+
+    public function __construct(ResearchWorkDetailSchemaBuilder $researchWorkDetailSchemaBuilder)
+    {
+        $this->researchWorkDetailSchemaBuilder = $researchWorkDetailSchemaBuilder;
+    }
 
     public function index(ParticipationNotificationIndexRequest $request)
     {
@@ -714,6 +722,10 @@ class LecturerParticipationNotificationController extends Controller
             'note_from_owner' => $row->activity_note,
             'confirmation_log' => $this->buildConfirmationLog($row),
             'work_system_status' => $row->activity_status_name,
+            'work_detail' => $this->researchWorkDetailSchemaBuilder->build(
+                (int) $row->activity_id,
+                $row->kind_code !== null ? (string) $row->kind_code : null
+            ),
             'members' => $this->buildParticipants((int) $row->activity_id, $currentLecturerId),
             'evidences' => $this->buildEvidences($row),
         ];

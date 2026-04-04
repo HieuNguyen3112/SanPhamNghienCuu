@@ -81,6 +81,7 @@ export interface ResearchWorkItem {
   kind: ResearchWorkKind;
   title: string;
   metaLine: string; // journal/publisher/level/location...
+  typeName: string;
   year: number | null;
   role: string;
   status: ResearchWorkStatus;
@@ -288,6 +289,7 @@ function mapResearchWorks(items?: ResearchWorkItemDTO[]): ResearchWorkItem[] {
         kind,
         title: item.title,
         metaLine: item.info || item.venue || item.location || "",
+        typeName: item.type_name || item.kind_name || "",
         year: item.work_year ?? parseYear(item.approved_at),
         role: item.member_role_name || "",
         status: mapWorkStatus(item.status_code),

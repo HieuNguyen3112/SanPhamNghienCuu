@@ -2,6 +2,23 @@ export type WorkTypeDto = "ARTICLE" | "PROJECT" | "BOOK" | "CONFERENCE";
 export type NotificationStatusDto = "PENDING" | "ACCEPTED" | "REJECTED";
 export type EvidenceTypeDto = "FILE" | "LINK";
 
+export interface ParticipationWorkDetailFieldDto {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+}
+
+export interface ParticipationWorkDetailSectionDto {
+  code: string;
+  title: string;
+  fields: ParticipationWorkDetailFieldDto[];
+}
+
+export interface ParticipationWorkDetailDto {
+  kind_code?: string | null;
+  sections?: ParticipationWorkDetailSectionDto[];
+}
+
 export interface ParticipationEvidenceDto {
   id: number;
   type: EvidenceTypeDto;
@@ -40,6 +57,7 @@ export interface ParticipationNotificationDto {
   confirmation_log?: ParticipationConfirmationLogDto;
 
   work_system_status: string;
+  work_detail?: ParticipationWorkDetailDto | null;
   members?: ParticipationMemberDto[];
   evidences?: ParticipationEvidenceDto[];
 }
@@ -51,6 +69,23 @@ export interface ParticipationNotificationDto {
 export type WorkType = WorkTypeDto;
 export type NotificationStatus = NotificationStatusDto;
 export type EvidenceType = EvidenceTypeDto;
+
+export interface ParticipationWorkDetailField {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+}
+
+export interface ParticipationWorkDetailSection {
+  code: string;
+  title: string;
+  fields: ParticipationWorkDetailField[];
+}
+
+export interface ParticipationWorkDetail {
+  kindCode: string | null;
+  sections: ParticipationWorkDetailSection[];
+}
 
 export interface ParticipationEvidence {
   id: number;
@@ -90,15 +125,17 @@ export interface ParticipationNotification {
   confirmationLog?: ParticipationConfirmationLog;
 
   workSystemStatus: string;
+  workDetail?: ParticipationWorkDetail;
   members: ParticipationMember[];
   evidences: ParticipationEvidence[];
 }
 
 export function mapParticipationNotificationDtoToModel(
-  dto: ParticipationNotificationDto
+  dto: ParticipationNotificationDto,
 ): ParticipationNotification {
   const members = dto.members ?? [];
   const evidences = dto.evidences ?? [];
+  const workDetailSections = dto.work_detail?.sections ?? [];
 
   return {
     id: dto.id,
@@ -118,6 +155,20 @@ export function mapParticipationNotificationDtoToModel(
         }
       : undefined,
     workSystemStatus: dto.work_system_status,
+    workDetail: dto.work_detail
+      ? {
+          kindCode: dto.work_detail.kind_code ?? null,
+          sections: workDetailSections.map((section) => ({
+            code: section.code,
+            title: section.title,
+            fields: (section.fields ?? []).map((field) => ({
+              key: field.key,
+              label: field.label,
+              value: field.value ?? null,
+            })),
+          })),
+        }
+      : undefined,
     members: members.map((m) => ({
       id: m.id,
       fullName: m.full_name,
@@ -138,7 +189,7 @@ export function mapParticipationNotificationDtoToModel(
 }
 
 export function mapParticipationNotificationModelToDto(
-  model: ParticipationNotification
+  model: ParticipationNotification,
 ): ParticipationNotificationDto {
   return {
     id: model.id,
@@ -158,6 +209,20 @@ export function mapParticipationNotificationModelToDto(
         }
       : undefined,
     work_system_status: model.workSystemStatus,
+    work_detail: model.workDetail
+      ? {
+          kind_code: model.workDetail.kindCode,
+          sections: model.workDetail.sections.map((section) => ({
+            code: section.code,
+            title: section.title,
+            fields: section.fields.map((field) => ({
+              key: field.key,
+              label: field.label,
+              value: field.value,
+            })),
+          })),
+        }
+      : undefined,
     members: model.members.map((m) => ({
       id: m.id,
       full_name: m.fullName,

@@ -129,6 +129,74 @@
                 </div>
               </div>
 
+              <div
+                class="mt-4 rounded-2xl border border-slate-200 bg-white p-4"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-sm font-semibold text-slate-900">
+                    Chi tiết công trình
+                  </div>
+                  <span
+                    class="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600"
+                  >
+                    {{ detailSections.length }} mục
+                  </span>
+                </div>
+
+                <div
+                  v-if="detailSections.length === 0"
+                  class="mt-2 text-sm text-slate-500"
+                >
+                  Chưa có dữ liệu chi tiết cho công trình này.
+                </div>
+
+                <div v-else class="mt-3 space-y-3">
+                  <section
+                    v-for="workDetailSection in detailSections"
+                    :key="workDetailSection.code"
+                    class="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                  >
+                    <div class="text-xs font-semibold text-slate-700">
+                      {{ workDetailSection.title }}
+                    </div>
+
+                    <div
+                      class="mt-2 grid grid-cols-1 gap-3 text-sm md:grid-cols-2"
+                    >
+                      <div
+                        v-for="detailField in workDetailSection.fields"
+                        :key="`${workDetailSection.code}-${detailField.key}`"
+                        :class="{
+                          'md:col-span-2': shouldSpanTwoColumns(
+                            detailField.key,
+                            detailField.value,
+                          ),
+                        }"
+                      >
+                        <div class="text-xs font-medium text-slate-500">
+                          {{ detailField.label }}
+                        </div>
+                        <a
+                          v-if="isLinkFieldValue(detailField.value)"
+                          :href="String(detailField.value)"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="mt-0.5 inline-flex break-all text-sm text-sky-700 hover:underline"
+                        >
+                          {{ String(detailField.value) }}
+                        </a>
+                        <div
+                          v-else
+                          class="mt-0.5 whitespace-pre-wrap text-sm text-slate-900"
+                        >
+                          {{ formatDetailFieldValue(detailField.value) }}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
               <!-- Card: Members -->
               <div
                 class="mt-4 rounded-2xl border border-slate-200 bg-white p-4"
@@ -434,50 +502,13 @@ import {
 import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
 import { usePdfPreview } from "@/shared/composables/usePdfPreview";
 import { formatBackendDateTimeVi } from "@/shared/utils/backendDateTime";
-
-type WorkType = "ARTICLE" | "PROJECT" | "BOOK" | "CONFERENCE";
-type NotificationStatus = "PENDING" | "ACCEPTED" | "REJECTED";
-type EvidenceType = "FILE" | "LINK";
-
-interface ParticipationEvidence {
-  id: number;
-  type: EvidenceType;
-  label: string;
-  url: string;
-  previewUrl?: string | null;
-  downloadUrl?: string | null;
-}
-
-interface ParticipationMember {
-  id: number;
-  fullName: string;
-  unit: string;
-  role: string;
-  status: NotificationStatus;
-  isCurrentUser: boolean;
-}
-
-interface ParticipationNotification {
-  id: number;
-  workTitle: string;
-  workType: WorkType;
-  yourRole: string;
-  ownerName: string;
-  requestedAt: string;
-  status: NotificationStatus;
-  workShortInfo: string;
-  noteFromOwner?: string;
-
-  confirmationLog?: {
-    status: "ACCEPTED" | "REJECTED";
-    confirmedAt: string;
-    reason?: string;
-  };
-
-  workSystemStatus: string;
-  members: ParticipationMember[];
-  evidences: ParticipationEvidence[];
-}
+import type {
+  NotificationStatus,
+  ParticipationEvidence,
+  ParticipationNotification,
+  ParticipationWorkDetailField,
+  WorkType,
+} from "../contracts/participationNotificationsContract";
 
 const props = defineProps<{
   open: boolean;
@@ -531,6 +562,44 @@ watch(
 );
 
 const notification = computed(() => props.notification);
+const detailSections = computed(() => {
+  return props.notification?.workDetail?.sections ?? [];
+});
+
+function formatDetailFieldValue(
+  value: ParticipationWorkDetailField["value"],
+): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Có" : "Không";
+  const text = String(value).trim();
+  return text === "" ? "—" : text;
+}
+
+function isLinkFieldValue(
+  value: ParticipationWorkDetailField["value"],
+): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("http://") || normalized.startsWith("https://");
+}
+
+function shouldSpanTwoColumns(
+  key: string,
+  value: ParticipationWorkDetailField["value"],
+): boolean {
+  const wideFieldKeys = new Set([
+    "objectives",
+    "content_summary",
+    "main_results",
+    "keywords",
+    "application_address",
+    "article_url",
+    "journal_website",
+  ]);
+  if (wideFieldKeys.has(key)) return true;
+  if (typeof value !== "string") return false;
+  return value.trim().length > 70;
+}
 
 function isEvidenceLoading(evidenceId: number): boolean {
   return isPreviewLoading(`participation-evidence:${evidenceId}`);
