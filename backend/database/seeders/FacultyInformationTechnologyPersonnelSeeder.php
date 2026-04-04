@@ -158,13 +158,22 @@ class FacultyInformationTechnologyPersonnelSeeder extends Seeder
     private function syncLecturers(array $users, array $departmentIds, array $degreeIds): void
     {
         foreach ($this->personnelDefinitions() as $definition) {
-            $lecturer = Lecturer::query()->firstOrNew(['code' => $definition['code']]);
             $linkedUser = $definition['user_email'] ? ($users[$definition['user_email']] ?? null) : null;
+            $lecturer = $this->resolveLecturerRecord($definition['code'], $definition['full_name'], $linkedUser);
             $departmentCode = $definition['department_code'] ?? self::SUPPORT_DEPARTMENT_CODE;
             $departmentId = $departmentIds[$departmentCode] ?? $departmentIds[self::SUPPORT_DEPARTMENT_CODE];
 
             if (! $departmentId) {
                 throw new \RuntimeException('Không tìm thấy bộ môn CNTT để gán dữ liệu seed.');
+            }
+
+            $existingCodeOwnerId = Lecturer::query()
+                ->where('code', $definition['code'])
+                ->when($lecturer->exists, fn ($query) => $query->where('id', '!=', $lecturer->id))
+                ->value('id');
+
+            if (! $existingCodeOwnerId) {
+                $lecturer->code = $definition['code'];
             }
 
             $lecturer->user_id = $linkedUser?->id;
@@ -187,6 +196,32 @@ class FacultyInformationTechnologyPersonnelSeeder extends Seeder
                 ]
             );
         }
+    }
+
+    private function resolveLecturerRecord(string $code, string $fullName, ?User $linkedUser): Lecturer
+    {
+        if ($linkedUser?->lecturer) {
+            return $linkedUser->lecturer;
+        }
+
+        $lecturerByCode = Lecturer::query()
+            ->where('code', $code)
+            ->first();
+        if ($lecturerByCode) {
+            return $lecturerByCode;
+        }
+
+        $lecturerByName = Lecturer::query()
+            ->where('full_name', $fullName)
+            ->whereNull('user_id')
+            ->first();
+        if ($lecturerByName) {
+            return $lecturerByName;
+        }
+
+        return new Lecturer([
+            'code' => $code,
+        ]);
     }
 
     private function cleanupSeedLocalUsers(): void
