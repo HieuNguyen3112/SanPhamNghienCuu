@@ -171,6 +171,48 @@
               </section>
 
               <section
+                v-for="workDetailSection in workDetailSections"
+                :key="workDetailSection.code"
+                class="rounded-xl border border-slate-200 bg-white p-4"
+              >
+                <div class="text-xs font-semibold text-slate-700">
+                  {{ workDetailSection.title }}
+                </div>
+
+                <div class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                  <div
+                    v-for="detailField in workDetailSection.fields"
+                    :key="`${workDetailSection.code}-${detailField.key}`"
+                    :class="{
+                      'md:col-span-2': shouldSpanTwoColumns(
+                        detailField.key,
+                        detailField.value,
+                      ),
+                    }"
+                  >
+                    <div class="text-xs font-medium text-slate-500">
+                      {{ detailField.label }}
+                    </div>
+                    <a
+                      v-if="isLinkFieldValue(detailField.value)"
+                      :href="String(detailField.value)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="mt-0.5 inline-flex break-all text-sm text-sky-700 hover:underline"
+                    >
+                      {{ String(detailField.value) }}
+                    </a>
+                    <div
+                      v-else
+                      class="mt-0.5 whitespace-pre-wrap text-sm text-slate-900"
+                    >
+                      {{ formatDetailFieldValue(detailField.value) }}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section
                 v-if="work.statusCode === 'member_rejected'"
                 class="rounded-xl border border-rose-200 bg-rose-50 p-4"
               >
@@ -263,7 +305,9 @@
                           v-if="work.actions.canResendPendingInvitation"
                           type="button"
                           class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          @click="emit('resend-pending-member', member.memberId)"
+                          @click="
+                            emit('resend-pending-member', member.memberId)
+                          "
                         >
                           Gửi lại lời mời
                         </button>
@@ -271,7 +315,9 @@
                           v-if="work.actions.canRemovePendingMember"
                           type="button"
                           class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100"
-                          @click="emit('remove-pending-member', member.memberId)"
+                          @click="
+                            emit('remove-pending-member', member.memberId)
+                          "
                         >
                           Xóa thành viên
                         </button>
@@ -400,7 +446,10 @@
           <div class="border-t border-slate-200 px-4 py-3">
             <div class="flex items-center justify-between gap-2">
               <button
-                v-if="work && (work.actions.canEdit || work.statusCode === 'rejected')"
+                v-if="
+                  work &&
+                  (work.actions.canEdit || work.statusCode === 'rejected')
+                "
                 type="button"
                 class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
                 @click="onClickPrimaryAction(work)"
@@ -431,6 +480,7 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
 import type {
+  PersonalWorkDetailField,
   PersonalWorkEvidence,
   PersonalWorkDetail,
   PersonalWorkStatusHistory,
@@ -508,11 +558,52 @@ const {
   prefetchPdfPreview,
 } = usePdfPreview();
 
+const workDetailSections = computed(() => {
+  return props.work?.workDetail?.sections ?? [];
+});
+
+function formatDetailFieldValue(
+  value: PersonalWorkDetailField["value"],
+): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Có" : "Không";
+  const text = String(value).trim();
+  return text === "" ? "—" : text;
+}
+
+function isLinkFieldValue(value: PersonalWorkDetailField["value"]): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("http://") || normalized.startsWith("https://");
+}
+
+function shouldSpanTwoColumns(
+  key: string,
+  value: PersonalWorkDetailField["value"],
+): boolean {
+  const wideFieldKeys = new Set([
+    "objectives",
+    "content_summary",
+    "main_results",
+    "keywords",
+    "application_address",
+    "article_url",
+    "journal_website",
+  ]);
+  if (wideFieldKeys.has(key)) return true;
+  if (typeof value !== "string") return false;
+  return value.trim().length > 70;
+}
+
 function findLatestHistoryByToStatus(statusCode: PersonalWorkStatusCode) {
   const currentWork = props.work;
   if (!currentWork) return null;
 
-  for (let index = currentWork.statusHistories.length - 1; index >= 0; index -= 1) {
+  for (
+    let index = currentWork.statusHistories.length - 1;
+    index >= 0;
+    index -= 1
+  ) {
     const history = currentWork.statusHistories[index];
     if (history?.toStatusCode === statusCode) return history;
   }
@@ -582,11 +673,12 @@ const submitterName = computed<string | null>(() => {
   return submittedHistory?.actedByUserName ?? null;
 });
 
-const memberWorkflowTimelineItems = computed<MemberWorkflowTimelineItem[]>(() => {
-  const currentWork = props.work;
-  if (!currentWork) return [];
+const memberWorkflowTimelineItems = computed<MemberWorkflowTimelineItem[]>(
+  () => {
+    const currentWork = props.work;
+    if (!currentWork) return [];
 
-  return currentWork.statusHistories.flatMap((history, index) => {
+    return currentWork.statusHistories.flatMap((history, index) => {
       const parsed = parseMemberTimelineHistory(history);
       if (!parsed) return [];
 
@@ -602,7 +694,8 @@ const memberWorkflowTimelineItems = computed<MemberWorkflowTimelineItem[]>(() =>
 
       return [item];
     });
-});
+  },
+);
 
 const hasMultipleMemberConfirmations = computed<boolean>(() => {
   return (props.work?.memberConfirmations.length ?? 0) > 1;
@@ -712,7 +805,8 @@ const lecturerConfirmedTimeline = computed<{
   );
 
   if (allMembersAccepted || transitionAfterConfirmed) {
-    const actedAt = transitionAfterConfirmed?.actedAt ?? latestAcceptedResponseAt;
+    const actedAt =
+      transitionAfterConfirmed?.actedAt ?? latestAcceptedResponseAt;
     return {
       value: formatDateTime(actedAt),
       actedAt,
@@ -725,7 +819,10 @@ const lecturerConfirmedTimeline = computed<{
     };
   }
 
-  if (rejectedMembers.length > 0 || currentWork.statusCode === "member_rejected") {
+  if (
+    rejectedMembers.length > 0 ||
+    currentWork.statusCode === "member_rejected"
+  ) {
     const actedAt = rejectedHistory?.actedAt ?? latestRejectedResponseAt;
     return {
       value: formatDateTime(actedAt),
@@ -779,7 +876,8 @@ const submitToFacultyTimeline = computed<{
   } else if (history?.note === "auto_sent_to_faculty_no_pending") {
     note = "Không có thành viên chờ xác nhận nên hệ thống gửi duyệt ngay.";
   } else if (history?.note === "pending_member_removed_auto_sent_to_faculty") {
-    note = "Đã xóa thành viên chờ xác nhận cuối cùng, hệ thống tự động chuyển hồ sơ lên khoa.";
+    note =
+      "Đã xóa thành viên chờ xác nhận cuối cùng, hệ thống tự động chuyển hồ sơ lên khoa.";
   } else if (history?.note === "minor_revision_sent_to_faculty") {
     note = "Chỉnh sửa nhỏ được gửi thẳng lên khoa duyệt lại.";
   }
@@ -828,7 +926,10 @@ const sortedTimelineItems = computed<TimelineRenderItem[]>(() => {
     });
   }
 
-  if (lecturerConfirmedTimeline.value && memberWorkflowTimelineItems.value.length === 0) {
+  if (
+    lecturerConfirmedTimeline.value &&
+    memberWorkflowTimelineItems.value.length === 0
+  ) {
     pushItem({
       key: "member-confirmation-completed",
       label: "Giảng viên đã xác nhận",
@@ -1035,7 +1136,10 @@ function parseMemberTimelineHistory(history: PersonalWorkStatusHistory): {
   const parsed = parseMemberTimelineNote(history.note);
   if (!parsed) return null;
 
-  const memberLabel = resolveMemberDisplayName(parsed.memberId, parsed.memberName);
+  const memberLabel = resolveMemberDisplayName(
+    parsed.memberId,
+    parsed.memberName,
+  );
 
   switch (parsed.action) {
     case "member_invitation_sent":
@@ -1149,7 +1253,10 @@ function parseMemberTimelineNote(note: string | null): {
   const trimmed = note.trim();
   if (trimmed === "") return null;
 
-  if (trimmed === "member_rejected" || trimmed === "member_rejected_block_submit") {
+  if (
+    trimmed === "member_rejected" ||
+    trimmed === "member_rejected_block_submit"
+  ) {
     return {
       action: trimmed,
       memberId: null,
@@ -1169,7 +1276,8 @@ function parseMemberTimelineNote(note: string | null): {
   const [rawAction, rawMemberId, ...rest] = trimmed.split("|");
   const action = (rawAction ?? "").trim() as MemberWorkflowAction;
   const parsedMemberIdRaw = (rawMemberId ?? "").trim();
-  const parsedMemberId = parsedMemberIdRaw === "" ? null : Number(parsedMemberIdRaw);
+  const parsedMemberId =
+    parsedMemberIdRaw === "" ? null : Number(parsedMemberIdRaw);
   if (!rawAction) {
     return null;
   }
@@ -1182,7 +1290,9 @@ function parseMemberTimelineNote(note: string | null): {
     action !== "member_rejected" && action !== "member_rejected_block_submit";
   if (
     requiresMemberId &&
-    (parsedMemberId === null || !Number.isFinite(parsedMemberId) || parsedMemberId <= 0)
+    (parsedMemberId === null ||
+      !Number.isFinite(parsedMemberId) ||
+      parsedMemberId <= 0)
   ) {
     return null;
   }
@@ -1192,7 +1302,9 @@ function parseMemberTimelineNote(note: string | null): {
   return {
     action,
     memberId:
-      parsedMemberId !== null && Number.isFinite(parsedMemberId) && parsedMemberId > 0
+      parsedMemberId !== null &&
+      Number.isFinite(parsedMemberId) &&
+      parsedMemberId > 0
         ? parsedMemberId
         : null,
     memberName: memberNameRaw !== "" ? memberNameRaw : null,
@@ -1215,7 +1327,9 @@ function isKnownMemberWorkflowAction(
   );
 }
 
-function pickLatestDateTime(values: Array<string | null | undefined>): string | null {
+function pickLatestDateTime(
+  values: Array<string | null | undefined>,
+): string | null {
   let latest: string | null = null;
 
   values.forEach((value) => {

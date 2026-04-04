@@ -115,6 +115,23 @@ export interface FinalApprovalDTO {
   note: string | null;
 }
 
+export interface WorkDetailFieldDTO {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+}
+
+export interface WorkDetailSectionDTO {
+  code: string;
+  title: string;
+  fields: WorkDetailFieldDTO[];
+}
+
+export interface WorkDetailDTO {
+  kind_code: string | null;
+  sections: WorkDetailSectionDTO[];
+}
+
 export interface ApprovedDetailDTO {
   activity_id: number;
   activity_code: string;
@@ -123,6 +140,7 @@ export interface ApprovedDetailDTO {
   abstract: string | null;
 
   kind_id: number;
+  kind_code?: string | null;
   kind_name: string;
 
   type_id: number | null;
@@ -143,6 +161,7 @@ export interface ApprovedDetailDTO {
   evidence_items: EvidenceDTO[];
 
   final_approval: FinalApprovalDTO | null;
+  work_detail?: WorkDetailDTO | null;
 }
 
 // =====================
@@ -264,6 +283,23 @@ export interface FinalApproval {
   note: string | null;
 }
 
+export interface WorkDetailField {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+}
+
+export interface WorkDetailSection {
+  code: string;
+  title: string;
+  fields: WorkDetailField[];
+}
+
+export interface WorkDetail {
+  kindCode: string | null;
+  sections: WorkDetailSection[];
+}
+
 export interface ApprovedDetail {
   activityId: number;
   activityCode: string;
@@ -272,6 +308,7 @@ export interface ApprovedDetail {
   abstract: string | null;
 
   kindId: number;
+  kindCode: string | null;
   kindName: string;
 
   typeId: number | null;
@@ -292,6 +329,7 @@ export interface ApprovedDetail {
   evidenceItems: Evidence[];
 
   finalApproval: FinalApproval | null;
+  workDetail: WorkDetail | null;
 }
 
 // =====================
@@ -370,12 +408,27 @@ export const mapper = {
   },
 
   approvedDetailFromDto(dto: ApprovedDetailDTO): ApprovedDetail {
+    const sections = (dto.work_detail?.sections ?? [])
+      .map((section) => ({
+        code: section.code,
+        title: section.title,
+        fields: (section.fields ?? [])
+          .filter((field) => field && field.label)
+          .map((field) => ({
+            key: field.key,
+            label: field.label,
+            value: field.value ?? null,
+          })),
+      }))
+      .filter((section) => section.fields.length > 0);
+
     return {
       activityId: dto.activity_id,
       activityCode: dto.activity_code,
       title: dto.title,
       abstract: dto.abstract,
       kindId: dto.kind_id,
+      kindCode: dto.kind_code ?? dto.work_detail?.kind_code ?? null,
       kindName: dto.kind_name,
       typeId: dto.type_id,
       typeName: dto.type_name,
@@ -419,6 +472,13 @@ export const mapper = {
             note: dto.final_approval.note,
           }
         : null,
+      workDetail:
+        sections.length > 0
+          ? {
+              kindCode: dto.work_detail?.kind_code ?? dto.kind_code ?? null,
+              sections,
+            }
+          : null,
     };
   },
 };

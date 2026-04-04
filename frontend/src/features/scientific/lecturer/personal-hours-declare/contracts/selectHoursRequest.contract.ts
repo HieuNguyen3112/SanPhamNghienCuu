@@ -45,6 +45,17 @@ export interface FormulaExplanationDTO {
   member_share_percent: number | null;
   member_role_code: string | null;
   contribution_share: number | null;
+  progress?: number | null;
+  role?: string | null;
+  claimed_before?: number | null;
+  final_hours?: number | null;
+  explainability?: {
+    base_hours?: number | null;
+    progress?: number | null;
+    role?: string | null;
+    claimed_before?: number | null;
+    final_hours?: number | null;
+  } | null;
 }
 
 export interface FormulaModifier {
@@ -64,6 +75,10 @@ export interface FormulaExplanation {
   memberSharePercent: number | null;
   memberRoleCode: string | null;
   contributionShare: number | null;
+  progress: number | null;
+  role: string | null;
+  claimedBefore: number | null;
+  finalHours: number | null;
 }
 
 function normalizeFormulaModifiers(modifiers: unknown): FormulaModifier[] {
@@ -352,6 +367,19 @@ export function formulaExplanationFromDto(
     memberSharePercent: dto.member_share_percent,
     memberRoleCode: dto.member_role_code,
     contributionShare: dto.contribution_share,
+    progress:
+      dto.progress ??
+      dto.explainability?.progress ??
+      dto.progress_percent ??
+      null,
+    role: dto.role ?? dto.explainability?.role ?? dto.member_role_code ?? null,
+    claimedBefore:
+      dto.claimed_before ?? dto.explainability?.claimed_before ?? null,
+    finalHours:
+      dto.final_hours ??
+      dto.explainability?.final_hours ??
+      dto.member_hours ??
+      null,
   };
 }
 

@@ -2,6 +2,7 @@
 
 namespace App\Services\Hours;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -11,9 +12,21 @@ class HoursRuleResolver
     private array $typeCodeCache = [];
     private array $kindCodeCache = [];
     private array $mappedTypeIdsCache = [];
+    private array $resolvedRuleCache = [];
+    private array $exactRuleCache = [];
+    private array $genericRuleCache = [];
 
     public function resolveForActivity(int $kindId, ?int $typeId, ?int $academicYearId = null): ?object
     {
+        $resolvedCacheKey = implode('|', [
+            $kindId,
+            $typeId !== null ? $typeId : 'null',
+            $academicYearId !== null ? $academicYearId : 'null',
+        ]);
+        if (array_key_exists($resolvedCacheKey, $this->resolvedRuleCache)) {
+            return $this->resolvedRuleCache[$resolvedCacheKey];
+        }
+
         [$windowStart, $windowEnd] = $this->resolveRuleWindow($academicYearId);
         $requestedTypeCode = $this->resolveTypeCode($typeId);
 
@@ -22,23 +35,28 @@ class HoursRuleResolver
         foreach ($candidateTypeIds as $candidateTypeId) {
             $rule = $this->findExactRule($kindId, $candidateTypeId, $windowStart, $windowEnd);
             if ($rule) {
+                $this->resolvedRuleCache[$resolvedCacheKey] = $rule;
                 return $rule;
             }
         }
 
         $rule = $this->findGenericRule($kindId, $windowStart, $windowEnd);
         if ($rule) {
+            $this->resolvedRuleCache[$resolvedCacheKey] = $rule;
             return $rule;
         }
 
         foreach ($candidateTypeIds as $candidateTypeId) {
             $rule = $this->findExactRule($kindId, $candidateTypeId);
             if ($rule) {
+                $this->resolvedRuleCache[$resolvedCacheKey] = $rule;
                 return $rule;
             }
         }
 
-        return $this->findGenericRule($kindId);
+        $this->resolvedRuleCache[$resolvedCacheKey] = $this->findGenericRule($kindId);
+
+        return $this->resolvedRuleCache[$resolvedCacheKey];
     }
 
     public function formatRuleSummary(?object $rule): string
@@ -141,13 +159,34 @@ class HoursRuleResolver
         ?string $windowStart = null,
         ?string $windowEnd = null
     ): ?object {
-        $query = $this->baseRuleQuery($kindId, $typeId);
+        $cacheKey = implode('|', [
+            'exact',
+            $kindId,
+            $typeId !== null ? $typeId : 'null',
+            $windowStart ?? 'null',
+            $windowEnd ?? 'null',
+        ]);
 
-        if ($windowStart && $windowEnd) {
-            $this->applyRuleWindowFilter($query, $windowStart, $windowEnd);
+        if (array_key_exists($cacheKey, $this->exactRuleCache)) {
+            return $this->exactRuleCache[$cacheKey];
         }
 
-        return $query->first();
+        $this->exactRuleCache[$cacheKey] = $this->rememberRule($cacheKey, function () use (
+            $kindId,
+            $typeId,
+            $windowStart,
+            $windowEnd
+        ) {
+            $query = $this->baseRuleQuery($kindId, $typeId);
+
+            if ($windowStart && $windowEnd) {
+                $this->applyRuleWindowFilter($query, $windowStart, $windowEnd);
+            }
+
+            return $query->first();
+        });
+
+        return $this->exactRuleCache[$cacheKey];
     }
 
     private function findGenericRule(
@@ -155,14 +194,58 @@ class HoursRuleResolver
         ?string $windowStart = null,
         ?string $windowEnd = null
     ): ?object {
-        $query = $this->baseRuleQuery($kindId, null, false)
-            ->whereNull('hr.type_id');
+        $cacheKey = implode('|', [
+            'generic',
+            $kindId,
+            $windowStart ?? 'null',
+            $windowEnd ?? 'null',
+        ]);
 
-        if ($windowStart && $windowEnd) {
-            $this->applyRuleWindowFilter($query, $windowStart, $windowEnd);
+        if (array_key_exists($cacheKey, $this->genericRuleCache)) {
+            return $this->genericRuleCache[$cacheKey];
         }
 
-        return $query->first();
+        $this->genericRuleCache[$cacheKey] = $this->rememberRule($cacheKey, function () use (
+            $kindId,
+            $windowStart,
+            $windowEnd
+        ) {
+            $query = $this->baseRuleQuery($kindId, null, false)
+                ->whereNull('hr.type_id');
+
+            if ($windowStart && $windowEnd) {
+                $this->applyRuleWindowFilter($query, $windowStart, $windowEnd);
+            }
+
+            return $query->first();
+        });
+
+        return $this->genericRuleCache[$cacheKey];
+    }
+
+    private function rememberRule(string $memoryKey, callable $resolver): ?object
+    {
+        $cacheKey = 'hour_rules:resolver:' . sha1($memoryKey);
+        $ttlSeconds = max(60, (int) config('cache.hour_rules_ttl_seconds', 300));
+
+        $cachedPayload = Cache::remember(
+            $cacheKey,
+            now()->addSeconds($ttlSeconds),
+            static function () use ($resolver) {
+                $rule = $resolver();
+                if (! $rule) {
+                    return ['__empty__' => true];
+                }
+
+                return (array) $rule;
+            }
+        );
+
+        if (! is_array($cachedPayload) || ($cachedPayload['__empty__'] ?? false) === true) {
+            return null;
+        }
+
+        return (object) $cachedPayload;
     }
 
     private function baseRuleQuery(int $kindId, ?int $typeId, bool $withTypeFilter = true)

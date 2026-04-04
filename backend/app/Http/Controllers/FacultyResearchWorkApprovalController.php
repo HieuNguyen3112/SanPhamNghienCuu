@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Faculty\FacultyWorkApprovalListRequest;
 use App\Http\Requests\Faculty\FacultyWorkApprovalRejectRequest;
 use App\Services\Hours\HoursRecomputeService;
+use App\Services\Hours\RecalculateLecturerYearlyHoursService;
 use App\Support\AuditLogger;
+use App\Support\ResearchWorkDetailSchemaBuilder;
 use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -19,12 +21,18 @@ class FacultyResearchWorkApprovalController extends Controller
     private const STATUS_REJECTED = 'REJECTED_BY_FACULTY';
     private const STATUS_NEED_REVISION = 'NEED_REVISION_BY_FACULTY';
     private HoursRecomputeService $hoursRecomputeService;
+    private RecalculateLecturerYearlyHoursService $recalculateLecturerYearlyHoursService;
+    private ResearchWorkDetailSchemaBuilder $researchWorkDetailSchemaBuilder;
     private ?array $stageIdsCache = null;
 
     public function __construct(
-        HoursRecomputeService $hoursRecomputeService
+        HoursRecomputeService $hoursRecomputeService,
+        RecalculateLecturerYearlyHoursService $recalculateLecturerYearlyHoursService,
+        ResearchWorkDetailSchemaBuilder $researchWorkDetailSchemaBuilder
     ) {
         $this->hoursRecomputeService = $hoursRecomputeService;
+        $this->recalculateLecturerYearlyHoursService = $recalculateLecturerYearlyHoursService;
+        $this->researchWorkDetailSchemaBuilder = $researchWorkDetailSchemaBuilder;
     }
 
     public function lookups(Request $request)
@@ -171,15 +179,11 @@ class FacultyResearchWorkApprovalController extends Controller
             (int) $row->lecturer_id
         );
 
-        // Keep detail open fast on host: only persist recomputation when hours snapshot is missing.
+        // Detail view must remain read-only: compute for display without mutating stored snapshots.
         $now = now();
         $this->ensureOwnerMemberExists((int) $activity, (int) $row->lecturer_id, $now);
         $members = $this->fetchMembers($activity);
-        $shouldPersistRecompute = $this->shouldPersistRecomputeForDetail($row, $members);
-        $calculation = $this->hoursRecomputeService->recomputeActivity((int) $activity, $now, $shouldPersistRecompute);
-        if ($shouldPersistRecompute) {
-            $members = $this->fetchMembers($activity);
-        }
+        $calculation = $this->hoursRecomputeService->recomputeActivity((int) $activity, $now, false);
         $computedHoursByLecturer = [];
         foreach (($calculation['members'] ?? []) as $memberHours) {
             $computedHoursByLecturer[(int) $memberHours['lecturer_id']] = $memberHours;
@@ -282,6 +286,10 @@ class FacultyResearchWorkApprovalController extends Controller
                         'faculty_id' => $row->faculty_id,
                         'faculty_name' => $row->faculty_name,
                     ],
+                    'work_detail' => $this->researchWorkDetailSchemaBuilder->build(
+                        (int) $activity,
+                        $row->kind_code !== null ? (string) $row->kind_code : null
+                    ),
                     'journal' => $this->fetchPaperJournalDetail((int) $activity),
                 ], $this->buildApproverConflictPayload($approverConflict)),
                 'members' => $membersPayload,
@@ -373,6 +381,15 @@ class FacultyResearchWorkApprovalController extends Controller
                 ]
             );
 
+            $this->shadowWriteAssistantStageToMembers(
+                (int) $activity,
+                (int) $stageIds['assistant'],
+                'approved',
+                (int) $user->id,
+                $now,
+                $request->input('note')
+            );
+
             DB::table('activity_status_histories')->insert([
                 'activity_id' => $activity,
                 'from_status_id' => $locked->status_id,
@@ -399,6 +416,8 @@ class FacultyResearchWorkApprovalController extends Controller
                 ],
             ], $user);
         });
+
+        $this->recalculateLecturerYearlyHoursService->recalculateForActivities([(int) $activity]);
 
         $workTitle = trim((string) ($current->title ?? ''));
         WorkflowNotification::notifyLecturer(
@@ -531,6 +550,8 @@ class FacultyResearchWorkApprovalController extends Controller
                 ],
             ], $user);
         });
+
+        $this->recalculateLecturerYearlyHoursService->recalculateForActivities([(int) $activity]);
 
         $workTitle = trim((string) ($current->title ?? ''));
         $recipientLecturerIds = $this->resolveTeamRecipientLecturerIds(
@@ -1309,25 +1330,58 @@ class FacultyResearchWorkApprovalController extends Controller
         return $this->hoursRecomputeService->recomputeActivity($activityId, $executedAt, true);
     }
 
-    private function shouldPersistRecomputeForDetail(object $activityRow, array $members): bool
-    {
-        if ($activityRow->total_hours_calc === null) {
-            return true;
+    private function shadowWriteAssistantStageToMembers(
+        int $activityId,
+        int $assistantStageId,
+        string $status,
+        int $decidedByUserId,
+        $decidedAt,
+        ?string $note
+    ): void {
+        $lecturerIds = DB::table('research_activity_members as ram')
+            ->join('research_activities as ra', 'ra.id', '=', 'ram.activity_id')
+            ->where('ram.activity_id', $activityId)
+            ->where(function ($query) {
+                $query->where('ram.confirmation_status', 'accepted')
+                    ->orWhereColumn('ram.lecturer_id', 'ra.owner_lecturer_id');
+            })
+            ->pluck('ram.lecturer_id')
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($lecturerIds === []) {
+            return;
         }
 
-        foreach ($members as $member) {
-            $isExternal = (bool) ($member->is_external ?? false);
-            $lecturerId = isset($member->lecturer_id) ? (int) $member->lecturer_id : 0;
-            if ($isExternal || $lecturerId <= 0) {
-                continue;
-            }
+        $rows = array_map(function (int $lecturerId) use (
+            $activityId,
+            $assistantStageId,
+            $status,
+            $decidedByUserId,
+            $decidedAt,
+            $note
+        ) {
+            return [
+                'activity_id' => $activityId,
+                'lecturer_id' => $lecturerId,
+                'stage_id' => $assistantStageId,
+                'status' => $status,
+                'decided_by_user_id' => $decidedByUserId,
+                'decided_at' => $decidedAt,
+                'note' => $note,
+                'created_at' => $decidedAt,
+                'updated_at' => $decidedAt,
+            ];
+        }, $lecturerIds);
 
-            if ($member->hours_assigned === null) {
-                return true;
-            }
-        }
-
-        return false;
+        DB::table('activity_member_approvals')->upsert(
+            $rows,
+            ['activity_id', 'lecturer_id', 'stage_id'],
+            ['status', 'decided_by_user_id', 'decided_at', 'note', 'updated_at']
+        );
     }
 
     private function getStatusId(string $code): ?int

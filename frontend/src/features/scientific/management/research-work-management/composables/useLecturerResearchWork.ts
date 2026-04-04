@@ -1,4 +1,4 @@
-import { computed, onMounted, reactive, ref } from "vue";
+import { onMounted, reactive, ref } from "vue";
 import type {
   AcademicYearOption,
   ApprovedDetail,
@@ -58,14 +58,8 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
   const isDetailLoading = ref(false);
   const detailError = ref<string | null>(null);
 
-  const selectedLecturerOverview = computed(() => {
-    if (!selectedLecturerId.value) return null;
-    return (
-      overviewItems.value.find(
-        (x) => x.lecturerId === selectedLecturerId.value,
-      ) ?? null
-    );
-  });
+  const selectedLecturerOverview = ref<OverviewItem | null>(null);
+  const activeDetailRequestId = ref(0);
 
   function updatePagination(target: Pagination, next: Pagination) {
     target.page = next.page;
@@ -105,6 +99,15 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
         );
       overviewItems.value = result.items;
       updatePagination(overviewPagination, result.pagination);
+
+      if (selectedLecturerId.value) {
+        const refreshedLecturer = result.items.find(
+          (item) => item.lecturerId === selectedLecturerId.value,
+        );
+        if (refreshedLecturer) {
+          selectedLecturerOverview.value = refreshedLecturer;
+        }
+      }
     } catch (error: any) {
       overviewError.value = error?.message || "Không tải được tổng quan.";
       overviewItems.value = [];
@@ -175,6 +178,9 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
 
   async function openLecturerDrawer(lecturerId: number) {
     selectedLecturerId.value = lecturerId;
+    selectedLecturerOverview.value =
+      overviewItems.value.find((item) => item.lecturerId === lecturerId) ??
+      null;
     selectedWorkId.value = null;
 
     isLecturerDrawerOpen.value = true;
@@ -187,10 +193,21 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
   }
 
   function closeLecturerDrawer() {
+    activeDetailRequestId.value += 1;
+
+    isDetailDrawerOpen.value = false;
     isLecturerDrawerOpen.value = false;
+
     selectedLecturerId.value = null;
+    selectedLecturerOverview.value = null;
+    selectedWorkId.value = null;
+
     approvedItems.value = [];
     approvedError.value = null;
+
+    detail.value = null;
+    detailError.value = null;
+    isDetailLoading.value = false;
   }
 
   async function openDetail(workId: number) {
@@ -202,6 +219,8 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
     }
 
     selectedWorkId.value = workId;
+    const requestId = activeDetailRequestId.value + 1;
+    activeDetailRequestId.value = requestId;
 
     isDetailDrawerOpen.value = true;
     isLecturerDrawerOpen.value = false;
@@ -211,19 +230,36 @@ export function useLecturerResearchWorkManagement(options: UseOptions) {
     isDetailLoading.value = true;
 
     try {
-      detail.value = await options.client.loadApprovedDetail(
+      const loadedDetail = await options.client.loadApprovedDetail(
         workId,
         selectedLecturerId.value,
       );
+
+      if (
+        requestId !== activeDetailRequestId.value ||
+        selectedWorkId.value !== workId
+      ) {
+        return;
+      }
+
+      detail.value = loadedDetail;
     } catch (error: any) {
+      if (requestId !== activeDetailRequestId.value) {
+        return;
+      }
+
       detailError.value = error?.message || "Không tải được chi tiết đã duyệt.";
       detail.value = null;
     } finally {
-      isDetailLoading.value = false;
+      if (requestId === activeDetailRequestId.value) {
+        isDetailLoading.value = false;
+      }
     }
   }
 
   function backToList() {
+    activeDetailRequestId.value += 1;
+
     isDetailDrawerOpen.value = false;
     isLecturerDrawerOpen.value = true;
     selectedWorkId.value = null;

@@ -63,6 +63,23 @@ export type FacultyApprovalListItem = {
   }[];
 };
 
+export type WorkDetailFieldDto = {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+};
+
+export type WorkDetailSectionDto = {
+  code: string;
+  title: string;
+  fields: WorkDetailFieldDto[];
+};
+
+export type WorkDetailDto = {
+  kind_code: string | null;
+  sections: WorkDetailSectionDto[];
+};
+
 export type FacultyApprovalDetailResponse = {
   activity: FacultyApprovalListItem & {
     computed_total_hours?: number | null;
@@ -82,6 +99,7 @@ export type FacultyApprovalDetailResponse = {
       journal_website: string | null;
       work_score: number | null;
     } | null;
+    work_detail?: WorkDetailDto | null;
   };
   members: {
     member_id: number;

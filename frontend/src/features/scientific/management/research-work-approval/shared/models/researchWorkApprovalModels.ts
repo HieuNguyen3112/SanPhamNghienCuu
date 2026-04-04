@@ -71,6 +71,23 @@ export interface ApprovalHistoryEntry {
   reviewNote: string;
 }
 
+export interface ResearchWorkDetailField {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+}
+
+export interface ResearchWorkDetailSection {
+  code: string;
+  title: string;
+  fields: ResearchWorkDetailField[];
+}
+
+export interface ResearchWorkDetail {
+  kindCode: string | null;
+  sections: ResearchWorkDetailSection[];
+}
+
 export interface ResearchWorkApprovalEntry {
   researchWorkIdentifier: number;
   researchWorkTitle: string;
@@ -126,6 +143,7 @@ export interface ResearchWorkApprovalEntry {
   researchWorkAuthorList: ResearchWorkAuthor[];
   coAuthorList: ResearchWorkCoAuthor[];
   approvalHistoryList: ApprovalHistoryEntry[];
+  researchWorkDetail?: ResearchWorkDetail | null;
 }
 
 export interface ResearchWorkApprovalUiConfiguration {

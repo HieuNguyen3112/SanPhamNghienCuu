@@ -156,6 +156,23 @@ export interface PersonalWorkStatusHistoryDTO {
   note: string | null;
 }
 
+export interface PersonalWorkDetailFieldDTO {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+}
+
+export interface PersonalWorkDetailSectionDTO {
+  code: string;
+  title: string;
+  fields: PersonalWorkDetailFieldDTO[];
+}
+
+export interface PersonalWorkDetailSchemaDTO {
+  kind_code: string | null;
+  sections: PersonalWorkDetailSectionDTO[];
+}
+
 export interface PersonalWorkDetailDTO {
   activity_id: number;
   activity_code: string;
@@ -197,6 +214,7 @@ export interface PersonalWorkDetailDTO {
 
   approvals: PersonalWorkApprovalDTO[];
   status_histories: PersonalWorkStatusHistoryDTO[];
+  work_detail?: PersonalWorkDetailSchemaDTO | null;
   actions?: PersonalWorkActionsDTO;
 }
 
@@ -334,6 +352,23 @@ export interface PersonalWorkStatusHistory {
   note: string | null;
 }
 
+export interface PersonalWorkDetailField {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+}
+
+export interface PersonalWorkDetailSection {
+  code: string;
+  title: string;
+  fields: PersonalWorkDetailField[];
+}
+
+export interface PersonalWorkDetailSchema {
+  kindCode: string | null;
+  sections: PersonalWorkDetailSection[];
+}
+
 export interface PersonalWorkDetail {
   activityId: number;
   activityCode: string;
@@ -375,6 +410,7 @@ export interface PersonalWorkDetail {
 
   approvals: PersonalWorkApproval[];
   statusHistories: PersonalWorkStatusHistory[];
+  workDetail: PersonalWorkDetailSchema | null;
   actions: PersonalWorkActions;
 }
 
@@ -435,6 +471,20 @@ export const mapper = {
   },
 
   detailFromDto(dto: PersonalWorkDetailDTO): PersonalWorkDetail {
+    const workDetailSections = (dto.work_detail?.sections ?? [])
+      .map((section) => ({
+        code: section.code,
+        title: section.title,
+        fields: (section.fields ?? [])
+          .filter((field) => field && field.label)
+          .map((field) => ({
+            key: field.key,
+            label: field.label,
+            value: field.value ?? null,
+          })),
+      }))
+      .filter((section) => section.fields.length > 0);
+
     return {
       activityId: dto.activity_id,
       activityCode: dto.activity_code,
@@ -540,6 +590,13 @@ export const mapper = {
         toStatusCode: normalizeStatusCodeFromDto(h.to_status_code),
         note: h.note,
       })),
+      workDetail:
+        workDetailSections.length > 0
+          ? {
+              kindCode: dto.work_detail?.kind_code ?? dto.kind_code ?? null,
+              sections: workDetailSections,
+            }
+          : null,
       actions: mapActionsFromDto(dto.actions),
     };
   },

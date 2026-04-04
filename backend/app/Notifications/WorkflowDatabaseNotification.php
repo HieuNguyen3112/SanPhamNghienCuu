@@ -3,9 +3,10 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-class WorkflowDatabaseNotification extends Notification
+class WorkflowDatabaseNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -26,4 +27,3 @@ class WorkflowDatabaseNotification extends Notification
         return $this->payload;
     }
 }
-

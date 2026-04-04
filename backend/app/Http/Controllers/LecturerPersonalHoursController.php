@@ -187,26 +187,26 @@ class LecturerPersonalHoursController extends Controller
         $this->backfillComputedHoursForLecturer((int) $lecturer->id, $scopeAcademicYearId);
 
         $statusCase = "CASE
-            WHEN SUM(CASE WHEN aa.status = 'pending' THEN 1 ELSE 0 END) > 0 THEN 'pending'
-            WHEN SUM(CASE WHEN aa.status = 'rejected' THEN 1 ELSE 0 END) > 0 THEN 'rejected'
+            WHEN SUM(CASE WHEN COALESCE(ama.status, aa.status) = 'pending' THEN 1 ELSE 0 END) > 0 THEN 'pending'
+            WHEN SUM(CASE WHEN COALESCE(ama.status, aa.status) = 'rejected' THEN 1 ELSE 0 END) > 0 THEN 'rejected'
             ELSE 'approved'
         END";
-        $batchIdExpr = $this->approvalBatchIdExpression('aa.created_at');
+        $batchIdExpr = $this->approvalBatchIdExpression('COALESCE(ama.created_at, aa.created_at)');
 
         $batchQuery = $this->hoursApprovalQuery((int) $lecturer->id, $scopeAcademicYearId, $hoursStageId)
             ->select([
                 DB::raw($batchIdExpr . ' as batch_id'),
                 'ay.id as academic_year_id',
                 'ay.code as academic_year_code',
-                DB::raw('MAX(aa.created_at) as submitted_at'),
-                DB::raw('MAX(aa.decided_at) as decided_at'),
+                DB::raw('MAX(COALESCE(ama.created_at, aa.created_at)) as submitted_at'),
+                DB::raw('MAX(COALESCE(ama.decided_at, aa.decided_at)) as decided_at'),
                 DB::raw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as total_hours'),
                 DB::raw($statusCase . ' as status_code'),
             ])
             ->groupBy(DB::raw($batchIdExpr), 'ay.id', 'ay.code');
 
         $paginator = $batchQuery
-            ->orderByDesc(DB::raw('MAX(aa.created_at)'))
+            ->orderByDesc(DB::raw('MAX(COALESCE(ama.created_at, aa.created_at))'))
             ->paginate($perPage, ['*'], 'page', $page);
 
         $items = collect($paginator->items())->map(function ($row) {
@@ -255,7 +255,7 @@ class LecturerPersonalHoursController extends Controller
         }
 
         $this->backfillComputedHoursForLecturer((int) $lecturer->id, null);
-        $batchIdExpr = $this->approvalBatchIdExpression('aa.created_at');
+        $batchIdExpr = $this->approvalBatchIdExpression('COALESCE(ama.created_at, aa.created_at)');
 
         $items = $this->hoursApprovalQuery($lecturer->id, null, $hoursStageId)
             ->whereRaw($batchIdExpr . ' = ?', [$batchId])
@@ -265,13 +265,13 @@ class LecturerPersonalHoursController extends Controller
                 'ak.code as kind_code',
                 'ak.name as kind_name',
                 'ram.hours_assigned as hours_assigned',
-                'aa.status as approval_status',
-                'aa.created_at as submitted_at',
-                'aa.decided_at as decided_at',
+                DB::raw('COALESCE(ama.status, aa.status) as approval_status'),
+                DB::raw('COALESCE(ama.created_at, aa.created_at) as submitted_at'),
+                DB::raw('COALESCE(ama.decided_at, aa.decided_at) as decided_at'),
                 'ay.id as academic_year_id',
                 'ay.code as academic_year_code',
             ])
-            ->orderByDesc('aa.created_at')
+            ->orderByDesc(DB::raw('COALESCE(ama.created_at, aa.created_at)'))
             ->get();
 
         if ($items->isEmpty()) {
@@ -554,9 +554,9 @@ class LecturerPersonalHoursController extends Controller
     private function summaryTotals(int $lecturerId, ?int $academicYearId, int $hoursStageId): array
     {
         $row = $this->hoursApprovalQuery($lecturerId, $academicYearId, $hoursStageId)
-            ->selectRaw("COALESCE(SUM(CASE WHEN aa.status = 'approved' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as approved_hours")
-            ->selectRaw("COALESCE(SUM(CASE WHEN aa.status = 'pending' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as pending_hours")
-            ->selectRaw("COALESCE(SUM(CASE WHEN aa.status = 'rejected' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as rejected_hours")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(ama.status, aa.status) = 'approved' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as approved_hours")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(ama.status, aa.status) = 'pending' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as pending_hours")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(ama.status, aa.status) = 'rejected' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as rejected_hours")
             ->first();
 
         return [
@@ -573,6 +573,11 @@ class LecturerPersonalHoursController extends Controller
             ->join('research_activity_members as ram', function ($join) use ($lecturerId) {
                 $join->on('ram.activity_id', '=', 'ra.id')
                     ->where('ram.lecturer_id', '=', $lecturerId);
+            })
+            ->leftJoin('activity_member_approvals as ama', function ($join) use ($lecturerId, $hoursStageId) {
+                $join->on('ama.activity_id', '=', 'ra.id')
+                    ->where('ama.lecturer_id', '=', $lecturerId)
+                    ->where('ama.stage_id', '=', $hoursStageId);
             })
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
             ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')

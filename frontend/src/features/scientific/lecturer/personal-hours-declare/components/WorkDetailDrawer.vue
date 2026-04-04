@@ -247,6 +247,27 @@
                         giờ
                       </span>
                     </div>
+                    <div
+                      v-if="
+                        detail.formulaExplanation?.baseHours != null &&
+                        detail.formulaExplanation?.progressPercent != null
+                      "
+                      class="rounded-lg bg-slate-50 px-3 py-2 sm:col-span-2"
+                    >
+                      <span class="text-slate-500">Công thức tiến độ:</span>
+                      <span class="ml-1 font-medium text-slate-900">
+                        {{ formatHours(detail.formulaExplanation.baseHours) }} ×
+                        {{ detail.formulaExplanation.progressPercent }}% =
+                        {{
+                          formatHours(
+                            detail.totalHoursActivity ??
+                              detail.formulaExplanation.totalHoursActivity ??
+                              null,
+                          )
+                        }}
+                        giờ
+                      </span>
+                    </div>
                     <div class="rounded-lg bg-slate-50 px-3 py-2">
                       <span class="text-slate-500"
                         >Tổng giờ công trình (sau tiến độ):</span

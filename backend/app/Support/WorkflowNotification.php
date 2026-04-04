@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\User;
 use App\Notifications\WorkflowDatabaseNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 class WorkflowNotification
 {
@@ -48,8 +49,8 @@ class WorkflowNotification
     public static function notifyLecturers(array $lecturerIds, array $payload): void
     {
         $lecturerIds = collect($lecturerIds)
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
             ->unique()
             ->values()
             ->all();
@@ -63,7 +64,7 @@ class WorkflowNotification
             ->whereNotNull('user_id')
             ->distinct()
             ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         if (empty($userIds)) {
@@ -71,9 +72,11 @@ class WorkflowNotification
         }
 
         $users = User::whereIn('id', $userIds)->get();
-        foreach ($users as $user) {
-            $user->notify(new WorkflowDatabaseNotification($payload));
+        if ($users->isEmpty()) {
+            return;
         }
+
+        Notification::send($users, new WorkflowDatabaseNotification($payload));
     }
 
     public static function notifyFacultyBoardByActivityId(
@@ -130,8 +133,10 @@ class WorkflowNotification
         }
 
         $users = User::whereIn('id', $userIds)->get();
-        foreach ($users as $user) {
-            $user->notify(new WorkflowDatabaseNotification($payload));
+        if ($users->isEmpty()) {
+            return;
         }
+
+        Notification::send($users, new WorkflowDatabaseNotification($payload));
     }
 }

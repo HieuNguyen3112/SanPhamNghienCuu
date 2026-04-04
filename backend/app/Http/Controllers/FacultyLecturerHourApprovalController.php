@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Faculty\FacultyLecturerHourApprovalListRequest;
 use App\Http\Requests\Faculty\FacultyLecturerHourApprovalRejectRequest;
+use App\Services\Hours\RecalculateLecturerYearlyHoursService;
 use App\Support\AuditLogger;
 use App\Support\AcademicYearResolver;
 use App\Support\WorkflowNotification;
@@ -14,6 +15,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class FacultyLecturerHourApprovalController extends Controller
 {
+    private RecalculateLecturerYearlyHoursService $recalculateLecturerYearlyHoursService;
+
+    public function __construct(RecalculateLecturerYearlyHoursService $recalculateLecturerYearlyHoursService)
+    {
+        $this->recalculateLecturerYearlyHoursService = $recalculateLecturerYearlyHoursService;
+    }
+
     public function lookups(Request $request)
     {
         $scope = $this->resolveFacultyScope($request);
@@ -114,10 +122,13 @@ class FacultyLecturerHourApprovalController extends Controller
         }
 
         $revisionLikePattern = '%"decision_mode":"revision"%';
-        $pendingCountExpression = "SUM(CASE WHEN aa.status = 'pending' THEN 1 ELSE 0 END)";
-        $approvedCountExpression = "SUM(CASE WHEN aa.status = 'approved' THEN 1 ELSE 0 END)";
-        $needRevisionCountExpression = "SUM(CASE WHEN aa.status = 'rejected' AND aa.note LIKE '{$revisionLikePattern}' THEN 1 ELSE 0 END)";
-        $hardRejectedCountExpression = "SUM(CASE WHEN aa.status = 'rejected' AND (aa.note IS NULL OR aa.note NOT LIKE '{$revisionLikePattern}') THEN 1 ELSE 0 END)";
+        $approvalStatusExpr = 'COALESCE(ama.status, aa.status)';
+        $approvalNoteExpr = 'COALESCE(ama.note, aa.note)';
+        $approvalCreatedAtExpr = 'COALESCE(ama.created_at, aa.created_at)';
+        $pendingCountExpression = "SUM(CASE WHEN {$approvalStatusExpr} = 'pending' THEN 1 ELSE 0 END)";
+        $approvedCountExpression = "SUM(CASE WHEN {$approvalStatusExpr} = 'approved' THEN 1 ELSE 0 END)";
+        $needRevisionCountExpression = "SUM(CASE WHEN {$approvalStatusExpr} = 'rejected' AND {$approvalNoteExpr} LIKE '{$revisionLikePattern}' THEN 1 ELSE 0 END)";
+        $hardRejectedCountExpression = "SUM(CASE WHEN {$approvalStatusExpr} = 'rejected' AND ({$approvalNoteExpr} IS NULL OR {$approvalNoteExpr} NOT LIKE '{$revisionLikePattern}') THEN 1 ELSE 0 END)";
 
         $statusCase = "CASE
             WHEN {$pendingCountExpression} > 0 THEN 'pending'
@@ -148,6 +159,11 @@ class FacultyLecturerHourApprovalController extends Controller
             ->join('lecturers as l', 'ra.owner_lecturer_id', '=', 'l.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
+            ->leftJoin('activity_member_approvals as ama', function ($join) use ($stageId) {
+                $join->on('ama.activity_id', '=', 'ra.id')
+                    ->on('ama.lecturer_id', '=', 'l.id')
+                    ->where('ama.stage_id', '=', $stageId);
+            })
             ->leftJoin('research_activity_members as ram', function ($join) {
                 $join->on('ram.activity_id', '=', 'ra.id')
                     ->on('ram.lecturer_id', '=', 'l.id');
@@ -158,10 +174,10 @@ class FacultyLecturerHourApprovalController extends Controller
                 $q->where('ra.academic_year_id', (int) $validated['academic_year_id']);
             })
             ->when(! empty($validated['from_date']), function ($q) use ($validated) {
-                $q->whereDate('aa.created_at', '>=', $validated['from_date']);
+                $q->whereRaw('DATE(COALESCE(ama.created_at, aa.created_at)) >= ?', [$validated['from_date']]);
             })
             ->when(! empty($validated['to_date']), function ($q) use ($validated) {
-                $q->whereDate('aa.created_at', '<=', $validated['to_date']);
+                $q->whereRaw('DATE(COALESCE(ama.created_at, aa.created_at)) <= ?', [$validated['to_date']]);
             })
             ->when(! empty($validated['keyword']), function ($q) use ($validated) {
                 $keyword = trim($validated['keyword']);
@@ -178,7 +194,7 @@ class FacultyLecturerHourApprovalController extends Controller
                 'f.name as faculty_name',
                 DB::raw('COUNT(DISTINCT ra.id) as works_count'),
                 DB::raw('COALESCE(SUM(COALESCE(ram.hours_assigned, 0)), 0) as total_hours_requested'),
-                DB::raw('MAX(aa.created_at) as submitted_at'),
+                DB::raw("MAX({$approvalCreatedAtExpr}) as submitted_at"),
                 DB::raw($statusCase . ' as status_code'),
             ])
             ->groupBy('l.id', 'l.code', 'l.full_name', 'f.id', 'f.name');
@@ -189,7 +205,7 @@ class FacultyLecturerHourApprovalController extends Controller
         }
 
         $paginator = $query
-            ->orderByDesc(DB::raw('MAX(aa.created_at)'))
+            ->orderByDesc(DB::raw("MAX({$approvalCreatedAtExpr})"))
             ->paginate($perPage, ['*'], 'page', $page);
 
         $items = collect($paginator->items())->map(function ($row) {
@@ -210,6 +226,7 @@ class FacultyLecturerHourApprovalController extends Controller
                 'status_label' => $this->statusLabel($statusCode),
                 'status' => $statusCode,
                 'partial_approved' => $statusCode === 'partially_approved',
+                'partially_approved' => $statusCode === 'partially_approved',
             ];
         })->all();
 
@@ -270,6 +287,11 @@ class FacultyLecturerHourApprovalController extends Controller
         $items = DB::table('activity_approvals as aa')
             ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
             ->join('activity_kinds as ak', 'ra.kind_id', '=', 'ak.id')
+            ->leftJoin('activity_member_approvals as ama', function ($join) use ($requestId, $stageId) {
+                $join->on('ama.activity_id', '=', 'ra.id')
+                    ->where('ama.lecturer_id', '=', $requestId)
+                    ->where('ama.stage_id', '=', $stageId);
+            })
             ->join('research_activity_members as ram', function ($join) use ($requestId) {
                 $join->on('ram.activity_id', '=', 'ra.id')
                     ->where('ram.lecturer_id', '=', $requestId);
@@ -280,7 +302,7 @@ class FacultyLecturerHourApprovalController extends Controller
             ->when($academicYearId !== null, function ($query) use ($academicYearId) {
                 $query->where('ra.academic_year_id', $academicYearId);
             })
-            ->orderByDesc('aa.created_at')
+            ->orderByDesc(DB::raw('COALESCE(ama.created_at, aa.created_at)'))
             ->select([
                 'ra.id as activity_id',
                 'ra.title as activity_title',
@@ -293,9 +315,9 @@ class FacultyLecturerHourApprovalController extends Controller
                 'mr.code as member_role_code',
                 'ram.contribution_share',
                 'ram.hours_assigned as hours_converted',
-                'aa.status as approval_status',
-                'aa.note as approval_note',
-                'aa.created_at as submitted_at',
+                DB::raw('COALESCE(ama.status, aa.status) as approval_status'),
+                DB::raw('COALESCE(ama.note, aa.note) as approval_note'),
+                DB::raw('COALESCE(ama.created_at, aa.created_at) as submitted_at'),
             ])
             ->get();
 
@@ -371,6 +393,7 @@ class FacultyLecturerHourApprovalController extends Controller
                 'status' => $statusCode,
                 'status_label' => $this->statusLabel($statusCode),
                 'partial_approved' => $statusCode === 'partially_approved',
+                'partially_approved' => $statusCode === 'partially_approved',
                 'note_from_lecturer' => null,
                 'note_from_faculty' => $noteFromFaculty,
                 'note_from_faculty_reason_code' => $noteFromFacultyReasonCode,
@@ -448,17 +471,15 @@ class FacultyLecturerHourApprovalController extends Controller
                     'updated_at' => $updatedAt,
                 ]);
 
-            $academicYearIds = $pendingRows
-                ->pluck('academic_year_id')
-                ->filter()
-                ->map(fn($id) => (int) $id)
-                ->unique()
-                ->values()
-                ->all();
-
-            foreach ($academicYearIds as $academicYearId) {
-                $this->syncLecturerYearlyHours($requestId, $academicYearId, $stageId, $updatedAt);
-            }
+            $this->shadowWriteMemberApprovals(
+                $pendingRows,
+                $requestId,
+                $stageId,
+                'approved',
+                $request->user()?->id,
+                $updatedAt,
+                null
+            );
         });
 
         $approvedActivityIds = $pendingRows
@@ -467,6 +488,8 @@ class FacultyLecturerHourApprovalController extends Controller
             ->unique()
             ->values()
             ->all();
+
+        $this->recalculateLecturerYearlyHoursService->recalculateForActivities($approvedActivityIds);
 
         $context = $this->buildHoursApprovalContext($stageId, $requestId);
         AuditLogger::log($request, [
@@ -600,26 +623,27 @@ class FacultyLecturerHourApprovalController extends Controller
         ], JSON_UNESCAPED_UNICODE);
 
         $updatedAt = now();
-        DB::table('activity_approvals')
-            ->whereIn('id', $pendingIds)
-            ->update([
-                'status' => 'rejected',
-                'decided_by_user_id' => $request->user()?->id,
-                'decided_at' => $updatedAt,
-                'note' => $note,
-                'updated_at' => $updatedAt,
-            ]);
+        DB::transaction(function () use ($pendingIds, $request, $updatedAt, $note, $pendingRows, $requestId, $stageId) {
+            DB::table('activity_approvals')
+                ->whereIn('id', $pendingIds)
+                ->update([
+                    'status' => 'rejected',
+                    'decided_by_user_id' => $request->user()?->id,
+                    'decided_at' => $updatedAt,
+                    'note' => $note,
+                    'updated_at' => $updatedAt,
+                ]);
 
-        $academicYearIds = $pendingRows
-            ->pluck('academic_year_id')
-            ->filter()
-            ->map(fn($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
-        foreach ($academicYearIds as $academicYearId) {
-            $this->syncLecturerYearlyHours($requestId, $academicYearId, $stageId, $updatedAt);
-        }
+            $this->shadowWriteMemberApprovals(
+                $pendingRows,
+                $requestId,
+                $stageId,
+                'rejected',
+                $request->user()?->id,
+                $updatedAt,
+                $note
+            );
+        });
 
         $rejectedActivityIds = $pendingRows
             ->pluck('activity_id')
@@ -627,6 +651,8 @@ class FacultyLecturerHourApprovalController extends Controller
             ->unique()
             ->values()
             ->all();
+
+        $this->recalculateLecturerYearlyHoursService->recalculateForActivities($rejectedActivityIds);
 
         $context = $this->buildHoursApprovalContext($stageId, $requestId);
         AuditLogger::log($request, [
@@ -783,9 +809,14 @@ class FacultyLecturerHourApprovalController extends Controller
     {
         $query = DB::table('activity_approvals as aa')
             ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
+            ->leftJoin('activity_member_approvals as ama', function ($join) use ($stageId, $lecturerId) {
+                $join->on('ama.activity_id', '=', 'ra.id')
+                    ->where('ama.stage_id', '=', $stageId)
+                    ->where('ama.lecturer_id', '=', $lecturerId);
+            })
             ->where('aa.stage_id', $stageId)
             ->where('ra.owner_lecturer_id', $lecturerId)
-            ->where('aa.status', 'pending');
+            ->whereRaw("COALESCE(ama.status, aa.status) = 'pending'");
 
         if (! empty($activityIds)) {
             $query->whereIn('ra.id', $activityIds);
@@ -833,6 +864,11 @@ class FacultyLecturerHourApprovalController extends Controller
         $query = DB::table('activity_approvals as aa')
             ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
             ->join('lecturers as l', 'ra.owner_lecturer_id', '=', 'l.id')
+            ->leftJoin('activity_member_approvals as ama', function ($join) use ($stageId) {
+                $join->on('ama.activity_id', '=', 'ra.id')
+                    ->on('ama.lecturer_id', '=', 'l.id')
+                    ->where('ama.stage_id', '=', $stageId);
+            })
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('academic_years as ay', 'ra.academic_year_id', '=', 'ay.id')
             ->where('aa.stage_id', $stageId)
@@ -842,7 +878,7 @@ class FacultyLecturerHourApprovalController extends Controller
             ->orderByDesc('ay.start_date');
 
         if ($status) {
-            $query->where('aa.status', $status);
+            $query->whereRaw('COALESCE(ama.status, aa.status) = ?', [$status]);
         }
 
         $value = $query->value('ra.academic_year_id');
@@ -888,43 +924,41 @@ class FacultyLecturerHourApprovalController extends Controller
         ];
     }
 
-    private function syncLecturerYearlyHours(int $lecturerId, int $academicYearId, int $hoursStageId, $updatedAt): void
-    {
-        $approvedHours = (float) DB::table('activity_approvals as aa')
-            ->join('research_activities as ra', 'aa.activity_id', '=', 'ra.id')
-            ->join('research_activity_members as ram', function ($join) use ($lecturerId) {
-                $join->on('ram.activity_id', '=', 'ra.id')
-                    ->where('ram.lecturer_id', '=', $lecturerId);
+    private function shadowWriteMemberApprovals(
+        $rows,
+        int $lecturerId,
+        int $stageId,
+        string $status,
+        ?int $decidedByUserId,
+        $decidedAt,
+        ?string $note
+    ): void {
+        $records = collect($rows)
+            ->map(function ($row) use ($lecturerId, $stageId, $status, $decidedByUserId, $decidedAt, $note) {
+                return [
+                    'activity_id' => (int) $row->activity_id,
+                    'lecturer_id' => $lecturerId,
+                    'stage_id' => $stageId,
+                    'status' => $status,
+                    'decided_by_user_id' => $decidedByUserId,
+                    'decided_at' => $decidedAt,
+                    'note' => $note,
+                    'created_at' => $decidedAt,
+                    'updated_at' => $decidedAt,
+                ];
             })
-            ->where('aa.stage_id', $hoursStageId)
-            ->where('aa.status', 'approved')
-            ->where('ra.owner_lecturer_id', $lecturerId)
-            ->where('ra.academic_year_id', $academicYearId)
-            ->sum(DB::raw('COALESCE(ram.hours_assigned, 0)'));
+            ->values()
+            ->all();
 
-        $existingId = DB::table('lecturer_yearly_hours')
-            ->where('lecturer_id', $lecturerId)
-            ->where('academic_year_id', $academicYearId)
-            ->value('id');
-
-        if ($existingId) {
-            DB::table('lecturer_yearly_hours')
-                ->where('id', (int) $existingId)
-                ->update([
-                    'hours_total' => $approvedHours,
-                    'updated_at' => $updatedAt,
-                ]);
-
+        if ($records === []) {
             return;
         }
 
-        DB::table('lecturer_yearly_hours')->insert([
-            'lecturer_id' => $lecturerId,
-            'academic_year_id' => $academicYearId,
-            'hours_total' => $approvedHours,
-            'created_at' => $updatedAt,
-            'updated_at' => $updatedAt,
-        ]);
+        DB::table('activity_member_approvals')->upsert(
+            $records,
+            ['activity_id', 'lecturer_id', 'stage_id'],
+            ['status', 'decided_by_user_id', 'decided_at', 'note', 'updated_at']
+        );
     }
 
     public function downloadEvidence(Request $request, int $evidence)

@@ -155,10 +155,50 @@
 
                   <div>
                     <div class="text-xs font-semibold text-slate-500">
-                      Giờ NCKH của bạn
+                      Giờ NCKH của giảng viên
                     </div>
                     <div class="mt-1 text-slate-900">
                       {{ detail.lecturerHours ?? "—" }}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section
+                v-for="workDetailSection in workDetailSections"
+                :key="workDetailSection.code"
+                class="rounded-xl border border-slate-200 bg-white p-4"
+              >
+                <div class="text-sm font-semibold text-slate-900">
+                  {{ workDetailSection.title }}
+                </div>
+
+                <div class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                  <div
+                    v-for="detailField in workDetailSection.fields"
+                    :key="`${workDetailSection.code}-${detailField.key}`"
+                    :class="{
+                      'md:col-span-2': shouldSpanTwoColumns(
+                        detailField.key,
+                        detailField.value,
+                      ),
+                    }"
+                  >
+                    <div class="text-xs font-semibold text-slate-500">
+                      {{ detailField.label }}
+                    </div>
+
+                    <a
+                      v-if="isLinkFieldValue(detailField.value)"
+                      :href="String(detailField.value)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="mt-1 inline-flex break-all text-sky-700 hover:underline"
+                    >
+                      {{ String(detailField.value) }}
+                    </a>
+                    <div v-else class="mt-1 whitespace-pre-wrap text-slate-900">
+                      {{ formatDetailFieldValue(detailField.value) }}
                     </div>
                   </div>
                 </div>
@@ -357,6 +397,7 @@ import { computed, watch } from "vue";
 import type {
   ApprovedDetail,
   Evidence,
+  WorkDetailField,
 } from "../lecturerResearchWork.contracts";
 import { ArrowLeftToLine } from "lucide-vue-next";
 import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
@@ -408,6 +449,10 @@ const fileEvidenceItems = computed(() => {
   );
 });
 
+const workDetailSections = computed(() => {
+  return props.detail?.workDetail?.sections ?? [];
+});
+
 function emitBack() {
   emit("back");
 }
@@ -433,6 +478,37 @@ function formatFileSize(sizeBytes: number | null) {
     unitIndex += 1;
   }
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatDetailFieldValue(value: WorkDetailField["value"]): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Có" : "Không";
+  const text = String(value).trim();
+  return text === "" ? "—" : text;
+}
+
+function isLinkFieldValue(value: WorkDetailField["value"]): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("http://") || normalized.startsWith("https://");
+}
+
+function shouldSpanTwoColumns(
+  key: string,
+  value: WorkDetailField["value"],
+): boolean {
+  const wideFieldKeys = new Set([
+    "objectives",
+    "content_summary",
+    "main_results",
+    "keywords",
+    "application_address",
+    "article_url",
+    "journal_website",
+  ]);
+  if (wideFieldKeys.has(key)) return true;
+  if (typeof value !== "string") return false;
+  return value.trim().length > 70;
 }
 
 function isEvidenceLoading(evidenceId: number): boolean {

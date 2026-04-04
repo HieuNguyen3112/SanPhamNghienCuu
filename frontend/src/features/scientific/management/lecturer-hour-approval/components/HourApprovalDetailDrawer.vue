@@ -284,6 +284,28 @@
                             giờ
                           </span>
                         </div>
+                        <div
+                          v-if="
+                            item.formulaExplanation.baseHours != null &&
+                            item.formulaExplanation.progressPercent != null
+                          "
+                          class="mt-1"
+                        >
+                          Công thức tiến độ:
+                          <span class="font-semibold text-slate-900">
+                            {{
+                              formatHours(item.formulaExplanation.baseHours)
+                            }}
+                            × {{ item.formulaExplanation.progressPercent }}% =
+                            {{
+                              formatHours(
+                                item.totalHoursActivity ??
+                                  item.formulaExplanation.totalHoursActivity,
+                              )
+                            }}
+                            giờ
+                          </span>
+                        </div>
                         <div class="mt-1">
                           Tổng giờ công trình (sau tiến độ):
                           <span class="font-semibold text-slate-900">
@@ -454,6 +476,12 @@
                   :class="statusTextClass(detail.status)"
                 >
                   {{ statusLabel(detail.status) }}
+                </span>
+                <span
+                  v-if="detail.partiallyApproved"
+                  class="ml-2 inline-flex rounded-full bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-700 ring-1 ring-cyan-200"
+                >
+                  Đã duyệt một phần
                 </span>
               </div>
 

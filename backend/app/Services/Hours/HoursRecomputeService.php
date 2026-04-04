@@ -17,7 +17,7 @@ class HoursRecomputeService
         $this->allocator = $allocator;
     }
 
-    public function recomputeActivity(int $activityId, $executedAt = null, bool $persist = true): array
+    public function recomputeActivity(int $activityId, $executedAt = null, bool $persist = false): array
     {
         $timestamp = $executedAt ?? now();
 
@@ -33,6 +33,7 @@ class HoursRecomputeService
                 'ra.start_date',
                 'ra.end_date',
                 'ra.quantity',
+                'ra.total_hours_calc',
                 'ak.code as kind_code',
                 'at.code as type_code',
             ])
@@ -72,6 +73,8 @@ class HoursRecomputeService
                 'ram.id',
                 'ram.lecturer_id',
                 'ram.hours_claimed_before',
+                'ram.contribution_share as current_contribution_share',
+                'ram.hours_assigned as current_hours_assigned',
                 'mr.code as member_role_code',
                 'ra.owner_lecturer_id',
             ])
@@ -102,7 +105,17 @@ class HoursRecomputeService
         $resolvedRuleId = $this->resolveRuleId($rule);
         $effectiveTotalHours = $calculated['total_hours_to_add'] ?? $calculated['total_hours_activity'];
 
-        if ($persist && $effectiveTotalHours !== null) {
+        $shouldPersist = $persist
+            && $effectiveTotalHours !== null
+            && $this->shouldPersistSnapshot(
+                $activityId,
+                $activity,
+                $members->all(),
+                $calculated['members'],
+                (float) $effectiveTotalHours
+            );
+
+        if ($shouldPersist) {
             DB::table('research_activities')
                 ->where('id', $activityId)
                 ->update([
@@ -171,7 +184,8 @@ class HoursRecomputeService
         int $lecturerId,
         int $approvedStatusId,
         ?int $academicYearId = null,
-        int $limit = 200
+        int $limit = 200,
+        bool $persist = true
     ): array {
         $activityIds = $this->collectBackfillActivityIds($lecturerId, $approvedStatusId, $academicYearId, $limit);
 
@@ -180,7 +194,7 @@ class HoursRecomputeService
         $processedIds = [];
 
         foreach ($activityIds as $activityId) {
-            $result = $this->recomputeActivity($activityId, now(), true);
+            $result = $this->recomputeActivity($activityId, now(), $persist);
             if ($result['total_hours_activity'] === null) {
                 $skipped++;
                 continue;
@@ -201,7 +215,8 @@ class HoursRecomputeService
         int $lecturerId,
         int $approvedStatusId,
         ?int $academicYearId = null,
-        int $limit = 200
+        int $limit = 200,
+        bool $persist = false
     ): array {
         $query = DB::table('research_activities as ra')
             ->leftJoin('research_activity_members as ram_self', function ($join) use ($lecturerId) {
@@ -232,7 +247,7 @@ class HoursRecomputeService
             ];
         }
 
-        $results = $this->recomputeActivities($activityIds, now());
+        $results = $this->recomputeActivities($activityIds, now(), $persist);
         $recomputed = 0;
         foreach ($results as $result) {
             if (($result['total_hours_activity'] ?? null) !== null) {
@@ -246,12 +261,12 @@ class HoursRecomputeService
         ];
     }
 
-    public function recomputeActivities(array $activityIds, $executedAt = null): array
+    public function recomputeActivities(array $activityIds, $executedAt = null, bool $persist = false): array
     {
         $timestamp = $executedAt ?? now();
         $results = [];
         foreach (array_values(array_unique(array_map('intval', $activityIds))) as $activityId) {
-            $results[$activityId] = $this->recomputeActivity($activityId, $timestamp, true);
+            $results[$activityId] = $this->recomputeActivity($activityId, $timestamp, $persist);
         }
 
         return $results;
@@ -308,5 +323,79 @@ class HoursRecomputeService
 
         $id = (int) $rule->id;
         return $id > 0 ? $id : null;
+    }
+
+    private function shouldPersistSnapshot(
+        int $activityId,
+        object $activity,
+        array $members,
+        array $calculatedMembers,
+        float $effectiveTotalHours
+    ): bool {
+        $hasSnapshot = DB::table('calculation_logs')
+            ->where('activity_id', $activityId)
+            ->exists();
+
+        if (! $hasSnapshot) {
+            return true;
+        }
+
+        $currentTotalHours = $activity->total_hours_calc !== null
+            ? (float) $activity->total_hours_calc
+            : null;
+
+        if ($currentTotalHours === null || $this->valuesDiffer($currentTotalHours, $effectiveTotalHours)) {
+            return true;
+        }
+
+        $currentMembersById = [];
+        foreach ($members as $member) {
+            $currentMembersById[(int) $member->id] = $member;
+        }
+
+        foreach ($calculatedMembers as $calculatedMember) {
+            $memberRowId = (int) ($calculatedMember['member_row_id'] ?? 0);
+            if ($memberRowId <= 0) {
+                continue;
+            }
+
+            $currentMember = $currentMembersById[$memberRowId] ?? null;
+            if (! $currentMember) {
+                return true;
+            }
+
+            $nextHours = isset($calculatedMember['hours_assigned'])
+                ? (float) $calculatedMember['hours_assigned']
+                : null;
+            $nextShare = isset($calculatedMember['contribution_share'])
+                ? (float) $calculatedMember['contribution_share']
+                : null;
+
+            $currentHours = $currentMember->current_hours_assigned !== null
+                ? (float) $currentMember->current_hours_assigned
+                : null;
+            $currentShare = $currentMember->current_contribution_share !== null
+                ? (float) $currentMember->current_contribution_share
+                : null;
+
+            if ($this->valuesDiffer($currentHours, $nextHours) || $this->valuesDiffer($currentShare, $nextShare)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function valuesDiffer(?float $left, ?float $right): bool
+    {
+        if ($left === null && $right === null) {
+            return false;
+        }
+
+        if ($left === null || $right === null) {
+            return true;
+        }
+
+        return abs($left - $right) >= 0.0001;
     }
 }

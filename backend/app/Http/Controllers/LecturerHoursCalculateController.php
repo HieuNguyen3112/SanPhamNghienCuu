@@ -71,13 +71,6 @@ class LecturerHoursCalculateController extends Controller
         $selectedAcademicYearId = $selectedAcademicYear ? (int) $selectedAcademicYear->id : null;
         $filters['academic_year_id'] = $selectedAcademicYearId;
 
-        // Đồng bộ lại giờ cho các công trình đã khoa duyệt để tránh dữ liệu cũ bị lệch quy tắc.
-        $this->hoursRecomputeService->recomputeApprovedActivitiesForLecturer(
-            (int) $lecturer->id,
-            $approvedStatusId,
-            $selectedAcademicYearId
-        );
-
         $page = max(1, (int) ($filters['page'] ?? 1));
         $perPage = max(1, min(100, (int) ($filters['per_page'] ?? 12)));
 
@@ -92,6 +85,18 @@ class LecturerHoursCalculateController extends Controller
 
         $query->orderByDesc('ra.updated_at');
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+
+        $currentPageActivityIds = collect($paginator->items())
+            ->pluck('activity_id')
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($currentPageActivityIds !== []) {
+            $this->hoursRecomputeService->recomputeActivities($currentPageActivityIds, now(), false);
+        }
 
         $items = collect($paginator->items())->map(fn($row) => $this->mapListItem($row))->all();
         $approvedCount = $this->approvedCount((int) $lecturer->id, $approvedStatusId, $selectedAcademicYearId);
@@ -143,7 +148,7 @@ class LecturerHoursCalculateController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $this->hoursRecomputeService->recomputeActivity((int) $activityId, now(), true);
+        $this->hoursRecomputeService->recomputeActivity((int) $activityId, now(), false);
 
         $row = $this->detailQuery($lecturer->id, $hoursStageId, $approvedStatusId)
             ->where('ra.id', $activityId)
@@ -257,7 +262,7 @@ class LecturerHoursCalculateController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $this->hoursRecomputeService->recomputeActivities($eligibleIds, now());
+        $this->hoursRecomputeService->recomputeActivities($eligibleIds, now(), true);
 
         $rows = $this->baseQuery((int) $lecturer->id, $hoursStageId, $approvedStatusId)
             ->whereIn('ra.id', $eligibleIds)
@@ -384,7 +389,7 @@ class LecturerHoursCalculateController extends Controller
         $submittedIds = [];
         $skipped = [];
 
-        DB::transaction(function () use ($eligibleIds, $hoursStageId, $now, &$submittedIds, &$skipped) {
+        DB::transaction(function () use ($eligibleIds, $hoursStageId, $now, &$submittedIds, &$skipped, $lecturer) {
             $existing = DB::table('activity_approvals')
                 ->where('stage_id', $hoursStageId)
                 ->whereIn('activity_id', $eligibleIds)
@@ -438,6 +443,17 @@ class LecturerHoursCalculateController extends Controller
                         'updated_at' => $now,
                     ]);
             }
+
+            $this->upsertMemberHoursApprovals(
+                $submittedIds,
+                (int) $lecturer->id,
+                $hoursStageId,
+                'pending',
+                null,
+                null,
+                null,
+                $now
+            );
         });
 
         if (empty($submittedIds)) {
@@ -563,7 +579,7 @@ class LecturerHoursCalculateController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
-        $hoursStatus = $this->resolveHoursApprovalStatus($activityId, $hoursStageId);
+        $hoursStatus = $this->resolveHoursApprovalStatus($activityId, $hoursStageId, (int) $lecturer->id);
         if ($hoursStatus === 'approved') {
             return response()->json([
                 'message' => 'Đã duyệt giờ, không thể cập nhật minh chứng.',
@@ -724,7 +740,7 @@ class LecturerHoursCalculateController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
-        $hoursStatus = $this->resolveHoursApprovalStatus((int) $evidence->activity_id, $hoursStageId);
+        $hoursStatus = $this->resolveHoursApprovalStatus((int) $evidence->activity_id, $hoursStageId, (int) $lecturer->id);
         if ($hoursStatus === 'approved') {
             return response()->json([
                 'message' => 'Đã duyệt giờ, không thể cập nhật minh chứng.',
@@ -929,6 +945,11 @@ class LecturerHoursCalculateController extends Controller
             ->leftJoinSub($memberStatsSubQuery, 'rms', function ($join) {
                 $join->on('rms.activity_id', '=', 'ra.id');
             })
+            ->leftJoin('activity_member_approvals as ama_hours', function ($join) use ($hoursStageId, $lecturerId) {
+                $join->on('ama_hours.activity_id', '=', 'ra.id')
+                    ->where('ama_hours.stage_id', '=', $hoursStageId)
+                    ->where('ama_hours.lecturer_id', '=', $lecturerId);
+            })
             ->leftJoin('activity_approvals as aa_hours', function ($join) use ($hoursStageId) {
                 $join->on('aa_hours.activity_id', '=', 'ra.id')
                     ->where('aa_hours.stage_id', '=', $hoursStageId);
@@ -956,8 +977,8 @@ class LecturerHoursCalculateController extends Controller
                 'ram.hours_claimed_before',
                 'ram.contribution_share',
                 'ast.code as activity_status_code',
-                'aa_hours.status as hours_approval_status',
-                'aa_hours.note as hours_approval_note',
+                DB::raw('COALESCE(ama_hours.status, aa_hours.status) as hours_approval_status'),
+                DB::raw('COALESCE(ama_hours.note, aa_hours.note) as hours_approval_note'),
                 DB::raw('COALESCE(efc.evidence_count, 0) as evidence_count'),
                 DB::raw('COALESCE(rms.member_count, 1) as member_count'),
                 DB::raw('COALESCE(rms.principal_count, 0) as principal_count'),
@@ -1015,20 +1036,22 @@ class LecturerHoursCalculateController extends Controller
 
         $normalized = strtolower(trim($status));
         $revisionMarker = '%"decision_mode":"revision"%';
+        $statusExpr = 'COALESCE(ama_hours.status, aa_hours.status)';
+        $noteExpr = 'COALESCE(ama_hours.note, aa_hours.note)';
         if (in_array($normalized, ['not_submitted', 'hours_not_submitted'], true)) {
-            $query->whereNull('aa_hours.status');
+            $query->whereRaw("{$statusExpr} IS NULL");
         } elseif (in_array($normalized, ['pending', 'hours_pending_faculty'], true)) {
-            $query->where('aa_hours.status', 'pending');
+            $query->whereRaw("{$statusExpr} = 'pending'");
         } elseif (in_array($normalized, ['approved', 'hours_approved'], true)) {
-            $query->where('aa_hours.status', 'approved');
+            $query->whereRaw("{$statusExpr} = 'approved'");
         } elseif (in_array($normalized, ['need_revision', 'hours_need_revision'], true)) {
-            $query->where('aa_hours.status', 'rejected')
-                ->where('aa_hours.note', 'like', $revisionMarker);
+            $query->whereRaw("{$statusExpr} = 'rejected'")
+                ->whereRaw("{$noteExpr} LIKE ?", [$revisionMarker]);
         } elseif (in_array($normalized, ['rejected', 'hours_rejected'], true)) {
-            $query->where('aa_hours.status', 'rejected')
+            $query->whereRaw("{$statusExpr} = 'rejected'")
                 ->where(function ($sub) use ($revisionMarker) {
-                    $sub->whereNull('aa_hours.note')
-                        ->orWhere('aa_hours.note', 'not like', $revisionMarker);
+                    $sub->whereRaw('COALESCE(ama_hours.note, aa_hours.note) IS NULL')
+                        ->orWhereRaw('COALESCE(ama_hours.note, aa_hours.note) NOT LIKE ?', [$revisionMarker]);
                 });
         }
     }
@@ -1040,7 +1063,7 @@ class LecturerHoursCalculateController extends Controller
         }
 
         $query
-            ->whereNull('aa_hours.status')
+            ->whereRaw('COALESCE(ama_hours.status, aa_hours.status) IS NULL')
             ->whereRaw('COALESCE(efc.evidence_count, 0) = 0');
     }
 
@@ -1564,6 +1587,21 @@ class LecturerHoursCalculateController extends Controller
             'member_share_percent' => $memberSharePercent,
             'member_role_code' => $memberRoleCode,
             'contribution_share' => $contributionShare,
+            'progress' => $progressPercent,
+            'role' => $memberRoleCode,
+            'claimed_before' => is_array($calculatedMember)
+                ? ($calculatedMember['hours_claimed_before'] ?? ($hoursClaimedBefore ?? 0.0))
+                : ($hoursClaimedBefore ?? 0.0),
+            'final_hours' => $memberHours,
+            'explainability' => [
+                'base_hours' => $formula['base_hours'] ?? null,
+                'progress' => $progressPercent,
+                'role' => $memberRoleCode,
+                'claimed_before' => is_array($calculatedMember)
+                    ? ($calculatedMember['hours_claimed_before'] ?? ($hoursClaimedBefore ?? 0.0))
+                    : ($hoursClaimedBefore ?? 0.0),
+                'final_hours' => $memberHours,
+            ],
         ];
 
         $calculatedHours = $rulePresent
@@ -2108,8 +2146,64 @@ class LecturerHoursCalculateController extends Controller
             ->first();
     }
 
-    private function resolveHoursApprovalStatus(int $activityId, int $hoursStageId): ?string
+    private function upsertMemberHoursApprovals(
+        array $activityIds,
+        int $lecturerId,
+        int $stageId,
+        string $status,
+        ?int $decidedByUserId,
+        $decidedAt,
+        ?string $note,
+        $timestamp
+    ): void {
+        $activityIds = array_values(array_unique(array_map('intval', $activityIds)));
+        if ($activityIds === [] || $lecturerId <= 0 || $stageId <= 0) {
+            return;
+        }
+
+        $records = array_map(function (int $activityId) use (
+            $lecturerId,
+            $stageId,
+            $status,
+            $decidedByUserId,
+            $decidedAt,
+            $note,
+            $timestamp
+        ) {
+            return [
+                'activity_id' => $activityId,
+                'lecturer_id' => $lecturerId,
+                'stage_id' => $stageId,
+                'status' => $status,
+                'decided_by_user_id' => $decidedByUserId,
+                'decided_at' => $decidedAt,
+                'note' => $note,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }, $activityIds);
+
+        DB::table('activity_member_approvals')->upsert(
+            $records,
+            ['activity_id', 'lecturer_id', 'stage_id'],
+            ['status', 'decided_by_user_id', 'decided_at', 'note', 'updated_at']
+        );
+    }
+
+    private function resolveHoursApprovalStatus(int $activityId, int $hoursStageId, ?int $lecturerId = null): ?string
     {
+        if ($lecturerId && $lecturerId > 0) {
+            $memberStatus = DB::table('activity_member_approvals')
+                ->where('activity_id', $activityId)
+                ->where('stage_id', $hoursStageId)
+                ->where('lecturer_id', $lecturerId)
+                ->value('status');
+
+            if ($memberStatus) {
+                return strtolower((string) $memberStatus);
+            }
+        }
+
         $status = DB::table('activity_approvals')
             ->where('activity_id', $activityId)
             ->where('stage_id', $hoursStageId)

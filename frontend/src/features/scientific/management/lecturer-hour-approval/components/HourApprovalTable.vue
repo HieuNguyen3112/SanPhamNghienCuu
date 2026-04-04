@@ -66,13 +66,21 @@
             </td>
 
             <td class="px-3 py-2 text-center">
-              <span
-                class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ring-1"
-                :class="statusPillClass(row.status)"
-              >
-                <component :is="statusIcon(row.status)" class="h-4 w-4" />
-                {{ statusLabel(row.status) }}
-              </span>
+              <div class="inline-flex flex-col items-center gap-1">
+                <span
+                  class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ring-1"
+                  :class="statusPillClass(row.status)"
+                >
+                  <component :is="statusIcon(row.status)" class="h-4 w-4" />
+                  {{ statusLabel(row.status) }}
+                </span>
+                <span
+                  v-if="row.partiallyApproved"
+                  class="inline-flex rounded-full bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-700 ring-1 ring-cyan-200"
+                >
+                  Đã duyệt một phần
+                </span>
+              </div>
             </td>
           </tr>
         </tbody>

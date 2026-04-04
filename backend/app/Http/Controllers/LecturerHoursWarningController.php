@@ -204,9 +204,9 @@ class LecturerHoursWarningController extends Controller
     private function summaryTotals(int $lecturerId, int $academicYearId, int $hoursStageId): array
     {
         $row = $this->hoursApprovalQuery($lecturerId, $academicYearId, $hoursStageId)
-            ->selectRaw("COALESCE(SUM(CASE WHEN aa.status = 'approved' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as approved_hours")
-            ->selectRaw("COALESCE(SUM(CASE WHEN aa.status = 'pending' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as pending_hours")
-            ->selectRaw("COALESCE(SUM(CASE WHEN aa.status = 'rejected' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as rejected_hours")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(ama.status, aa.status) = 'approved' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as approved_hours")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(ama.status, aa.status) = 'pending' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as pending_hours")
+            ->selectRaw("COALESCE(SUM(CASE WHEN COALESCE(ama.status, aa.status) = 'rejected' THEN COALESCE(ram.hours_assigned, 0) ELSE 0 END), 0) as rejected_hours")
             ->first();
 
         return [
@@ -223,6 +223,11 @@ class LecturerHoursWarningController extends Controller
             ->join('research_activity_members as ram', function ($join) use ($lecturerId) {
                 $join->on('ram.activity_id', '=', 'ra.id')
                     ->where('ram.lecturer_id', '=', $lecturerId);
+            })
+            ->leftJoin('activity_member_approvals as ama', function ($join) use ($lecturerId, $hoursStageId) {
+                $join->on('ama.activity_id', '=', 'ra.id')
+                    ->where('ama.lecturer_id', '=', $lecturerId)
+                    ->where('ama.stage_id', '=', $hoursStageId);
             })
             ->where('aa.stage_id', $hoursStageId)
             ->where('ra.academic_year_id', $academicYearId);
@@ -241,17 +246,17 @@ class LecturerHoursWarningController extends Controller
         $base = $this->eligibleWorkQuery($lecturerId, $academicYearId, $assistantStageId, $managerStageId, $hoursStageId);
 
         $notSubmitted = (clone $base)
-            ->whereNull('aa_hours.status')
+            ->whereRaw('COALESCE(ama_hours.status, aa_hours.status) IS NULL')
             ->distinct()
             ->count('ra.id');
 
         $pending = (clone $base)
-            ->where('aa_hours.status', 'pending')
+            ->whereRaw("COALESCE(ama_hours.status, aa_hours.status) = 'pending'")
             ->distinct()
             ->count('ra.id');
 
         $rejected = (clone $base)
-            ->where('aa_hours.status', 'rejected')
+            ->whereRaw("COALESCE(ama_hours.status, aa_hours.status) = 'rejected'")
             ->distinct()
             ->count('ra.id');
 
@@ -278,14 +283,19 @@ class LecturerHoursWarningController extends Controller
                 $join->on('aa_hours.activity_id', '=', 'ra.id')
                     ->where('aa_hours.stage_id', '=', $hoursStageId);
             })
+            ->leftJoin('activity_member_approvals as ama_hours', function ($join) use ($lecturerId, $hoursStageId) {
+                $join->on('ama_hours.activity_id', '=', 'ra.id')
+                    ->where('ama_hours.lecturer_id', '=', $lecturerId)
+                    ->where('ama_hours.stage_id', '=', $hoursStageId);
+            })
             ->where('ram.lecturer_id', $lecturerId)
             ->where('ra.academic_year_id', $academicYearId)
             ->where('aa_assistant.status', 'approved')
             ->where('aa_manager.status', 'approved');
     }
 
-    
-    
+
+
     private function buildWarnings(
         string $academicYearCode,
         float $requiredHours,
@@ -396,13 +406,13 @@ class LecturerHoursWarningController extends Controller
 
         return $warnings;
     }
-private function attachStates(int $lecturerId, int $academicYearId, array $warnings): array
+    private function attachStates(int $lecturerId, int $academicYearId, array $warnings): array
     {
         if (empty($warnings)) {
             return [];
         }
 
-        $typeKeys = array_values(array_unique(array_map(fn ($w) => $w['type_key'], $warnings)));
+        $typeKeys = array_values(array_unique(array_map(fn($w) => $w['type_key'], $warnings)));
         $existing = DB::table('lecturer_hour_warnings')
             ->where('lecturer_id', $lecturerId)
             ->where('academic_year_id', $academicYearId)
@@ -484,13 +494,13 @@ private function attachStates(int $lecturerId, int $academicYearId, array $warni
     private function applyTabFilter(array $warnings, string $tab): array
     {
         if ($tab === 'danger') {
-            return array_values(array_filter($warnings, fn ($w) => $w['severity_key'] === 'danger' && ($w['status_key'] ?? 'unseen') !== 'resolved'));
+            return array_values(array_filter($warnings, fn($w) => $w['severity_key'] === 'danger' && ($w['status_key'] ?? 'unseen') !== 'resolved'));
         }
         if ($tab === 'warning') {
-            return array_values(array_filter($warnings, fn ($w) => $w['severity_key'] === 'warning' && ($w['status_key'] ?? 'unseen') !== 'resolved'));
+            return array_values(array_filter($warnings, fn($w) => $w['severity_key'] === 'warning' && ($w['status_key'] ?? 'unseen') !== 'resolved'));
         }
         if ($tab === 'done') {
-            return array_values(array_filter($warnings, fn ($w) => ($w['status_key'] ?? 'unseen') === 'resolved'));
+            return array_values(array_filter($warnings, fn($w) => ($w['status_key'] ?? 'unseen') === 'resolved'));
         }
         return $warnings;
     }
@@ -521,7 +531,7 @@ private function attachStates(int $lecturerId, int $academicYearId, array $warni
 
     private function appendResolvedWarnings(int $lecturerId, int $academicYearId, array $warnings): array
     {
-        $activeTypes = array_values(array_unique(array_map(fn ($w) => $w['type_key'], $warnings)));
+        $activeTypes = array_values(array_unique(array_map(fn($w) => $w['type_key'], $warnings)));
 
         $stored = DB::table('lecturer_hour_warnings')
             ->where('lecturer_id', $lecturerId)
@@ -569,8 +579,8 @@ private function attachStates(int $lecturerId, int $academicYearId, array $warni
         return array_values(array_merge($warnings, $resolvedItems));
     }
 
-    
-    
+
+
     private function warningMeta(string $typeKey): array
     {
         return match ($typeKey) {
