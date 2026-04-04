@@ -274,8 +274,18 @@
                         <div class="font-medium text-slate-800">
                           {{ item.formulaExplanation.ruleName }}
                         </div>
+                        <div
+                          v-if="item.formulaExplanation.baseHours != null"
+                          class="mt-1"
+                        >
+                          Giờ gốc (100%):
+                          <span class="font-semibold text-slate-900">
+                            {{ formatHours(item.formulaExplanation.baseHours) }}
+                            giờ
+                          </span>
+                        </div>
                         <div class="mt-1">
-                          Tổng giờ công trình:
+                          Tổng giờ công trình (sau tiến độ):
                           <span class="font-semibold text-slate-900">
                             {{
                               formatHours(
@@ -284,6 +294,15 @@
                               )
                             }}
                             giờ
+                          </span>
+                          <span
+                            v-if="
+                              item.formulaExplanation.progressPercent != null
+                            "
+                            class="ml-1 text-slate-500"
+                          >
+                            ({{ item.formulaExplanation.progressPercent }}% của
+                            giờ gốc)
                           </span>
                         </div>
                         <div>
@@ -304,7 +323,16 @@
                             "
                             class="ml-1 text-slate-500"
                           >
-                            ({{ item.formulaExplanation.memberSharePercent }}%)
+                            (tỷ trọng vai trò:
+                            {{ item.formulaExplanation.memberSharePercent }}%)
+                          </span>
+                        </div>
+                        <div
+                          v-if="item.formulaExplanation.progressPercent != null"
+                        >
+                          Tiến độ đề tài:
+                          <span class="font-semibold text-slate-900">
+                            {{ item.formulaExplanation.progressPercent }}%
                           </span>
                         </div>
                       </div>

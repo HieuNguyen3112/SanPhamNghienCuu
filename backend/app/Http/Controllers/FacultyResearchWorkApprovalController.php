@@ -8,6 +8,7 @@ use App\Services\Hours\HoursRecomputeService;
 use App\Support\AuditLogger;
 use App\Support\WorkflowNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -18,6 +19,7 @@ class FacultyResearchWorkApprovalController extends Controller
     private const STATUS_REJECTED = 'REJECTED_BY_FACULTY';
     private const STATUS_NEED_REVISION = 'NEED_REVISION_BY_FACULTY';
     private HoursRecomputeService $hoursRecomputeService;
+    private ?array $stageIdsCache = null;
 
     public function __construct(
         HoursRecomputeService $hoursRecomputeService
@@ -32,28 +34,32 @@ class FacultyResearchWorkApprovalController extends Controller
             return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
         }
 
-        $academicYears = DB::table('academic_years')
-            ->select(['id', 'code', 'is_active'])
-            ->orderByDesc('is_active')
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn($row) => [
-                'id' => (int) $row->id,
-                'code' => $row->code,
-                'is_active' => (bool) $row->is_active,
-            ])
-            ->all();
+        $academicYears = Cache::remember('faculty_work_approvals:academic_years:v1', 300, function () {
+            return DB::table('academic_years')
+                ->select(['id', 'code', 'is_active'])
+                ->orderByDesc('is_active')
+                ->orderByDesc('id')
+                ->get()
+                ->map(fn($row) => [
+                    'id' => (int) $row->id,
+                    'code' => $row->code,
+                    'is_active' => (bool) $row->is_active,
+                ])
+                ->all();
+        });
 
-        $kinds = DB::table('activity_kinds')
-            ->select(['id', 'code', 'name'])
-            ->orderBy('name')
-            ->get()
-            ->map(fn($row) => [
-                'id' => (int) $row->id,
-                'code' => $row->code,
-                'name' => $row->name,
-            ])
-            ->all();
+        $kinds = Cache::remember('faculty_work_approvals:work_kinds:v1', 300, function () {
+            return DB::table('activity_kinds')
+                ->select(['id', 'code', 'name'])
+                ->orderBy('name')
+                ->get()
+                ->map(fn($row) => [
+                    'id' => (int) $row->id,
+                    'code' => $row->code,
+                    'name' => $row->name,
+                ])
+                ->all();
+        });
 
         return response()->json([
             'data' => [
@@ -98,15 +104,18 @@ class FacultyResearchWorkApprovalController extends Controller
         $activityIds = $items->pluck('activity_id')->all();
         $actingLecturerId = $this->resolveActingLecturerId($request);
         $authorsByActivity = $this->fetchAuthorsByActivity($activityIds);
-        $participantLecturerIdsByActivity = $this->fetchParticipantLecturerIdsByActivity($activityIds);
+        $activityIdsParticipatedByActingLecturer = $this->fetchActivityIdsParticipatedByLecturer(
+            $activityIds,
+            $actingLecturerId
+        );
 
         $rows = $items
-            ->map(function ($row) use ($authorsByActivity, $actingLecturerId, $participantLecturerIdsByActivity) {
+            ->map(function ($row) use ($authorsByActivity, $actingLecturerId, $activityIdsParticipatedByActingLecturer) {
                 return $this->mapListEntry(
                     $row,
                     $authorsByActivity,
                     $actingLecturerId,
-                    $participantLecturerIdsByActivity
+                    $activityIdsParticipatedByActingLecturer
                 );
             })
             ->values()
@@ -156,19 +165,21 @@ class FacultyResearchWorkApprovalController extends Controller
         }
 
         $actingLecturerId = $this->resolveActingLecturerId($request);
-        $participantLecturerIdsByActivity = $this->fetchParticipantLecturerIdsByActivity([(int) $activity]);
         $approverConflict = $this->resolveApproverConflict(
             $actingLecturerId,
             (int) $activity,
-            (int) $row->lecturer_id,
-            $participantLecturerIdsByActivity
+            (int) $row->lecturer_id
         );
 
-        // Recompute before rendering so the member-hours grid always uses the latest projected values.
+        // Keep detail open fast on host: only persist recomputation when hours snapshot is missing.
         $now = now();
         $this->ensureOwnerMemberExists((int) $activity, (int) $row->lecturer_id, $now);
-        $calculation = $this->hoursRecomputeService->recomputeActivity((int) $activity, $now, true);
         $members = $this->fetchMembers($activity);
+        $shouldPersistRecompute = $this->shouldPersistRecomputeForDetail($row, $members);
+        $calculation = $this->hoursRecomputeService->recomputeActivity((int) $activity, $now, $shouldPersistRecompute);
+        if ($shouldPersistRecompute) {
+            $members = $this->fetchMembers($activity);
+        }
         $computedHoursByLecturer = [];
         foreach (($calculation['members'] ?? []) as $memberHours) {
             $computedHoursByLecturer[(int) $memberHours['lecturer_id']] = $memberHours;
@@ -587,10 +598,20 @@ class FacultyResearchWorkApprovalController extends Controller
 
     private function getStageIds(): array
     {
-        return [
-            'assistant' => (int) DB::table('approval_stages')->where('code', 'assistant')->value('id'),
-            'manager' => (int) DB::table('approval_stages')->where('code', 'manager')->value('id'),
+        if ($this->stageIdsCache !== null) {
+            return $this->stageIdsCache;
+        }
+
+        $stageIdMap = DB::table('approval_stages')
+            ->whereIn('code', ['assistant', 'manager'])
+            ->pluck('id', 'code');
+
+        $this->stageIdsCache = [
+            'assistant' => (int) ($stageIdMap->get('assistant') ?? 0),
+            'manager' => (int) ($stageIdMap->get('manager') ?? 0),
         ];
+
+        return $this->stageIdsCache;
     }
 
     private function baseQuery(array $stageIds, int $facultyId)
@@ -749,7 +770,7 @@ class FacultyResearchWorkApprovalController extends Controller
         object $row,
         array $authorsByActivity,
         ?int $actingLecturerId,
-        array $participantLecturerIdsByActivity
+        array $activityIdsParticipatedByActingLecturer
     ): array {
         $activityId = (int) $row->activity_id;
         $approvalStatus = $this->resolveFacultyApprovalStatus($row) ?? self::STATUS_PENDING;
@@ -757,7 +778,7 @@ class FacultyResearchWorkApprovalController extends Controller
             $actingLecturerId,
             $activityId,
             (int) $row->lecturer_id,
-            $participantLecturerIdsByActivity
+            $activityIdsParticipatedByActingLecturer
         );
 
         return array_merge([
@@ -775,6 +796,8 @@ class FacultyResearchWorkApprovalController extends Controller
             'submitted_at' => $row->submitted_at,
             'approved_at' => $row->approved_at,
             'declared_hours' => (float) ($row->declared_hours ?? 0),
+            'computed_total_hours' => $row->total_hours_calc !== null ? (float) $row->total_hours_calc : null,
+            'hours_value_label' => 'Giờ hệ thống tính',
             'official_hours' => null,
             'evidence_count' => (int) ($row->evidence_count ?? 0),
             'lecturer' => [
@@ -790,55 +813,28 @@ class FacultyResearchWorkApprovalController extends Controller
         ], $this->buildApproverConflictPayload($approverConflict));
     }
 
-    private function fetchParticipantLecturerIdsByActivity(array $activityIds): array
+    private function fetchActivityIdsParticipatedByLecturer(array $activityIds, ?int $actingLecturerId): array
     {
-        if (count($activityIds) === 0) {
+        if (! $actingLecturerId || count($activityIds) === 0) {
             return [];
         }
 
-        $grouped = [];
-
-        $ownerRows = DB::table('research_activities')
-            ->whereIn('id', $activityIds)
-            ->select(['id', 'owner_lecturer_id'])
-            ->get();
-
-        foreach ($ownerRows as $row) {
-            $activityId = (int) $row->id;
-            if ($row->owner_lecturer_id !== null) {
-                $grouped[$activityId][] = (int) $row->owner_lecturer_id;
-            }
-        }
-
-        $memberRows = DB::table('research_activity_members')
+        return DB::table('research_activity_members')
+            ->where('lecturer_id', $actingLecturerId)
             ->whereIn('activity_id', $activityIds)
-            ->select(['activity_id', 'lecturer_id'])
-            ->get();
-
-        foreach ($memberRows as $row) {
-            $activityId = (int) $row->activity_id;
-            if ($row->lecturer_id !== null) {
-                $grouped[$activityId][] = (int) $row->lecturer_id;
-            }
-        }
-
-        foreach ($grouped as $activityId => $lecturerIds) {
-            $grouped[$activityId] = collect($lecturerIds)
-                ->map(fn($id) => (int) $id)
-                ->filter(fn($id) => $id > 0)
-                ->unique()
-                ->values()
-                ->all();
-        }
-
-        return $grouped;
+            ->pluck('activity_id')
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function resolveApproverConflict(
         ?int $actingLecturerId,
         int $activityId,
         ?int $ownerLecturerId = null,
-        ?array $participantLecturerIdsByActivity = null
+        ?array $activityIdsParticipatedByActingLecturer = null
     ): ?array {
         if (! $actingLecturerId || $activityId <= 0) {
             return null;
@@ -852,19 +848,17 @@ class FacultyResearchWorkApprovalController extends Controller
             ];
         }
 
-        $participantLecturerIds = $participantLecturerIdsByActivity[$activityId] ?? null;
-        if ($participantLecturerIds === null) {
-            $participantLecturerIds = DB::table('research_activity_members')
+        $isParticipantMember = false;
+        if (is_array($activityIdsParticipatedByActingLecturer)) {
+            $isParticipantMember = in_array($activityId, $activityIdsParticipatedByActingLecturer, true);
+        } else {
+            $isParticipantMember = DB::table('research_activity_members')
                 ->where('activity_id', $activityId)
-                ->pluck('lecturer_id')
-                ->map(fn($id) => (int) $id)
-                ->filter(fn($id) => $id > 0)
-                ->unique()
-                ->values()
-                ->all();
+                ->where('lecturer_id', $actingLecturerId)
+                ->exists();
         }
 
-        if (in_array($actingLecturerId, $participantLecturerIds, true)) {
+        if ($isParticipantMember) {
             return [
                 'code' => 'APPROVER_IS_ACTIVITY_PARTICIPANT',
                 'message' => 'You cannot approve or reject an activity you participate in.',
@@ -1313,6 +1307,27 @@ class FacultyResearchWorkApprovalController extends Controller
     private function calculateAndPersistHoursDistribution(int $activityId, $executedAt): array
     {
         return $this->hoursRecomputeService->recomputeActivity($activityId, $executedAt, true);
+    }
+
+    private function shouldPersistRecomputeForDetail(object $activityRow, array $members): bool
+    {
+        if ($activityRow->total_hours_calc === null) {
+            return true;
+        }
+
+        foreach ($members as $member) {
+            $isExternal = (bool) ($member->is_external ?? false);
+            $lecturerId = isset($member->lecturer_id) ? (int) $member->lecturer_id : 0;
+            if ($isExternal || $lecturerId <= 0) {
+                continue;
+            }
+
+            if ($member->hours_assigned === null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function getStatusId(string $code): ?int

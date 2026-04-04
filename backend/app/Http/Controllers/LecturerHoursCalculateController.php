@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Lecturer\LecturerHoursCalculateIndexRequest;
 use App\Http\Requests\Lecturer\LecturerHoursCalculateSubmitRequest;
 use App\Services\Evidence\ResearchEvidenceStorageService;
+use App\Services\Hours\HoursCalculationService;
 use App\Services\Hours\HoursRecomputeService;
 use App\Services\Hours\HoursRuleResolver;
 use App\Support\StorageDownload;
@@ -24,13 +25,16 @@ class LecturerHoursCalculateController extends Controller
     private const EVIDENCE_REQUIRED = true;
     private HoursRuleResolver $hoursRuleResolver;
     private HoursRecomputeService $hoursRecomputeService;
+    private HoursCalculationService $hoursCalculationService;
 
     public function __construct(
         HoursRuleResolver $hoursRuleResolver,
-        HoursRecomputeService $hoursRecomputeService
+        HoursRecomputeService $hoursRecomputeService,
+        HoursCalculationService $hoursCalculationService
     ) {
         $this->hoursRuleResolver = $hoursRuleResolver;
         $this->hoursRecomputeService = $hoursRecomputeService;
+        $this->hoursCalculationService = $hoursCalculationService;
     }
 
     public function index(LecturerHoursCalculateIndexRequest $request)
@@ -170,7 +174,10 @@ class LecturerHoursCalculateController extends Controller
             $row->kind_name ? (string) $row->kind_name : null,
             $row->type_code ? (string) $row->type_code : null,
             $row->type_name ? (string) $row->type_name : null,
-            $row->academic_year_code ? (string) $row->academic_year_code : null
+            $row->academic_year_code ? (string) $row->academic_year_code : null,
+            $row->hours_claimed_before !== null ? (float) $row->hours_claimed_before : null,
+            $row->start_date ? (string) $row->start_date : null,
+            $row->end_date ? (string) $row->end_date : null
         );
 
         return response()->json([
@@ -312,7 +319,10 @@ class LecturerHoursCalculateController extends Controller
                 $row->kind_name ? (string) $row->kind_name : null,
                 $row->type_code ? (string) $row->type_code : null,
                 $row->type_name ? (string) $row->type_name : null,
-                $row->academic_year_code ? (string) $row->academic_year_code : null
+                $row->academic_year_code ? (string) $row->academic_year_code : null,
+                $row->hours_claimed_before !== null ? (float) $row->hours_claimed_before : null,
+                $row->start_date ? (string) $row->start_date : null,
+                $row->end_date ? (string) $row->end_date : null
             );
 
             if ($hoursValues['effective_hours_display'] === null) {
@@ -381,10 +391,13 @@ class LecturerHoursCalculateController extends Controller
                 ->get()
                 ->keyBy('activity_id');
 
+            $rowsToInsert = [];
+            $approvalIdsToResetPending = [];
+
             foreach ($eligibleIds as $activityId) {
                 $row = $existing[$activityId] ?? null;
                 if (! $row) {
-                    DB::table('activity_approvals')->insert([
+                    $rowsToInsert[] = [
                         'activity_id' => $activityId,
                         'stage_id' => $hoursStageId,
                         'status' => 'pending',
@@ -393,21 +406,13 @@ class LecturerHoursCalculateController extends Controller
                         'note' => null,
                         'created_at' => $now,
                         'updated_at' => $now,
-                    ]);
+                    ];
                     $submittedIds[] = $activityId;
                     continue;
                 }
 
                 if ($row->status === 'rejected' && $this->isNeedRevisionNote($row->note)) {
-                    DB::table('activity_approvals')
-                        ->where('id', $row->id)
-                        ->update([
-                            'status' => 'pending',
-                            'decided_by_user_id' => null,
-                            'decided_at' => null,
-                            'note' => null,
-                            'updated_at' => $now,
-                        ]);
+                    $approvalIdsToResetPending[] = (int) $row->id;
                     $submittedIds[] = $activityId;
                     continue;
                 }
@@ -416,6 +421,22 @@ class LecturerHoursCalculateController extends Controller
                     'activity_id' => (int) $activityId,
                     'status' => (string) $row->status,
                 ];
+            }
+
+            if (! empty($rowsToInsert)) {
+                DB::table('activity_approvals')->insert($rowsToInsert);
+            }
+
+            if (! empty($approvalIdsToResetPending)) {
+                DB::table('activity_approvals')
+                    ->whereIn('id', $approvalIdsToResetPending)
+                    ->update([
+                        'status' => 'pending',
+                        'decided_by_user_id' => null,
+                        'decided_at' => null,
+                        'note' => null,
+                        'updated_at' => $now,
+                    ]);
             }
         });
 
@@ -932,6 +953,7 @@ class LecturerHoursCalculateController extends Controller
                 'mr.name as member_role_name',
                 'mr.code as member_role_code',
                 'ram.hours_assigned',
+                'ram.hours_claimed_before',
                 'ram.contribution_share',
                 'ast.code as activity_status_code',
                 'aa_hours.status as hours_approval_status',
@@ -941,6 +963,8 @@ class LecturerHoursCalculateController extends Controller
                 DB::raw('COALESCE(rms.principal_count, 0) as principal_count'),
                 'ay.id as academic_year_id',
                 'ay.code as academic_year_code',
+                'ra.start_date',
+                'ra.end_date',
                 'ra.updated_at',
             ]);
     }
@@ -1174,7 +1198,10 @@ class LecturerHoursCalculateController extends Controller
             $row->kind_name ? (string) $row->kind_name : null,
             $row->type_code ? (string) $row->type_code : null,
             $row->type_name ? (string) $row->type_name : null,
-            $row->academic_year_code ? (string) $row->academic_year_code : null
+            $row->academic_year_code ? (string) $row->academic_year_code : null,
+            $row->hours_claimed_before !== null ? (float) $row->hours_claimed_before : null,
+            $row->start_date ? (string) $row->start_date : null,
+            $row->end_date ? (string) $row->end_date : null
         );
 
         return [
@@ -1453,7 +1480,10 @@ class LecturerHoursCalculateController extends Controller
         ?string $kindName = null,
         ?string $typeCode = null,
         ?string $typeName = null,
-        ?string $academicYearCode = null
+        ?string $academicYearCode = null,
+        ?float $hoursClaimedBefore = null,
+        ?string $activityStartDate = null,
+        ?string $activityEndDate = null
     ): array {
         $resolvedTypeId = $this->resolveRuleTypeId(
             $kindId,
@@ -1466,22 +1496,35 @@ class LecturerHoursCalculateController extends Controller
 
         $rule = $this->hoursRuleResolver->resolveForActivity($kindId, $resolvedTypeId, $academicYearId);
         $rulePresent = $rule !== null;
-        $ruleSnapshot = $this->calculateRuleSnapshot(
-            $rule,
-            $quantity,
+        $previewMembers = $this->buildPreviewMembers(
+            $memberRoleCode,
             $memberCount,
             $principalCount,
-            $memberRoleCode
+            $hoursClaimedBefore
         );
 
-        $totalHoursActivity = $totalHoursCalc ?? $ruleSnapshot['total_hours_activity'];
+        $calculation = $this->hoursCalculationService->calculate(
+            $rule,
+            $quantity,
+            $previewMembers,
+            [
+                'kind_code' => $kindCode,
+                'start_date' => $activityStartDate,
+                'end_date' => $activityEndDate,
+                'executed_at' => now(),
+            ]
+        );
+
+        $calculatedMember = $calculation['members'][0] ?? null;
+
+        $totalHoursActivity = $totalHoursCalc ?? ($calculation['total_hours_activity'] ?? null);
         $memberHours = $hoursAssigned;
 
+        if ($memberHours === null && is_array($calculatedMember)) {
+            $memberHours = isset($calculatedMember['hours_assigned']) ? (float) $calculatedMember['hours_assigned'] : null;
+        }
         if ($memberHours === null && $totalHoursActivity !== null && $contributionShare !== null) {
             $memberHours = round($totalHoursActivity * $contributionShare, 2);
-        }
-        if ($memberHours === null) {
-            $memberHours = $ruleSnapshot['member_hours'];
         }
 
         $memberSharePercent = null;
@@ -1491,21 +1534,45 @@ class LecturerHoursCalculateController extends Controller
             $memberSharePercent = round($contributionShare * 100, 2);
         }
 
+        $formula = $calculation['formula'] ?? [];
+        $progressMultiplier = isset($formula['progress_multiplier'])
+            ? (float) $formula['progress_multiplier']
+            : 1.0;
+        $progressPercent = round($progressMultiplier * 100, 2);
+        $ruleName = $rulePresent
+            ? $this->buildRuleName($rule, (string) ($rule->distribution_strategy ?? 'unknown'))
+            : 'Chưa có quy tắc quy đổi';
+
         $formulaExplanation = [
-            'rule_name' => $ruleSnapshot['rule_name'],
-            'distribution_strategy' => $ruleSnapshot['distribution_strategy'],
-            'base_hours' => $ruleSnapshot['base_hours'],
-            'modifiers' => $ruleSnapshot['modifiers'],
+            'rule_name' => $ruleName,
+            'distribution_strategy' => $formula['distribution_strategy'] ?? ($rule?->distribution_strategy ?? null),
+            'base_hours' => $formula['base_hours'] ?? null,
+            'modifiers' => $this->buildFormulaModifiers($formula),
             'total_hours_activity' => $totalHoursActivity,
             'member_hours' => $memberHours,
+            'member_calculated_hours' => is_array($calculatedMember)
+                ? ($calculatedMember['calculated_hours'] ?? null)
+                : null,
+            'hours_claimed_before' => is_array($calculatedMember)
+                ? ($calculatedMember['hours_claimed_before'] ?? ($hoursClaimedBefore ?? 0.0))
+                : ($hoursClaimedBefore ?? 0.0),
+            'hours_to_add' => is_array($calculatedMember)
+                ? ($calculatedMember['hours_to_add'] ?? $memberHours)
+                : $memberHours,
+            'progress_multiplier' => $progressMultiplier,
+            'progress_percent' => $progressPercent,
             'member_share_percent' => $memberSharePercent,
             'member_role_code' => $memberRoleCode,
             'contribution_share' => $contributionShare,
         ];
 
-        $calculatedHours = $rulePresent ? $memberHours : null;
+        $calculatedHours = $rulePresent
+            ? (is_array($calculatedMember)
+                ? (isset($calculatedMember['calculated_hours']) ? (float) $calculatedMember['calculated_hours'] : $memberHours)
+                : $memberHours)
+            : null;
         $proposedHours = null;
-        $effectiveHours = $calculatedHours;
+        $effectiveHours = $rulePresent ? $memberHours : null;
         $ruleSummary = $rulePresent
             ? $this->hoursRuleResolver->formatRuleSummary($rule)
             : $this->buildMissingRuleSummary(
@@ -1530,6 +1597,134 @@ class LecturerHoursCalculateController extends Controller
             'formula_explanation' => $formulaExplanation,
             'can_edit_proposed_hours' => false,
         ];
+    }
+
+    private function buildFormulaModifiers(array $formula): array
+    {
+        $modifiers = [];
+
+        $push = static function (string $name, $value) use (&$modifiers): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            if (is_bool($value)) {
+                $value = $value ? 'Có' : 'Không';
+            }
+
+            if (is_float($value)) {
+                $value = round($value, 4);
+            }
+
+            $modifiers[] = [
+                'name' => $name,
+                'value' => $value,
+            ];
+        };
+
+        $progressReason = isset($formula['progress_reason']) ? (string) $formula['progress_reason'] : '';
+        if ($progressReason !== '') {
+            $push('Nguồn tiến độ', $this->progressReasonLabel($progressReason));
+        }
+
+        $progressWindow = $formula['progress_window'] ?? null;
+        if (is_array($progressWindow)) {
+            $start = isset($progressWindow['start_date']) ? (string) $progressWindow['start_date'] : '';
+            $end = isset($progressWindow['end_date']) ? (string) $progressWindow['end_date'] : '';
+            if ($start !== '' || $end !== '') {
+                $push('Mốc thời gian', trim(($start !== '' ? $start : '?') . ' -> ' . ($end !== '' ? $end : '?')));
+            }
+        }
+
+        $push('Số lần quy đổi', $formula['effective_occurrences'] ?? null);
+        $push('Giới hạn số lần trong năm', $formula['max_occurrences_per_year'] ?? null);
+        $push('Giờ chủ nhiệm áp dụng', $formula['leader_hours_total'] ?? null);
+        $push('Quỹ giờ thành viên', $formula['member_pool_total'] ?? null);
+        $push('Quỹ giờ thành viên áp dụng', $formula['member_pool_applied_total'] ?? null);
+        $push('Số chủ nhiệm/chủ biên', $formula['principal_count'] ?? null);
+        $push('Số thành viên', $formula['non_principal_count'] ?? null);
+        $push('Tỷ lệ chủ nhiệm/chủ biên', $formula['principal_fraction'] ?? null);
+        $push('Tỷ lệ nhóm thành viên', $formula['others_fraction_total'] ?? null);
+
+        return $modifiers;
+    }
+
+    private function progressReasonLabel(string $reason): string
+    {
+        return match ($reason) {
+            'progress_disabled' => 'Không áp dụng tiến độ',
+            'missing_dates_fallback_full_hours' => 'Thiếu mốc thời gian, dùng 100%',
+            'start_date_in_future' => 'Đề tài chưa bắt đầu',
+            'already_finished' => 'Đề tài đã kết thúc',
+            'invalid_duration_fallback_full_hours' => 'Mốc thời gian không hợp lệ, dùng 100%',
+            'time_based_progress' => 'Tính theo thời gian hệ thống',
+            default => $reason,
+        };
+    }
+
+    private function buildPreviewMembers(
+        ?string $memberRoleCode,
+        ?int $memberCount,
+        ?int $principalCount,
+        ?float $hoursClaimedBefore
+    ): array {
+        $normalizedMemberCount = max(1, (int) ($memberCount ?? 1));
+        $normalizedPrincipalCount = max(0, min($normalizedMemberCount, (int) ($principalCount ?? 0)));
+
+        $normalizedRoleCode = strtolower(trim((string) ($memberRoleCode ?? '')));
+        if ($normalizedRoleCode === '') {
+            $normalizedRoleCode = $normalizedPrincipalCount > 0 ? 'principal' : 'member';
+        }
+
+        $currentIsPrincipal = in_array($normalizedRoleCode, ['principal', 'chief_editor'], true);
+        $remainingPrincipals = max(0, $normalizedPrincipalCount - ($currentIsPrincipal ? 1 : 0));
+        $remainingMembers = max(0, ($normalizedMemberCount - 1) - $remainingPrincipals);
+
+        $previewMembers = [
+            (object) [
+                'id' => 1,
+                'lecturer_id' => 1,
+                'member_role_code' => $normalizedRoleCode,
+                'owner_lecturer_id' => 1,
+                'hours_claimed_before' => $hoursClaimedBefore ?? 0.0,
+            ],
+        ];
+
+        $cursor = 2;
+        for ($i = 0; $i < $remainingPrincipals; $i++) {
+            $previewMembers[] = (object) [
+                'id' => $cursor,
+                'lecturer_id' => $cursor,
+                'member_role_code' => 'principal',
+                'owner_lecturer_id' => 1,
+                'hours_claimed_before' => 0.0,
+            ];
+            $cursor++;
+        }
+
+        for ($i = 0; $i < $remainingMembers; $i++) {
+            $previewMembers[] = (object) [
+                'id' => $cursor,
+                'lecturer_id' => $cursor,
+                'member_role_code' => 'member',
+                'owner_lecturer_id' => 1,
+                'hours_claimed_before' => 0.0,
+            ];
+            $cursor++;
+        }
+
+        while (count($previewMembers) < $normalizedMemberCount) {
+            $previewMembers[] = (object) [
+                'id' => $cursor,
+                'lecturer_id' => $cursor,
+                'member_role_code' => 'member',
+                'owner_lecturer_id' => 1,
+                'hours_claimed_before' => 0.0,
+            ];
+            $cursor++;
+        }
+
+        return $previewMembers;
     }
 
     private function resolveRuleTypeId(

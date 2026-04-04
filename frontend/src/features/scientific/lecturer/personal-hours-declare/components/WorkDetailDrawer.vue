@@ -237,7 +237,7 @@
                     class="mt-2 grid grid-cols-1 gap-2 text-xs text-slate-700 sm:grid-cols-2"
                   >
                     <div class="rounded-lg bg-slate-50 px-3 py-2">
-                      <span class="text-slate-500">Giờ gốc:</span>
+                      <span class="text-slate-500">Giờ gốc (100%):</span>
                       <span class="ml-1 font-medium text-slate-900">
                         {{
                           formatHours(
@@ -248,7 +248,9 @@
                       </span>
                     </div>
                     <div class="rounded-lg bg-slate-50 px-3 py-2">
-                      <span class="text-slate-500">Tổng giờ công trình:</span>
+                      <span class="text-slate-500"
+                        >Tổng giờ công trình (sau tiến độ):</span
+                      >
                       <span class="ml-1 font-medium text-slate-900">
                         {{
                           formatHours(
@@ -258,6 +260,15 @@
                           )
                         }}
                         giờ
+                      </span>
+                      <span
+                        v-if="
+                          detail.formulaExplanation?.progressPercent != null
+                        "
+                        class="ml-2 text-slate-500"
+                      >
+                        ({{ detail.formulaExplanation.progressPercent }}% của
+                        giờ gốc)
                       </span>
                     </div>
                     <div class="rounded-lg bg-slate-50 px-3 py-2 sm:col-span-2">
@@ -272,13 +283,23 @@
                         }}
                         giờ
                       </span>
-                      <span
+                      <div
                         v-if="
                           detail.formulaExplanation?.memberSharePercent != null
                         "
-                        class="ml-2 text-slate-500"
+                        class="mt-1 text-[11px] text-slate-500"
                       >
-                        ({{ detail.formulaExplanation.memberSharePercent }}%)
+                        Tỷ trọng phân bổ vai trò:
+                        {{ detail.formulaExplanation.memberSharePercent }}%
+                      </div>
+                    </div>
+                    <div
+                      v-if="detail.formulaExplanation?.progressPercent != null"
+                      class="rounded-lg bg-slate-50 px-3 py-2 sm:col-span-2"
+                    >
+                      <span class="text-slate-500">Tiến độ đề tài:</span>
+                      <span class="ml-1 font-medium text-slate-900">
+                        {{ detail.formulaExplanation.progressPercent }}%
                       </span>
                     </div>
                   </div>

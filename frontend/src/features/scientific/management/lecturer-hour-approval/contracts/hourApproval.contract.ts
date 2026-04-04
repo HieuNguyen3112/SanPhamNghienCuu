@@ -74,9 +74,11 @@ export interface FormulaExplanationDTO {
   rule_name: string;
   distribution_strategy: string | null;
   base_hours: number | null;
-  modifiers: FormulaModifierDTO[];
+  modifiers?: FormulaModifierDTO[] | Record<string, unknown> | null;
   total_hours_activity: number | null;
   member_hours: number | null;
+  progress_multiplier?: number | null;
+  progress_percent?: number | null;
   member_share_percent: number | null;
   member_role_code: string | null;
   contribution_share: number | null;
@@ -94,9 +96,52 @@ export interface FormulaExplanation {
   modifiers: FormulaModifier[];
   totalHoursActivity: number | null;
   memberHours: number | null;
+  progressMultiplier: number | null;
+  progressPercent: number | null;
   memberSharePercent: number | null;
   memberRoleCode: string | null;
   contributionShare: number | null;
+}
+
+function normalizeFormulaModifiers(modifiers: unknown): FormulaModifier[] {
+  if (Array.isArray(modifiers)) {
+    return modifiers
+      .map((item) => {
+        if (item && typeof item === "object") {
+          const candidate = item as Partial<FormulaModifierDTO>;
+          return {
+            name: String(candidate.name ?? ""),
+            value:
+              candidate.value === undefined ? null : (candidate.value ?? null),
+          };
+        }
+
+        return null;
+      })
+      .filter((item): item is FormulaModifier => {
+        return Boolean(item && item.name.trim().length > 0);
+      });
+  }
+
+  if (modifiers && typeof modifiers === "object") {
+    return Object.entries(modifiers)
+      .map(([key, value]) => ({
+        name: key,
+        value:
+          value == null ||
+          typeof value === "string" ||
+          typeof value === "number"
+            ? (value as string | number | null)
+            : typeof value === "boolean"
+              ? value
+                ? "true"
+                : "false"
+              : JSON.stringify(value),
+      }))
+      .filter((item) => item.name.trim().length > 0);
+  }
+
+  return [];
 }
 
 /** ========== DTOs (snake_case) ========== */
@@ -301,12 +346,11 @@ export const hourApprovalMappers = {
       ruleName: dto.rule_name,
       distributionStrategy: dto.distribution_strategy,
       baseHours: dto.base_hours,
-      modifiers: (dto.modifiers ?? []).map((item) => ({
-        name: item.name,
-        value: item.value ?? null,
-      })),
+      modifiers: normalizeFormulaModifiers(dto.modifiers),
       totalHoursActivity: dto.total_hours_activity,
       memberHours: dto.member_hours,
+      progressMultiplier: dto.progress_multiplier ?? null,
+      progressPercent: dto.progress_percent ?? null,
       memberSharePercent: dto.member_share_percent,
       memberRoleCode: dto.member_role_code,
       contributionShare: dto.contribution_share,
