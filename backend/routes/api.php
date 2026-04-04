@@ -19,6 +19,7 @@ use App\Http\Controllers\LookupController;
 use App\Http\Controllers\ResearchActivityController;
 use App\Http\Controllers\AdminResearchWorkController;
 use App\Http\Controllers\AdminResearchWorkSearchController;
+use App\Http\Controllers\AdminResearchCleanupController;
 use App\Http\Controllers\AdminLecturerHoursController;
 use App\Http\Controllers\AdminLecturerHourWarningController;
 use App\Http\Controllers\AdminLecturerAccountController;
@@ -234,6 +235,13 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SC
         Route::get('/lecturers/summary', [AdminResearchWorkController::class, 'lecturerSummary']);
         Route::get('/lecturers/{lecturer}/approved', [AdminResearchWorkController::class, 'approvedByLecturer']);
         Route::get('/activities/{activity}/approved', [AdminResearchWorkController::class, 'approvedDetail']);
+    });
+
+Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE'])
+    ->prefix('admin/research-cleanup')
+    ->group(function () {
+        Route::post('/paper/dry-run', [AdminResearchCleanupController::class, 'paperDryRun']);
+        Route::post('/paper/execute', [AdminResearchCleanupController::class, 'paperExecute']);
     });
 
 Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:SCIENCE_OFFICE|DEPARTMENT_BOARD'])
