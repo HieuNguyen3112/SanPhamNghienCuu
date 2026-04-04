@@ -103,6 +103,8 @@ Route::middleware(['auth:sanctum', 'auto.rotate.sanctum', 'force.json', 'role:LE
         Route::put('/{activity}', [ResearchActivityController::class, 'update']);
         Route::put('/{activity}/members', [ResearchActivityController::class, 'syncMembers']);
         Route::post('/{activity}/members/{member}/reinvite', [ResearchActivityController::class, 'reinviteMember']);
+        Route::delete('/{activity}/members/{member}/pending', [ResearchActivityController::class, 'removePendingMember']);
+        Route::post('/{activity}/members/{member}/pending/resend', [ResearchActivityController::class, 'resendPendingMemberInvitation']);
         Route::post('/{activity}/submit', [ResearchActivityController::class, 'submit']);
         Route::put('/{activity}/{detail}', [ResearchActivityController::class, 'upsertDetail']);
         Route::get('/{activity}/evidence-files', [ResearchActivityController::class, 'listEvidenceFiles']);

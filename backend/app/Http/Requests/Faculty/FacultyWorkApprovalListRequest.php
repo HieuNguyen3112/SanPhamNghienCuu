@@ -24,6 +24,7 @@ class FacultyWorkApprovalListRequest extends FormRequest
                 'PENDING_FACULTY_APPROVAL' => 'pending',
                 'APPROVED_BY_FACULTY_FINAL' => 'approved',
                 'REJECTED_BY_FACULTY' => 'rejected',
+                'NEED_REVISION_BY_FACULTY' => 'need_revision',
                 // legacy FE values
                 'APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY' => 'approved',
             ];
@@ -62,7 +63,7 @@ class FacultyWorkApprovalListRequest extends FormRequest
         return [
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
             'kind_code' => ['nullable', 'string', 'exists:activity_kinds,code'],
-            'status' => ['nullable', 'string', 'in:pending,approved,rejected,all'],
+            'status' => ['nullable', 'string', 'in:pending,approved,rejected,need_revision,all'],
             'q' => ['nullable', 'string', 'max:255'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],

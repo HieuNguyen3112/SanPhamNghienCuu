@@ -42,10 +42,11 @@
             @change="onChangeHoursMode"
           >
             <option value="all">Tất cả</option>
-            <option value="hours_not_submitted">Chưa gửi duyệt giờ</option>
-            <option value="hours_pending_faculty">Chờ khoa duyệt giờ</option>
-            <option value="hours_approved">Đã duyệt giờ</option>
-            <option value="hours_rejected">Khoa từ chối giờ</option>
+            <option value="hours_not_submitted">Chưa gửi duyệt</option>
+            <option value="hours_pending_faculty">Chờ khoa duyệt</option>
+            <option value="hours_need_revision">Cần chỉnh sửa</option>
+            <option value="hours_approved">Đã duyệt</option>
+            <option value="hours_rejected">Bị từ chối</option>
           </select>
         </div>
 

@@ -637,6 +637,43 @@
                   </button>
                 </div>
 
+                <div
+                  v-if="approvalScopeIdentifier === 'FACULTY_SCOPE'"
+                  class="mt-3 rounded-xl border border-rose-200 bg-white p-3"
+                >
+                  <div class="text-xs font-semibold text-rose-900">
+                    Kết quả xử lý
+                  </div>
+                  <div class="mt-2 space-y-2">
+                    <label
+                      class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2"
+                    >
+                      <input
+                        v-model="selectedFacultyRejectDecision"
+                        type="radio"
+                        value="return_for_revision"
+                        class="h-4 w-4"
+                      />
+                      <span class="text-sm font-medium text-slate-800"
+                        >Yêu cầu chỉnh sửa</span
+                      >
+                    </label>
+                    <label
+                      class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2"
+                    >
+                      <input
+                        v-model="selectedFacultyRejectDecision"
+                        type="radio"
+                        value="reject"
+                        class="h-4 w-4"
+                      />
+                      <span class="text-sm font-medium text-slate-800"
+                        >Từ chối hẳn công trình</span
+                      >
+                    </label>
+                  </div>
+                </div>
+
                 <div class="mt-3 space-y-2">
                   <label
                     v-for="option in rejectionReasonOptionList"
@@ -793,6 +830,7 @@ const emit = defineEmits<{
     eventName: "reject",
     payload: {
       researchWorkIdentifier: number;
+      decision?: "reject" | "return_for_revision";
       rejectionReasonType: ResearchWorkRejectionReasonType;
       rejectionReasonDetail: string | null;
     },
@@ -919,12 +957,23 @@ const rejectionPanelElement = ref<HTMLElement | null>(null);
 const selectedRejectionReasonType = ref<ResearchWorkRejectionReasonType | null>(
   null,
 );
+const selectedFacultyRejectDecision = ref<"reject" | "return_for_revision">(
+  "return_for_revision",
+);
 const rejectionReasonDetail = ref("");
 const shouldShowRejectionValidationHint = ref(false);
 const generalSectionElement = ref<HTMLElement | null>(null);
 const evidenceSectionElement = ref<HTMLElement | null>(null);
 const membersSectionElement = ref<HTMLElement | null>(null);
 const historySectionElement = ref<HTMLElement | null>(null);
+const isFacultyScope = computed(
+  () => approvalScopeIdentifier.value === "FACULTY_SCOPE",
+);
+const isReturnForRevisionDecision = computed(
+  () =>
+    isFacultyScope.value &&
+    selectedFacultyRejectDecision.value === "return_for_revision",
+);
 
 const isOtherRejectionReasonSelected = computed(
   () => selectedRejectionReasonType.value === "OTHER",
@@ -937,6 +986,9 @@ const isRejectionFormValid = computed(() => {
 });
 
 const rejectActionButtonDisplayName = computed(() => {
+  if (isRejectionPanelVisible.value && isReturnForRevisionDecision.value) {
+    return "Xác nhận yêu cầu chỉnh sửa";
+  }
   return isRejectionPanelVisible.value
     ? "Xác nhận từ chối"
     : dangerActionButtonLabel.value;
@@ -945,6 +997,7 @@ const rejectActionButtonDisplayName = computed(() => {
 function resetRejectionFlowState(): void {
   isRejectionPanelVisible.value = false;
   selectedRejectionReasonType.value = null;
+  selectedFacultyRejectDecision.value = "return_for_revision";
   rejectionReasonDetail.value = "";
   shouldShowRejectionValidationHint.value = false;
 }
@@ -1008,6 +1061,15 @@ const authorHourRows = computed<AuthorHourRow[]>(() => {
   });
 });
 
+const approvableAuthorHourRows = computed<AuthorHourRow[]>(() => {
+  return authorHourRows.value.filter(
+    (row) =>
+      row.lecturerId !== null &&
+      row.lecturerId !== undefined &&
+      row.lecturerId > 0,
+  );
+});
+
 function formatHourValue(v: number | null): string {
   return v == null ? "—" : formatIntegerValue(v);
 }
@@ -1037,7 +1099,7 @@ watch(
 );
 
 const totalOfficialHours = computed<number>(() => {
-  return authorHourRows.value.reduce((sum, r) => {
+  return approvableAuthorHourRows.value.reduce((sum, r) => {
     const v = officialHoursDraftByAuthorId.value[r.authorIdentifier];
     return sum + (Number.isFinite(v as number) ? (v as number) : 0);
   }, 0);
@@ -1045,9 +1107,9 @@ const totalOfficialHours = computed<number>(() => {
 
 const isOfficialHoursValid = computed<boolean>(() => {
   if (!canFinalizeHours.value) return true;
-  if (authorHourRows.value.length === 0) return false;
+  if (approvableAuthorHourRows.value.length === 0) return false;
 
-  return authorHourRows.value.every((r) => {
+  return approvableAuthorHourRows.value.every((r) => {
     const v = officialHoursDraftByAuthorId.value[r.authorIdentifier];
     return Number.isFinite(v as number) && (v as number) >= 0;
   });
@@ -1200,7 +1262,7 @@ function approveSelectedResearchWork(): void {
     officialResearchHours: canFinalizeHours.value
       ? Math.round(totalOfficialHours.value)
       : null,
-    memberHours: authorHourRows.value.map((row) => ({
+    memberHours: approvableAuthorHourRows.value.map((row) => ({
       authorIdentifier: row.authorIdentifier,
       officialHours: Number(
         officialHoursDraftByAuthorId.value[row.authorIdentifier] ?? 0,
@@ -1249,6 +1311,9 @@ async function onRejectActionButtonClicked(): Promise<void> {
 
   const rejectionPayload = {
     researchWorkIdentifier: entry.researchWorkIdentifier,
+    decision: isFacultyScope.value
+      ? selectedFacultyRejectDecision.value
+      : undefined,
     rejectionReasonType: selectedRejectionReasonType.value,
     rejectionReasonDetail:
       selectedRejectionReasonType.value === "OTHER"
@@ -1259,9 +1324,13 @@ async function onRejectActionButtonClicked(): Promise<void> {
   openActionResultModal({
     type: "warning",
     title: "Xác nhận",
-    message: "Xác nhận từ chối công trình này?",
+    message: isReturnForRevisionDecision.value
+      ? "Xác nhận gửi yêu cầu chỉnh sửa công trình này?"
+      : "Xác nhận từ chối công trình này?",
     closeLabel: "Hủy",
-    secondaryLabel: "Từ chối",
+    secondaryLabel: isReturnForRevisionDecision.value
+      ? "Yêu cầu chỉnh sửa"
+      : "Từ chối",
     onSecondary: () => {
       emit("reject", rejectionPayload);
       resetRejectionFlowState();

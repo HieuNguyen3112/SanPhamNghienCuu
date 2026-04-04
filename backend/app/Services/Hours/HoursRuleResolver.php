@@ -7,6 +7,11 @@ use Illuminate\Support\Str;
 
 class HoursRuleResolver
 {
+    private array $academicYearWindowCache = [];
+    private array $typeCodeCache = [];
+    private array $kindCodeCache = [];
+    private array $mappedTypeIdsCache = [];
+
     public function resolveForActivity(int $kindId, ?int $typeId, ?int $academicYearId = null): ?object
     {
         [$windowStart, $windowEnd] = $this->resolveRuleWindow($academicYearId);
@@ -111,16 +116,23 @@ class HoursRuleResolver
             return [null, null];
         }
 
+        if (array_key_exists($academicYearId, $this->academicYearWindowCache)) {
+            return $this->academicYearWindowCache[$academicYearId];
+        }
+
         $row = DB::table('academic_years')
             ->where('id', $academicYearId)
             ->select(['start_date', 'end_date'])
             ->first();
 
         if (! $row) {
-            return [null, null];
+            $this->academicYearWindowCache[$academicYearId] = [null, null];
+            return $this->academicYearWindowCache[$academicYearId];
         }
 
-        return [$row->start_date, $row->end_date];
+        $this->academicYearWindowCache[$academicYearId] = [$row->start_date, $row->end_date];
+
+        return $this->academicYearWindowCache[$academicYearId];
     }
 
     private function findExactRule(
@@ -198,12 +210,19 @@ class HoursRuleResolver
             return null;
         }
 
+        if (array_key_exists($typeId, $this->typeCodeCache)) {
+            return $this->typeCodeCache[$typeId];
+        }
+
         $code = DB::table('activity_types')->where('id', $typeId)->value('code');
         if (! $code) {
+            $this->typeCodeCache[$typeId] = null;
             return null;
         }
 
-        return (string) $code;
+        $this->typeCodeCache[$typeId] = (string) $code;
+
+        return $this->typeCodeCache[$typeId];
     }
 
     private function resolveMappedTypeIds(int $kindId, ?string $typeCode): array
@@ -212,7 +231,7 @@ class HoursRuleResolver
             return [];
         }
 
-        $kindCode = strtolower((string) DB::table('activity_kinds')->where('id', $kindId)->value('code'));
+        $kindCode = $this->resolveKindCode($kindId);
         if ($kindCode === '') {
             return [];
         }
@@ -220,6 +239,11 @@ class HoursRuleResolver
         $normalized = $this->normalizeToken($typeCode);
         if ($normalized === '') {
             return [];
+        }
+
+        $mappedTypeIdsCacheKey = $kindId . '|' . $normalized;
+        if (array_key_exists($mappedTypeIdsCacheKey, $this->mappedTypeIdsCache)) {
+            return $this->mappedTypeIdsCache[$mappedTypeIdsCacheKey];
         }
 
         $aliasGroups = [];
@@ -264,13 +288,27 @@ class HoursRuleResolver
             }
         }
 
-        return $typeIds;
+        $this->mappedTypeIdsCache[$mappedTypeIdsCacheKey] = $typeIds;
+
+        return $this->mappedTypeIdsCache[$mappedTypeIdsCacheKey];
+    }
+
+    private function resolveKindCode(int $kindId): string
+    {
+        if (array_key_exists($kindId, $this->kindCodeCache)) {
+            return $this->kindCodeCache[$kindId];
+        }
+
+        $code = DB::table('activity_kinds')->where('id', $kindId)->value('code');
+        $this->kindCodeCache[$kindId] = strtolower((string) ($code ?? ''));
+
+        return $this->kindCodeCache[$kindId];
     }
 
     private function findTypeIdsByAliases(int $kindId, array $aliases): array
     {
         $normalizedAliases = array_values(array_unique(array_filter(array_map(
-            fn ($alias) => $this->normalizeToken((string) $alias),
+            fn($alias) => $this->normalizeToken((string) $alias),
             $aliases
         ))));
 
@@ -288,7 +326,7 @@ class HoursRuleResolver
             })
             ->orderByDesc('id')
             ->pluck('id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
     }
 
@@ -310,4 +348,3 @@ class HoursRuleResolver
         return false;
     }
 }
-

@@ -8,6 +8,7 @@ export type PersonalWorkStatusCodeDTO =
   | "pending_member_confirm"
   | "member_rejected"
   | "pending_faculty_review"
+  | "need_revision"
   | "submitted"
   | "approved"
   | "rejected";
@@ -17,7 +18,6 @@ export type PersonalWorkFilterTabDTO =
   | "all"
   | "pending"
   | "approved"
-  | "submitted"
   | "rejected"
   | "draft";
 
@@ -81,16 +81,21 @@ export interface PersonalWorkActionsDTO {
   can_delete?: boolean;
   can_view?: boolean;
   can_reinvite?: boolean;
+  can_manage_pending_members?: boolean;
+  can_remove_pending_member?: boolean;
+  can_resend_pending_invitation?: boolean;
 }
 
 export interface PersonalWorkAuthorDTO {
-  lecturer_id: number;
+  member_id?: number;
+  lecturer_id: number | null;
   lecturer_full_name: string;
 
-  member_role_id: number;
-  member_role_name: string;
+  member_role_id: number | null;
+  member_role_name: string | null;
 
   department_name: string | null;
+  is_external?: boolean | null;
 
   contribution_share: string | null;
   confirmation_status?: "pending" | "accepted" | "rejected" | null;
@@ -198,7 +203,10 @@ export interface PersonalWorkDetailDTO {
 // =====================
 // UI Models (camelCase)
 // =====================
-export type PersonalWorkStatusCode = PersonalWorkStatusCodeDTO;
+export type PersonalWorkStatusCode = Exclude<
+  PersonalWorkStatusCodeDTO,
+  "submitted"
+>;
 export type PersonalWorkFilterTab =
   | "all"
   | "approved"
@@ -253,16 +261,21 @@ export interface PersonalWorkActions {
   canDelete: boolean;
   canView: boolean;
   canReinvite: boolean;
+  canManagePendingMembers: boolean;
+  canRemovePendingMember: boolean;
+  canResendPendingInvitation: boolean;
 }
 
 export interface PersonalWorkAuthor {
-  lecturerId: number;
+  memberId: number;
+  lecturerId: number | null;
   lecturerFullName: string;
 
-  memberRoleId: number;
-  memberRoleName: string;
+  memberRoleId: number | null;
+  memberRoleName: string | null;
 
   departmentName: string | null;
+  isExternal: boolean;
   contributionShare: string | null;
   confirmationStatus: "pending" | "accepted" | "rejected" | null;
   confirmationNote: string | null;
@@ -403,7 +416,7 @@ export const mapper = {
       academicYearCode: dto.academic_year_code,
 
       statusId: dto.status_id,
-      statusCode: dto.status_code,
+      statusCode: normalizeStatusCodeFromDto(dto.status_code),
       statusName: dto.status_name,
 
       workYear: dto.work_year,
@@ -440,7 +453,7 @@ export const mapper = {
       academicYearCode: dto.academic_year_code,
 
       statusId: dto.status_id,
-      statusCode: dto.status_code,
+      statusCode: normalizeStatusCodeFromDto(dto.status_code),
       statusName: dto.status_name,
 
       workYear: dto.work_year,
@@ -458,11 +471,13 @@ export const mapper = {
       rejectionNote: dto.rejection_note,
 
       authors: dto.authors.map((a) => ({
-        lecturerId: a.lecturer_id,
+        memberId: a.member_id ?? a.lecturer_id ?? 0,
+        lecturerId: a.lecturer_id ?? null,
         lecturerFullName: a.lecturer_full_name,
         memberRoleId: a.member_role_id,
         memberRoleName: a.member_role_name,
         departmentName: a.department_name,
+        isExternal: Boolean(a.is_external),
         contributionShare: a.contribution_share,
         confirmationStatus: a.confirmation_status ?? null,
         confirmationNote: a.confirmation_note ?? null,
@@ -521,8 +536,8 @@ export const mapper = {
         actedAt: h.acted_at,
         actedByUserId: h.acted_by_user_id,
         actedByUserName: h.acted_by_user_name,
-        fromStatusCode: h.from_status_code,
-        toStatusCode: h.to_status_code,
+        fromStatusCode: normalizeNullableStatusCodeFromDto(h.from_status_code),
+        toStatusCode: normalizeStatusCodeFromDto(h.to_status_code),
         note: h.note,
       })),
       actions: mapActionsFromDto(dto.actions),
@@ -530,12 +545,34 @@ export const mapper = {
   },
 };
 
-function mapActionsFromDto(dto?: PersonalWorkActionsDTO | null): PersonalWorkActions {
+function normalizeStatusCodeFromDto(
+  statusCode: PersonalWorkStatusCodeDTO,
+): PersonalWorkStatusCode {
+  if (statusCode === "submitted") {
+    return "pending_faculty_review";
+  }
+
+  return statusCode;
+}
+
+function normalizeNullableStatusCodeFromDto(
+  statusCode: PersonalWorkStatusCodeDTO | null,
+): PersonalWorkStatusCode | null {
+  if (!statusCode) return null;
+  return normalizeStatusCodeFromDto(statusCode);
+}
+
+function mapActionsFromDto(
+  dto?: PersonalWorkActionsDTO | null,
+): PersonalWorkActions {
   return {
     canEdit: dto?.can_edit ?? false,
     canSubmit: dto?.can_submit ?? false,
     canDelete: dto?.can_delete ?? false,
     canView: dto?.can_view ?? true,
     canReinvite: dto?.can_reinvite ?? false,
+    canManagePendingMembers: dto?.can_manage_pending_members ?? false,
+    canRemovePendingMember: dto?.can_remove_pending_member ?? false,
+    canResendPendingInvitation: dto?.can_resend_pending_invitation ?? false,
   };
 }

@@ -49,8 +49,8 @@ export type PublicResearchListResponseDto = {
 };
 
 export type PublicResearchParticipantDto = {
-  lecturer_id: number;
-  lecturer_code: string;
+  lecturer_id: number | null;
+  lecturer_code: string | null;
   lecturer_name: string;
   faculty_name: string;
   role_name: string;

@@ -85,6 +85,12 @@ class HoursWorkflowTest extends TestCase
             'stage_id' => $this->hoursStageId,
             'status' => 'pending',
         ]);
+
+        $this->assertDatabaseHas('hours_history', [
+            'lecturer_id' => $this->lecturerId,
+            'action' => 'submit',
+            'performed_by' => $this->lecturerUser->id,
+        ]);
     }
 
     public function test_faculty_approve_updates_lecturer_view_to_approved(): void
@@ -111,6 +117,12 @@ class HoursWorkflowTest extends TestCase
             'lecturer_id' => $this->lecturerId,
             'academic_year_id' => $this->academicYearId,
             'hours_total' => 300.0,
+        ]);
+
+        $this->assertDatabaseHas('hours_history', [
+            'lecturer_id' => $this->lecturerId,
+            'action' => 'approve',
+            'performed_by' => $this->facultyUser->id,
         ]);
     }
 
@@ -169,7 +181,8 @@ class HoursWorkflowTest extends TestCase
             'activity_ids' => [$activityA],
         ])
             ->assertOk()
-            ->assertJsonPath('data.status', 'pending');
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.partial_approved', false);
 
         $items = collect($response->json('data.items'))->keyBy('activity_id');
         $this->assertSame('approved', $items[$activityA]['approval_status']);
@@ -218,7 +231,7 @@ class HoursWorkflowTest extends TestCase
 
         $returnedActivityIds = collect($response->json('data.items'))
             ->pluck('activity_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         $this->assertContains($currentActivityId, $returnedActivityIds);
@@ -228,7 +241,7 @@ class HoursWorkflowTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_faculty_reject_returns_reason_and_lecturer_can_resubmit(): void
+    public function test_faculty_request_revision_returns_reason_and_lecturer_can_resubmit(): void
     {
         $activityId = $this->createActivity('approved');
         $this->attachEvidenceRecord($activityId, $this->lecturerUser->id);
@@ -240,18 +253,29 @@ class HoursWorkflowTest extends TestCase
 
         Sanctum::actingAs($this->facultyUser);
         $this->putJson('/api/faculty/hours/approvals/' . $this->lecturerId . '/reject', [
-            'reason_code' => 'missing_evidence',
+            'reason_code' => 'INVALID_EVIDENCE',
             'reason_detail' => 'Missing acceptance document.',
+            'decision_mode' => 'revision',
         ])
             ->assertOk()
-            ->assertJsonPath('data.status', 'rejected')
-            ->assertJsonPath('data.note_from_faculty', 'Missing acceptance document.');
+            ->assertJsonPath('data.status', 'need_revision')
+            ->assertJsonPath('data.note_from_faculty', 'Missing acceptance document.')
+            ->assertJsonPath('data.note_from_faculty_reason_code', 'INVALID_EVIDENCE')
+            ->assertJsonPath('data.note_from_faculty_reason_detail', 'Missing acceptance document.');
+
+        $this->assertDatabaseHas('hours_history', [
+            'lecturer_id' => $this->lecturerId,
+            'action' => 'revision',
+            'performed_by' => $this->facultyUser->id,
+        ]);
 
         Sanctum::actingAs($this->lecturerUser);
         $this->getJson('/api/lecturer/hours/calculate')
             ->assertOk()
-            ->assertJsonPath('data.items.0.hours_request_state', 'hours_rejected')
-            ->assertJsonPath('data.items.0.hours_rejection_reason', 'Missing acceptance document.');
+            ->assertJsonPath('data.items.0.hours_request_state', 'hours_need_revision')
+            ->assertJsonPath('data.items.0.hours_rejection_reason', 'Missing acceptance document.')
+            ->assertJsonPath('data.items.0.hours_rejection_reason_code', 'INVALID_EVIDENCE')
+            ->assertJsonPath('data.items.0.hours_rejection_reason_detail', 'Missing acceptance document.');
 
         $this->postJson('/api/lecturer/hours/calculate/submit', [
             'activity_ids' => [$activityId],
@@ -265,6 +289,97 @@ class HoursWorkflowTest extends TestCase
             'status' => 'pending',
             'note' => null,
         ]);
+    }
+
+    public function test_lecturer_cannot_resubmit_when_hours_request_is_pending(): void
+    {
+        $activityId = $this->createActivity('approved');
+        $this->attachEvidenceRecord($activityId, $this->lecturerUser->id);
+
+        Sanctum::actingAs($this->lecturerUser);
+        $this->postJson('/api/lecturer/hours/calculate/submit', [
+            'activity_ids' => [$activityId],
+        ])->assertOk();
+
+        $this->postJson('/api/lecturer/hours/calculate/submit', [
+            'activity_ids' => [$activityId],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'HOURS_ALREADY_PENDING')
+            ->assertJsonPath('invalid_activity_ids.0', $activityId);
+    }
+
+    public function test_faculty_hard_reject_is_final_and_lecturer_cannot_resubmit(): void
+    {
+        $activityId = $this->createActivity('approved');
+        $this->attachEvidenceRecord($activityId, $this->lecturerUser->id);
+
+        Sanctum::actingAs($this->lecturerUser);
+        $this->postJson('/api/lecturer/hours/calculate/submit', [
+            'activity_ids' => [$activityId],
+        ])->assertOk();
+
+        Sanctum::actingAs($this->facultyUser);
+        $this->putJson('/api/faculty/hours/approvals/' . $this->lecturerId . '/reject', [
+            'reason_code' => 'INVALID_EVIDENCE',
+            'reason_detail' => 'Thiếu biên bản nghiệm thu.',
+            'decision_mode' => 'reject',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'rejected');
+
+        $this->assertDatabaseHas('hours_history', [
+            'lecturer_id' => $this->lecturerId,
+            'action' => 'reject',
+            'performed_by' => $this->facultyUser->id,
+        ]);
+
+        Sanctum::actingAs($this->lecturerUser);
+        $this->getJson('/api/lecturer/hours/calculate')
+            ->assertOk()
+            ->assertJsonPath('data.items.0.hours_request_state', 'hours_rejected');
+
+        $this->postJson('/api/lecturer/hours/calculate/submit', [
+            'activity_ids' => [$activityId],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'HOURS_FINAL_REJECTED')
+            ->assertJsonPath('invalid_activity_ids.0', $activityId);
+    }
+
+    public function test_partial_approve_then_reject_keeps_partially_approved_status(): void
+    {
+        $activityA = $this->createActivity('approved');
+        $activityB = $this->createActivity('approved');
+
+        $this->attachEvidenceRecord($activityA, $this->lecturerUser->id);
+        $this->attachEvidenceRecord($activityB, $this->lecturerUser->id);
+
+        Sanctum::actingAs($this->lecturerUser);
+        $this->postJson('/api/lecturer/hours/calculate/submit', [
+            'activity_ids' => [$activityA, $activityB],
+        ])->assertOk();
+
+        Sanctum::actingAs($this->facultyUser);
+        $this->putJson('/api/faculty/hours/approvals/' . $this->lecturerId . '/approve', [
+            'activity_ids' => [$activityA],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'pending');
+
+        $response = $this->putJson('/api/faculty/hours/approvals/' . $this->lecturerId . '/reject', [
+            'reason_code' => 'INVALID_HOURS',
+            'reason_detail' => 'Giờ quy đổi của mục còn lại chưa phù hợp.',
+            'activity_ids' => [$activityB],
+            'decision_mode' => 'reject',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'partially_approved')
+            ->assertJsonPath('data.partial_approved', true);
+
+        $items = collect($response->json('data.items'))->keyBy('activity_id');
+        $this->assertSame('approved', $items[$activityA]['approval_status']);
+        $this->assertSame('rejected', $items[$activityB]['approval_status']);
     }
 
     public function test_faculty_can_reject_selected_hours_items_only(): void
@@ -282,12 +397,13 @@ class HoursWorkflowTest extends TestCase
 
         Sanctum::actingAs($this->facultyUser);
         $response = $this->putJson('/api/faculty/hours/approvals/' . $this->lecturerId . '/reject', [
-            'reason_code' => 'hours_not_reasonable',
+            'reason_code' => 'INVALID_HOURS',
             'reason_detail' => 'Cần rà soát lại minh chứng.',
             'activity_ids' => [$activityA],
         ])
             ->assertOk()
-            ->assertJsonPath('data.status', 'pending');
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.partial_approved', false);
 
         $items = collect($response->json('data.items'))->keyBy('activity_id');
         $this->assertSame('rejected', $items[$activityA]['approval_status']);
@@ -355,6 +471,26 @@ class HoursWorkflowTest extends TestCase
             ->assertJsonPath('data.evidence_id', $evidenceId);
 
         $this->assertDatabaseMissing('evidence_files', ['id' => $evidenceId]);
+    }
+
+    public function test_upload_invalid_hours_evidence_file_type_fails(): void
+    {
+        Storage::fake('local');
+        config(['filesystems.default' => 'local']);
+
+        $activityId = $this->createActivity('approved');
+
+        Sanctum::actingAs($this->lecturerUser);
+        $this->postJson(
+            "/api/lecturer/hours/calculate/{$activityId}/evidence",
+            [
+                'file_type_id' => $this->evidenceFileTypeId,
+                'file' => UploadedFile::fake()->create('not-pdf.png', 40, 'image/png'),
+            ]
+        )
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'VALIDATION_FAILED')
+            ->assertJsonStructure(['errors' => ['file']]);
     }
 
     public function test_link_disk_is_not_counted_as_valid_hours_evidence(): void
@@ -520,6 +656,44 @@ class HoursWorkflowTest extends TestCase
         $this->assertIsString($downloadUrl);
 
         $this->get($downloadUrl)->assertOk();
+    }
+
+    public function test_faculty_detail_filters_items_by_selected_academic_year(): void
+    {
+        $legacyAcademicYearId = DB::table('academic_years')->insertGetId([
+            'code' => '2024-2025',
+            'start_date' => '2024-09-01',
+            'end_date' => '2025-08-31',
+            'is_active' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $currentActivityId = $this->createActivity('approved', 20, null, null, $this->academicYearId);
+        $legacyActivityId = $this->createActivity('approved', 20, null, null, $legacyAcademicYearId);
+
+        $this->attachEvidenceRecord($currentActivityId, $this->lecturerUser->id);
+        $this->attachEvidenceRecord($legacyActivityId, $this->lecturerUser->id);
+
+        Sanctum::actingAs($this->lecturerUser);
+        $this->postJson('/api/lecturer/hours/calculate/submit', [
+            'activity_ids' => [$currentActivityId, $legacyActivityId],
+        ])->assertOk();
+
+        Sanctum::actingAs($this->facultyUser);
+        $response = $this->getJson(
+            '/api/faculty/hours/approvals/' . $this->lecturerId . '?academic_year_id=' . $this->academicYearId
+        )
+            ->assertOk()
+            ->assertJsonCount(1, 'data.items');
+
+        $returnedActivityIds = collect($response->json('data.items'))
+            ->pluck('activity_id')
+            ->map(fn($id) => (int) $id)
+            ->all();
+
+        $this->assertContains($currentActivityId, $returnedActivityIds);
+        $this->assertNotContains($legacyActivityId, $returnedActivityIds);
     }
 
     public function test_admin_hours_approval_route_is_removed(): void
@@ -695,7 +869,7 @@ class HoursWorkflowTest extends TestCase
             [150.0, 150.0],
             $memberRows
                 ->pluck('computed_member_hours')
-                ->map(fn ($value) => $value !== null ? (float) $value : null)
+                ->map(fn($value) => $value !== null ? (float) $value : null)
                 ->all()
         );
     }
@@ -1364,14 +1538,16 @@ class HoursWorkflowTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        foreach ([
-            'draft' => 'Draft',
-            'pending_member_confirm' => 'Pending member confirm',
-            'member_rejected' => 'Member rejected',
-            'pending_faculty_review' => 'Pending faculty review',
-            'approved' => 'Approved',
-            'rejected' => 'Rejected',
-        ] as $code => $name) {
+        foreach (
+            [
+                'draft' => 'Draft',
+                'pending_member_confirm' => 'Pending member confirm',
+                'member_rejected' => 'Member rejected',
+                'pending_faculty_review' => 'Pending faculty review',
+                'approved' => 'Approved',
+                'rejected' => 'Rejected',
+            ] as $code => $name
+        ) {
             DB::table('activity_statuses')->insert([
                 'code' => $code,
                 'name' => $name,
@@ -1515,8 +1691,7 @@ class HoursWorkflowTest extends TestCase
         ?int $typeId = null,
         ?int $academicYearId = null,
         ?int $ownerMemberRoleId = null
-    ): int
-    {
+    ): int {
         $resolvedKindId = $kindId ?? $this->kindId;
         $resolvedTypeId = $typeId ?? $this->typeId;
         $resolvedAcademicYearId = $academicYearId ?? $this->academicYearId;

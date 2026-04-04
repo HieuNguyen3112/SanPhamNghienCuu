@@ -33,6 +33,10 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
         { value: "ALL_APPROVAL_STATUSES", label: "Tất cả trạng thái" },
         { value: "PENDING_FACULTY_APPROVAL", label: "Chờ khoa duyệt" },
         {
+          value: "NEED_REVISION_BY_FACULTY",
+          label: "Yêu cầu chỉnh sửa",
+        },
+        {
           value: "APPROVED_BY_FACULTY_FINAL",
           label: "Đã duyệt (cuối cùng tại khoa)",
         },
@@ -71,6 +75,7 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
       APPROVED_BY_FACULTY_FINAL: "Đã duyệt (cuối cùng tại khoa)",
       APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY:
         "Đã duyệt (cuối cùng tại khoa)",
+      NEED_REVISION_BY_FACULTY: "Yêu cầu chỉnh sửa",
       REJECTED_BY_FACULTY: "Bị từ chối ở cấp khoa",
 
       PENDING_UNIVERSITY_APPROVAL: "Chờ duyệt cấp trường",
@@ -91,6 +96,8 @@ export function useResearchWorkApprovalDisplayMapping(parameters: {
         "inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-900",
       APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY:
         "inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-900",
+      NEED_REVISION_BY_FACULTY:
+        "inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-900",
       REJECTED_BY_FACULTY:
         "inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-900",
 

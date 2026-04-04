@@ -677,13 +677,14 @@ class AdminResearchWorkSearchController extends Controller
     protected function buildParticipants(int $activityId): array
     {
         return DB::table('research_activity_members as ram')
-            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
-            ->join('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->leftJoin('departments as d', 'l.department_id', '=', 'd.id')
             ->leftJoin('faculties as f', 'd.faculty_id', '=', 'f.id')
             ->where('ram.activity_id', $activityId)
             ->orderBy('ram.id')
             ->select([
+                'ram.id as member_id',
                 'l.id as lecturer_id',
                 'l.code as lecturer_code',
                 'l.full_name as lecturer_name',
@@ -691,17 +692,28 @@ class AdminResearchWorkSearchController extends Controller
                 'mr.name as role_name',
                 'd.name as department_name',
                 'f.name as faculty_name',
+                'ram.is_external as is_external',
+                'ram.external_full_name as external_full_name',
+                'ram.external_department_name as external_department_name',
             ])
             ->get()
             ->map(function ($row) {
-                $unit = $row->faculty_name ?: $row->department_name;
+                $isExternal = (bool) ($row->is_external ?? false);
+                $name = $isExternal
+                    ? trim((string) ($row->external_full_name ?? ''))
+                    : trim((string) ($row->lecturer_name ?? ''));
+                $unit = $isExternal
+                    ? trim((string) ($row->external_department_name ?? ''))
+                    : trim((string) ($row->faculty_name ?? $row->department_name ?? ''));
                 return [
-                    'lecturer_id' => (int) $row->lecturer_id,
+                    'member_id' => (int) $row->member_id,
+                    'lecturer_id' => $row->lecturer_id !== null ? (int) $row->lecturer_id : null,
                     'lecturer_code' => $row->lecturer_code,
-                    'lecturer_name' => $row->lecturer_name,
-                    'unit_name' => $unit,
+                    'lecturer_name' => $name !== '' ? $name : '—',
+                    'unit_name' => $unit !== '' ? $unit : null,
                     'role_key' => $row->role_code,
-                    'role_label' => $row->role_name,
+                    'role_label' => $row->role_name ?: 'Thành viên',
+                    'is_external' => $isExternal,
                 ];
             })
             ->all();

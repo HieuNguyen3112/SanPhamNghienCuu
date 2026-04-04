@@ -101,6 +101,7 @@ class ResearchLookupSeeder extends Seeder
             ['code' => 'pending_member_confirm', 'name' => 'Chờ thành viên xác nhận'],
             ['code' => 'member_rejected', 'name' => 'Thành viên từ chối'],
             ['code' => 'pending_faculty_review', 'name' => 'Chờ khoa duyệt'],
+            ['code' => 'need_revision', 'name' => 'Cần chỉnh sửa'],
             ['code' => 'approved', 'name' => 'Đã duyệt'],
             ['code' => 'rejected', 'name' => 'Từ chối'],
         ];

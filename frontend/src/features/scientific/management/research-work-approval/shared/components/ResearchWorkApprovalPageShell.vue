@@ -148,19 +148,19 @@ const componentEvents = defineEmits<{
   (eventName: "update:selectedDepartmentIdentifier", value: string): void;
   (
     eventName: "update:selectedResearchWorkType",
-    value: ResearchWorkType | "ALL_RESEARCH_WORK_TYPES"
+    value: ResearchWorkType | "ALL_RESEARCH_WORK_TYPES",
   ): void;
   (eventName: "update:selectedApprovalStatus", value: string): void;
   (
     eventName: "update:selectedLecturerOrResearchWorkKeyword",
-    value: string
+    value: string,
   ): void;
 
   (eventName: "resetFilterConditions"): void;
 
   (
     eventName: "openResearchWorkDetailDrawer",
-    entry: ResearchWorkApprovalEntry
+    entry: ResearchWorkApprovalEntry,
   ): void;
   (eventName: "closeResearchWorkDetailDrawer"): void;
 
@@ -169,16 +169,17 @@ const componentEvents = defineEmits<{
     payload: {
       researchWorkIdentifier: number;
       officialResearchHours: number | null;
-        memberHours?: { authorIdentifier: number; officialHours: number }[];
-    }
+      memberHours?: { authorIdentifier: number; officialHours: number }[];
+    },
   ): void;
   (
     eventName: "reject",
     payload: {
       researchWorkIdentifier: number;
+      decision?: "reject" | "return_for_revision";
       rejectionReasonType: ResearchWorkRejectionReasonType;
       rejectionReasonDetail: string | null;
-    }
+    },
   ): void;
 }>();
 
@@ -238,6 +239,7 @@ function approve(payload: {
 
 function reject(payload: {
   researchWorkIdentifier: number;
+  decision?: "reject" | "return_for_revision";
   rejectionReasonType: ResearchWorkRejectionReasonType;
   rejectionReasonDetail: string | null;
 }): void {

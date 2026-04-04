@@ -35,7 +35,7 @@ class FacultyLecturerHourApprovalListRequest extends FormRequest
             'faculty_id' => ['nullable', 'integer', 'exists:faculties,id'],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
             'include_all_years' => ['nullable', 'boolean'],
-            'status' => ['nullable', 'string', 'in:all,pending,approved,rejected'],
+            'status' => ['nullable', 'string', 'in:all,pending,approved,rejected,need_revision,partially_approved'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date'],
             'keyword' => ['nullable', 'string', 'max:255'],

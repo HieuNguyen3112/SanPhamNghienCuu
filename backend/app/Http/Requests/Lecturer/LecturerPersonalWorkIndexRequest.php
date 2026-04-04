@@ -47,7 +47,7 @@ class LecturerPersonalWorkIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['nullable', 'string', 'in:all,pending,draft,pending_member_confirm,member_rejected,pending_faculty_review,submitted,approved,rejected'],
+            'status' => ['nullable', 'string', 'in:all,pending,draft,pending_member_confirm,member_rejected,pending_faculty_review,need_revision,approved,rejected'],
             'q' => ['nullable', 'string', 'max:255'],
             'year' => ['nullable', 'integer', 'min:1900', 'max:3000'],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
@@ -107,7 +107,8 @@ class LecturerPersonalWorkIndexRequest extends FormRequest
             'pending_member_confirm', 'cho_thanh_vien_xac_nhan' => 'pending_member_confirm',
             'member_rejected', 'thanh_vien_tu_choi' => 'member_rejected',
             'pending_faculty_review', 'cho_khoa_duyet' => 'pending_faculty_review',
-            'submitted', 'da_gui_duyet', 'da_gui' => 'submitted',
+            'submitted', 'da_gui_duyet', 'da_gui' => 'pending_faculty_review',
+            'need_revision', 'yeu_cau_chinh_sua', 'can_chinh_sua' => 'need_revision',
             'approved', 'da_duyet', 'khoa_duyet' => 'approved',
             'rejected', 'tu_choi', 'khoa_tu_choi' => 'rejected',
             default => (string) $this->input('status'),

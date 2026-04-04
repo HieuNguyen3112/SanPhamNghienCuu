@@ -49,7 +49,9 @@
               role="menuitem"
               @click="onClickPrimaryEdit"
             >
-              <Pencil class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
+              <Pencil
+                class="h-4 w-4 text-slate-500 group-hover:text-slate-700"
+              />
               <span class="min-w-0 truncate">{{ editLabel }}</span>
             </button>
 
@@ -63,7 +65,6 @@
               <Send class="h-4 w-4 text-slate-500 group-hover:text-slate-700" />
               <span class="min-w-0 truncate">Gửi lại yêu cầu xác nhận</span>
             </button>
-
           </div>
         </div>
       </Transition>
@@ -91,7 +92,7 @@ const props = withDefaults(
   {
     showView: true,
     viewLabel: null,
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -116,15 +117,19 @@ const viewLabelResolved = computed(() => {
     : "Xem chi tiết";
 });
 
-const showEditAction = computed(() => props.actions.canEdit);
+const showEditAction = computed(
+  () => props.actions.canEdit || props.statusCode === "rejected",
+);
 
 const showReinviteAction = computed(
-  () => props.statusCode === "member_rejected" && props.actions.canReinvite
+  () => props.statusCode === "member_rejected" && props.actions.canReinvite,
 );
 
 const editLabel = computed(() => {
   if (props.statusCode === "member_rejected") return "Chỉnh sửa thành viên";
-  if (props.statusCode === "rejected") return "Mở lại để chỉnh sửa";
+  if (props.statusCode === "need_revision")
+    return "Chỉnh sửa theo yêu cầu khoa";
+  if (props.statusCode === "rejected") return "Sao chép để kê khai lại";
   return "Tiếp tục kê khai";
 });
 
@@ -169,7 +174,7 @@ function updateMenuPosition() {
   const desiredLeft = rect.right - menuWidth;
   const clampedLeft = Math.min(
     Math.max(viewportPadding, desiredLeft),
-    window.innerWidth - viewportPadding - menuWidth
+    window.innerWidth - viewportPadding - menuWidth,
   );
 
   menuLeft.value = clampedLeft;
@@ -208,7 +213,7 @@ watch(
     document.addEventListener("pointerdown", onDocPointerDown, true);
     window.addEventListener("resize", updateMenuPosition);
     window.addEventListener("scroll", updateMenuPosition, true);
-  }
+  },
 );
 
 watch(
@@ -218,7 +223,7 @@ watch(
     document.removeEventListener("pointerdown", onDocPointerDown, true);
     window.removeEventListener("resize", updateMenuPosition);
     window.removeEventListener("scroll", updateMenuPosition, true);
-  }
+  },
 );
 
 onBeforeUnmount(() => {

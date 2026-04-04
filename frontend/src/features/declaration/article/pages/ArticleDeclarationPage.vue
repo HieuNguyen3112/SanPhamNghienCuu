@@ -19,6 +19,7 @@
         :icon="FileText"
         :status="shell.status.value"
         :canSubmit="canSubmit"
+        :participantCount="submitParticipantCount"
         :pending="shell.pending.value"
         :errorMessage="shell.error_message.value"
         :successVisible="shell.success_visible.value"
@@ -1175,14 +1176,7 @@ const canSubmit = computed(() => {
   if (!form.academicYearId) return false;
   if (!selectedArticleMode.value) return false;
   if (!form.title.trim()) return false;
-
-  const validMembers = form.members.filter((m) => {
-    const hasRole = typeof m.member_role_id === "number";
-    if (!hasRole) return false;
-    if (m.is_external) return Boolean(m.external_full_name?.trim());
-    return typeof m.lecturer_id === "number";
-  });
-  if (validMembers.length === 0) return false;
+  if (submitParticipantCount.value === 0) return false;
 
   const invalidPending = pendingEvidenceFiles.value.some(
     (p: any) => !p.file_type_id,
@@ -1196,6 +1190,16 @@ const canSubmit = computed(() => {
 
   return true;
 });
+
+const submitParticipantCount = computed(
+  () =>
+    form.members.filter((m) => {
+      const hasRole = typeof m.member_role_id === "number";
+      if (!hasRole) return false;
+      if (m.is_external) return Boolean(m.external_full_name?.trim());
+      return typeof m.lecturer_id === "number";
+    }).length,
+);
 
 function inputClass(error?: string | null) {
   return [
@@ -1301,19 +1305,32 @@ async function loadCatalogs() {
   }
 }
 
-async function loadDraftFromQuery() {
-  const raw = route.query.activity_id;
+function parseQueryActivityId(key: "activity_id" | "copy_from"): number | null {
+  const raw = route.query[key];
   const rawValue = Array.isArray(raw) ? raw[0] : raw;
-  const activityId = rawValue ? Number(rawValue) : null;
+  const parsed = rawValue ? Number(rawValue) : null;
 
-  if (!activityId || Number.isNaN(activityId)) return;
+  if (!parsed || Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+async function loadDraftFromQuery() {
+  const copyFromId = parseQueryActivityId("copy_from");
+  const activityId = parseQueryActivityId("activity_id");
+  const sourceActivityId = copyFromId ?? activityId;
+  const isCopyMode = copyFromId !== null;
+
+  if (!sourceActivityId) return;
 
   try {
-    const data = await fetch_activity(activityId);
+    const data = await fetch_activity(sourceActivityId);
     const activity = data.activity;
     if (!activity) return;
 
-    form.activityId = activity.id;
+    form.activityId = isCopyMode ? null : activity.id;
     form.academicYearId = activity.academic_year_id ?? null;
     form.kindId = activity.kind_id ?? form.kindId;
     form.typeId = activity.type_id ?? null;
@@ -1374,7 +1391,9 @@ async function loadDraftFromQuery() {
     pendingEvidenceFiles.value = [];
     pendingEvidenceLinks.value = [];
 
-    const statusCode = (activity.status_code ?? "draft") as any;
+    const statusCode = (
+      isCopyMode ? "draft" : (activity.status_code ?? "draft")
+    ) as any;
     shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
   } catch (err) {
     shell.error_message.value = normalizeErrorMessage(
@@ -1719,7 +1738,7 @@ function collectMissingFields(mode: "draft" | "submit") {
         typeof m.member_role_id === "number",
     );
     if (validMembers.length === 0) {
-      missing.push("Danh sách người tham gia");
+      missing.push("Danh sách tác giả");
     }
   }
 
@@ -1737,7 +1756,7 @@ function handleSaveDraft() {
   shell.save_draft();
 }
 
-function handleSubmit() {
+function handleSubmit(payload: { minorChange: boolean }) {
   resetErrors();
   submitNotice.value = null;
   const missing = collectMissingFields("submit");
@@ -1745,7 +1764,7 @@ function handleSubmit() {
     openMissingModal(missing);
     return;
   }
-  shell.submit_for_approval();
+  shell.submit_for_approval(payload);
 }
 
 const shell = useDeclarationFormShell({
@@ -1769,8 +1788,9 @@ const shell = useDeclarationFormShell({
       form.typeId = persistedTypeId.value ?? null;
 
       if (saved.id) {
+        const { copy_from: _copyFrom, ...restQuery } = route.query;
         await router.replace({
-          query: { ...route.query, activity_id: String(saved.id) },
+          query: { ...restQuery, activity_id: String(saved.id) },
         });
       }
 
@@ -1840,13 +1860,13 @@ const shell = useDeclarationFormShell({
       );
     }
   },
-  on_submit: async () => {
+  on_submit: async (payload) => {
     resetErrors();
     try {
       // Always persist latest edits before submit so backend validates fresh data.
       await shell.save_draft({ silent_success: true });
       if (!form.activityId) return;
-      const submitResponse = await submit_activity(form.activityId);
+      const submitResponse = await submit_activity(form.activityId, payload);
       const nextStatusCode =
         submitResponse?.workflow?.status_code ??
         submitResponse?.data?.status_code ??

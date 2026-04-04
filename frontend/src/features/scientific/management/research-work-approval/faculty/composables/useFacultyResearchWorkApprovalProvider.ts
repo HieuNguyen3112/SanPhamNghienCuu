@@ -171,6 +171,49 @@ export function useFacultyResearchWorkApprovalProvider() {
     return mapping[kindCode] ?? "JOURNAL_ARTICLE";
   }
 
+  function buildFinalApprovalHistory(
+    approvals: FacultyApprovalDetailResponse["approvals"],
+  ): ResearchWorkApprovalEntry["approvalHistoryList"] {
+    const processedApprovals = approvals.filter(
+      (approval) =>
+        approval.status !== "pending" &&
+        Boolean(approval.decided_at || approval.decided_by_user_name),
+    );
+
+    if (processedApprovals.length === 0) {
+      return [];
+    }
+
+    const latest = processedApprovals.reduce((selected, current) => {
+      const selectedDate = selected.decided_at ?? "";
+      const currentDate = current.decided_at ?? "";
+
+      if (currentDate > selectedDate) return current;
+      if (currentDate < selectedDate) return selected;
+      return current.id > selected.id ? current : selected;
+    });
+
+    const reviewActionDisplayName =
+      latest.status === "approved"
+        ? "Duyệt"
+        : latest.status === "rejected"
+          ? "Từ chối"
+          : "Đã xử lý";
+
+    const reviewerName = latest.decided_by_user_name?.trim() || "Không rõ";
+    const stageName = latest.stage_name?.trim() || "Hội đồng";
+
+    return [
+      {
+        historyIdentifier: latest.id,
+        reviewLevelDisplayName: "Người duyệt cuối cùng",
+        reviewActionDisplayName,
+        reviewedAtDateTimeString: latest.decided_at ?? "",
+        reviewNote: `${reviewerName} (${stageName})`,
+      },
+    ];
+  }
+
   function mapAuthors(item: FacultyApprovalListItem, submitterId: number) {
     const ownerFacultyId = item.lecturer.faculty_id ?? null;
     return item.authors.map((author) => {
@@ -178,15 +221,23 @@ export function useFacultyResearchWorkApprovalProvider() {
         author.member_role_code === "principal" ||
         author.member_role_code === "corresponding_author" ||
         author.member_role_code === "chief_editor";
+      const isExternal = Boolean(
+        author.is_external || author.lecturer_id == null,
+      );
       const memberFacultyId = author.member_faculty_id ?? null;
       const isOutsideFaculty =
-        author.is_outside_faculty ??
+        (author.is_outside_faculty ?? isExternal) ||
         (ownerFacultyId !== null &&
           memberFacultyId !== null &&
           ownerFacultyId !== memberFacultyId);
+      const authorCode = author.lecturer_code?.trim() ?? "";
+      const displayName = authorCode
+        ? `${author.lecturer_full_name} (${authorCode})`
+        : author.lecturer_full_name;
       return {
-        authorIdentifier: author.lecturer_id,
-        authorDisplayName: `${author.lecturer_full_name} (${author.lecturer_code})`,
+        authorIdentifier: author.member_id,
+        lecturerId: author.lecturer_id ?? null,
+        authorDisplayName: displayName,
         authorFacultyIdentifier:
           facultyIdentifierById.value[memberFacultyId ?? 0] ??
           facultyIdentifierById.value[ownerFacultyId ?? 0] ??
@@ -196,8 +247,9 @@ export function useFacultyResearchWorkApprovalProvider() {
         authorFacultyId: memberFacultyId,
         ownerFacultyId,
         isOutsideFaculty,
+        isExternal,
         isPrimaryAuthor: isPrimary,
-        isSubmittingLecturer: author.lecturer_id === submitterId,
+        isSubmittingLecturer: !isExternal && author.lecturer_id === submitterId,
       };
     });
   }
@@ -270,6 +322,9 @@ export function useFacultyResearchWorkApprovalProvider() {
         member.member_role_code === "principal" ||
         member.member_role_code === "corresponding_author" ||
         member.member_role_code === "chief_editor";
+      const isExternal = Boolean(
+        member.is_external || member.lecturer_id == null,
+      );
       const computedMemberHours =
         member.computed_member_hours ??
         member.declared_hours ??
@@ -279,13 +334,18 @@ export function useFacultyResearchWorkApprovalProvider() {
         member.owner_faculty_id ?? item.lecturer.faculty_id ?? null;
       const memberFacultyId = member.member_faculty_id ?? null;
       const isOutsideFaculty =
-        member.is_outside_faculty ??
+        (member.is_outside_faculty ?? isExternal) ||
         (ownerFacultyId !== null &&
           memberFacultyId !== null &&
           ownerFacultyId !== memberFacultyId);
+      const memberCode = member.lecturer_code?.trim() ?? "";
+      const displayName = memberCode
+        ? `${member.lecturer_full_name} (${memberCode})`
+        : member.lecturer_full_name;
       return {
-        authorIdentifier: member.lecturer_id,
-        authorDisplayName: `${member.lecturer_full_name} (${member.lecturer_code})`,
+        authorIdentifier: member.member_id,
+        lecturerId: member.lecturer_id ?? null,
+        authorDisplayName: displayName,
         authorFacultyIdentifier:
           facultyIdentifierById.value[memberFacultyId ?? 0] ??
           facultyIdentifierById.value[ownerFacultyId ?? 0] ??
@@ -295,8 +355,10 @@ export function useFacultyResearchWorkApprovalProvider() {
         authorFacultyId: memberFacultyId,
         ownerFacultyId,
         isOutsideFaculty,
+        isExternal,
         isPrimaryAuthor: isPrimary,
-        isSubmittingLecturer: member.lecturer_id === item.lecturer.id,
+        isSubmittingLecturer:
+          !isExternal && member.lecturer_id === item.lecturer.id,
         authorRoleDisplayName:
           member.member_role_name ??
           (isPrimary ? "Tác giả chính" : "Đồng tác giả"),
@@ -308,29 +370,7 @@ export function useFacultyResearchWorkApprovalProvider() {
       };
     });
 
-    const approvalHistoryList = detail.approvals
-      .filter((approval) => approval.decided_at)
-      .map((approval) => {
-        const reviewAction =
-          approval.status === "approved"
-            ? "Duyệt"
-            : approval.status === "rejected"
-              ? "Từ chối"
-              : "Chờ duyệt";
-        const reviewLevel =
-          approval.stage_code === "assistant" ? "Cấp khoa" : "Lịch sử duyệt";
-        return {
-          historyIdentifier: approval.id,
-          reviewLevelDisplayName: reviewLevel,
-          reviewActionDisplayName: reviewAction,
-          reviewedAtDateTimeString: approval.decided_at ?? "",
-          reviewNote:
-            approval.note ??
-            (reviewAction === "Duyệt"
-              ? `${reviewLevel} đã duyệt.`
-              : `${reviewLevel} cập nhật trạng thái.`),
-        };
-      });
+    const approvalHistoryList = buildFinalApprovalHistory(detail.approvals);
 
     const assistantReviewedAt =
       detail.approvals.find(
@@ -355,8 +395,7 @@ export function useFacultyResearchWorkApprovalProvider() {
             journalScope: detail.activity.journal.journal_scope ?? null,
             journalSourceName:
               detail.activity.journal.journal_source_name ?? null,
-            journalPublisher:
-              detail.activity.journal.journal_publisher ?? null,
+            journalPublisher: detail.activity.journal.journal_publisher ?? null,
             journalWebsite: detail.activity.journal.journal_website ?? null,
             workScore: detail.activity.journal.work_score ?? null,
           }
@@ -515,12 +554,16 @@ export function useFacultyResearchWorkApprovalProvider() {
 
   async function reject(payload: {
     researchWorkIdentifier: number;
+    decision?: "reject" | "return_for_revision";
     rejectionReasonType: ResearchWorkRejectionReasonType;
     rejectionReasonDetail: string | null;
   }): Promise<void> {
+    const decision = payload.decision ?? "reject";
+
     await runWithFeedback(
       async () => {
         await rejectFacultyApproval(payload.researchWorkIdentifier, {
+          decision,
           reason_type: payload.rejectionReasonType,
           reason_detail: payload.rejectionReasonDetail,
         });
@@ -529,12 +572,18 @@ export function useFacultyResearchWorkApprovalProvider() {
       },
       {
         loading: {
-          title: "Đang xử lý từ chối",
+          title:
+            decision === "return_for_revision"
+              ? "Đang gửi yêu cầu chỉnh sửa"
+              : "Đang xử lý từ chối",
           message: "Hệ thống đang cập nhật kết quả xét duyệt...",
         },
         success: {
           title: "Thành công",
-          message: "Đã từ chối công trình.",
+          message:
+            decision === "return_for_revision"
+              ? "Đã gửi yêu cầu chỉnh sửa cho giảng viên."
+              : "Đã từ chối công trình.",
         },
         error: {
           title: "Từ chối công trình thất bại",

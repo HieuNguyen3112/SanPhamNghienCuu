@@ -176,22 +176,74 @@ export function useUniversityResearchWorkApprovalProvider() {
     return mapping[kindCode] ?? "JOURNAL_ARTICLE";
   }
 
+  function buildFinalApprovalHistory(
+    approvals: UniversityApprovalDetailResponse["approvals"],
+  ): ResearchWorkApprovalEntry["approvalHistoryList"] {
+    const processedApprovals = approvals.filter(
+      (approval) =>
+        approval.status !== "pending" &&
+        Boolean(approval.decided_at || approval.decided_by_user_name),
+    );
+
+    if (processedApprovals.length === 0) {
+      return [];
+    }
+
+    const latest = processedApprovals.reduce((selected, current) => {
+      const selectedDate = selected.decided_at ?? "";
+      const currentDate = current.decided_at ?? "";
+
+      if (currentDate > selectedDate) return current;
+      if (currentDate < selectedDate) return selected;
+      return current.id > selected.id ? current : selected;
+    });
+
+    const reviewActionDisplayName =
+      latest.status === "approved"
+        ? "Duyệt"
+        : latest.status === "rejected"
+          ? "Từ chối"
+          : "Đã xử lý";
+
+    const reviewerName = latest.decided_by_user_name?.trim() || "Không rõ";
+    const stageName = latest.stage_name?.trim() || "Hội đồng";
+
+    return [
+      {
+        historyIdentifier: latest.id,
+        reviewLevelDisplayName: "Người duyệt cuối cùng",
+        reviewActionDisplayName,
+        reviewedAtDateTimeString: latest.decided_at ?? "",
+        reviewNote: `${reviewerName} (${stageName})`,
+      },
+    ];
+  }
+
   function mapAuthors(item: UniversityApprovalListItem, submitterId: number) {
     return item.authors.map((author) => {
       const isPrimary =
         author.member_role_code === "principal" ||
         author.member_role_code === "corresponding_author" ||
         author.member_role_code === "chief_editor";
+      const isExternal = Boolean(
+        author.is_external || author.lecturer_id == null,
+      );
+      const authorCode = author.lecturer_code?.trim() ?? "";
+      const displayName = authorCode
+        ? `${author.lecturer_full_name} (${authorCode})`
+        : author.lecturer_full_name;
       return {
-        authorIdentifier: author.lecturer_id,
-        authorDisplayName: `${author.lecturer_full_name} (${author.lecturer_code})`,
+        authorIdentifier: author.member_id,
+        lecturerId: author.lecturer_id ?? null,
+        authorDisplayName: displayName,
         authorFacultyIdentifier:
           facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
           "ALL_DEPARTMENTS",
         authorFacultyDisplayName:
           author.faculty_name ?? author.department_name ?? "",
+        isExternal,
         isPrimaryAuthor: isPrimary,
-        isSubmittingLecturer: author.lecturer_id === submitterId,
+        isSubmittingLecturer: !isExternal && author.lecturer_id === submitterId,
       };
     });
   }
@@ -261,15 +313,25 @@ export function useUniversityResearchWorkApprovalProvider() {
         member.member_role_code === "principal" ||
         member.member_role_code === "corresponding_author" ||
         member.member_role_code === "chief_editor";
+      const isExternal = Boolean(
+        member.is_external || member.lecturer_id == null,
+      );
+      const memberCode = member.lecturer_code?.trim() ?? "";
+      const displayName = memberCode
+        ? `${member.lecturer_full_name} (${memberCode})`
+        : member.lecturer_full_name;
       const entry: any = {
-        authorIdentifier: member.lecturer_id,
-        authorDisplayName: `${member.lecturer_full_name} (${member.lecturer_code})`,
+        authorIdentifier: member.member_id,
+        lecturerId: member.lecturer_id ?? null,
+        authorDisplayName: displayName,
         authorFacultyIdentifier:
           facultyIdentifierById.value[item.lecturer.faculty_id ?? 0] ??
           "ALL_DEPARTMENTS",
         authorFacultyDisplayName: member.faculty_name ?? "",
+        isExternal,
         isPrimaryAuthor: isPrimary,
-        isSubmittingLecturer: member.lecturer_id === item.lecturer.id,
+        isSubmittingLecturer:
+          !isExternal && member.lecturer_id === item.lecturer.id,
         declaredHours: member.declared_hours,
         recommendedHoursByPolicy: member.recommended_hours,
         officialHours: member.official_hours,
@@ -277,29 +339,7 @@ export function useUniversityResearchWorkApprovalProvider() {
       return entry;
     });
 
-    const approvalHistoryList = detail.approvals
-      .filter((approval) => approval.decided_at)
-      .map((approval) => {
-        const reviewAction =
-          approval.status === "approved"
-            ? "Duyệt"
-            : approval.status === "rejected"
-              ? "Từ chối"
-              : "Chờ duyệt";
-        const reviewLevel =
-          approval.stage_code === "assistant" ? "Cấp khoa" : "Cấp trường";
-        return {
-          historyIdentifier: approval.id,
-          reviewLevelDisplayName: reviewLevel,
-          reviewActionDisplayName: reviewAction,
-          reviewedAtDateTimeString: approval.decided_at ?? "",
-          reviewNote:
-            approval.note ??
-            (reviewAction === "Duyệt"
-              ? `${reviewLevel} đã duyệt.`
-              : `${reviewLevel} cập nhật trạng thái.`),
-        };
-      });
+    const approvalHistoryList = buildFinalApprovalHistory(detail.approvals);
 
     const assistantReviewedAt =
       detail.approvals.find(
@@ -434,11 +474,29 @@ export function useUniversityResearchWorkApprovalProvider() {
     officialResearchHours: number | null;
     memberHours?: { authorIdentifier: number; officialHours: number }[];
   }): Promise<void> {
+    const authorLookup = new Map<number, number | null>(
+      (
+        selectedResearchWorkApprovalEntry.value?.researchWorkAuthorList ?? []
+      ).map((author) => [author.authorIdentifier, author.lecturerId ?? null]),
+    );
+
     const memberHours =
-      payload.memberHours?.map((member) => ({
-        lecturer_id: member.authorIdentifier,
-        official_hours: member.officialHours,
-      })) ?? [];
+      payload.memberHours
+        ?.map((member) => {
+          const lecturerId = authorLookup.get(member.authorIdentifier) ?? null;
+          if (lecturerId === null || lecturerId <= 0) {
+            return null;
+          }
+
+          return {
+            lecturer_id: lecturerId,
+            official_hours: member.officialHours,
+          };
+        })
+        .filter(
+          (member): member is { lecturer_id: number; official_hours: number } =>
+            member !== null,
+        ) ?? [];
 
     await runWithFeedback(
       async () => {
@@ -468,6 +526,7 @@ export function useUniversityResearchWorkApprovalProvider() {
 
   async function reject(payload: {
     researchWorkIdentifier: number;
+    decision?: "reject" | "return_for_revision";
     rejectionReasonType: ResearchWorkRejectionReasonType;
     rejectionReasonDetail: string | null;
   }): Promise<void> {

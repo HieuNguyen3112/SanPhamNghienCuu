@@ -34,41 +34,50 @@
           <div class="border-b border-slate-200 px-4 py-4">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="text-sm font-semibold text-slate-900">Chi tiết công trình</div>
+                <div class="text-sm font-semibold text-slate-900">
+                  Chi tiết công trình
+                </div>
                 <div class="mt-1 text-xs text-slate-500">
-                  Theo dõi công thức tính giờ tự động, quản lý minh chứng và trạng thái duyệt giờ NCKH.
+                  Theo dõi công thức tính giờ tự động, quản lý minh chứng và
+                  trạng thái duyệt giờ NCKH.
                 </div>
               </div>
-
-              <button
-                type="button"
-                class="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50"
-                title="Đóng"
-                @click="emit('close')"
-              >
-                <X class="h-4 w-4" />
-              </button>
             </div>
           </div>
 
           <div class="flex-1 overflow-auto px-4 py-4">
-            <div v-if="loading" class="text-sm text-slate-700">Đang tải chi tiết...</div>
+            <div v-if="loading" class="text-sm text-slate-700">
+              Đang tải chi tiết...
+            </div>
 
             <div
               v-else-if="error"
               class="rounded-xl border border-rose-200 bg-rose-50 p-4"
             >
-              <div class="text-sm font-medium text-rose-700">Không tải được chi tiết</div>
+              <div class="text-sm font-medium text-rose-700">
+                Không tải được chi tiết
+              </div>
               <div class="mt-1 whitespace-pre-wrap text-xs text-rose-700">
                 {{ error }}
               </div>
             </div>
 
-            <div v-else-if="!detail" class="text-sm text-slate-700">Không có dữ liệu chi tiết.</div>
+            <div v-else-if="!detail" class="text-sm text-slate-700">
+              Không có dữ liệu chi tiết.
+            </div>
 
             <div v-else class="space-y-4">
-              <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                <div class="text-sm font-semibold text-slate-900">{{ detail.title }}</div>
+              <div
+                class="rounded-2xl border bg-white p-4"
+                :class="
+                  highlightActivitySection
+                    ? 'border-amber-300 ring-1 ring-amber-100'
+                    : 'border-slate-200'
+                "
+              >
+                <div class="text-sm font-semibold text-slate-900">
+                  {{ detail.title }}
+                </div>
                 <div class="mt-2 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                   <div class="flex items-center gap-2 text-slate-700">
                     <BookOpen class="h-4 w-4 text-slate-500" />
@@ -79,13 +88,21 @@
                   <div class="flex items-center gap-2 text-slate-700">
                     <Calendar class="h-4 w-4 text-slate-500" />
                     <span class="text-xs text-slate-500">Năm học:</span>
-                    <span class="font-medium">{{ detail.academicYearCode }}</span>
+                    <span class="font-medium">{{
+                      detail.academicYearCode
+                    }}</span>
                   </div>
 
-                  <div class="flex items-center gap-2 text-slate-700 md:col-span-2">
+                  <div
+                    class="flex items-center gap-2 text-slate-700 md:col-span-2"
+                  >
                     <Building2 class="h-4 w-4 text-slate-500" />
-                    <span class="text-xs text-slate-500">Đơn vị / nơi công bố:</span>
-                    <span class="font-medium">{{ detail.publicationOrUnit }}</span>
+                    <span class="text-xs text-slate-500"
+                      >Đơn vị / nơi công bố:</span
+                    >
+                    <span class="font-medium">{{
+                      detail.publicationOrUnit
+                    }}</span>
                   </div>
 
                   <div class="flex items-center gap-2 text-slate-700">
@@ -108,13 +125,17 @@
                 </div>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div class="text-sm font-semibold text-slate-900">Quy tắc quy đổi giờ</div>
-                <div class="mt-2 text-sm text-slate-700">{{ detail.ruleSummary }}</div>
-              </div>
-
-              <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                <div class="text-sm font-semibold text-slate-900">Giờ NCKH tính tự động</div>
+              <div
+                class="rounded-2xl border bg-white p-4"
+                :class="
+                  highlightHoursSection
+                    ? 'border-amber-300 ring-1 ring-amber-100'
+                    : 'border-slate-200'
+                "
+              >
+                <div class="text-sm font-semibold text-slate-900">
+                  Giờ NCKH tính tự động
+                </div>
 
                 <div class="mt-3 flex items-center gap-2">
                   <span
@@ -130,14 +151,44 @@
                 </div>
 
                 <div
-                  v-if="detail.hoursRequestState === 'hours_rejected' && detail.hoursRejectionReason"
-                  class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"
+                  v-if="
+                    detail.hoursRequestState === 'hours_rejected' ||
+                    detail.hoursRequestState === 'hours_need_revision'
+                  "
+                  class="mt-3 rounded-xl border p-3 text-xs"
+                  :class="
+                    detail.hoursRequestState === 'hours_need_revision'
+                      ? 'border-blue-200 bg-blue-50 text-blue-800'
+                      : 'border-rose-200 bg-rose-50 text-rose-700'
+                  "
                 >
-                  Lý do từ chối: {{ detail.hoursRejectionReason }}
+                  <div class="font-semibold">
+                    {{
+                      detail.hoursRequestState === "hours_need_revision"
+                        ? "Yêu cầu chỉnh sửa từ khoa"
+                        : "Lý do từ chối"
+                    }}
+                  </div>
+                  <div v-if="detail.hoursRejectionReasonCode" class="mt-1">
+                    {{ rejectionReasonLabel }}
+                  </div>
+                  <div v-if="rejectionReasonText" class="mt-1">
+                    {{ rejectionReasonText }}
+                  </div>
+                  <div
+                    v-if="detail.hoursRequestState === 'hours_need_revision'"
+                    class="mt-2 rounded-lg border border-blue-200 bg-white/80 px-2.5 py-2"
+                  >
+                    {{ revisionActionHint }}
+                  </div>
                 </div>
 
-                <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <div class="text-xs text-slate-500">Giờ quy đổi (tự động)</div>
+                <div
+                  class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
+                  <div class="text-xs text-slate-500">
+                    Giờ quy đổi (tự động)
+                  </div>
                   <div class="mt-1 text-xl font-semibold text-slate-900">
                     {{ formatHours(detail.calculatedHours) }} giờ
                   </div>
@@ -150,58 +201,117 @@
                   <div class="flex items-start gap-2">
                     <AlertTriangle class="mt-0.5 h-4 w-4" />
                     <span v-if="detail.conversionRulePresent">
-                      Hệ thống chưa tính được giờ quy đổi tự động cho công trình này. Bạn chưa thể gửi duyệt giờ.
+                      Hệ thống chưa tính được giờ quy đổi tự động cho công trình
+                      này. Bạn chưa thể gửi duyệt giờ.
                     </span>
                     <span v-else>
-                      Chưa có quy tắc quy đổi cho công trình này. Vui lòng liên hệ Phòng quản lý khoa học để cấu hình trước khi gửi duyệt giờ.
+                      Chưa có quy tắc quy đổi cho công trình này. Vui lòng liên
+                      hệ Phòng quản lý khoa học để cấu hình trước khi gửi duyệt
+                      giờ.
                     </span>
                   </div>
                 </div>
 
-                <div class="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                <div
+                  class="mt-4 rounded-xl border border-slate-200 bg-white p-3"
+                >
                   <div class="text-xs text-slate-500">Giờ dùng để duyệt</div>
                   <div class="mt-1 text-xl font-semibold text-slate-900">
                     {{ formatHours(detail.effectiveHoursDisplay) }} giờ
                   </div>
                 </div>
 
-                <div class="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                  <div class="text-xs font-semibold text-slate-700">Công thức tính giờ</div>
-                  <div class="mt-2 text-xs text-slate-600">
-                    {{ detail.formulaExplanation?.ruleName ?? "Chưa có quy tắc quy đổi" }}
+                <div
+                  class="mt-4 rounded-xl border border-slate-200 bg-white p-3"
+                >
+                  <div class="text-xs font-semibold text-slate-700">
+                    Công thức tính giờ
                   </div>
-                  <div class="mt-2 grid grid-cols-1 gap-2 text-xs text-slate-700 sm:grid-cols-2">
+                  <div class="mt-2 text-xs text-slate-600">
+                    {{
+                      detail.formulaExplanation?.ruleName ??
+                      "Chưa có quy tắc quy đổi"
+                    }}
+                  </div>
+                  <div
+                    class="mt-2 grid grid-cols-1 gap-2 text-xs text-slate-700 sm:grid-cols-2"
+                  >
                     <div class="rounded-lg bg-slate-50 px-3 py-2">
-                      <span class="text-slate-500">Giờ gốc:</span>
+                      <span class="text-slate-500">Giờ gốc (100%):</span>
                       <span class="ml-1 font-medium text-slate-900">
-                        {{ formatHours(detail.formulaExplanation?.baseHours ?? null) }} giờ
+                        {{
+                          formatHours(
+                            detail.formulaExplanation?.baseHours ?? null,
+                          )
+                        }}
+                        giờ
                       </span>
                     </div>
                     <div class="rounded-lg bg-slate-50 px-3 py-2">
-                      <span class="text-slate-500">Tổng giờ công trình:</span>
+                      <span class="text-slate-500"
+                        >Tổng giờ công trình (sau tiến độ):</span
+                      >
                       <span class="ml-1 font-medium text-slate-900">
-                        {{ formatHours(detail.totalHoursActivity ?? detail.formulaExplanation?.totalHoursActivity ?? null) }} giờ
+                        {{
+                          formatHours(
+                            detail.totalHoursActivity ??
+                              detail.formulaExplanation?.totalHoursActivity ??
+                              null,
+                          )
+                        }}
+                        giờ
+                      </span>
+                      <span
+                        v-if="
+                          detail.formulaExplanation?.progressPercent != null
+                        "
+                        class="ml-2 text-slate-500"
+                      >
+                        ({{ detail.formulaExplanation.progressPercent }}% của
+                        giờ gốc)
                       </span>
                     </div>
                     <div class="rounded-lg bg-slate-50 px-3 py-2 sm:col-span-2">
                       <span class="text-slate-500">Giờ của bạn:</span>
                       <span class="ml-1 font-medium text-slate-900">
-                        {{ formatHours(detail.memberHours ?? detail.formulaExplanation?.memberHours ?? detail.effectiveHoursDisplay) }} giờ
+                        {{
+                          formatHours(
+                            detail.memberHours ??
+                              detail.formulaExplanation?.memberHours ??
+                              detail.effectiveHoursDisplay,
+                          )
+                        }}
+                        giờ
                       </span>
-                      <span
-                        v-if="detail.formulaExplanation?.memberSharePercent != null"
-                        class="ml-2 text-slate-500"
+                      <div
+                        v-if="
+                          detail.formulaExplanation?.memberSharePercent != null
+                        "
+                        class="mt-1 text-[11px] text-slate-500"
                       >
-                        ({{ detail.formulaExplanation.memberSharePercent }}%)
+                        Tỷ trọng phân bổ vai trò:
+                        {{ detail.formulaExplanation.memberSharePercent }}%
+                      </div>
+                    </div>
+                    <div
+                      v-if="detail.formulaExplanation?.progressPercent != null"
+                      class="rounded-lg bg-slate-50 px-3 py-2 sm:col-span-2"
+                    >
+                      <span class="text-slate-500">Tiến độ đề tài:</span>
+                      <span class="ml-1 font-medium text-slate-900">
+                        {{ detail.formulaExplanation.progressPercent }}%
                       </span>
                     </div>
                   </div>
                   <ul
-                    v-if="(detail.formulaExplanation?.modifiers?.length ?? 0) > 0"
+                    v-if="
+                      (detail.formulaExplanation?.modifiers?.length ?? 0) > 0
+                    "
                     class="mt-2 space-y-1 text-xs text-slate-600"
                   >
                     <li
-                      v-for="modifier in detail.formulaExplanation?.modifiers ?? []"
+                      v-for="modifier in detail.formulaExplanation?.modifiers ??
+                      []"
                       :key="`${modifier.name}-${modifier.value}`"
                     >
                       {{ modifier.name }}: {{ modifier.value }}
@@ -210,10 +320,21 @@
                 </div>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-white p-4">
+              <div
+                class="rounded-2xl border bg-white p-4"
+                :class="
+                  highlightEvidenceSection
+                    ? 'border-amber-300 ring-1 ring-amber-100'
+                    : 'border-slate-200'
+                "
+              >
                 <div class="flex items-center justify-between gap-2">
-                  <div class="text-sm font-semibold text-slate-900">Minh chứng duyệt giờ</div>
-                  <span class="text-xs text-slate-500">{{ evidenceFiles.length }} tệp</span>
+                  <div class="text-sm font-semibold text-slate-900">
+                    Minh chứng duyệt giờ
+                  </div>
+                  <span class="text-xs text-slate-500"
+                    >{{ evidenceFiles.length }} tệp</span
+                  >
                 </div>
 
                 <div
@@ -223,19 +344,23 @@
                   Hồ sơ đã được duyệt giờ, không thể chỉnh sửa minh chứng.
                 </div>
 
+                <div
+                  v-else
+                  class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
                   <div
-                    v-else
-                    class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                    class="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-end"
                   >
-                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-end">
-                      <div class="min-w-0 space-y-1">
-                        <label class="text-xs font-medium text-slate-600">Loại minh chứng</label>
-                        <select
-                          class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-slate-400 focus:ring-0"
-                          :value="selectedEvidenceTypeId ?? ''"
-                          :disabled="loadingEvidenceTypes || drawerActionsLocked"
-                          @change="onChangeEvidenceType"
-                        >
+                    <div class="min-w-0 space-y-1">
+                      <label class="text-xs font-medium text-slate-600"
+                        >Loại minh chứng</label
+                      >
+                      <select
+                        class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-slate-400 focus:ring-0"
+                        :value="selectedEvidenceTypeId ?? ''"
+                        :disabled="loadingEvidenceTypes || drawerActionsLocked"
+                        @change="onChangeEvidenceType"
+                      >
                         <option value="">Chọn loại minh chứng</option>
                         <option
                           v-for="type in evidenceFileTypes"
@@ -254,7 +379,9 @@
                     </div>
 
                     <div class="min-w-0 space-y-1">
-                      <label class="text-xs font-medium text-slate-600">Tệp minh chứng (PDF)</label>
+                      <label class="text-xs font-medium text-slate-600"
+                        >Tệp minh chứng (PDF)</label
+                      >
                       <input
                         :key="evidenceFileInputResetKey"
                         ref="evidenceFileInputRef"
@@ -316,7 +443,9 @@
                   </div>
                 </div>
 
-                <div v-if="loadingEvidence" class="mt-3 text-sm text-slate-600">Đang tải minh chứng...</div>
+                <div v-if="loadingEvidence" class="mt-3 text-sm text-slate-600">
+                  Đang tải minh chứng...
+                </div>
 
                 <div
                   v-else-if="evidenceFiles.length === 0"
@@ -362,7 +491,9 @@
                         @click="emit('request-delete-evidence', file.id)"
                       >
                         <Trash2 class="h-3.5 w-3.5" />
-                        {{ deletingEvidenceId === file.id ? "Đang xóa..." : "Xóa" }}
+                        {{
+                          deletingEvidenceId === file.id ? "Đang xóa..." : "Xóa"
+                        }}
                       </button>
                     </div>
                   </li>
@@ -405,7 +536,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref, toRefs } from "vue";
 import {
   AlertTriangle,
   BookOpen,
@@ -417,7 +548,6 @@ import {
   Trash2,
   Upload,
   User,
-  X,
 } from "lucide-vue-next";
 import ConfirmActionModal from "@/shared/components/modals/ConfirmActionModal.vue";
 import type {
@@ -425,9 +555,15 @@ import type {
   EvidenceFileType,
   WorkDetail,
 } from "../contracts/selectHoursRequest.contract";
-import { formatBytes, formatHours } from "../contracts/selectHoursRequest.contract";
+import {
+  formatBytes,
+  formatHours,
+  hoursRejectReasonActionHint,
+  hoursRejectReasonLabel,
+  normalizeHoursRejectReasonCode,
+} from "../contracts/selectHoursRequest.contract";
 
-defineProps<{
+const props = defineProps<{
   open: boolean;
   detail: WorkDetail | null;
   loading: boolean;
@@ -452,6 +588,31 @@ defineProps<{
   deleteEvidenceConfirmMessage: string;
 }>();
 
+const {
+  open,
+  detail,
+  loading,
+  error,
+  evidenceFiles,
+  evidenceFileTypes,
+  selectedEvidenceTypeId,
+  selectedEvidenceFile,
+  evidenceFileInputResetKey,
+  loadingEvidence,
+  loadingEvidenceTypes,
+  evidenceError,
+  evidenceTypeError,
+  evidenceFileError,
+  uploadRequestError,
+  duplicateEvidenceWarning,
+  uploadingEvidence,
+  deletingEvidenceId,
+  drawerActionsLocked,
+  canUploadEvidence,
+  deleteEvidenceConfirmOpen,
+  deleteEvidenceConfirmMessage,
+} = toRefs(props);
+
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "update:evidenceTypeId", value: number | null): void;
@@ -463,12 +624,48 @@ const emit = defineEmits<{
 }>();
 
 const evidenceFileInputRef = ref<HTMLInputElement | null>(null);
+const normalizedReasonCode = computed(() =>
+  normalizeHoursRejectReasonCode(detail.value?.hoursRejectionReasonCode),
+);
+
+const rejectionReasonLabel = computed(() =>
+  hoursRejectReasonLabel(normalizedReasonCode.value),
+);
+
+const rejectionReasonText = computed(() => {
+  return (
+    detail.value?.hoursRejectionReasonDetail ??
+    detail.value?.hoursRejectionReason ??
+    null
+  );
+});
+
+const revisionActionHint = computed(() =>
+  hoursRejectReasonActionHint(normalizedReasonCode.value),
+);
+
+const highlightEvidenceSection = computed(
+  () => normalizedReasonCode.value === "INVALID_EVIDENCE",
+);
+
+const highlightHoursSection = computed(
+  () => normalizedReasonCode.value === "INVALID_HOURS",
+);
+
+const highlightActivitySection = computed(
+  () =>
+    normalizedReasonCode.value === "INVALID_ACTIVITY" ||
+    normalizedReasonCode.value === "NOT_ELIGIBLE",
+);
 
 function hoursStatusLabel(detail: WorkDetail) {
-  if (detail.hoursRequestState === "hours_approved") return "Đã duyệt giờ";
-  if (detail.hoursRequestState === "hours_pending_faculty") return "Chờ khoa duyệt giờ";
-  if (detail.hoursRequestState === "hours_rejected") return "Khoa từ chối giờ";
-  return "Chưa gửi duyệt giờ";
+  if (detail.hoursRequestState === "hours_approved") return "Đã duyệt";
+  if (detail.hoursRequestState === "hours_pending_faculty")
+    return "Chờ khoa duyệt";
+  if (detail.hoursRequestState === "hours_need_revision")
+    return "Cần chỉnh sửa";
+  if (detail.hoursRequestState === "hours_rejected") return "Bị từ chối";
+  return "Chưa gửi duyệt";
 }
 
 function hoursPillClass(detail: WorkDetail) {
@@ -476,6 +673,8 @@ function hoursPillClass(detail: WorkDetail) {
     return "bg-emerald-50 text-emerald-700 ring-emerald-200";
   if (detail.hoursRequestState === "hours_pending_faculty")
     return "bg-amber-50 text-amber-700 ring-amber-200";
+  if (detail.hoursRequestState === "hours_need_revision")
+    return "bg-blue-50 text-blue-700 ring-blue-200";
   if (detail.hoursRequestState === "hours_rejected")
     return "bg-rose-50 text-rose-700 ring-rose-200";
   return "bg-slate-50 text-slate-700 ring-slate-200";

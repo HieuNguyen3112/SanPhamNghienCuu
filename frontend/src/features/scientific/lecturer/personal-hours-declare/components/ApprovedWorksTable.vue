@@ -1,10 +1,14 @@
 <template>
   <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-    <div v-if="loading" class="p-4 text-sm text-slate-700">Đang tải danh sách...</div>
+    <div v-if="loading" class="p-4 text-sm text-slate-700">
+      Đang tải danh sách...
+    </div>
 
     <div v-else-if="error" class="p-4">
       <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
-        <div class="text-sm font-medium text-rose-700">Không tải được dữ liệu</div>
+        <div class="text-sm font-medium text-rose-700">
+          Không tải được dữ liệu
+        </div>
         <div class="mt-1 whitespace-pre-wrap text-xs text-rose-700">
           {{ error }}
         </div>
@@ -12,7 +16,9 @@
     </div>
 
     <div v-else-if="rows.length === 0" class="p-6 text-center">
-      <div class="text-sm font-medium text-slate-900">Không có công trình đủ điều kiện</div>
+      <div class="text-sm font-medium text-slate-900">
+        Không có công trình đủ điều kiện
+      </div>
       <div class="mt-1 text-xs text-slate-500">
         Chỉ hiển thị công trình đã được khoa duyệt nội dung.
       </div>
@@ -43,7 +49,11 @@
         </thead>
 
         <tbody class="divide-y divide-slate-200">
-          <tr v-for="row in rows" :key="row.activityId" class="hover:bg-slate-50">
+          <tr
+            v-for="row in rows"
+            :key="row.activityId"
+            class="hover:bg-slate-50"
+          >
             <td class="px-3 py-2">
               <input
                 type="checkbox"
@@ -85,12 +95,33 @@
             </td>
 
             <td class="px-3 py-2">
-              <div class="text-xs text-slate-700">{{ row.nextActionText ?? "—" }}</div>
+              <div class="text-xs text-slate-700">
+                {{ row.nextActionText ?? "—" }}
+              </div>
               <div
-                v-if="row.hoursRequestState === 'hours_rejected' && row.hoursRejectionReason"
+                v-if="
+                  row.hoursRequestState === 'hours_rejected' ||
+                  row.hoursRequestState === 'hours_need_revision'
+                "
                 class="mt-1 text-xs text-rose-700"
               >
-                Lý do: {{ row.hoursRejectionReason }}
+                <div>
+                  {{
+                    row.hoursRequestState === "hours_need_revision"
+                      ? "Yêu cầu chỉnh sửa"
+                      : "Lý do từ chối"
+                  }}:
+                  {{ hoursRejectReasonLabel(normalizedReasonCode(row)) }}
+                </div>
+                <div v-if="rejectionReasonText(row)">
+                  {{ rejectionReasonText(row) }}
+                </div>
+                <div
+                  v-if="row.hoursRequestState === 'hours_need_revision'"
+                  class="mt-1 text-blue-700"
+                >
+                  {{ hoursRejectReasonActionHint(normalizedReasonCode(row)) }}
+                </div>
               </div>
               <div
                 v-if="validationMessages(row).length > 0"
@@ -138,13 +169,17 @@
     </div>
 
     <div class="border-t border-slate-200 bg-slate-50/40 px-4 py-3">
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+      >
         <div class="text-sm text-slate-700">
           <span class="font-medium text-slate-900">Tổng giờ đã chọn:</span>
           <span class="ml-1 font-semibold text-slate-900">
             {{ formatHours(selectedHoursTotal) }} giờ
           </span>
-          <span class="ml-2 text-xs text-slate-500">( {{ selectedCount }} công trình )</span>
+          <span class="ml-2 text-xs text-slate-500"
+            >( {{ selectedCount }} công trình )</span
+          >
         </div>
 
         <button
@@ -154,7 +189,7 @@
           @click="emit('submit-request')"
         >
           <Check class="h-4 w-4" />
-          Gửi duyệt giờ
+          {{ submitActionLabel }}
         </button>
       </div>
 
@@ -175,7 +210,10 @@ import { Check, Eye } from "lucide-vue-next";
 import type { ApprovedWorkRow } from "../contracts/selectHoursRequest.contract";
 import {
   formatHours,
+  hoursRejectReasonActionHint,
+  hoursRejectReasonLabel,
   isWorkEligibleForSubmit,
+  normalizeHoursRejectReasonCode,
 } from "../contracts/selectHoursRequest.contract";
 
 const props = defineProps<{
@@ -197,11 +235,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   (
     e: "toggle-row",
-    payload: { activityId: number; nextChecked: boolean }
+    payload: { activityId: number; nextChecked: boolean },
   ): void;
   (
     e: "toggle-select-all",
-    payload: { selectableIds: number[]; nextChecked: boolean }
+    payload: { selectableIds: number[]; nextChecked: boolean },
   ): void;
   (e: "open-detail", activityId: number): void;
   (e: "submit-request"): void;
@@ -230,6 +268,23 @@ const someSelectableSelected = computed(() => {
   );
 });
 
+const submitActionLabel = computed(() => {
+  if (props.selectedIds.length === 0) {
+    return "Gửi duyệt giờ";
+  }
+
+  const selectedRows = props.rows.filter((row) =>
+    selectedIdSet.value.has(row.activityId),
+  );
+  const onlyNeedRevisionRows =
+    selectedRows.length > 0 &&
+    selectedRows.every(
+      (row) => row.hoursRequestState === "hours_need_revision",
+    );
+
+  return onlyNeedRevisionRows ? "Chỉnh sửa và gửi lại" : "Gửi duyệt giờ";
+});
+
 const selectAllCheckbox = ref<HTMLInputElement | null>(null);
 watch(
   () => someSelectableSelected.value,
@@ -237,7 +292,7 @@ watch(
     if (!selectAllCheckbox.value) return;
     selectAllCheckbox.value.indeterminate = someSelectableSelected.value;
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 function onToggleSelectAll(event: Event) {
@@ -261,11 +316,21 @@ function validationMessages(row: ApprovedWorkRow): string[] {
   return props.submitItemErrorsByActivityId[row.activityId] ?? [];
 }
 
+function normalizedReasonCode(row: ApprovedWorkRow) {
+  return normalizeHoursRejectReasonCode(row.hoursRejectionReasonCode);
+}
+
+function rejectionReasonText(row: ApprovedWorkRow): string | null {
+  return row.hoursRejectionReasonDetail ?? row.hoursRejectionReason ?? null;
+}
+
 function hoursStatusLabel(row: ApprovedWorkRow) {
-  if (row.hoursRequestState === "hours_approved") return "Đã duyệt giờ";
-  if (row.hoursRequestState === "hours_pending_faculty") return "Chờ khoa duyệt giờ";
-  if (row.hoursRequestState === "hours_rejected") return "Khoa từ chối giờ";
-  return "Chưa gửi duyệt giờ";
+  if (row.hoursRequestState === "hours_approved") return "Đã duyệt";
+  if (row.hoursRequestState === "hours_pending_faculty")
+    return "Chờ khoa duyệt";
+  if (row.hoursRequestState === "hours_need_revision") return "Cần chỉnh sửa";
+  if (row.hoursRequestState === "hours_rejected") return "Bị từ chối";
+  return "Chưa gửi duyệt";
 }
 
 function hoursPillClass(row: ApprovedWorkRow) {
@@ -273,6 +338,8 @@ function hoursPillClass(row: ApprovedWorkRow) {
     return "bg-emerald-50 text-emerald-700 ring-emerald-200";
   if (row.hoursRequestState === "hours_pending_faculty")
     return "bg-amber-50 text-amber-700 ring-amber-200";
+  if (row.hoursRequestState === "hours_need_revision")
+    return "bg-blue-50 text-blue-700 ring-blue-200";
   if (row.hoursRequestState === "hours_rejected")
     return "bg-rose-50 text-rose-700 ring-rose-200";
   return "bg-slate-50 text-slate-700 ring-slate-200";

@@ -11,7 +11,6 @@ import FacultyResearchWorkApprovalPage from "@/features/scientific/management/re
 import FacultyLecturerHoursManagementPage from "@/features/scientific/management/lecturer-hours-management/pages/FacultyLecturerHoursManagementPage.vue";
 import UniversityLecturerHoursManagementPage from "@/features/scientific/management/lecturer-hours-management/pages/UniversityLecturerHoursManagementPage.vue";
 import FacultyHourApprovalPage from "@/features/scientific/management/lecturer-hour-approval/pages/FacultyHourApprovalPage.vue";
-import UniversityHourApprovalPage from "@/features/scientific/management/lecturer-hour-approval/pages/UniversityHourApprovalPage.vue";
 
 import FacultyResearchHourWarningPage from "@/features/scientific/management/lecturer-hours-warnings/pages/FacultyResearchHourWarningPage.vue";
 import UniversityResearchHourWarningPage from "@/features/scientific/management/lecturer-hours-warnings/pages/UniversityResearchHourWarningPage.vue";
@@ -97,12 +96,6 @@ export const researchWorksRoutes: RouteRecordRaw[] = [
     path: "hours/unimanagement",
     name: "hours.unimanagement",
     component: UniversityLecturerHoursManagementPage,
-    meta: { roles: ["SCIENCE_OFFICE"] },
-  },
-  {
-    path: "hours/uniapprovals",
-    name: "hours.uniapprovals",
-    component: UniversityHourApprovalPage,
     meta: { roles: ["SCIENCE_OFFICE"] },
   },
   {

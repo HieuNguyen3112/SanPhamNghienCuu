@@ -42,7 +42,7 @@ class FacultyResearchWorkLecturerWorksRequest extends FormRequest
     {
         return [
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
-            'status' => ['nullable', 'string', 'in:all,approved,pending,rejected'],
+            'status' => ['nullable', 'string', 'in:all,approved,pending,need_revision,rejected'],
             'q' => ['nullable', 'string', 'max:255'],
             'sort' => ['nullable', 'string', 'max:50'],
             'page' => ['nullable', 'integer', 'min:1'],

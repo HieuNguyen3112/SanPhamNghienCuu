@@ -27,7 +27,7 @@ class FacultyLecturerHourApprovalController extends Controller
             ->select(['id', 'code', 'start_date', 'end_date', 'is_active'])
             ->orderByDesc('start_date')
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->id,
                 'code' => (string) $row->code,
                 'start_date' => (string) $row->start_date,
@@ -51,7 +51,9 @@ class FacultyLecturerHourApprovalController extends Controller
                 'statuses' => [
                     ['code' => 'all', 'label' => 'Tất cả'],
                     ['code' => 'pending', 'label' => 'Chờ khoa duyệt giờ'],
+                    ['code' => 'partially_approved', 'label' => 'Đã duyệt một phần'],
                     ['code' => 'approved', 'label' => 'Đã duyệt giờ'],
+                    ['code' => 'need_revision', 'label' => 'Cần chỉnh sửa'],
                     ['code' => 'rejected', 'label' => 'Khoa từ chối giờ'],
                 ],
                 'academic_years' => $academicYears,
@@ -111,10 +113,34 @@ class FacultyLecturerHourApprovalController extends Controller
             ], Response::HTTP_OK);
         }
 
+        $revisionLikePattern = '%"decision_mode":"revision"%';
+        $pendingCountExpression = "SUM(CASE WHEN aa.status = 'pending' THEN 1 ELSE 0 END)";
+        $approvedCountExpression = "SUM(CASE WHEN aa.status = 'approved' THEN 1 ELSE 0 END)";
+        $needRevisionCountExpression = "SUM(CASE WHEN aa.status = 'rejected' AND aa.note LIKE '{$revisionLikePattern}' THEN 1 ELSE 0 END)";
+        $hardRejectedCountExpression = "SUM(CASE WHEN aa.status = 'rejected' AND (aa.note IS NULL OR aa.note NOT LIKE '{$revisionLikePattern}') THEN 1 ELSE 0 END)";
+
         $statusCase = "CASE
-            WHEN SUM(CASE WHEN aa.status = 'pending' THEN 1 ELSE 0 END) > 0 THEN 'pending'
-            WHEN SUM(CASE WHEN aa.status = 'rejected' THEN 1 ELSE 0 END) > 0 THEN 'rejected'
-            ELSE 'approved'
+            WHEN {$pendingCountExpression} > 0 THEN 'pending'
+
+            WHEN {$approvedCountExpression} > 0
+                AND {$pendingCountExpression} = 0
+                AND {$hardRejectedCountExpression} = 0
+                AND {$needRevisionCountExpression} = 0
+            THEN 'approved'
+
+            WHEN {$hardRejectedCountExpression} > 0
+                AND {$pendingCountExpression} = 0
+                AND {$approvedCountExpression} = 0
+                AND {$needRevisionCountExpression} = 0
+            THEN 'rejected'
+
+            WHEN {$needRevisionCountExpression} > 0
+                AND {$pendingCountExpression} = 0
+                AND {$approvedCountExpression} = 0
+                AND {$hardRejectedCountExpression} = 0
+            THEN 'need_revision'
+
+            ELSE 'partially_approved'
         END";
 
         $query = DB::table('activity_approvals as aa')
@@ -183,6 +209,7 @@ class FacultyLecturerHourApprovalController extends Controller
                 'status_code' => $statusCode,
                 'status_label' => $this->statusLabel($statusCode),
                 'status' => $statusCode,
+                'partial_approved' => $statusCode === 'partially_approved',
             ];
         })->all();
 
@@ -214,6 +241,8 @@ class FacultyLecturerHourApprovalController extends Controller
         if (! $scope) {
             return response()->json(['message' => 'faculty scope not found'], Response::HTTP_FORBIDDEN);
         }
+
+        $academicYearId = $this->resolveRequestedAcademicYearId($request);
 
         $stageId = $this->resolveHoursStageId();
         if (! $stageId) {
@@ -248,6 +277,9 @@ class FacultyLecturerHourApprovalController extends Controller
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('aa.stage_id', $stageId)
             ->where('ra.owner_lecturer_id', $requestId)
+            ->when($academicYearId !== null, function ($query) use ($academicYearId) {
+                $query->where('ra.academic_year_id', $academicYearId);
+            })
             ->orderByDesc('aa.created_at')
             ->select([
                 'ra.id as activity_id',
@@ -271,14 +303,30 @@ class FacultyLecturerHourApprovalController extends Controller
             return response()->json(['message' => 'request not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $statusCode = $this->aggregateStatus($items->pluck('approval_status')->all());
+        $displayStatuses = $items
+            ->map(fn($item) => $this->normalizeApprovalStatusForDisplay($item->approval_status ?? null, $item->approval_note ?? null))
+            ->all();
+
+        $statusCode = $this->aggregateStatus($displayStatuses);
         $submittedAt = $items->max('submitted_at');
-        $activityIds = $items->pluck('activity_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $activityIds = $items->pluck('activity_id')->map(fn($id) => (int) $id)->unique()->values()->all();
         $evidenceByActivity = $this->fetchEvidenceByActivityIds($activityIds);
         $noteFromFaculty = null;
-        if ($statusCode === 'rejected') {
-            $latestRejected = $items->first(fn ($item) => $item->approval_status === 'rejected');
-            $noteFromFaculty = $this->resolveRejectNote($latestRejected?->approval_note);
+        $noteFromFacultyReasonCode = null;
+        $noteFromFacultyReasonDetail = null;
+        if (in_array($statusCode, ['rejected', 'need_revision', 'partially_approved'], true)) {
+            $latestHandled = $items->first(function ($item) {
+                $status = $this->normalizeApprovalStatusForDisplay(
+                    $item->approval_status ?? null,
+                    $item->approval_note ?? null
+                );
+
+                return in_array($status, ['rejected', 'need_revision'], true);
+            });
+            $latestRejectMeta = $this->resolveRejectMeta($latestHandled?->approval_note);
+            $noteFromFaculty = $latestRejectMeta['reason_text'];
+            $noteFromFacultyReasonCode = $latestRejectMeta['reason_code'];
+            $noteFromFacultyReasonDetail = $latestRejectMeta['reason_detail'];
         }
 
         $totalHours = (float) $items->sum(function ($row) {
@@ -287,16 +335,24 @@ class FacultyLecturerHourApprovalController extends Controller
 
         $detailItems = $items->map(function ($row) use ($evidenceByActivity) {
             $activityId = (int) $row->activity_id;
+            $approvalStatus = $this->normalizeApprovalStatusForDisplay(
+                $row->approval_status ?? null,
+                $row->approval_note ?? null
+            );
+            $rejectMeta = in_array($approvalStatus, ['rejected', 'need_revision'], true)
+                ? $this->resolveRejectMeta($row->approval_note)
+                : null;
+
             return [
                 'activity_id' => $activityId,
                 'activity_title' => $row->activity_title,
                 'activity_kind_name' => $row->activity_kind_name,
                 'member_role_name' => $row->member_role_name,
                 'hours_converted' => $row->hours_converted !== null ? (float) $row->hours_converted : 0.0,
-                'approval_status' => $row->approval_status,
-                'rejection_reason' => $row->approval_status === 'rejected'
-                    ? $this->resolveRejectNote($row->approval_note)
-                    : null,
+                'approval_status' => $approvalStatus,
+                'rejection_reason' => $rejectMeta['reason_text'] ?? null,
+                'rejection_reason_code' => $rejectMeta['reason_code'] ?? null,
+                'rejection_reason_detail' => $rejectMeta['reason_detail'] ?? null,
                 'evidence_files' => $evidenceByActivity[$activityId] ?? [],
             ];
         })->all();
@@ -314,8 +370,11 @@ class FacultyLecturerHourApprovalController extends Controller
                 'submitted_at' => $submittedAt,
                 'status' => $statusCode,
                 'status_label' => $this->statusLabel($statusCode),
+                'partial_approved' => $statusCode === 'partially_approved',
                 'note_from_lecturer' => null,
                 'note_from_faculty' => $noteFromFaculty,
+                'note_from_faculty_reason_code' => $noteFromFacultyReasonCode,
+                'note_from_faculty_reason_detail' => $noteFromFacultyReasonDetail,
                 'activity_count' => $items->count(),
                 'total_hours_requested' => $totalHours,
                 'total_hours_valid' => $totalHours,
@@ -353,7 +412,7 @@ class FacultyLecturerHourApprovalController extends Controller
         if (! empty($selectedActivityIds)) {
             $pendingActivityIds = $pendingRows
                 ->pluck('activity_id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn($id) => (int) $id)
                 ->all();
             $invalidActivityIds = array_values(array_diff($selectedActivityIds, $pendingActivityIds));
             if (! empty($invalidActivityIds)) {
@@ -367,7 +426,7 @@ class FacultyLecturerHourApprovalController extends Controller
 
         $pendingIds = $pendingRows
             ->pluck('approval_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         if (empty($pendingIds)) {
@@ -392,7 +451,7 @@ class FacultyLecturerHourApprovalController extends Controller
             $academicYearIds = $pendingRows
                 ->pluck('academic_year_id')
                 ->filter()
-                ->map(fn ($id) => (int) $id)
+                ->map(fn($id) => (int) $id)
                 ->unique()
                 ->values()
                 ->all();
@@ -404,7 +463,7 @@ class FacultyLecturerHourApprovalController extends Controller
 
         $approvedActivityIds = $pendingRows
             ->pluck('activity_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -460,6 +519,17 @@ class FacultyLecturerHourApprovalController extends Controller
             )
         );
 
+        $this->recordHoursHistory(
+            $requestId,
+            'approve',
+            (int) ($request->user()?->id ?? 0),
+            json_encode([
+                'activity_ids' => $approvedActivityIds,
+                'count' => count($approvedActivityIds),
+                'academic_year' => $context['academic_year_code'] ?? null,
+            ], JSON_UNESCAPED_UNICODE)
+        );
+
         return $this->show($request, $requestId);
     }
 
@@ -480,15 +550,17 @@ class FacultyLecturerHourApprovalController extends Controller
         }
 
         $validated = $request->validated();
+        $canonicalReasonCode = $this->canonicalReasonCode($validated['reason_code'] ?? null);
+        $reasonDetail = isset($validated['reason_detail'])
+            ? trim((string) $validated['reason_detail'])
+            : '';
+        $reasonDetail = $reasonDetail !== '' ? $reasonDetail : null;
 
-        if ($validated['reason_code'] === 'other' && empty($validated['reason_detail'])) {
-            return response()->json([
-                'message' => 'reason_detail is required when reason_code is other',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
+        $decisionMode = strtolower((string) ($validated['decision_mode'] ?? 'reject'));
+        $isRevisionMode = $decisionMode === 'revision';
 
         $selectedActivityIds = collect($validated['activity_ids'] ?? [])
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -497,7 +569,7 @@ class FacultyLecturerHourApprovalController extends Controller
         if (! empty($selectedActivityIds)) {
             $pendingActivityIds = $pendingRows
                 ->pluck('activity_id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn($id) => (int) $id)
                 ->all();
             $invalidActivityIds = array_values(array_diff($selectedActivityIds, $pendingActivityIds));
             if (! empty($invalidActivityIds)) {
@@ -511,7 +583,7 @@ class FacultyLecturerHourApprovalController extends Controller
 
         $pendingIds = $pendingRows
             ->pluck('approval_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         if (empty($pendingIds)) {
@@ -522,8 +594,9 @@ class FacultyLecturerHourApprovalController extends Controller
         }
 
         $note = json_encode([
-            'reason_code' => $validated['reason_code'],
-            'reason_detail' => $validated['reason_detail'] ?? null,
+            'reason_code' => $canonicalReasonCode,
+            'reason_detail' => $reasonDetail,
+            'decision_mode' => $isRevisionMode ? 'revision' : 'reject',
         ], JSON_UNESCAPED_UNICODE);
 
         $updatedAt = now();
@@ -540,7 +613,7 @@ class FacultyLecturerHourApprovalController extends Controller
         $academicYearIds = $pendingRows
             ->pluck('academic_year_id')
             ->filter()
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -550,7 +623,7 @@ class FacultyLecturerHourApprovalController extends Controller
 
         $rejectedActivityIds = $pendingRows
             ->pluck('activity_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -558,8 +631,8 @@ class FacultyLecturerHourApprovalController extends Controller
         $context = $this->buildHoursApprovalContext($stageId, $requestId);
         AuditLogger::log($request, [
             'action_group' => 'approval',
-            'action_code' => 'HOURS_REJECTED',
-            'action_label' => 'Từ chối duyệt giờ NCKH',
+            'action_code' => $isRevisionMode ? 'HOURS_NEED_REVISION' : 'HOURS_REJECTED',
+            'action_label' => $isRevisionMode ? 'Yêu cầu chỉnh sửa hồ sơ giờ NCKH' : 'Từ chối duyệt giờ NCKH',
             'severity' => 'important',
             'result_status' => 'success',
             'target_type' => 'hours_request',
@@ -575,35 +648,53 @@ class FacultyLecturerHourApprovalController extends Controller
                 'academic_year_code' => $context['academic_year_code'],
                 'works_count' => $context['works_count'],
                 'total_hours' => $context['total_hours'],
-                'reason_code' => $validated['reason_code'],
-                'reason_detail' => $validated['reason_detail'] ?? null,
+                'reason_code' => $canonicalReasonCode,
+                'reason_detail' => $reasonDetail,
+                'decision_mode' => $isRevisionMode ? 'revision' : 'reject',
                 'rejected_activity_ids' => $rejectedActivityIds,
                 'rejected_count' => count($rejectedActivityIds),
             ],
         ], $request->user());
 
-        $rejectionReason = trim((string) ($validated['reason_detail'] ?? ''));
-        if ($rejectionReason === '') {
-            $rejectionReason = trim((string) ($validated['reason_code'] ?? ''));
-        }
+        $rejectionReason = $reasonDetail
+            ?? $this->reasonCodeLabel($canonicalReasonCode)
+            ?? '';
 
         WorkflowNotification::notifyLecturer(
             $requestId,
             WorkflowNotification::makePayload(
-                'hours_rejected',
-                'Giờ NCKH bị từ chối',
-                $rejectionReason !== ''
-                    ? ('Khoa đã từ chối yêu cầu duyệt giờ NCKH. Lý do: ' . $rejectionReason . '.')
-                    : 'Khoa đã từ chối yêu cầu duyệt giờ NCKH của bạn.',
+                $isRevisionMode ? 'hours_need_revision' : 'hours_rejected',
+                $isRevisionMode ? 'Giờ NCKH cần chỉnh sửa' : 'Giờ NCKH bị từ chối',
+                $isRevisionMode
+                    ? ($rejectionReason !== ''
+                        ? ('Khoa yêu cầu bạn chỉnh sửa hồ sơ giờ NCKH và gửi lại. Góp ý: ' . $rejectionReason . '.')
+                        : 'Khoa yêu cầu bạn chỉnh sửa hồ sơ giờ NCKH và gửi lại.')
+                    : ($rejectionReason !== ''
+                        ? ('Khoa đã từ chối yêu cầu duyệt giờ NCKH. Lý do: ' . $rejectionReason . '.')
+                        : 'Khoa đã từ chối yêu cầu duyệt giờ NCKH của bạn.'),
                 '/hours/calculate',
                 [
                     'lecturer_id' => (int) $requestId,
                     'rejected_activity_ids' => $rejectedActivityIds,
-                    'reason_code' => $validated['reason_code'] ?? null,
-                    'reason_detail' => $validated['reason_detail'] ?? null,
+                    'reason_code' => $canonicalReasonCode,
+                    'reason_detail' => $reasonDetail,
+                    'decision_mode' => $isRevisionMode ? 'revision' : 'reject',
                     'academic_year' => $context['academic_year_code'] ?? null,
                 ]
             )
+        );
+
+        $this->recordHoursHistory(
+            $requestId,
+            $isRevisionMode ? 'revision' : 'reject',
+            (int) ($request->user()?->id ?? 0),
+            json_encode([
+                'reason_code' => $canonicalReasonCode,
+                'reason_detail' => $reasonDetail,
+                'decision_mode' => $isRevisionMode ? 'revision' : 'reject',
+                'activity_ids' => $rejectedActivityIds,
+                'count' => count($rejectedActivityIds),
+            ], JSON_UNESCAPED_UNICODE)
         );
 
         return $this->show($request, $requestId);
@@ -648,6 +739,28 @@ class FacultyLecturerHourApprovalController extends Controller
         return $id ? (int) $id : null;
     }
 
+    private function resolveRequestedAcademicYearId(Request $request): ?int
+    {
+        if (! $request->query->has('academic_year_id')) {
+            return null;
+        }
+
+        $raw = trim((string) $request->query('academic_year_id'));
+        if ($raw === '') {
+            return null;
+        }
+
+        if (ctype_digit($raw)) {
+            return (int) $raw;
+        }
+
+        $matchedId = DB::table('academic_years')
+            ->where('code', $raw)
+            ->value('id');
+
+        return $matchedId ? (int) $matchedId : null;
+    }
+
     private function extractSelectedActivityIds(Request $request): ?array
     {
         $validator = Validator::make($request->all(), [
@@ -660,7 +773,7 @@ class FacultyLecturerHourApprovalController extends Controller
         }
 
         return collect($validator->validated()['activity_ids'] ?? [])
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -862,28 +975,116 @@ class FacultyLecturerHourApprovalController extends Controller
 
     private function resolveRejectNote(?string $note): ?string
     {
+        $meta = $this->resolveRejectMeta($note);
+        return $meta['reason_text'];
+    }
+
+    private function resolveRejectMeta(?string $note): array
+    {
         if (! $note || trim($note) === '') {
+            return [
+                'reason_code' => null,
+                'reason_detail' => null,
+                'decision_mode' => null,
+                'reason_text' => null,
+            ];
+        }
+
+        $decoded = json_decode($note, true);
+        if (! is_array($decoded)) {
+            $raw = trim($note);
+            return [
+                'reason_code' => null,
+                'reason_detail' => $raw !== '' ? $raw : null,
+                'decision_mode' => null,
+                'reason_text' => $raw !== '' ? $raw : null,
+            ];
+        }
+
+        $reasonCode = $this->canonicalReasonCode($decoded['reason_code'] ?? null);
+        $reasonDetail = isset($decoded['reason_detail']) ? trim((string) $decoded['reason_detail']) : '';
+        $decisionMode = strtolower(trim((string) ($decoded['decision_mode'] ?? '')));
+        if (! in_array($decisionMode, ['revision', 'reject'], true)) {
+            $decisionMode = null;
+        }
+
+        $reasonText = $reasonDetail !== ''
+            ? $reasonDetail
+            : $this->reasonCodeLabel($reasonCode);
+
+        return [
+            'reason_code' => $reasonCode,
+            'reason_detail' => $reasonDetail !== '' ? $reasonDetail : null,
+            'decision_mode' => $decisionMode,
+            'reason_text' => $reasonText,
+        ];
+    }
+
+    private function canonicalReasonCode($reasonCode): ?string
+    {
+        $normalized = strtoupper(trim((string) $reasonCode));
+        if ($normalized === '') {
             return null;
+        }
+
+        return match ($normalized) {
+            'INVALID_EVIDENCE', 'MISSING_EVIDENCE' => 'INVALID_EVIDENCE',
+            'INVALID_HOURS', 'HOURS_NOT_REASONABLE' => 'INVALID_HOURS',
+            'INVALID_ACTIVITY', 'OTHER' => 'INVALID_ACTIVITY',
+            'NOT_ELIGIBLE', 'WORK_NOT_ELIGIBLE' => 'NOT_ELIGIBLE',
+            default => $normalized,
+        };
+    }
+
+    private function reasonCodeLabel(?string $reasonCode): ?string
+    {
+        return match ($reasonCode) {
+            'INVALID_EVIDENCE' => 'Minh chứng không hợp lệ hoặc còn thiếu',
+            'INVALID_HOURS' => 'Giờ quy đổi chưa hợp lý',
+            'INVALID_ACTIVITY' => 'Hoạt động không hợp lệ',
+            'NOT_ELIGIBLE' => 'Không đủ điều kiện xét duyệt giờ',
+            default => null,
+        };
+    }
+
+    private function normalizeApprovalStatusForDisplay(?string $status, ?string $note): string
+    {
+        $normalized = strtolower(trim((string) $status));
+        if ($normalized !== 'rejected') {
+            return $normalized !== '' ? $normalized : 'pending';
+        }
+
+        return $this->isRevisionDecision($note)
+            ? 'need_revision'
+            : 'rejected';
+    }
+
+    private function isRevisionDecision(?string $note): bool
+    {
+        if (! $note || trim($note) === '') {
+            return false;
         }
 
         $decoded = json_decode($note, true);
         if (is_array($decoded)) {
-            $reasonDetail = isset($decoded['reason_detail']) ? trim((string) $decoded['reason_detail']) : '';
-            if ($reasonDetail !== '') {
-                return $reasonDetail;
+            $decisionMode = strtolower(trim((string) ($decoded['decision_mode'] ?? '')));
+            if ($decisionMode === 'revision') {
+                return true;
             }
-
-            $reasonCode = isset($decoded['reason_code']) ? trim((string) $decoded['reason_code']) : '';
-            return match ($reasonCode) {
-                'hours_not_reasonable' => 'Giờ quy đổi chưa hợp lý',
-                'work_not_eligible' => 'Công trình chưa đủ điều kiện',
-                'missing_evidence' => 'Thiếu minh chứng',
-                'other' => 'Lý do khác',
-                default => $reasonCode !== '' ? $reasonCode : null,
-            };
         }
 
-        return trim($note);
+        return str_contains($note, '"decision_mode":"revision"');
+    }
+
+    private function recordHoursHistory(int $lecturerId, string $action, int $performedBy, ?string $reason = null): void
+    {
+        DB::table('hours_history')->insert([
+            'lecturer_id' => $lecturerId,
+            'action' => $action,
+            'performed_by' => $performedBy > 0 ? $performedBy : null,
+            'reason' => $reason,
+            'created_at' => now(),
+        ]);
     }
 
     private function fetchEvidenceByActivityIds(array $activityIds): array
@@ -932,7 +1133,9 @@ class FacultyLecturerHourApprovalController extends Controller
     {
         return match ($status) {
             'pending' => 'Chờ khoa duyệt giờ',
+            'partially_approved' => 'Đã duyệt một phần',
             'approved' => 'Đã duyệt giờ',
+            'need_revision' => 'Cần chỉnh sửa',
             'rejected' => 'Khoa từ chối giờ',
             default => $status,
         };
@@ -940,13 +1143,23 @@ class FacultyLecturerHourApprovalController extends Controller
 
     private function aggregateStatus(array $statuses): string
     {
-        if (in_array('pending', $statuses, true)) {
+        $normalized = array_values(array_unique(array_filter(array_map(
+            fn($status) => strtolower(trim((string) $status)),
+            $statuses
+        ))));
+
+        if (empty($normalized)) {
             return 'pending';
         }
-        if (in_array('rejected', $statuses, true)) {
-            return 'rejected';
+
+        if (in_array('pending', $normalized, true)) {
+            return 'pending';
         }
-        return 'approved';
+
+        if (count($normalized) === 1) {
+            return $normalized[0];
+        }
+
+        return 'partially_approved';
     }
 }
-

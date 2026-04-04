@@ -48,8 +48,9 @@ export type FacultyApprovalListItem = {
     faculty_name: string | null;
   };
   authors: {
-    lecturer_id: number;
-    lecturer_code: string;
+    member_id: number;
+    lecturer_id: number | null;
+    lecturer_code: string | null;
     lecturer_full_name: string;
     member_role_code: string | null;
     member_role_name: string | null;
@@ -58,6 +59,7 @@ export type FacultyApprovalListItem = {
     member_faculty_id?: number | null;
     owner_faculty_id?: number | null;
     is_outside_faculty?: boolean;
+    is_external?: boolean;
   }[];
 };
 
@@ -82,8 +84,9 @@ export type FacultyApprovalDetailResponse = {
     } | null;
   };
   members: {
-    lecturer_id: number;
-    lecturer_code: string;
+    member_id: number;
+    lecturer_id: number | null;
+    lecturer_code: string | null;
     lecturer_full_name: string;
     member_role_id: number | null;
     member_role_code: string | null;
@@ -99,6 +102,7 @@ export type FacultyApprovalDetailResponse = {
     owner_faculty_id?: number | null;
     member_faculty_id?: number | null;
     is_outside_faculty?: boolean;
+    is_external?: boolean;
   }[];
   evidence_files: {
     id: number;
@@ -135,6 +139,7 @@ export type FacultyApprovalListResponse = {
       pending: number;
       approved: number;
       rejected: number;
+      need_revision?: number;
       total: number;
     };
     pagination?: {
@@ -162,7 +167,7 @@ export async function fetchFacultyApprovalLookups(): Promise<FacultyApprovalLook
 }
 
 export async function fetchFacultyApprovals(
-  filters: FacultyApprovalFilters
+  filters: FacultyApprovalFilters,
 ): Promise<FacultyApprovalListResponse> {
   const response = await http.get("/api/faculty/works/approvals", {
     params: normalizeParams(filters),
@@ -171,20 +176,26 @@ export async function fetchFacultyApprovals(
 }
 
 export async function fetchFacultyApprovalDetail(
-  activityId: number
+  activityId: number,
 ): Promise<FacultyApprovalDetailResponse> {
   const response = await http.get(`/api/faculty/works/approvals/${activityId}`);
   return response.data?.data as FacultyApprovalDetailResponse;
 }
 
-export async function approveFacultyApproval(activityId: number): Promise<void> {
+export async function approveFacultyApproval(
+  activityId: number,
+): Promise<void> {
   await ensureCsrfCookie();
   await http.put(`/api/faculty/works/approvals/${activityId}/approve`);
 }
 
 export async function rejectFacultyApproval(
   activityId: number,
-  payload: { reason_type: string; reason_detail?: string | null }
+  payload: {
+    decision: "reject" | "return_for_revision";
+    reason_type: string;
+    reason_detail?: string | null;
+  },
 ): Promise<void> {
   await ensureCsrfCookie();
   await http.put(`/api/faculty/works/approvals/${activityId}/reject`, payload);

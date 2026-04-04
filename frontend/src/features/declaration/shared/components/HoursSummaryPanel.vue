@@ -34,7 +34,7 @@
       </div>
 
       <div class="rounded-xl border border-slate-200 bg-white p-3">
-        <div class="text-xs text-slate-500">Số người tham gia</div>
+        <div class="text-xs text-slate-500">Số tác giả</div>
         <div class="mt-1 text-base font-semibold text-slate-900">
           {{ totalParticipants }}
         </div>
@@ -52,7 +52,7 @@
             <th
               class="px-4 py-3 text-left text-xs font-semibold text-slate-600"
             >
-              Thành viên
+              Tác giả
             </th>
             <th
               class="px-4 py-3 text-left text-xs font-semibold text-slate-600"
@@ -138,12 +138,12 @@ const externalMembers = computed(() => props.externalMembers ?? []);
 const hasExternal = computed(() => externalMembers.value.length > 0);
 
 const totalParticipants = computed(
-  () => props.membersDistribution.length + externalMembers.value.length
+  () => props.membersDistribution.length + externalMembers.value.length,
 );
 
 const totalHoursText = computed(() => fmt(props.totalHours));
 const currentLecturerHoursText = computed(() =>
-  fmt(props.currentLecturerHours)
+  fmt(props.currentLecturerHours),
 );
 
 type TableRow =
@@ -190,7 +190,7 @@ const finalNote = computed(() => {
 
   if (hasExternal.value) {
     notes.push(
-      `Có ${externalMembers.value.length} đồng tác giả ngoài trường. Phần giờ của tác giả ngoài trường không được phân bổ lại.`
+      `Có ${externalMembers.value.length} đồng tác giả ngoài trường. Phần giờ của tác giả ngoài trường không được phân bổ lại.`,
     );
   }
 

@@ -45,8 +45,8 @@ export type SelectOption<TValue> = {
 };
 
 export type PublicResearchParticipant = {
-  lecturerId: number;
-  lecturerCode: string;
+  lecturerId: number | null;
+  lecturerCode: string | null;
   lecturerName: string;
   facultyName: string;
   roleName: string;

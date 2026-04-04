@@ -30,6 +30,8 @@ class HoursRecomputeService
                 'ra.kind_id',
                 'ra.type_id',
                 'ra.academic_year_id',
+                'ra.start_date',
+                'ra.end_date',
                 'ra.quantity',
                 'ak.code as kind_code',
                 'at.code as type_code',
@@ -69,6 +71,7 @@ class HoursRecomputeService
             ->select([
                 'ram.id',
                 'ram.lecturer_id',
+                'ram.hours_claimed_before',
                 'mr.code as member_role_code',
                 'ra.owner_lecturer_id',
             ])
@@ -88,15 +91,22 @@ class HoursRecomputeService
         $calculated = $this->allocator->allocateByRule(
             $rule,
             $activity->quantity ? (int) $activity->quantity : 1,
-            $members->all()
+            $members->all(),
+            [
+                'kind_code' => $activity->kind_code,
+                'start_date' => $activity->start_date,
+                'end_date' => $activity->end_date,
+                'executed_at' => $timestamp,
+            ]
         );
         $resolvedRuleId = $this->resolveRuleId($rule);
+        $effectiveTotalHours = $calculated['total_hours_to_add'] ?? $calculated['total_hours_activity'];
 
-        if ($persist && $calculated['total_hours_activity'] !== null) {
+        if ($persist && $effectiveTotalHours !== null) {
             DB::table('research_activities')
                 ->where('id', $activityId)
                 ->update([
-                    'total_hours_calc' => $calculated['total_hours_activity'],
+                    'total_hours_calc' => $effectiveTotalHours,
                     'updated_at' => $timestamp,
                 ]);
 
@@ -120,19 +130,26 @@ class HoursRecomputeService
                         'type_code' => $activity->type_code,
                         'distribution_strategy' => $rule?->distribution_strategy,
                         'quantity' => max(1, (int) ($activity->quantity ?? 1)),
+                        'start_date' => $activity->start_date,
+                        'end_date' => $activity->end_date,
                         'member_count' => $members->count(),
-                        'members' => array_map(static fn ($member) => [
+                        'members' => array_map(static fn($member) => [
                             'member_row_id' => (int) $member->id,
                             'lecturer_id' => (int) $member->lecturer_id,
                             'member_role_code' => $member->member_role_code ? (string) $member->member_role_code : null,
+                            'hours_claimed_before' => $member->hours_claimed_before !== null
+                                ? (float) $member->hours_claimed_before
+                                : 0.0,
                         ], $members->all()),
                     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                     'result_snapshot' => json_encode([
-                        'total_hours_activity' => $calculated['total_hours_activity'],
+                        'total_hours_activity' => $effectiveTotalHours,
+                        'calculated_total_hours' => $calculated['calculated_total_hours'] ?? null,
+                        'total_hours_to_add' => $calculated['total_hours_to_add'] ?? null,
                         'members' => $calculated['members'],
                         'formula' => $calculated['formula'] ?? null,
                     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                    'total_hours' => $calculated['total_hours_activity'],
+                    'total_hours' => $effectiveTotalHours,
                     'created_at' => $timestamp,
                     'updated_at' => $timestamp,
                 ]);
@@ -142,7 +159,9 @@ class HoursRecomputeService
         return [
             'rule_id' => $this->resolveRuleId($rule),
             'rule_summary' => $this->ruleResolver->formatRuleSummary($rule),
-            'total_hours_activity' => $calculated['total_hours_activity'],
+            'total_hours_activity' => $effectiveTotalHours,
+            'calculated_total_hours' => $calculated['calculated_total_hours'] ?? null,
+            'total_hours_to_add' => $calculated['total_hours_to_add'] ?? null,
             'members' => $calculated['members'],
             'formula' => $calculated['formula'] ?? null,
         ];
@@ -203,7 +222,7 @@ class HoursRecomputeService
             ->orderByDesc('ra.updated_at')
             ->limit(max(1, $limit))
             ->pluck('ra.id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
 
         if (empty($activityIds)) {
@@ -277,7 +296,7 @@ class HoursRecomputeService
             ->orderByDesc('ra.updated_at')
             ->limit(max(1, $limit))
             ->pluck('ra.id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->all();
     }
 

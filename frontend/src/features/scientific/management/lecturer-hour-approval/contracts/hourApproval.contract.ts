@@ -1,12 +1,22 @@
 // UI model camelCase + API DTO snake_case (mock-ready)
 
-export type HourApprovalRequestStatus = "pending" | "approved" | "rejected";
+export type HourApprovalRequestStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "need_revision"
+  | "partially_approved";
+
+export type HourApprovalDecisionMode = "reject" | "revision";
+
+export type CanonicalHourApprovalRejectReasonCode =
+  | "INVALID_EVIDENCE"
+  | "INVALID_HOURS"
+  | "INVALID_ACTIVITY"
+  | "NOT_ELIGIBLE";
 
 export type HourApprovalRejectReasonCode =
-  | "hours_not_reasonable"
-  | "work_not_eligible"
-  | "missing_evidence"
-  | "other";
+  CanonicalHourApprovalRejectReasonCode;
 
 export interface FacultyOption {
   id: number;
@@ -64,9 +74,11 @@ export interface FormulaExplanationDTO {
   rule_name: string;
   distribution_strategy: string | null;
   base_hours: number | null;
-  modifiers: FormulaModifierDTO[];
+  modifiers?: FormulaModifierDTO[] | Record<string, unknown> | null;
   total_hours_activity: number | null;
   member_hours: number | null;
+  progress_multiplier?: number | null;
+  progress_percent?: number | null;
   member_share_percent: number | null;
   member_role_code: string | null;
   contribution_share: number | null;
@@ -84,9 +96,52 @@ export interface FormulaExplanation {
   modifiers: FormulaModifier[];
   totalHoursActivity: number | null;
   memberHours: number | null;
+  progressMultiplier: number | null;
+  progressPercent: number | null;
   memberSharePercent: number | null;
   memberRoleCode: string | null;
   contributionShare: number | null;
+}
+
+function normalizeFormulaModifiers(modifiers: unknown): FormulaModifier[] {
+  if (Array.isArray(modifiers)) {
+    return modifiers
+      .map((item) => {
+        if (item && typeof item === "object") {
+          const candidate = item as Partial<FormulaModifierDTO>;
+          return {
+            name: String(candidate.name ?? ""),
+            value:
+              candidate.value === undefined ? null : (candidate.value ?? null),
+          };
+        }
+
+        return null;
+      })
+      .filter((item): item is FormulaModifier => {
+        return Boolean(item && item.name.trim().length > 0);
+      });
+  }
+
+  if (modifiers && typeof modifiers === "object") {
+    return Object.entries(modifiers)
+      .map(([key, value]) => ({
+        name: key,
+        value:
+          value == null ||
+          typeof value === "string" ||
+          typeof value === "number"
+            ? (value as string | number | null)
+            : typeof value === "boolean"
+              ? value
+                ? "true"
+                : "false"
+              : JSON.stringify(value),
+      }))
+      .filter((item) => item.name.trim().length > 0);
+  }
+
+  return [];
 }
 
 /** ========== DTOs (snake_case) ========== */
@@ -128,6 +183,8 @@ export interface HourApprovalRequestItemDTO {
   hours_converted: number;
   approval_status?: HourApprovalRequestStatus;
   rejection_reason?: string | null;
+  rejection_reason_code?: string | null;
+  rejection_reason_detail?: string | null;
   evidence_files?: EvidenceFileDTO[];
 }
 
@@ -146,6 +203,8 @@ export interface HourApprovalRequestDetailDTO {
 
   note_from_lecturer: string | null;
   note_from_faculty?: string | null;
+  note_from_faculty_reason_code?: string | null;
+  note_from_faculty_reason_detail?: string | null;
 
   activity_count: number;
   total_hours: number;
@@ -158,6 +217,7 @@ export interface HourApprovalRequestDetailDTO {
 export interface RejectPayloadDTO {
   reason_code: HourApprovalRejectReasonCode;
   reason_detail: string | null;
+  decision_mode?: HourApprovalDecisionMode;
   activity_ids?: number[];
 }
 
@@ -220,6 +280,8 @@ export interface HourApprovalRequestItem {
   hoursConverted: number;
   approvalStatus: HourApprovalRequestStatus | null;
   rejectionReason: string | null;
+  rejectionReasonCode: CanonicalHourApprovalRejectReasonCode | null;
+  rejectionReasonDetail: string | null;
   evidenceFiles: EvidenceFile[];
 }
 
@@ -238,6 +300,8 @@ export interface HourApprovalRequestDetail {
 
   noteFromLecturer: string | null;
   noteFromFaculty: string | null;
+  noteFromFacultyReasonCode: CanonicalHourApprovalRejectReasonCode | null;
+  noteFromFacultyReasonDetail: string | null;
 
   activityCount: number;
   totalHours: number;
@@ -248,6 +312,7 @@ export interface HourApprovalRequestDetail {
 export interface RejectPayload {
   reasonCode: HourApprovalRejectReasonCode;
   reasonNote: string | null;
+  decisionMode?: HourApprovalDecisionMode;
   activityIds?: number[];
 }
 
@@ -273,7 +338,7 @@ export const hourApprovalMappers = {
   },
 
   formulaExplanationFromDto(
-    dto?: FormulaExplanationDTO | null
+    dto?: FormulaExplanationDTO | null,
   ): FormulaExplanation | null {
     if (!dto) return null;
 
@@ -281,12 +346,11 @@ export const hourApprovalMappers = {
       ruleName: dto.rule_name,
       distributionStrategy: dto.distribution_strategy,
       baseHours: dto.base_hours,
-      modifiers: (dto.modifiers ?? []).map((item) => ({
-        name: item.name,
-        value: item.value ?? null,
-      })),
+      modifiers: normalizeFormulaModifiers(dto.modifiers),
       totalHoursActivity: dto.total_hours_activity,
       memberHours: dto.member_hours,
+      progressMultiplier: dto.progress_multiplier ?? null,
+      progressPercent: dto.progress_percent ?? null,
       memberSharePercent: dto.member_share_percent,
       memberRoleCode: dto.member_role_code,
       contributionShare: dto.contribution_share,
@@ -294,7 +358,7 @@ export const hourApprovalMappers = {
   },
 
   summaryFromDto(
-    dto: HourApprovalRequestSummaryDTO
+    dto: HourApprovalRequestSummaryDTO,
   ): HourApprovalRequestSummary {
     return {
       requestId: dto.request_id,
@@ -322,6 +386,10 @@ export const hourApprovalMappers = {
       status: dto.status,
       noteFromLecturer: dto.note_from_lecturer,
       noteFromFaculty: dto.note_from_faculty ?? null,
+      noteFromFacultyReasonCode: normalizeHourApprovalRejectReasonCode(
+        dto.note_from_faculty_reason_code,
+      ),
+      noteFromFacultyReasonDetail: dto.note_from_faculty_reason_detail ?? null,
       activityCount: dto.activity_count,
       totalHours: dto.total_hours ?? dto.total_hours_requested ?? 0,
       items: dto.items.map((item) => ({
@@ -338,13 +406,18 @@ export const hourApprovalMappers = {
         totalHoursActivity: item.total_hours_activity ?? null,
         memberHours: item.member_hours ?? null,
         formulaExplanation: hourApprovalMappers.formulaExplanationFromDto(
-          item.formula_explanation
+          item.formula_explanation,
         ),
         hoursConverted: item.hours_converted,
         approvalStatus: item.approval_status ?? null,
-        rejectionReason: item.rejection_reason ?? null,
+        rejectionReason:
+          item.rejection_reason ?? item.rejection_reason_detail ?? null,
+        rejectionReasonCode: normalizeHourApprovalRejectReasonCode(
+          item.rejection_reason_code,
+        ),
+        rejectionReasonDetail: item.rejection_reason_detail ?? null,
         evidenceFiles: (item.evidence_files ?? []).map((e) =>
-          hourApprovalMappers.evidenceFileFromDto(e)
+          hourApprovalMappers.evidenceFileFromDto(e),
         ),
       })),
     };
@@ -354,6 +427,7 @@ export const hourApprovalMappers = {
     return {
       reason_code: payload.reasonCode,
       reason_detail: payload.reasonNote,
+      decision_mode: payload.decisionMode,
       activity_ids: payload.activityIds,
     };
   },
@@ -399,4 +473,35 @@ export function formatBytes(sizeBytes: number): string {
   if (kb < 1024) return `${kb.toFixed(1)} KB`;
   const mb = kb / 1024;
   return `${mb.toFixed(1)} MB`;
+}
+
+export function normalizeHourApprovalRejectReasonCode(
+  code: string | null | undefined,
+): CanonicalHourApprovalRejectReasonCode | null {
+  const normalized = (code ?? "").toString().trim();
+  if (!normalized) return null;
+
+  const upper = normalized.toUpperCase();
+  if (upper === "INVALID_EVIDENCE") return "INVALID_EVIDENCE";
+  if (upper === "INVALID_HOURS") return "INVALID_HOURS";
+  if (upper === "INVALID_ACTIVITY") return "INVALID_ACTIVITY";
+  if (upper === "NOT_ELIGIBLE") return "NOT_ELIGIBLE";
+
+  const lower = normalized.toLowerCase();
+  if (lower === "missing_evidence") return "INVALID_EVIDENCE";
+  if (lower === "hours_not_reasonable") return "INVALID_HOURS";
+  if (lower === "invalid_activity") return "INVALID_ACTIVITY";
+  if (lower === "work_not_eligible") return "NOT_ELIGIBLE";
+
+  return null;
+}
+
+export function hourApprovalRejectReasonLabel(
+  code: CanonicalHourApprovalRejectReasonCode | null,
+): string {
+  if (code === "INVALID_EVIDENCE") return "Minh chứng chưa hợp lệ";
+  if (code === "INVALID_HOURS") return "Giờ quy đổi chưa hợp lệ";
+  if (code === "INVALID_ACTIVITY") return "Công trình chưa hợp lệ";
+  if (code === "NOT_ELIGIBLE") return "Công trình chưa đủ điều kiện";
+  return "Lý do chưa xác định";
 }

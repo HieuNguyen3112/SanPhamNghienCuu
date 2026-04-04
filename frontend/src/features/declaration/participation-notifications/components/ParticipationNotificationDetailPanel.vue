@@ -134,7 +134,7 @@
                 class="mt-4 rounded-2xl border border-slate-200 bg-white p-4"
               >
                 <div class="text-sm font-semibold text-slate-900">
-                  Danh sách thành viên
+                  Danh sách tác giả
                 </div>
 
                 <div

@@ -12,7 +12,6 @@ type FacultyDirectoryEntry = {
 };
 
 function createSeededRandom(seedValue: number): () => number {
-  // Mulberry32
   let value = seedValue >>> 0;
   return () => {
     value += 0x6d2b79f5;
@@ -23,12 +22,6 @@ function createSeededRandom(seedValue: number): () => number {
   };
 }
 
-/**
- * WHY: Project hay bật `noUncheckedIndexedAccess` => arr[index] là T | undefined.
- * pickOne phải "fail fast" để mock data không sinh undefined âm thầm.
- *
- * NOTE: Giữ đúng call-site hiện tại của bạn: pickOne(random, list)
- */
 function pickOne<T>(
   randomNumberGenerator: () => number,
   list: readonly T[]
@@ -37,7 +30,7 @@ function pickOne<T>(
     throw new Error("pickOne(): list is empty");
   }
   const index = Math.floor(randomNumberGenerator() * list.length);
-  return list[index]!; // chắc chắn có vì list.length > 0
+  return list[index]!;
 }
 
 function createIsoDateTimeStringFromNowMinusDays(dayCount: number): string {
@@ -75,26 +68,23 @@ function getFacultyDirectoryEntryForScope(parameters: {
   randomNumberGenerator: () => number;
 }): FacultyDirectoryEntry {
   if (parameters.approvalScopeIdentifier === "FACULTY_SCOPE") {
-    // WHY: cấp khoa cần cố định theo khoa đăng nhập; nếu thiếu id thì fallback để demo chạy được.
     const matched =
       facultyDirectory.find(
         (item) => item.facultyIdentifier === parameters.facultyIdentifier
-      ) ?? facultyDirectory[0]!; // ! để TS không báo undefined (noUncheckedIndexedAccess)
+      ) ?? facultyDirectory[0]!;
     return matched;
   }
 
-  // UNIVERSITY_SCOPE: random faculty
   return pickOne(parameters.randomNumberGenerator, facultyDirectory);
 }
 
 export function createResearchWorkApprovalListMockData(parameters: {
   approvalScopeIdentifier: ResearchWorkApprovalScopeIdentifier;
-  facultyIdentifier?: string; // chỉ cần khi FACULTY_SCOPE
+  facultyIdentifier?: string;
   totalResearchWorkCount: number;
   seedValue: number;
 }): ResearchWorkApprovalEntry[] {
   const random = createSeededRandom(parameters.seedValue);
-
   const academicYearOptions = ["2022-2023", "2023-2024", "2024-2025"] as const;
 
   const list: ResearchWorkApprovalEntry[] = [];
@@ -124,6 +114,7 @@ export function createResearchWorkApprovalListMockData(parameters: {
         "PENDING_FACULTY_APPROVAL",
         "PENDING_FACULTY_APPROVAL",
         "APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY",
+        "NEED_REVISION_BY_FACULTY",
         "REJECTED_BY_FACULTY",
       ] as const);
     } else {
@@ -145,9 +136,7 @@ export function createResearchWorkApprovalListMockData(parameters: {
     const facultyReviewedAtDateTimeString =
       approvalStatus === "PENDING_FACULTY_APPROVAL"
         ? null
-        : createIsoDateTimeStringFromNowMinusDays(
-            5 + Math.floor(random() * 40)
-          );
+        : createIsoDateTimeStringFromNowMinusDays(5 + Math.floor(random() * 40));
 
     const universityReviewedAtDateTimeString =
       approvalStatus === "PENDING_UNIVERSITY_APPROVAL"
@@ -169,14 +158,13 @@ export function createResearchWorkApprovalListMockData(parameters: {
     const authorCount = 1 + Math.floor(random() * 4);
     const researchWorkAuthorList = Array.from({ length: authorCount }).map(
       (_, authorIndex) => {
-        // WHY: phải pick 1 lần để identifier/displayName đồng nhất
         const randomFacultyForCoAuthor = pickOne(random, facultyDirectory);
-
         const authorFaculty =
           authorIndex === 0 ? faculty : randomFacultyForCoAuthor;
 
         return {
           authorIdentifier: index * 10 + authorIndex,
+          lecturerId: index * 10 + authorIndex,
           authorDisplayName:
             authorIndex === 0
               ? "Nguyễn Văn A"
@@ -193,7 +181,10 @@ export function createResearchWorkApprovalListMockData(parameters: {
       null;
     let facultyRejectionReasonDetail: string | null = null;
 
-    if (approvalStatus === "REJECTED_BY_FACULTY") {
+    if (
+      approvalStatus === "REJECTED_BY_FACULTY" ||
+      approvalStatus === "NEED_REVISION_BY_FACULTY"
+    ) {
       facultyRejectionReasonType = pickOne(random, [
         "MISSING_EVIDENCE",
         "INACCURATE_INFORMATION",
@@ -239,11 +230,17 @@ export function createResearchWorkApprovalListMockData(parameters: {
               historyIdentifier: index * 1000 + 2,
               reviewLevelDisplayName: "Cấp khoa",
               reviewActionDisplayName:
-                approvalStatus === "REJECTED_BY_FACULTY" ? "Từ chối" : "Duyệt",
+                approvalStatus === "REJECTED_BY_FACULTY"
+                  ? "Từ chối"
+                  : approvalStatus === "NEED_REVISION_BY_FACULTY"
+                  ? "Yêu cầu chỉnh sửa"
+                  : "Duyệt",
               reviewedAtDateTimeString: facultyReviewedAtDateTimeString,
               reviewNote:
                 approvalStatus === "REJECTED_BY_FACULTY"
-                  ? "Khoa yêu cầu hoàn thiện trước khi chuyển lên cấp trường."
+                  ? "Khoa từ chối hồ sơ."
+                  : approvalStatus === "NEED_REVISION_BY_FACULTY"
+                  ? "Khoa yêu cầu chỉnh sửa và nộp lại."
                   : "Khoa xác nhận hồ sơ hợp lệ và chuyển lên cấp trường.",
             },
           ]

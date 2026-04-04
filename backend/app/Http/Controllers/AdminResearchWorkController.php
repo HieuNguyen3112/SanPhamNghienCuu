@@ -172,18 +172,39 @@ class AdminResearchWorkController extends Controller
         }
 
         $authors = DB::table('research_activity_members as ram')
-            ->join('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
-            ->join('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
+            ->leftJoin('lecturers as l', 'ram.lecturer_id', '=', 'l.id')
+            ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activity)
             ->orderBy('ram.id')
             ->select([
+                'ram.id as member_id',
                 'ram.lecturer_id',
                 'l.full_name as lecturer_full_name',
                 'ram.member_role_id',
                 'mr.name as member_role_name',
                 'ram.contribution_share',
+                'ram.is_external',
+                'ram.external_full_name',
             ])
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                $isExternal = (bool) ($row->is_external ?? false);
+                $displayName = $isExternal
+                    ? trim((string) ($row->external_full_name ?? ''))
+                    : trim((string) ($row->lecturer_full_name ?? ''));
+
+                return [
+                    'member_id' => (int) $row->member_id,
+                    'lecturer_id' => $row->lecturer_id !== null ? (int) $row->lecturer_id : null,
+                    'lecturer_full_name' => $displayName !== '' ? $displayName : '—',
+                    'member_role_id' => $row->member_role_id !== null ? (int) $row->member_role_id : null,
+                    'member_role_name' => $row->member_role_name,
+                    'contribution_share' => $row->contribution_share !== null ? (string) $row->contribution_share : null,
+                    'is_external' => $isExternal,
+                ];
+            })
+            ->values()
+            ->all();
 
         $evidenceItems = DB::table('evidence_files as ef')
             ->join('evidence_file_types as eft', 'ef.file_type_id', '=', 'eft.id')

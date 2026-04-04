@@ -120,12 +120,19 @@
 
                 <div
                   v-if="
-                    work.statusCode === 'rejected' &&
+                    (work.statusCode === 'rejected' ||
+                      work.statusCode === 'need_revision') &&
                     lecturerRejectionReasonDisplay
                   "
                   class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"
                 >
-                  <div class="text-xs font-semibold">Lý do từ chối</div>
+                  <div class="text-xs font-semibold">
+                    {{
+                      work.statusCode === "need_revision"
+                        ? "Lý do yêu cầu chỉnh sửa"
+                        : "Lý do từ chối"
+                    }}
+                  </div>
                   <div class="mt-1 font-medium">
                     {{ lecturerRejectionReasonDisplay.label }}
                   </div>
@@ -142,11 +149,23 @@
                   class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
                 >
                   <div class="text-xs font-semibold text-amber-900">
-                    Thành viên đã từ chối tham gia
+                    Tác giả đã từ chối tham gia
                   </div>
                   <p class="mt-1">
-                    Bạn cần xóa/thay thế thành viên bị từ chối hoặc gửi lại yêu
-                    cầu xác nhận trước khi gửi lên khoa.
+                    Bạn cần xóa/thay thế tác giả bị từ chối hoặc gửi lại yêu cầu
+                    xác nhận trước khi gửi lên khoa.
+                  </p>
+                </div>
+
+                <div
+                  v-if="work.statusCode === 'need_revision'"
+                  class="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800"
+                >
+                  <div class="text-xs font-semibold text-sky-900">
+                    Khoa yêu cầu chỉnh sửa
+                  </div>
+                  <p class="mt-1">
+                    Vui lòng cập nhật hồ sơ theo góp ý rồi gửi duyệt lại.
                   </p>
                 </div>
               </section>
@@ -156,14 +175,14 @@
                 class="rounded-xl border border-rose-200 bg-rose-50 p-4"
               >
                 <div class="text-xs font-semibold text-rose-700">
-                  Danh sách thành viên từ chối
+                  Danh sách tác giả từ chối
                 </div>
 
                 <div
                   v-if="work.rejectedMembers.length === 0"
                   class="mt-3 text-sm text-rose-700"
                 >
-                  Chưa có chi tiết thành viên từ chối.
+                  Chưa có chi tiết tác giả từ chối.
                 </div>
 
                 <div v-else class="mt-3 space-y-2">
@@ -205,6 +224,63 @@
                 </div>
               </section>
 
+              <section
+                v-if="work.statusCode === 'pending_member_confirm'"
+                class="rounded-xl border border-amber-200 bg-amber-50 p-4"
+              >
+                <div class="text-xs font-semibold text-amber-900">
+                  Danh sách tác giả đang chờ xác nhận
+                </div>
+
+                <div
+                  v-if="pendingMemberConfirmations.length === 0"
+                  class="mt-3 text-sm text-amber-800"
+                >
+                  Không còn tác giả nào đang chờ xác nhận.
+                </div>
+
+                <div v-else class="mt-3 space-y-2">
+                  <div
+                    v-for="member in pendingMemberConfirmations"
+                    :key="member.memberId"
+                    class="rounded-lg border border-amber-200 bg-white p-3"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="font-semibold text-slate-900">
+                          {{ member.lecturerFullName }}
+                          <span class="text-slate-500"
+                            >({{ member.lecturerCode ?? "N/A" }})</span
+                          >
+                        </div>
+                        <div class="mt-0.5 text-xs text-slate-600">
+                          Vai trò: {{ member.memberRoleName ?? "—" }}
+                        </div>
+                      </div>
+
+                      <div class="flex shrink-0 items-center gap-2">
+                        <button
+                          v-if="work.actions.canResendPendingInvitation"
+                          type="button"
+                          class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          @click="emit('resend-pending-member', member.memberId)"
+                        >
+                          Gửi lại lời mời
+                        </button>
+                        <button
+                          v-if="work.actions.canRemovePendingMember"
+                          type="button"
+                          class="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100"
+                          @click="emit('remove-pending-member', member.memberId)"
+                        >
+                          Xóa thành viên
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
               <section class="rounded-xl border border-slate-200 bg-white p-4">
                 <div class="text-xs font-semibold text-slate-700">
                   Danh sách tác giả
@@ -233,10 +309,7 @@
                     </thead>
 
                     <tbody class="divide-y divide-slate-100">
-                      <tr
-                        v-for="author in work.authors"
-                        :key="author.lecturerId"
-                      >
+                      <tr v-for="author in work.authors" :key="author.memberId">
                         <td class="px-3 py-2 font-medium text-slate-900">
                           {{ author.lecturerFullName }}
                         </td>
@@ -311,43 +384,13 @@
 
                 <div class="mt-3 space-y-3">
                   <TimelineItem
-                    label="Gửi duyệt"
-                    :value="formatDateTime(work.submittedAt)"
-                    :actor-name="submitterName"
-                    :note="null"
-                    :status="null"
-                  />
-
-                  <TimelineItem
-                    v-for="approval in work.approvals"
-                    :key="approval.stageCode"
-                    :label="`Xét duyệt ${approval.stageName}`"
-                    :value="
-                      approval.decidedAt
-                        ? formatDateTime(approval.decidedAt)
-                        : '—'
-                    "
-                    :actor-name="approval.decidedByUserName"
-                    :note="approval.note"
-                    :status="approval.status"
-                  />
-
-                  <TimelineItem
-                    v-if="work.statusCode === 'approved'"
-                    label="Phê duyệt"
-                    :value="formatDateTime(work.approvedAt)"
-                    :actor-name="approvalActorName"
-                    :note="null"
-                    status="approved"
-                  />
-
-                  <TimelineItem
-                    v-if="work.statusCode === 'rejected'"
-                    label="Từ chối"
-                    :value="formatDateTime(rejectedActedAt)"
-                    :actor-name="rejectedActorName"
-                    :note="lecturerRejectionReasonDisplay?.fullText ?? null"
-                    status="rejected"
+                    v-for="item in sortedTimelineItems"
+                    :key="item.key"
+                    :label="item.label"
+                    :value="item.value"
+                    :actor-name="item.actorName"
+                    :note="item.note"
+                    :status="item.status"
                   />
                 </div>
               </section>
@@ -357,10 +400,10 @@
           <div class="border-t border-slate-200 px-4 py-3">
             <div class="flex items-center justify-between gap-2">
               <button
-                v-if="work && work.actions.canEdit"
+                v-if="work && (work.actions.canEdit || work.statusCode === 'rejected')"
                 type="button"
                 class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                @click="emit('edit-draft', work.activityId)"
+                @click="onClickPrimaryAction(work)"
               >
                 {{ editActionLabel(work) }}
               </button>
@@ -390,6 +433,7 @@ import { computed, watch } from "vue";
 import type {
   PersonalWorkEvidence,
   PersonalWorkDetail,
+  PersonalWorkStatusHistory,
   PersonalWorkStatusCode,
 } from "../contracts/personalResearchWorksContracts";
 import InfoRow from "@/features/scientific/lecturer/personal-research-works/components/InfoRow.vue";
@@ -398,6 +442,40 @@ import PdfPreviewModal from "@/shared/components/modals/PdfPreviewModal.vue";
 import { usePdfPreview } from "@/shared/composables/usePdfPreview";
 import { formatBackendDateTimeVi } from "@/shared/utils/backendDateTime";
 import { formatResearchWorkRejectionReason } from "@/features/scientific/shared/utils/researchWorkRejectionReason";
+
+type TimelineStatus = "pending" | "approved" | "rejected" | null;
+
+type MemberWorkflowAction =
+  | "member_invitation_sent"
+  | "pending_member_invitation_resent"
+  | "member_reinvited"
+  | "member_accepted_invitation"
+  | "member_rejected_by_invitee"
+  | "member_rejected"
+  | "member_rejected_block_submit"
+  | "pending_member_removed"
+  | "member_removed_from_list";
+
+type MemberWorkflowTimelineItem = {
+  key: string;
+  label: string;
+  value: string;
+  actedAt: string | null;
+  actorName: string | null;
+  note: string | null;
+  status: TimelineStatus;
+};
+
+type TimelineRenderItem = {
+  key: string;
+  label: string;
+  value: string;
+  actedAt: string | null;
+  actorName: string | null;
+  note: string | null;
+  status: TimelineStatus;
+  order: number;
+};
 
 const props = defineProps<{
   open: boolean;
@@ -409,7 +487,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "edit-draft", workId: number): void;
+  (e: "copy-rejected", workId: number): void;
   (e: "reinvite-member", memberId: number): void;
+  (e: "resend-pending-member", memberId: number): void;
+  (e: "remove-pending-member", memberId: number): void;
 }>();
 const {
   previewOpen,
@@ -427,17 +508,68 @@ const {
   prefetchPdfPreview,
 } = usePdfPreview();
 
-const rejectedActedAt = computed<string | null>(() => {
+function findLatestHistoryByToStatus(statusCode: PersonalWorkStatusCode) {
   const currentWork = props.work;
   if (!currentWork) return null;
 
-  const histories = currentWork.statusHistories;
-  for (let index = histories.length - 1; index >= 0; index -= 1) {
-    const history = histories[index];
-    if (!history) continue;
-    if (history.toStatusCode === "rejected") return history.actedAt;
+  for (let index = currentWork.statusHistories.length - 1; index >= 0; index -= 1) {
+    const history = currentWork.statusHistories[index];
+    if (history?.toStatusCode === statusCode) return history;
   }
+
   return null;
+}
+
+const rejectedActedAt = computed<string | null>(() => {
+  return findLatestHistoryByToStatus("rejected")?.actedAt ?? null;
+});
+
+const needRevisionActedAt = computed<string | null>(() => {
+  return findLatestHistoryByToStatus("need_revision")?.actedAt ?? null;
+});
+
+const shouldShowNeedRevisionTimeline = computed<boolean>(() => {
+  const needRevisionAt = needRevisionActedAt.value;
+  if (!needRevisionAt) return false;
+
+  if (props.work?.statusCode === "need_revision") return true;
+
+  const rejectedAt = rejectedActedAt.value;
+  if (!rejectedAt) return true;
+
+  // Hide old "need_revision" events when the final outcome is a later rejection.
+  return needRevisionAt > rejectedAt;
+});
+
+const requestedMemberConfirmationHistory = computed(() => {
+  const currentWork = props.work;
+  if (!currentWork) return null;
+
+  return (
+    currentWork.statusHistories.find(
+      (history) => history.toStatusCode === "pending_member_confirm",
+    ) ?? null
+  );
+});
+
+const pendingMemberConfirmations = computed(() => {
+  const currentWork = props.work;
+  if (!currentWork) return [];
+
+  return currentWork.memberConfirmations.filter(
+    (member) => member.confirmationStatus === "pending",
+  );
+});
+
+const sentToFacultyHistory = computed(() => {
+  const currentWork = props.work;
+  if (!currentWork) return null;
+
+  return (
+    currentWork.statusHistories.find(
+      (history) => history.toStatusCode === "pending_faculty_review",
+    ) ?? null
+  );
 });
 
 const submitterName = computed<string | null>(() => {
@@ -445,11 +577,354 @@ const submitterName = computed<string | null>(() => {
   if (!currentWork) return null;
 
   const submittedHistory = currentWork.statusHistories.find(
-    (history) =>
-      history.toStatusCode === "submitted" ||
-      history.toStatusCode === "pending_faculty_review",
+    (history) => history.toStatusCode === "pending_faculty_review",
   );
   return submittedHistory?.actedByUserName ?? null;
+});
+
+const memberWorkflowTimelineItems = computed<MemberWorkflowTimelineItem[]>(() => {
+  const currentWork = props.work;
+  if (!currentWork) return [];
+
+  return currentWork.statusHistories.flatMap((history, index) => {
+      const parsed = parseMemberTimelineHistory(history);
+      if (!parsed) return [];
+
+      const item: MemberWorkflowTimelineItem = {
+        key: `member-flow-${index}-${parsed.action}`,
+        label: parsed.label,
+        value: formatDateTime(history.actedAt),
+        actedAt: history.actedAt,
+        actorName: history.actedByUserName || null,
+        note: parsed.note,
+        status: parsed.status,
+      };
+
+      return [item];
+    });
+});
+
+const hasMultipleMemberConfirmations = computed<boolean>(() => {
+  return (props.work?.memberConfirmations.length ?? 0) > 1;
+});
+
+const requiresMemberConfirmationFlow = computed<boolean>(() => {
+  const currentWork = props.work;
+  if (!currentWork) return false;
+
+  if (memberWorkflowTimelineItems.value.length > 0) {
+    return true;
+  }
+
+  if (!hasMultipleMemberConfirmations.value) {
+    return false;
+  }
+
+  if (requestedMemberConfirmationHistory.value) return true;
+  if (
+    currentWork.statusCode === "pending_member_confirm" ||
+    currentWork.statusCode === "member_rejected"
+  ) {
+    return true;
+  }
+
+  return currentWork.statusHistories.some(
+    (history) => history.fromStatusCode === "pending_member_confirm",
+  );
+});
+
+const memberConfirmationRequestedTimeline = computed<{
+  value: string;
+  actedAt: string | null;
+  actorName: string | null;
+  note: string | null;
+  status: TimelineStatus;
+} | null>(() => {
+  const currentWork = props.work;
+  if (!currentWork || !requiresMemberConfirmationFlow.value) return null;
+
+  const requestedHistory = requestedMemberConfirmationHistory.value;
+  const requestedAt = requestedHistory?.actedAt ?? null;
+
+  let status: TimelineStatus = "pending";
+  if (currentWork.statusCode === "member_rejected") {
+    status = "rejected";
+  } else if (sentToFacultyHistory.value || requestedAt) {
+    status = "approved";
+  }
+
+  let note: string | null = null;
+  if (requestedHistory?.note === "requested_approval_waiting_members") {
+    note = "Đã gửi yêu cầu xác nhận cho các giảng viên tham gia.";
+  }
+
+  return {
+    value: formatDateTime(requestedAt),
+    actedAt: requestedAt,
+    actorName: requestedHistory?.actedByUserName ?? null,
+    note,
+    status,
+  };
+});
+
+const lecturerConfirmedTimeline = computed<{
+  value: string;
+  actedAt: string | null;
+  actorName: string | null;
+  note: string | null;
+  status: TimelineStatus;
+} | null>(() => {
+  const currentWork = props.work;
+  if (!currentWork || !requiresMemberConfirmationFlow.value) return null;
+
+  const confirmations = currentWork.memberConfirmations;
+  const acceptedMembers = confirmations.filter(
+    (member) => member.confirmationStatus === "accepted",
+  );
+  const pendingMembers = confirmations.filter(
+    (member) => member.confirmationStatus === "pending",
+  );
+  const rejectedMembers = confirmations.filter(
+    (member) => member.confirmationStatus === "rejected",
+  );
+
+  const allMembersAccepted =
+    confirmations.length > 0 &&
+    pendingMembers.length === 0 &&
+    rejectedMembers.length === 0;
+
+  const transitionAfterConfirmed = currentWork.statusHistories.find(
+    (history) =>
+      history.fromStatusCode === "pending_member_confirm" &&
+      history.toStatusCode === "pending_faculty_review",
+  );
+
+  const rejectedHistory = [...currentWork.statusHistories]
+    .reverse()
+    .find((history) => history.toStatusCode === "member_rejected");
+
+  const latestAcceptedResponseAt = pickLatestDateTime(
+    acceptedMembers.map((member) => member.respondedAt),
+  );
+
+  const latestRejectedResponseAt = pickLatestDateTime(
+    rejectedMembers.map((member) => member.respondedAt),
+  );
+
+  if (allMembersAccepted || transitionAfterConfirmed) {
+    const actedAt = transitionAfterConfirmed?.actedAt ?? latestAcceptedResponseAt;
+    return {
+      value: formatDateTime(actedAt),
+      actedAt,
+      actorName: transitionAfterConfirmed?.actedByUserName ?? null,
+      note:
+        confirmations.length > 0
+          ? `${acceptedMembers.length}/${confirmations.length} giảng viên đã xác nhận.`
+          : "Đã hoàn tất xác nhận thành viên.",
+      status: "approved",
+    };
+  }
+
+  if (rejectedMembers.length > 0 || currentWork.statusCode === "member_rejected") {
+    const actedAt = rejectedHistory?.actedAt ?? latestRejectedResponseAt;
+    return {
+      value: formatDateTime(actedAt),
+      actedAt,
+      actorName: rejectedHistory?.actedByUserName ?? null,
+      note:
+        confirmations.length > 0
+          ? `${acceptedMembers.length}/${confirmations.length} đã xác nhận, ${rejectedMembers.length} từ chối.`
+          : "Có giảng viên từ chối xác nhận.",
+      status: "rejected",
+    };
+  }
+
+  return {
+    value: "—",
+    actedAt: null,
+    actorName: null,
+    note:
+      confirmations.length > 0
+        ? `${acceptedMembers.length}/${confirmations.length} giảng viên đã xác nhận.`
+        : "Đang chờ giảng viên xác nhận.",
+    status: "pending",
+  };
+});
+
+const submitToFacultyTimeline = computed<{
+  value: string;
+  actedAt: string | null;
+  actorName: string | null;
+  note: string | null;
+  status: TimelineStatus;
+}>(() => {
+  const currentWork = props.work;
+  if (!currentWork) {
+    return {
+      value: "—",
+      actedAt: null,
+      actorName: null,
+      note: null,
+      status: null,
+    };
+  }
+
+  const history = sentToFacultyHistory.value;
+  const sentAt = history?.actedAt ?? currentWork.submittedAt;
+  const hasSentToFaculty = Boolean(sentAt);
+
+  let note: string | null = null;
+  if (history?.note === "auto_sent_to_faculty_all_members_accepted") {
+    note = "Hệ thống tự động gửi duyệt sau khi các giảng viên đã xác nhận.";
+  } else if (history?.note === "auto_sent_to_faculty_no_pending") {
+    note = "Không có thành viên chờ xác nhận nên hệ thống gửi duyệt ngay.";
+  } else if (history?.note === "pending_member_removed_auto_sent_to_faculty") {
+    note = "Đã xóa thành viên chờ xác nhận cuối cùng, hệ thống tự động chuyển hồ sơ lên khoa.";
+  } else if (history?.note === "minor_revision_sent_to_faculty") {
+    note = "Chỉnh sửa nhỏ được gửi thẳng lên khoa duyệt lại.";
+  }
+
+  const status: TimelineStatus = hasSentToFaculty
+    ? "approved"
+    : currentWork.statusCode === "draft" ||
+        currentWork.statusCode === "pending_member_confirm" ||
+        currentWork.statusCode === "member_rejected"
+      ? "pending"
+      : null;
+
+  return {
+    value: formatDateTime(sentAt),
+    actedAt: sentAt,
+    actorName: history?.actedByUserName ?? submitterName.value,
+    note,
+    status,
+  };
+});
+
+const sortedTimelineItems = computed<TimelineRenderItem[]>(() => {
+  const currentWork = props.work;
+  if (!currentWork) return [];
+
+  const items: TimelineRenderItem[] = [];
+  let order = 0;
+
+  const pushItem = (item: Omit<TimelineRenderItem, "order">) => {
+    items.push({ ...item, order });
+    order += 1;
+  };
+
+  if (
+    memberConfirmationRequestedTimeline.value &&
+    memberWorkflowTimelineItems.value.length === 0
+  ) {
+    pushItem({
+      key: "member-confirmation-requested",
+      label: "Gửi giảng viên xác nhận",
+      value: memberConfirmationRequestedTimeline.value.value,
+      actedAt: memberConfirmationRequestedTimeline.value.actedAt,
+      actorName: memberConfirmationRequestedTimeline.value.actorName,
+      note: memberConfirmationRequestedTimeline.value.note,
+      status: memberConfirmationRequestedTimeline.value.status,
+    });
+  }
+
+  if (lecturerConfirmedTimeline.value && memberWorkflowTimelineItems.value.length === 0) {
+    pushItem({
+      key: "member-confirmation-completed",
+      label: "Giảng viên đã xác nhận",
+      value: lecturerConfirmedTimeline.value.value,
+      actedAt: lecturerConfirmedTimeline.value.actedAt,
+      actorName: lecturerConfirmedTimeline.value.actorName,
+      note: lecturerConfirmedTimeline.value.note,
+      status: lecturerConfirmedTimeline.value.status,
+    });
+  }
+
+  memberWorkflowTimelineItems.value.forEach((item) => {
+    pushItem({
+      key: item.key,
+      label: item.label,
+      value: item.value,
+      actedAt: item.actedAt,
+      actorName: item.actorName,
+      note: item.note,
+      status: item.status,
+    });
+  });
+
+  pushItem({
+    key: "submit-to-faculty",
+    label: "Gửi duyệt",
+    value: submitToFacultyTimeline.value.value,
+    actedAt: submitToFacultyTimeline.value.actedAt,
+    actorName: submitToFacultyTimeline.value.actorName,
+    note: submitToFacultyTimeline.value.note,
+    status: submitToFacultyTimeline.value.status,
+  });
+
+  currentWork.approvals.forEach((approval, index) => {
+    pushItem({
+      key: `approval-${approval.stageCode}-${index}`,
+      label: `Xét duyệt ${approval.stageName}`,
+      value: approval.decidedAt ? formatDateTime(approval.decidedAt) : "—",
+      actedAt: approval.decidedAt ?? null,
+      actorName: approval.decidedByUserName,
+      note: approval.note,
+      status: approval.status,
+    });
+  });
+
+  if (currentWork.statusCode === "approved") {
+    pushItem({
+      key: "status-approved",
+      label: "Phê duyệt",
+      value: formatDateTime(currentWork.approvedAt),
+      actedAt: currentWork.approvedAt,
+      actorName: approvalActorName.value,
+      note: null,
+      status: "approved",
+    });
+  }
+
+  if (currentWork.statusCode === "rejected") {
+    pushItem({
+      key: "status-rejected",
+      label: "Từ chối",
+      value: formatDateTime(rejectedActedAt.value),
+      actedAt: rejectedActedAt.value,
+      actorName: rejectedActorName.value,
+      note: lecturerRejectionReasonDisplay.value?.fullText ?? null,
+      status: "rejected",
+    });
+  }
+
+  if (shouldShowNeedRevisionTimeline.value) {
+    pushItem({
+      key: "status-need-revision",
+      label: "Yêu cầu chỉnh sửa",
+      value: formatDateTime(needRevisionActedAt.value),
+      actedAt: needRevisionActedAt.value,
+      actorName: needRevisionActorName.value,
+      note: lecturerRejectionReasonDisplay.value?.fullText ?? null,
+      status: "rejected",
+    });
+  }
+
+  return [...items].sort((a, b) => {
+    const aTs = toEpochMs(a.actedAt);
+    const bTs = toEpochMs(b.actedAt);
+
+    if (aTs !== null && bTs !== null) {
+      if (aTs === bTs) {
+        return a.order - b.order;
+      }
+      return aTs - bTs;
+    }
+
+    if (aTs !== null) return -1;
+    if (bTs !== null) return 1;
+    return a.order - b.order;
+  });
 });
 
 const approvalActorName = computed<string | null>(() => {
@@ -475,17 +950,11 @@ const approvalActorName = computed<string | null>(() => {
 });
 
 const rejectedActorName = computed<string | null>(() => {
+  const rejectedHistory = findLatestHistoryByToStatus("rejected");
+  if (rejectedHistory) return rejectedHistory.actedByUserName;
+
   const currentWork = props.work;
   if (!currentWork) return null;
-
-  for (
-    let index = currentWork.statusHistories.length - 1;
-    index >= 0;
-    index -= 1
-  ) {
-    const history = currentWork.statusHistories[index];
-    if (history?.toStatusCode === "rejected") return history.actedByUserName;
-  }
 
   for (let index = currentWork.approvals.length - 1; index >= 0; index -= 1) {
     const approval = currentWork.approvals[index];
@@ -494,6 +963,10 @@ const rejectedActorName = computed<string | null>(() => {
     }
   }
   return null;
+});
+
+const needRevisionActorName = computed<string | null>(() => {
+  return findLatestHistoryByToStatus("need_revision")?.actedByUserName ?? null;
 });
 
 const lecturerRejectionReasonDisplay = computed(() => {
@@ -511,8 +984,9 @@ function badgeClass(statusCode: PersonalWorkStatusCode): string {
       return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
     case "pending_member_confirm":
     case "pending_faculty_review":
-    case "submitted":
       return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+    case "need_revision":
+      return "bg-sky-50 text-sky-700 ring-1 ring-sky-200";
     case "member_rejected":
     case "rejected":
       return "bg-rose-50 text-rose-700 ring-1 ring-rose-200";
@@ -525,14 +999,233 @@ function badgeClass(statusCode: PersonalWorkStatusCode): string {
 
 function editActionLabel(work: PersonalWorkDetail): string {
   if (work.statusCode === "member_rejected") return "Chỉnh sửa thành viên";
-  if (work.statusCode === "rejected") return "Mở lại để chỉnh sửa";
+  if (work.statusCode === "need_revision") return "Chỉnh sửa theo yêu cầu khoa";
+  if (work.statusCode === "rejected") return "Sao chép để kê khai lại";
   return "Chỉnh sửa công trình";
+}
+
+function onClickPrimaryAction(work: PersonalWorkDetail): void {
+  if (work.statusCode === "rejected") {
+    emit("copy-rejected", work.activityId);
+    return;
+  }
+
+  emit("edit-draft", work.activityId);
 }
 
 function formatDateTime(value: string | null): string {
   if (!value) return "—";
   const formatted = formatBackendDateTimeVi(value);
   return formatted || value;
+}
+
+function toEpochMs(value: string | null): number | null {
+  if (!value) return null;
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const parsed = Date.parse(normalized);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function parseMemberTimelineHistory(history: PersonalWorkStatusHistory): {
+  action: MemberWorkflowAction;
+  label: string;
+  note: string;
+  status: TimelineStatus;
+} | null {
+  const parsed = parseMemberTimelineNote(history.note);
+  if (!parsed) return null;
+
+  const memberLabel = resolveMemberDisplayName(parsed.memberId, parsed.memberName);
+
+  switch (parsed.action) {
+    case "member_invitation_sent":
+      return {
+        action: parsed.action,
+        label: "Gửi lời mời xác nhận",
+        note: `${memberLabel} đã được mời xác nhận tham gia.`,
+        status: "pending",
+      };
+    case "pending_member_invitation_resent":
+      return {
+        action: parsed.action,
+        label: "Gửi lại lời mời",
+        note: `Đã gửi lại lời mời xác nhận cho ${memberLabel}.`,
+        status: "pending",
+      };
+    case "member_reinvited":
+      return {
+        action: parsed.action,
+        label: "Mời lại giảng viên",
+        note: `Đã mời lại ${memberLabel} tham gia công trình.`,
+        status: "pending",
+      };
+    case "member_accepted_invitation":
+      return {
+        action: parsed.action,
+        label: "Giảng viên xác nhận tham gia",
+        note: `${memberLabel} đã đồng ý tham gia công trình.`,
+        status: "approved",
+      };
+    case "member_rejected_by_invitee":
+      return {
+        action: parsed.action,
+        label: "Giảng viên từ chối tham gia",
+        note: `${memberLabel} đã từ chối tham gia công trình.`,
+        status: "rejected",
+      };
+    case "member_rejected":
+      return {
+        action: parsed.action,
+        label: "Có giảng viên từ chối tham gia",
+        note: "Công trình chuyển về trạng thái thành viên từ chối do có phản hồi từ chối.",
+        status: "rejected",
+      };
+    case "member_rejected_block_submit":
+      return {
+        action: parsed.action,
+        label: "Bị chặn gửi duyệt",
+        note: "Không thể gửi duyệt vì còn giảng viên từ chối tham gia. Vui lòng xử lý danh sách tác giả trước khi gửi lại.",
+        status: "rejected",
+      };
+    case "pending_member_removed":
+      return {
+        action: parsed.action,
+        label: "Xóa giảng viên khỏi công trình",
+        note: `Đã xóa ${memberLabel} khỏi danh sách chờ xác nhận.`,
+        status: null,
+      };
+    case "member_removed_from_list":
+      return {
+        action: parsed.action,
+        label: "Cập nhật danh sách tác giả",
+        note: `Đã loại ${memberLabel} khỏi danh sách tác giả.`,
+        status: null,
+      };
+    default:
+      return null;
+  }
+}
+
+function resolveMemberDisplayName(
+  memberId: number | null,
+  explicitName: string | null,
+): string {
+  const normalizedExplicitName = explicitName?.trim();
+  if (normalizedExplicitName) {
+    return normalizedExplicitName;
+  }
+
+  const currentWork = props.work;
+  if (!currentWork || !memberId) {
+    return "giảng viên";
+  }
+
+  const confirmationMatch = currentWork.memberConfirmations.find(
+    (member) => member.memberId === memberId,
+  );
+  const confirmationName = confirmationMatch?.lecturerFullName?.trim();
+  if (confirmationName) {
+    return confirmationName;
+  }
+
+  const authorMatch = currentWork.authors.find(
+    (member) => member.memberId === memberId,
+  );
+  const authorName = authorMatch?.lecturerFullName?.trim();
+  if (authorName) {
+    return authorName;
+  }
+
+  return "giảng viên";
+}
+
+function parseMemberTimelineNote(note: string | null): {
+  action: MemberWorkflowAction;
+  memberId: number | null;
+  memberName: string | null;
+} | null {
+  if (!note) return null;
+
+  const trimmed = note.trim();
+  if (trimmed === "") return null;
+
+  if (trimmed === "member_rejected" || trimmed === "member_rejected_block_submit") {
+    return {
+      action: trimmed,
+      memberId: null,
+      memberName: null,
+    };
+  }
+
+  const legacyReinviteMatch = trimmed.match(/^member_reinvited:(\d+)$/i);
+  if (legacyReinviteMatch) {
+    return {
+      action: "member_reinvited",
+      memberId: Number(legacyReinviteMatch[1]),
+      memberName: null,
+    };
+  }
+
+  const [rawAction, rawMemberId, ...rest] = trimmed.split("|");
+  const action = (rawAction ?? "").trim() as MemberWorkflowAction;
+  const parsedMemberIdRaw = (rawMemberId ?? "").trim();
+  const parsedMemberId = parsedMemberIdRaw === "" ? null : Number(parsedMemberIdRaw);
+  if (!rawAction) {
+    return null;
+  }
+
+  if (!isKnownMemberWorkflowAction(action)) {
+    return null;
+  }
+
+  const requiresMemberId =
+    action !== "member_rejected" && action !== "member_rejected_block_submit";
+  if (
+    requiresMemberId &&
+    (parsedMemberId === null || !Number.isFinite(parsedMemberId) || parsedMemberId <= 0)
+  ) {
+    return null;
+  }
+
+  const memberNameRaw = rest.join("|").trim();
+
+  return {
+    action,
+    memberId:
+      parsedMemberId !== null && Number.isFinite(parsedMemberId) && parsedMemberId > 0
+        ? parsedMemberId
+        : null,
+    memberName: memberNameRaw !== "" ? memberNameRaw : null,
+  };
+}
+
+function isKnownMemberWorkflowAction(
+  action: string,
+): action is MemberWorkflowAction {
+  return (
+    action === "member_invitation_sent" ||
+    action === "pending_member_invitation_resent" ||
+    action === "member_reinvited" ||
+    action === "member_accepted_invitation" ||
+    action === "member_rejected_by_invitee" ||
+    action === "member_rejected" ||
+    action === "member_rejected_block_submit" ||
+    action === "pending_member_removed" ||
+    action === "member_removed_from_list"
+  );
+}
+
+function pickLatestDateTime(values: Array<string | null | undefined>): string | null {
+  let latest: string | null = null;
+
+  values.forEach((value) => {
+    if (!value) return;
+    if (!latest || value > latest) {
+      latest = value;
+    }
+  });
+
+  return latest;
 }
 
 function formatBytes(bytes: number): string {

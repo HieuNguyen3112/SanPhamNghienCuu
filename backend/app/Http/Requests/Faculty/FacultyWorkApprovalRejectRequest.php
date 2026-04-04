@@ -16,6 +16,11 @@ class FacultyWorkApprovalRejectRequest extends FormRequest
     {
         $input = $this->all();
 
+        if (array_key_exists('decision', $input)) {
+            $decision = is_string($input['decision']) ? trim(strtolower($input['decision'])) : $input['decision'];
+            $input['decision'] = $decision === '' ? null : $decision;
+        }
+
         if (array_key_exists('reason_detail', $input)) {
             $detail = is_string($input['reason_detail']) ? trim($input['reason_detail']) : $input['reason_detail'];
             $input['reason_detail'] = $detail === '' ? null : $detail;
@@ -27,6 +32,7 @@ class FacultyWorkApprovalRejectRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'decision' => ['nullable', 'string', 'in:reject,return_for_revision'],
             'reason_type' => [
                 'required',
                 'string',

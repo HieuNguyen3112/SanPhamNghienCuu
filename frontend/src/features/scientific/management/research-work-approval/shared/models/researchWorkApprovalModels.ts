@@ -13,6 +13,7 @@ export type ResearchWorkApprovalStatus =
   | "PENDING_FACULTY_APPROVAL"
   | "APPROVED_BY_FACULTY_FINAL"
   | "APPROVED_BY_FACULTY_FORWARDED_TO_UNIVERSITY"
+  | "NEED_REVISION_BY_FACULTY"
   | "REJECTED_BY_FACULTY"
   | "PENDING_UNIVERSITY_APPROVAL"
   | "APPROVED_BY_UNIVERSITY_FINALIZED_HOURS"
@@ -40,12 +41,14 @@ export interface EvidenceAttachment {
 
 export interface ResearchWorkAuthor {
   authorIdentifier: number;
+  lecturerId?: number | null;
   authorDisplayName: string;
   authorFacultyIdentifier: string;
   authorFacultyDisplayName: string;
   authorFacultyId?: number | null;
   ownerFacultyId?: number | null;
   isOutsideFaculty?: boolean;
+  isExternal?: boolean;
   isPrimaryAuthor: boolean;
   isSubmittingLecturer: boolean;
   authorRoleDisplayName?: string;

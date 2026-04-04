@@ -57,6 +57,7 @@ class NotificationPayloadFormatter
             'work_approved' => 'Công trình đã được duyệt',
             'work_rejected' => 'Công trình bị từ chối',
             'hours_approved' => 'Giờ NCKH đã được duyệt',
+            'hours_need_revision' => 'Giờ NCKH cần chỉnh sửa',
             'hours_rejected' => 'Giờ NCKH bị từ chối',
             'hours_warning' => 'Nhắc nhở giờ NCKH',
             'work_submitted_to_faculty' => 'Có hồ sơ công trình cần duyệt',
@@ -79,6 +80,7 @@ class NotificationPayloadFormatter
             'work_approved' => 'Công trình của bạn đã được duyệt.',
             'work_rejected' => 'Công trình của bạn đã bị từ chối.',
             'hours_approved' => 'Yêu cầu duyệt giờ của bạn đã được duyệt.',
+            'hours_need_revision' => 'Khoa yêu cầu bạn chỉnh sửa hồ sơ giờ NCKH trước khi gửi lại.',
             'hours_rejected' => 'Yêu cầu duyệt giờ của bạn đã bị từ chối.',
             'hours_warning' => 'Bạn có nhắc nhở mới về giờ nghiên cứu khoa học.',
             'work_submitted_to_faculty' => 'Có hồ sơ công trình mới đang chờ khoa duyệt.',
@@ -105,6 +107,7 @@ class NotificationPayloadFormatter
         return match ($eventKey) {
             'work_approved', 'work_rejected' => '/works/personal',
             'hours_approved', 'hours_rejected', 'hours_warning' => '/hours/personal',
+            'hours_need_revision' => '/hours/calculate',
             'work_submitted_to_faculty' => '/works/facapprovals',
             'hours_submitted_to_faculty' => '/hours/facapprovals',
             'participation_invitation', 'participation_accepted', 'participation_rejected' => '/declarations/participation',

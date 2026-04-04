@@ -494,11 +494,14 @@ class PublicResearchWorkController extends Controller
         ];
 
         $membersQ = DB::table('research_activity_members as ram')
-            ->join('lecturers as ml', 'ram.lecturer_id', '=', 'ml.id')
+            ->leftJoin('lecturers as ml', 'ram.lecturer_id', '=', 'ml.id')
             ->leftJoin('departments as md', 'ml.department_id', '=', 'md.id')
             ->leftJoin('member_roles as mr', 'ram.member_role_id', '=', 'mr.id')
             ->where('ram.activity_id', $activityId)
-            ->where('ram.lecturer_id', '<>', (int)$row->lecturer_id);
+            ->where(function ($sub) use ($row) {
+                $sub->whereNull('ram.lecturer_id')
+                    ->orWhere('ram.lecturer_id', '<>', (int) $row->lecturer_id);
+            });
 
         if ($hasFacultyJoin) {
             $membersQ->leftJoin('faculties as mf', 'md.faculty_id', '=', 'mf.id');
@@ -510,10 +513,26 @@ class PublicResearchWorkController extends Controller
             'ml.full_name as lecturer_name',
             $hasFacultyJoin ? 'mf.name as faculty_name' : 'md.name as faculty_name',
             'mr.name as role_name',
+            'ram.is_external as is_external',
+            'ram.external_full_name as external_full_name',
+            'ram.external_department_name as external_department_name',
         ])->get();
 
         foreach ($memberRows as $m) {
             $fallbackRole = $row->kind_code === 'paper' ? 'Đồng tác giả' : 'Thành viên';
+
+            // If the member is external (not linked to a lecturer record), prefer external_full_name
+            if (! empty($m->is_external)) {
+                $participants[] = [
+                    'lecturer_id' => null,
+                    'lecturer_code' => null,
+                    'lecturer_name' => (string) ($m->external_full_name ?? '—'),
+                    'faculty_name' => (string) ($m->external_department_name ?? '—'),
+                    'role_name' => $m->role_name ? (string)$m->role_name : $fallbackRole,
+                ];
+                continue;
+            }
+
             $participants[] = [
                 'lecturer_id' => (int) $m->lecturer_id,
                 'lecturer_code' => (string) $m->lecturer_code,

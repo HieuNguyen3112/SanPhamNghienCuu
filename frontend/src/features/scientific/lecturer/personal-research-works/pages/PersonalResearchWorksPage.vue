@@ -23,14 +23,17 @@
       v-if="stats.rejectedCount > 0 || filterTab === 'rejected'"
       class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
     >
-      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div
+        class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+      >
         <div>
           <div class="font-semibold text-sky-950">
             Công trình bị khoa trả về được xử lý trong mục này
           </div>
           <p class="mt-1 leading-6">
-            Thông báo workflow ở biểu tượng chuông chỉ giúp điều hướng. Chủ nhiệm và các thành viên đã chấp nhận
-            tham gia đều xem lý do từ chối và mở lại công trình tại tab
+            Thông báo workflow ở biểu tượng chuông chỉ giúp điều hướng. Chủ
+            nhiệm và các thành viên đã chấp nhận tham gia đều xem lý do từ chối
+            và sao chép công trình sang bản kê khai mới tại tab
             <span class="font-semibold">Bị từ chối</span>.
           </p>
         </div>
@@ -52,8 +55,8 @@
         noticeTone === 'success'
           ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
           : noticeTone === 'error'
-          ? 'border-rose-200 bg-rose-50 text-rose-700'
-          : 'border-blue-200 bg-blue-50 text-blue-700',
+            ? 'border-rose-200 bg-rose-50 text-rose-700'
+            : 'border-blue-200 bg-blue-50 text-blue-700',
       ]"
     >
       {{ noticeMessage }}
@@ -82,7 +85,10 @@
       :work="selectedWorkDetail"
       @close="closeDetail"
       @edit-draft="goToEditDraft"
+      @copy-rejected="copyFromRejected"
       @reinvite-member="reinviteMember"
+      @resend-pending-member="resendPendingInvitation"
+      @remove-pending-member="removePendingMember"
     />
   </div>
 </template>
@@ -118,7 +124,10 @@ const {
   closeDetail,
 
   goToEditDraft,
+  copyFromRejected,
   reinviteMember,
+  resendPendingInvitation,
+  removePendingMember,
 
   currentPageNumber,
   pageSize,

@@ -54,7 +54,7 @@ class LecturerHoursCalculateIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['nullable', 'string', 'in:all,not_submitted,pending,approved,rejected,hours_not_submitted,hours_pending_faculty,hours_approved,hours_rejected'],
+            'status' => ['nullable', 'string', 'in:all,not_submitted,pending,approved,rejected,need_revision,hours_not_submitted,hours_pending_faculty,hours_approved,hours_rejected,hours_need_revision'],
             'q' => ['nullable', 'string', 'max:255'],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
             'include_all_years' => ['nullable', 'boolean'],
@@ -109,6 +109,7 @@ class LecturerHoursCalculateIndexRequest extends FormRequest
             'not_submitted', 'hours_not_submitted', 'chua_gui_duyet_gio', 'chua_gui_gio', 'chua_gui_duyet', 'chua_gui' => 'hours_not_submitted',
             'pending', 'hours_pending_faculty', 'cho_khoa_duyet_gio', 'cho_khoa_duyet', 'cho_duyet_gio', 'cho_duyet' => 'hours_pending_faculty',
             'approved', 'hours_approved', 'da_duyet_gio', 'da_duyet' => 'hours_approved',
+            'need_revision', 'hours_need_revision', 'can_chinh_sua', 'yeu_cau_chinh_sua', 'revision' => 'hours_need_revision',
             'rejected', 'hours_rejected', 'khoa_tu_choi_gio', 'tu_choi_gio', 'tu_choi' => 'hours_rejected',
             default => (string) $this->input('status'),
         };

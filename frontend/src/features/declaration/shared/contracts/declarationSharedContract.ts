@@ -3,7 +3,7 @@ export type DeclarationStatusUi =
   | "PENDING_MEMBER_CONFIRM"
   | "MEMBER_REJECTED"
   | "PENDING_FACULTY_REVIEW"
-  | "SUBMITTED"
+  | "NEED_REVISION"
   | "APPROVED"
   | "REJECTED";
 
@@ -39,6 +39,7 @@ export type ActivityStatusDto = {
     | "pending_member_confirm"
     | "member_rejected"
     | "pending_faculty_review"
+    | "need_revision"
     | "submitted"
     | "approved"
     | "rejected";
@@ -152,6 +153,8 @@ export function mapStatusCodeToUi(
       return "MEMBER_REJECTED";
     case "pending_faculty_review":
       return "PENDING_FACULTY_REVIEW";
+    case "need_revision":
+      return "NEED_REVISION";
     case "submitted":
       return "PENDING_FACULTY_REVIEW";
     case "approved":
@@ -173,8 +176,8 @@ export function mapUiToStatusCode(
       return "member_rejected";
     case "PENDING_FACULTY_REVIEW":
       return "pending_faculty_review";
-    case "SUBMITTED":
-      return "pending_faculty_review";
+    case "NEED_REVISION":
+      return "need_revision";
     case "APPROVED":
       return "approved";
     case "REJECTED":

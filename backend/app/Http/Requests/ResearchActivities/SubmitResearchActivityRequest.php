@@ -14,9 +14,32 @@ class SubmitResearchActivityRequest extends FormRequest
         return $this->user() !== null;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $input = $this->all();
+
+        if (array_key_exists('minor_change', $input)) {
+            $value = $input['minor_change'];
+            if ($value === '' || $value === null) {
+                $input['minor_change'] = null;
+            } elseif (is_string($value)) {
+                $normalized = strtolower(trim($value));
+                if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
+                    $input['minor_change'] = true;
+                } elseif (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
+                    $input['minor_change'] = false;
+                }
+            }
+        }
+
+        $this->replace($input);
+    }
+
     public function rules(): array
     {
-        return [];
+        return [
+            'minor_change' => ['nullable', 'boolean'],
+        ];
     }
 
     public function withValidator(Validator $validator): void
@@ -135,7 +158,7 @@ class SubmitResearchActivityRequest extends FormRequest
                 ->where('activity_id', $activityId)
                 ->count();
             if ($memberCount === 0) {
-                $validator->errors()->add('members', 'Vui lòng thêm danh sách người tham gia.');
+                $validator->errors()->add('members', 'Vui lòng thêm danh sách tác giả.');
             }
         });
     }

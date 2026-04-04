@@ -18,6 +18,7 @@ const STATUS_NAME: Record<PersonalWorkStatusCodeDTO, string> = {
   pending_member_confirm: "Chờ thành viên xác nhận",
   member_rejected: "Thành viên từ chối",
   pending_faculty_review: "Chờ khoa duyệt",
+  need_revision: "Cần chỉnh sửa theo yêu cầu khoa",
   submitted: "Chờ duyệt",
   approved: "Đã duyệt",
   rejected: "Bị từ chối",
@@ -31,7 +32,8 @@ export const personalWorksMock = (() => {
       activity_id: 1,
       activity_code: "RA-2025-0001",
       title: "Bài báo về tối ưu hóa truy vấn trong hệ thống SPNC",
-      abstract: "Nghiên cứu cải thiện hiệu năng truy vấn cho hệ thống quản lý nghiên cứu khoa học.",
+      abstract:
+        "Nghiên cứu cải thiện hiệu năng truy vấn cho hệ thống quản lý nghiên cứu khoa học.",
       kind_id: 1,
       kind_code: "paper",
       kind_name: "Bài báo",
@@ -316,37 +318,50 @@ export const personalWorksMock = (() => {
     },
   };
 
-  const rows: PersonalWorkRowDTO[] = Object.values(detailsById).map((detail) => ({
-    activity_id: detail.activity_id,
-    activity_code: detail.activity_code,
-    title: detail.title,
-    kind_id: detail.kind_id,
-    kind_code: detail.kind_code,
-    kind_name: detail.kind_name,
-    type_id: detail.type_id,
-    type_name: detail.type_name,
-    academic_year_id: detail.academic_year_id,
-    academic_year_code: detail.academic_year_code,
-    status_id: detail.status_id,
-    status_code: detail.status_code,
-    status_name: detail.status_name,
-    work_year: detail.work_year,
-    venue_name: detail.venue_name,
-    member_role_id: detail.member_role_id,
-    member_role_name: detail.member_role_name,
-    lecturer_hours: detail.lecturer_hours,
-    submitted_at: detail.submitted_at,
-    approved_at: detail.approved_at,
-    updated_at: detail.approved_at ?? detail.submitted_at ?? daysAgoIso(1),
-  }));
+  const rows: PersonalWorkRowDTO[] = Object.values(detailsById).map(
+    (detail) => ({
+      activity_id: detail.activity_id,
+      activity_code: detail.activity_code,
+      title: detail.title,
+      kind_id: detail.kind_id,
+      kind_code: detail.kind_code,
+      kind_name: detail.kind_name,
+      type_id: detail.type_id,
+      type_name: detail.type_name,
+      academic_year_id: detail.academic_year_id,
+      academic_year_code: detail.academic_year_code,
+      status_id: detail.status_id,
+      status_code: detail.status_code,
+      status_name: detail.status_name,
+      work_year: detail.work_year,
+      venue_name: detail.venue_name,
+      member_role_id: detail.member_role_id,
+      member_role_name: detail.member_role_name,
+      lecturer_hours: detail.lecturer_hours,
+      submitted_at: detail.submitted_at,
+      approved_at: detail.approved_at,
+      updated_at: detail.approved_at ?? detail.submitted_at ?? daysAgoIso(1),
+    }),
+  );
 
-  const recomputeStats = (inputRows: PersonalWorkRowDTO[]): PersonalStatsDTO => {
+  const recomputeStats = (
+    inputRows: PersonalWorkRowDTO[],
+  ): PersonalStatsDTO => {
     const total = inputRows.length;
-    const approved = inputRows.filter((r) => r.status_code === "approved").length;
-    const pending = inputRows.filter((r) =>
-      ["pending_member_confirm", "pending_faculty_review", "submitted"].includes(r.status_code)
+    const approved = inputRows.filter(
+      (r) => r.status_code === "approved",
     ).length;
-    const rejected = inputRows.filter((r) => ["member_rejected", "rejected"].includes(r.status_code)).length;
+    const pending = inputRows.filter((r) =>
+      [
+        "pending_member_confirm",
+        "pending_faculty_review",
+        "need_revision",
+        "submitted",
+      ].includes(r.status_code),
+    ).length;
+    const rejected = inputRows.filter((r) =>
+      ["member_rejected", "rejected"].includes(r.status_code),
+    ).length;
     const draft = inputRows.filter((r) => r.status_code === "draft").length;
 
     return {

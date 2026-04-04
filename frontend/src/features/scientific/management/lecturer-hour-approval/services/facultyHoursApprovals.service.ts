@@ -40,9 +40,17 @@ export function createFacultyHourApprovalService(): HourApprovalService {
       return data;
     },
 
-    async getRequestDetail(requestId: number) {
+    async getRequestDetail(
+      requestId: number,
+      options?: { academicYearId?: number | null }
+    ) {
+      const params = normalizeParams({
+        academic_year_id: options?.academicYearId ?? null,
+      });
+
       const { data } = await http.get<{ data: HourApprovalRequestDetailDTO }>(
-        `/api/faculty/hours/approvals/${requestId}`
+        `/api/faculty/hours/approvals/${requestId}`,
+        { params }
       );
       return data.data;
     },

@@ -78,7 +78,7 @@
             type="button"
             class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
             :disabled="pending || !canSubmitNow"
-            @click="$emit('submit')"
+            @click="openSubmitClassificationModal"
           >
             <Send class="h-4 w-4" />
             Gửi duyệt
@@ -95,11 +95,98 @@
         nên đang ở chế độ chỉ xem.
       </div>
     </div>
+
+    <div
+      v-if="submitClassificationModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+      @click.self="closeSubmitClassificationModal"
+    >
+      <div
+        class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl md:p-5"
+      >
+        <div class="text-base font-semibold text-slate-900">
+          Phân loại lần gửi duyệt
+        </div>
+        <p class="mt-1 text-sm text-slate-600">
+          Chọn loại thay đổi để hệ thống quyết định có cần gửi lại xác nhận cho
+          tác giả hay không.
+        </p>
+
+        <div class="mt-4 space-y-2">
+          <label
+            class="flex cursor-pointer gap-3 rounded-xl border px-3 py-3"
+            :class="
+              submitMode === 'major'
+                ? 'border-slate-300 bg-slate-50'
+                : 'border-slate-200 bg-white'
+            "
+          >
+            <input
+              v-model="submitMode"
+              value="major"
+              type="radio"
+              class="mt-0.5"
+            />
+            <div>
+              <div class="text-sm font-semibold text-slate-900">
+                Thay đổi lớn
+              </div>
+              <div class="mt-1 text-xs text-slate-600">
+                Có chỉnh sửa đáng kể (đặc biệt liên quan tác giả/thành viên). Hệ
+                thống có thể yêu cầu xác nhận lại.
+              </div>
+            </div>
+          </label>
+
+          <label
+            class="flex cursor-pointer gap-3 rounded-xl border px-3 py-3"
+            :class="
+              submitMode === 'minor'
+                ? 'border-slate-300 bg-slate-50'
+                : 'border-slate-200 bg-white'
+            "
+          >
+            <input
+              v-model="submitMode"
+              value="minor"
+              type="radio"
+              class="mt-0.5"
+            />
+            <div>
+              <div class="text-sm font-semibold text-slate-900">
+                Thay đổi nhỏ
+              </div>
+              <div class="mt-1 text-xs text-slate-600">
+                Chỉ chỉnh sửa nội dung nhỏ, không thay đổi ý nghĩa đóng góp của
+                tác giả.
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            @click="closeSubmitClassificationModal"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            class="rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            @click="confirmSubmitWithClassification"
+          >
+            Xác nhận gửi duyệt
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { Save, Send } from "lucide-vue-next";
 import DeclarationStatusBadge from "./DeclarationStatusBadge.vue";
 import type { DeclarationStatusUi } from "../contracts/declarationSharedContract";
@@ -111,6 +198,7 @@ const props = defineProps<{
   icon?: any;
   status: DeclarationStatusUi;
   canSubmit: boolean;
+  participantCount?: number;
   pending: boolean;
   errorMessage?: string | null;
   submittedAt?: string | null;
@@ -119,20 +207,59 @@ const props = defineProps<{
   successMessage?: string | null;
 }>();
 
-defineEmits<{
-  (e: "save-draft"): void;
-  (e: "submit"): void;
-  (e: "close-success"): void;
-}>();
-
 function isEditableStatus(status: DeclarationStatusUi): boolean {
   return (
-    status === "DRAFT" || status === "MEMBER_REJECTED" || status === "REJECTED"
+    status === "DRAFT" ||
+    status === "MEMBER_REJECTED" ||
+    status === "NEED_REVISION"
   );
 }
 
 const readOnly = computed(() => !isEditableStatus(props.status));
 const canSubmitNow = computed(() => !readOnly.value && props.canSubmit);
+const shouldShowSubmitClassification = computed(
+  () => props.status === "NEED_REVISION" && (props.participantCount ?? 0) > 1,
+);
+const submitClassificationModalOpen = ref(false);
+const submitMode = ref<"major" | "minor">(
+  props.status === "NEED_REVISION" ? "minor" : "major",
+);
+
+const emit = defineEmits<{
+  (e: "save-draft"): void;
+  (e: "submit", payload: { minorChange: boolean }): void;
+  (e: "close-success"): void;
+}>();
+
+watch(
+  () => props.status,
+  (status) => {
+    submitMode.value = status === "NEED_REVISION" ? "minor" : "major";
+    if (status !== "NEED_REVISION") {
+      submitClassificationModalOpen.value = false;
+    }
+  },
+);
+
+function openSubmitClassificationModal() {
+  if (!canSubmitNow.value || props.pending) return;
+
+  if (!shouldShowSubmitClassification.value) {
+    emit("submit", { minorChange: false });
+    return;
+  }
+
+  submitClassificationModalOpen.value = true;
+}
+
+function closeSubmitClassificationModal() {
+  submitClassificationModalOpen.value = false;
+}
+
+function confirmSubmitWithClassification() {
+  emit("submit", { minorChange: submitMode.value === "minor" });
+  submitClassificationModalOpen.value = false;
+}
 
 const statusText = computed(() => {
   switch (props.status) {
@@ -144,8 +271,8 @@ const statusText = computed(() => {
       return "Thành viên từ chối";
     case "PENDING_FACULTY_REVIEW":
       return "Chờ khoa duyệt";
-    case "SUBMITTED":
-      return "Đã gửi duyệt";
+    case "NEED_REVISION":
+      return "Cần chỉnh sửa theo yêu cầu khoa";
     case "APPROVED":
       return "Được duyệt";
     case "REJECTED":

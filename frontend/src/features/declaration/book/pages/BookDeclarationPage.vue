@@ -7,6 +7,7 @@
         :icon="BookOpen"
         :status="shell.status.value"
         :canSubmit="canSubmit"
+        :participantCount="submitParticipantCount"
         :pending="shell.pending.value"
         :errorMessage="shell.error_message.value"
         :successVisible="shell.success_visible.value"
@@ -537,7 +538,7 @@ const chiefEditorWarning = computed(() => {
 const hoursNote = computed(() => {
   if (!form.typeId) return "Chọn loại tài liệu để xác định giờ chuẩn.";
   if (hours.value.distribution.length === 0)
-    return "Cần danh sách người tham gia để phân bổ giờ.";
+    return "Cần danh sách tác giả để phân bổ giờ.";
   return null;
 });
 
@@ -560,13 +561,7 @@ const canSubmit = computed(() => {
     if (!form.publisherWebsite.trim()) return false;
     if (!isValidEmail(form.publisherEmail)) return false;
   }
-  const validMembers = form.members.filter((m) => {
-    const hasRole = typeof m.member_role_id === "number";
-    if (!hasRole) return false;
-    if (m.is_external) return Boolean(m.external_full_name?.trim());
-    return typeof m.lecturer_id === "number";
-  });
-  if (validMembers.length === 0) return false;
+  if (submitParticipantCount.value === 0) return false;
   if (chiefEditorWarning.value) return false;
   const invalidPending = pendingEvidenceFiles.value.some(
     (p: any) => !p.file_type_id,
@@ -578,6 +573,16 @@ const canSubmit = computed(() => {
   if (invalidPendingLinks) return false;
   return true;
 });
+
+const submitParticipantCount = computed(
+  () =>
+    form.members.filter((m) => {
+      const hasRole = typeof m.member_role_id === "number";
+      if (!hasRole) return false;
+      if (m.is_external) return Boolean(m.external_full_name?.trim());
+      return typeof m.lecturer_id === "number";
+    }).length,
+);
 
 async function loadCatalogs() {
   const [
@@ -807,19 +812,32 @@ async function persistEvidenceDraft(activityId: number) {
   }
 }
 
-async function loadDraftFromQuery() {
-  const raw = route.query.activity_id;
+function parseQueryActivityId(key: "activity_id" | "copy_from"): number | null {
+  const raw = route.query[key];
   const rawValue = Array.isArray(raw) ? raw[0] : raw;
-  const activityId = rawValue ? Number(rawValue) : null;
+  const parsed = rawValue ? Number(rawValue) : null;
 
-  if (!activityId || Number.isNaN(activityId)) return;
+  if (!parsed || Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+async function loadDraftFromQuery() {
+  const copyFromId = parseQueryActivityId("copy_from");
+  const activityId = parseQueryActivityId("activity_id");
+  const sourceActivityId = copyFromId ?? activityId;
+  const isCopyMode = copyFromId !== null;
+
+  if (!sourceActivityId) return;
 
   try {
-    const data = await fetch_activity(activityId);
+    const data = await fetch_activity(sourceActivityId);
     const activity = data.activity;
     if (!activity) return;
 
-    form.activityId = activity.id;
+    form.activityId = isCopyMode ? null : activity.id;
     form.academicYearId = activity.academic_year_id ?? null;
     form.kindId = activity.kind_id ?? form.kindId;
     form.typeId = activity.type_id ?? null;
@@ -890,7 +908,9 @@ async function loadDraftFromQuery() {
     pendingEvidenceFiles.value = [];
     pendingEvidenceLinks.value = [];
 
-    const statusCode = (activity.status_code ?? "draft") as any;
+    const statusCode = (
+      isCopyMode ? "draft" : (activity.status_code ?? "draft")
+    ) as any;
     shell.status.value = mapStatusCodeToUi(statusCode) ?? "DRAFT";
   } catch (err) {
     shell.error_message.value = normalizeErrorMessage(
@@ -927,8 +947,9 @@ const shell = useDeclarationFormShell({
       } as any);
 
       form.activityId = saved.id;
+      const { copy_from: _copyFrom, ...restQuery } = route.query;
       await router.replace({
-        query: { ...route.query, activity_id: String(saved.id) },
+        query: { ...restQuery, activity_id: String(saved.id) },
       });
 
       await upsert_book_details({
@@ -985,13 +1006,13 @@ const shell = useDeclarationFormShell({
       );
     }
   },
-  on_submit: async () => {
+  on_submit: async (payload) => {
     try {
       if (!form.activityId) {
         await shell.save_draft({ silent_success: true });
       }
       if (!form.activityId) return;
-      const submitResult = await submit_activity(form.activityId);
+      const submitResult = await submit_activity(form.activityId, payload);
       const nextStatusCode =
         submitResult?.workflow?.status_code ??
         submitResult?.data?.status_code ??
