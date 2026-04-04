@@ -1,4 +1,7 @@
-import http, { getCsrfCookie as fetchCsrfCookie } from "@/lib/http";
+import http, {
+  getCsrfCookie as fetchCsrfCookie,
+  refreshCsrfCookie,
+} from "@/lib/http";
 
 interface LoginRequest {
   email: string;
@@ -29,7 +32,7 @@ export const resetPassword = async (payload: {
 };
 
 export const logout = async () => {
-  await fetchCsrfCookie();
+  await refreshCsrfCookie();
   return http.post("/logout");
 };
 

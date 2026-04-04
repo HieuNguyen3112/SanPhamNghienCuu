@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import axios from "axios";
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -34,6 +35,19 @@ type AuthErrorCode =
   | "FORBIDDEN_MISSING_ROLE"
   | "FORBIDDEN"
   | "UNKNOWN";
+
+type LogoutResult =
+  | {
+      success: true;
+      state: "logged_out" | "already_logged_out";
+      status: number | null;
+    }
+  | {
+      success: false;
+      state: "failed";
+      status: number | null;
+      error: unknown;
+    };
 
 const mapBackendRole = (role: string): UserRole | null => {
   switch ((role || "").toUpperCase()) {
@@ -113,6 +127,16 @@ export const useUserStore = defineStore("user", {
   },
 
   actions: {
+    resetAuthState() {
+      this.currentUser = null;
+      this.currentRole = null;
+      this._initPromise = null;
+      this.isInitialized = true;
+      this.authErrorCode = null;
+      this.authErrorMessage = null;
+      this.setSessionHint(false);
+    },
+
     setSessionHint(value: boolean) {
       this.hasSessionHint = value;
       writeAuthSessionHint(value);
@@ -174,9 +198,10 @@ export const useUserStore = defineStore("user", {
           return this.currentUser;
         } catch (err: any) {
           const status = err?.response?.status;
+          const isExpiredSession = status === 401 || status === 419;
           const code: AuthErrorCode =
             err?.response?.data?.code ||
-            (status === 401
+            (isExpiredSession
               ? "UNAUTHENTICATED"
               : status === 403
                 ? "FORBIDDEN"
@@ -185,7 +210,7 @@ export const useUserStore = defineStore("user", {
           this.authErrorCode = code;
           this.authErrorMessage =
             err?.response?.data?.message ||
-            (status === 401
+            (isExpiredSession
               ? "Unauthenticated"
               : status === 403
                 ? "Forbidden"
@@ -193,7 +218,7 @@ export const useUserStore = defineStore("user", {
 
           this.currentUser = null;
           this.currentRole = null;
-          if (status === 401) {
+          if (isExpiredSession) {
             this.setSessionHint(false);
           }
           return null;
@@ -277,24 +302,39 @@ export const useUserStore = defineStore("user", {
       return role;
     },
 
-    async logout() {
-      let remoteLogoutOk = true;
+    async logout(): Promise<LogoutResult> {
       try {
         await apiLogout();
+        this.resetAuthState();
+        return {
+          success: true,
+          state: "logged_out",
+          status: 200,
+        };
       } catch (error) {
-        remoteLogoutOk = false;
+        const status = axios.isAxiosError(error)
+          ? (error.response?.status ?? null)
+          : null;
+
+        if (status === 401 || status === 419) {
+          this.resetAuthState();
+          return {
+            success: true,
+            state: "already_logged_out",
+            status,
+          };
+        }
+
         if (import.meta.env.DEV) {
           console.error("[logout] API error", error);
         }
+        return {
+          success: false,
+          state: "failed",
+          status,
+          error,
+        };
       }
-      this.currentUser = null;
-      this.currentRole = null;
-      this._initPromise = null;
-      this.isInitialized = false;
-      this.authErrorCode = null;
-      this.authErrorMessage = null;
-      this.setSessionHint(false);
-      return remoteLogoutOk;
     },
   },
 });

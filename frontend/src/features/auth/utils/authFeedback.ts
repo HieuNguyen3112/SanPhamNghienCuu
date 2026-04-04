@@ -94,9 +94,18 @@ export function resolveLogoutErrorMessage(error: unknown): string {
   const rawMessage =
     typeof err?.message === "string" ? err.message.trim() : "";
   const status = err?.response?.status ?? null;
+  const backendCode = readBackendCode(err);
 
   if (rawMessage === "LOGOUT_ENDPOINT_FAILED") {
     return "Không thể hoàn tất đăng xuất lúc này. Vui lòng thử lại.";
+  }
+
+  if (status === 419 || backendCode === "CSRF_TOKEN_MISMATCH") {
+    return "Phiên làm việc đã hết hạn hoặc không còn đồng bộ. Vui lòng đăng nhập lại.";
+  }
+
+  if (status === 401) {
+    return "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.";
   }
 
   if (isNetworkLikeError(rawMessage)) {

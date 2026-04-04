@@ -30,9 +30,14 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+type CsrfCookieOptions = {
+  force?: boolean;
+};
+
 // Ensure the SPA has a fresh CSRF cookie before mutating requests.
-export const getCsrfCookie = async () => {
-  if (readCookie("XSRF-TOKEN")) return;
+export const getCsrfCookie = async (options: CsrfCookieOptions = {}) => {
+  const { force = false } = options;
+  if (!force && readCookie("XSRF-TOKEN")) return;
   if (csrfPromise) return csrfPromise;
 
   csrfPromise = http
@@ -46,5 +51,6 @@ export const getCsrfCookie = async () => {
 };
 
 export const ensureCsrfCookie = () => getCsrfCookie();
+export const refreshCsrfCookie = () => getCsrfCookie({ force: true });
 
 export default http;

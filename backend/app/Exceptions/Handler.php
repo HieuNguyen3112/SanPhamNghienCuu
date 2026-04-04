@@ -4,6 +4,7 @@ namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Session\TokenMismatchException;
 use Spatie\Permission\Exceptions\UnauthorizedException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
@@ -48,6 +49,17 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             //
+        });
+
+        $this->renderable(function (TokenMismatchException $e, $request) {
+            if (! ($request->expectsJson() || $request->is('logout') || $request->is('login'))) {
+                return null;
+            }
+
+            return response()->json([
+                'code' => 'CSRF_TOKEN_MISMATCH',
+                'message' => 'Phiên làm việc đã hết hạn hoặc không còn đồng bộ.',
+            ], 419);
         });
 
         // Luon tra JSON 401 cho SPA (/me va cac route json)

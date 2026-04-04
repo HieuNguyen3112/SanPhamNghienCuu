@@ -12,11 +12,11 @@ export function useLogoutFeedback(redirectPath = "/") {
     try {
       await runWithFeedback(
         async () => {
-          const remoteLogoutOk = await userStore.logout();
+          const result = await userStore.logout();
           await router.replace(redirectPath);
 
-          if (!remoteLogoutOk) {
-            throw new Error("LOGOUT_ENDPOINT_FAILED");
+          if (!result.success) {
+            throw result.error ?? new Error("LOGOUT_ENDPOINT_FAILED");
           }
         },
         {
