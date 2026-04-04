@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         LookupSeeder::class,
         RolesPermissionsSeeder::class,
         UsersDemoSeeder::class,
+        FacultyInformationTechnologyPersonnelSeeder::class,
         ResearchLookupSeeder::class,
         ResearchHoursCatalogSeeder::class,
     ]);
